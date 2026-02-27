@@ -1,0 +1,13 @@
+;(function(){
+var P="thyquidity_pending_hcp_url",V="thyquidity_hcp_visited",H=["/hcp","/healthcare"];
+function isHcp(p){p=(p||"").replace(/\/$/,"")||"/";return H.some(function(b){return p===b||p.indexOf(b+"/")===0});}
+function getPath(){var p=(location.pathname||"").replace(/\/$/,"")||"/";if(p!=="/")return p;var h=(location.hash||"").replace(/^#!?/,"");return h&&h[0]==="/"?h.replace(/\/$/,"")||"/":p;}
+function hide(m){if(!m)return;m.style.cssText="display:none;visibility:hidden;pointer-events:none";var e=m.parentElement;while(e&&e!==document.body){var s=getComputedStyle(e);if(s.position==="fixed"&&s.display!=="none"){e.style.display="none";e.style.pointerEvents="none";break;}e=e.parentElement;}}
+function show(url){sessionStorage.setItem(P,url);sessionStorage.removeItem("thyquidity_pending_offramp_url");var m=document.querySelector("[data-hcp-modal],#hcp-modal")||document.querySelector("[data-offramp-modal],#offramp-modal");if(m){var e=m.parentElement;while(e&&e!==document.body){var s=getComputedStyle(e);if(s.position==="fixed"){e.style.display="";e.style.pointerEvents="";break;}e=e.parentElement;}m.style.cssText="display:flex;visibility:visible;opacity:1;pointer-events:auto";}dispatchEvent(new CustomEvent("thyquidity-hcp-modal-show",{detail:url}));}
+window.thyquidityConfirmHcp=function(){var u=sessionStorage.getItem(P);sessionStorage.removeItem(P);sessionStorage.setItem(V,"true");var m=document.querySelector("[data-hcp-modal],#hcp-modal")||document.querySelector("[data-offramp-modal],#offramp-modal");hide(m);if(u)location.href=u;};
+window.thyquidityCancelHcp=function(){sessionStorage.removeItem(P);var m=document.querySelector("[data-hcp-modal],#hcp-modal")||document.querySelector("[data-offramp-modal],#offramp-modal");hide(m);};
+function getHref(e){function chk(h){if(!h||h[0]==="#")return null;try{var u=new URL(h,location.origin);if(u.origin!==location.origin)return null;var p=u.pathname.replace(/\/$/,"")||"/";return H.some(function(b){return p===b||p.indexOf(b+"/")===0})?u.href:null;}catch(_){return null;}}var el=e.target;while(el&&el!==document.body){var h=el.getAttribute&&(el.getAttribute("href")||el.getAttribute("data-href"));if(h){var r=chk(h);if(r)return r;}el=el.parentElement;}var a=e.target.closest&&e.target.closest("a[href]");return a?chk(a.getAttribute("href")||a.href):null;}
+function on(e){var h=getHref(e);if(!h)return;var p=getPath();if(isHcp(p))return;if(sessionStorage.getItem(V))return;e.preventDefault();e.stopPropagation();show(h);}
+function init(){if(isHcp(getPath()))sessionStorage.setItem(V,"true");document.addEventListener("click",on,true);document.addEventListener("pointerdown",on,true);}
+document.readyState==="loading"?document.addEventListener("DOMContentLoaded",init):init();
+})();

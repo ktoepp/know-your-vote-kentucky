@@ -1,0 +1,9 @@
+/* Modal Tagger - inject into head. SETUP: Replace v-5tw9zz and m2k2aj with your modal classes. */
+;(function(){
+  var OFF="v-yfbra",HCP="m2k2aj";
+  function tag(s,a){if(!s||String(s).indexOf("CHANGE_ME")===0)return;var e=document.querySelector("[class*='"+s+"']");if(!e)return;if(!e.getAttribute(a))e.setAttribute(a,"true");var c=e.querySelector("[data-framer-name='Cancel']"),o=e.querySelector("[data-framer-name='Default']");if(c&&!c.getAttribute("data-thyquidity-cancel"))c.setAttribute("data-thyquidity-cancel","true");if(o&&!o.getAttribute("data-thyquidity-confirm"))o.setAttribute("data-thyquidity-confirm","true")}
+  function tagFallback(){if(document.querySelector("[data-offramp-modal]"))return;var all=document.querySelectorAll("[data-framer-name='Cancel']");for(var i=0;i<all.length;i++){var btn=all[i],def=btn.parentElement&&btn.parentElement.querySelector("[data-framer-name='Default']");if(!def){var p=btn.parentElement;while(p&&p!==document.body){def=p.querySelector("[data-framer-name='Default']");if(def)break;p=p.parentElement}}if(!def)continue;var modal=btn.closest?btn.closest("div"):null;while(modal&&modal!==document.body){var s=window.getComputedStyle(modal);if(s.position==="fixed")break;modal=modal.parentElement}if(!modal||modal===document.body)continue;modal.setAttribute("data-offramp-modal","true");modal.setAttribute("data-hcp-modal","true");if(!btn.getAttribute("data-thyquidity-cancel"))btn.setAttribute("data-thyquidity-cancel","true");if(!def.getAttribute("data-thyquidity-confirm"))def.setAttribute("data-thyquidity-confirm","true");return}}
+  function run(){if(!document.body)return;tag(OFF,"data-offramp-modal");tag(HCP,"data-hcp-modal");tagFallback()}
+  function init(){run();try{var o=new MutationObserver(run);o.observe(document.body,{childList:true,subtree:true})}catch(_){}}
+  document.readyState==="loading"?document.addEventListener("DOMContentLoaded",init):init();
+})();
