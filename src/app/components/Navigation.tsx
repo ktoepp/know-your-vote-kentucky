@@ -53,11 +53,13 @@ import { ThemedIcon } from '@/lib/icons';
 import { useTooltips } from '@/lib/TooltipContext';
 import { useUser } from "../lib/UserContext";
 
-// Primary navigation links - streamlined focus
+// Primary navigation links - Kentucky civic engagement
 const primaryNavLinks = [
-  { href: '/live-content', label: 'Live Data', icon: <LiveTvIcon />, priority: 'primary' },
-  { href: '/#bills', label: 'Bills', icon: <Description />, priority: 'primary' },
-  { href: '/#events', label: 'Events', icon: <EventIcon />, priority: 'primary' },
+  { href: '/bills', label: 'Bills', icon: <Description />, priority: 'primary' },
+  { href: '/ordinances', label: 'Ordinances', icon: <AccountTree />, priority: 'primary' },
+  { href: '/events', label: 'Meetings', icon: <EventIcon />, priority: 'primary' },
+  { href: '/members', label: 'Members', icon: <Groups />, priority: 'primary' },
+  { href: '/search', label: 'Search', icon: <SearchIcon />, priority: 'primary' },
 ];
 
 // Legacy navigation links (for backward compatibility)
@@ -68,7 +70,7 @@ function GlobalSearchBar() {
   
   return (
     <TextField
-      placeholder="Search congressional data..."
+      placeholder="Search Kentucky bills, ordinances, members..."
       variant="outlined"
       size="small"
       sx={{

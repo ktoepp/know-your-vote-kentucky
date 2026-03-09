@@ -39,29 +39,29 @@ interface NavigationItem {
 
 const navigationItems: NavigationItem[] = [
   {
-    label: 'Explore',
-    path: '/explore',
-    icon: <Explore />,
+    label: 'Bills',
+    path: '/bills',
+    icon: <ListAlt />,
   },
   {
-    label: 'Browse',
-    path: '/browse',
+    label: 'Ordinances',
+    path: '/ordinances',
     icon: <ListAlt />,
+  },
+  {
+    label: 'Meetings',
+    path: '/events',
+    icon: <ListAlt />,
+  },
+  {
+    label: 'Members',
+    path: '/members',
+    icon: <Explore />,
   },
   {
     label: 'Search',
     path: '/search',
     icon: <Search />,
-  },
-  {
-    label: 'Upload',
-    path: '/upload',
-    icon: <CloudUpload />,
-  },
-  {
-    label: 'Events',
-    path: '/events',
-    icon: <ListAlt />,
   },
 ];
 
