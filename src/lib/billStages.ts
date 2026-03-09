@@ -45,7 +45,7 @@ export const BILL_STAGES: BillStage[] = [
   { key: 'stalled', label: 'Stalled', group: 'Critical Status', description: 'No action for extended period.' },
 ];
 
-// Map Congress.gov action text/codes to canonical stages
+// Map legislative action text/codes to canonical stages
 // This is a stub; to be implemented with real mappings
 export function mapCongressGovActionToStage(actionText: string): BillStage | undefined {
   // TODO: Implement robust mapping logic

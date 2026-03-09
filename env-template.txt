@@ -1,0 +1,46 @@
+# Know Your Vote Kentucky — Environment Configuration
+# Copy this file to .env.local and fill in your values
+
+# =============================================================================
+# REQUIRED — Supabase (primary database)
+# =============================================================================
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+
+# =============================================================================
+# REQUIRED — AI / Summarization
+# =============================================================================
+# Anthropic API Key (for Claude-based summaries and intelligence scoring)
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# OpenAI API Key (optional fallback for summarization)
+# OPENAI_API_KEY=your_openai_api_key_here
+
+# =============================================================================
+# REQUIRED — Kentucky Data Sources
+# =============================================================================
+# LegiScan API key — https://legiscan.com/legiscan
+LEGISCAN_API_KEY=your_legiscan_api_key_here
+
+# OpenStates API key — https://openstates.org/accounts/profile/
+OPENSTATES_API_KEY=your_openstates_api_key_here
+
+# =============================================================================
+# REQUIRED — Sync Protection
+# =============================================================================
+# Secret key to protect /api/sync endpoints (used as Bearer token)
+SYNC_API_KEY=your_sync_api_key_here
+
+# =============================================================================
+# OPTIONAL — Application Settings
+# =============================================================================
+NODE_ENV=development
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Optional: Debug / Logging
+# DEBUG_MODE=false
+# LOG_LEVEL=info
+
+# Note: Replace all "your_*_here" placeholders with actual values.
+# Keep this file secure and never commit it to version control.
