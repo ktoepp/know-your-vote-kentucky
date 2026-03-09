@@ -55,7 +55,9 @@
     "master-process": "tsx scripts/master-processor.ts",
     "check-batch": "tsx scripts/check-batch-status.ts",
     "test-url-validation": "tsx scripts/test-url-validation.ts",
-    "setup-env": "tsx scripts/setup-env.ts"
+    "setup-env": "tsx scripts/setup-env.ts",
+    "sync:ky": "tsx scripts/manual-sync.ts",
+    "sync:ky:dry": "tsx scripts/manual-sync.ts --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
