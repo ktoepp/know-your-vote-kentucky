@@ -46,9 +46,11 @@ export async function POST(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const source = searchParams.get('source') || undefined;
   const dryRun = searchParams.get('dryRun') === 'true';
+  const limitParam = searchParams.get('limit');
+  const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
   try {
-    const results = await syncAll({ source, dryRun });
+    const results = await syncAll({ source, dryRun, limit });
     const hasErrors = results.some(r => r.status === 'error');
     return NextResponse.json(
       { results, dryRun },

@@ -16,7 +16,7 @@ export interface LegiScanVote { roll_call_id: number; bill_id: number; date: str
 export interface LegiScanSearchResult { relevance: number; bill_id: number; number: string; title: string; state: string; }
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
-const RATE_DELAY = 1200;
+const RATE_DELAY = 500;
 const MAX_RETRIES = 3;
 
 export class KyLegiScanClient {

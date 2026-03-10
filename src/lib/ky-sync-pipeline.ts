@@ -18,6 +18,7 @@ import type { KYSource } from '../types/kentucky';
 export interface SyncOptions {
   dryRun?: boolean;
   source?: string;
+  limit?: number;
 }
 
 export interface SyncResult {
@@ -83,13 +84,16 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
       log(source, `Session ${sorted[i - 1].session_name} had 0 bills, trying ${latestSession.session_name}`);
       bills = await client.fetchBills(latestSession.session_id);
     }
-    log(source, `Fetched ${bills.length} bills from ${latestSession.session_name}`);
+    const limit = options.limit ?? 150;
+    const toSync = bills.slice(0, limit);
+    if (bills.length > limit) log(source, `Limiting to ${limit} of ${bills.length} bills (use limit param for more)`);
+    log(source, `Fetched ${bills.length} bills from ${latestSession.session_name}, syncing ${toSync.length}`);
     if (options.dryRun) {
-      log(source, `[DRY RUN] Would upsert ${bills.length} bills`);
-      return { source, status: 'success', itemsSynced: bills.length, duration: Date.now() - start };
+      log(source, `[DRY RUN] Would upsert ${toSync.length} bills`);
+      return { source, status: 'success', itemsSynced: toSync.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    const rows = bills.map((bill) => ({
+    const rows = toSync.map((bill) => ({
       legiscan_id: bill.bill_id,
       bill_number: bill.number,
       title: bill.title,
@@ -110,7 +114,7 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
       if (error) logError(source, `Batch ${i / BATCH + 1}: ${error.message}`);
       else synced += batch.length;
     }
-    log(source, `Synced ${synced}/${bills.length} bills`);
+    log(source, `Synced ${synced}/${toSync.length} bills`);
     await updateSourceStatus(source, 'success', synced);
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
   } catch (err: any) {
