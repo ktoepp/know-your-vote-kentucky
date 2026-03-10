@@ -1,12 +1,19 @@
 /**
  * Open States API v3 Client — Kentucky Legislature (fallback)
- * GraphQL client for https://v3.openstates.org/graphql
+ * REST client for https://v3.openstates.org/
  * Required env: OPENSTATES_API_KEY
  */
 import axios, { AxiosInstance } from 'axios';
 
 export interface OpenStatesBill { id: string; identifier: string; title: string; classification: string[]; subject: string[]; updatedAt: string; createdAt: string; session: string; jurisdiction: { name: string }; abstracts: { abstract: string }[]; actions: { description: string; date: string; classification: string[] }[]; sponsors: { name: string; classification: string }[]; }
-export interface OpenStatesLegislator { id: string; name: string; party: string; currentRole: { title: string; district: string; chamber: string } | null; image: string; email: string; }
+export interface OpenStatesLegislator {
+  id: string;
+  name: string;
+  party: string;
+  currentRole?: { title: string; district: string; org_classification: string } | null;
+  image?: string;
+  email?: string;
+}
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const MAX_RETRIES = 3;
@@ -20,8 +27,8 @@ export class KyOpenStatesClient {
     this.apiKey = apiKey || process.env.OPENSTATES_API_KEY || '';
     if (!this.apiKey) console.warn('[KyOpenStates] OPENSTATES_API_KEY not set');
     this.client = axios.create({
-      baseURL: 'https://v3.openstates.org/graphql',
-      headers: { 'X-API-KEY': this.apiKey, 'Content-Type': 'application/json' },
+      baseURL: 'https://v3.openstates.org',
+      headers: { 'X-API-KEY': this.apiKey },
     });
   }
 
@@ -32,16 +39,15 @@ export class KyOpenStatesClient {
     return null;
   }
 
-  private async gql<T>(query: string, variables: Record<string, any> = {}): Promise<T> {
-    const ck = JSON.stringify({ query, variables });
+  private async get<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {
+    const ck = path + JSON.stringify(params);
     const cached = this.getCached<T>(ck);
     if (cached) return cached;
     for (let i = 1; i <= MAX_RETRIES; i++) {
       try {
-        const r = await this.client.post('', { query, variables });
-        if (r.data.errors?.length) throw new Error(`OpenStates GQL: ${r.data.errors[0].message}`);
-        this.cache.set(ck, { data: r.data.data, ts: Date.now() });
-        return r.data.data as T;
+        const r = await this.client.get(path, { params });
+        this.cache.set(ck, { data: r.data, ts: Date.now() });
+        return r.data as T;
       } catch (err: any) {
         console.error(`[KyOpenStates] Attempt ${i}/${MAX_RETRIES}: ${err.message}`);
         if (i === MAX_RETRIES) throw err;
@@ -53,44 +59,43 @@ export class KyOpenStatesClient {
 
   async fetchBills(params: { session?: string; query?: string; first?: number } = {}): Promise<OpenStatesBill[]> {
     console.log('[KyOpenStates] Fetching KY bills');
-    const q = `query($jurisdiction: String!, $session: String, $searchQuery: String, $first: Int) {
-      bills(jurisdiction: $jurisdiction, session: $session, searchQuery: $searchQuery, first: $first) {
-        edges { node { id identifier title classification subject updatedAt createdAt session
-          jurisdiction { name } abstracts { abstract }
-          actions { description date classification }
-          sponsors { name classification }
-        }}
-      }
-    }`;
-    const d = await this.gql<any>(q, { jurisdiction: 'Kentucky', session: params.session, searchQuery: params.query, first: params.first || 50 });
-    return (d?.bills?.edges || []).map((e: any) => e.node);
+    const data = await this.get<{ results: any[] }>('/bills', {
+      jurisdiction: 'ky',
+      ...(params.session && { session: params.session }),
+      ...(params.query && { q: params.query }),
+      per_page: String(params.first || 50),
+    });
+    return data?.results || [];
   }
 
   async fetchLegislators(): Promise<OpenStatesLegislator[]> {
     console.log('[KyOpenStates] Fetching KY legislators');
-    const q = `query($jurisdiction: String!) {
-      people(jurisdiction: $jurisdiction, first: 200) {
-        edges { node { id name party: primaryParty
-          currentRole { title district: orgClassification chamber: orgClassification }
-          image email
-        }}
-      }
-    }`;
-    const d = await this.gql<any>(q, { jurisdiction: 'Kentucky' });
-    return (d?.people?.edges || []).map((e: any) => e.node);
+    const all: OpenStatesLegislator[] = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      const data = await this.get<{ results: any[]; pagination: { max_page: number } }>('/people', {
+        jurisdiction: 'ky',
+        per_page: '100',
+        page: String(page),
+      });
+      const results = data?.results || [];
+      all.push(...results);
+      const maxPage = data?.pagination?.max_page ?? 1;
+      hasMore = results.length === 100 && page < maxPage && page < 5;
+      page++;
+    }
+    return all;
   }
 
   async fetchBillDetail(id: string): Promise<OpenStatesBill | null> {
     console.log(`[KyOpenStates] Fetching bill ${id}`);
-    const q = `query($id: String!) {
-      bill(id: $id) { id identifier title classification subject updatedAt createdAt session
-        jurisdiction { name } abstracts { abstract }
-        actions { description date classification }
-        sponsors { name classification }
-      }
-    }`;
-    const d = await this.gql<any>(q, { id });
-    return d?.bill || null;
+    try {
+      const data = await this.get<any>(`/bills/ocd-bill/${id}`);
+      return data;
+    } catch {
+      return null;
+    }
   }
 
   async fetchLatest(): Promise<OpenStatesBill[]> { return this.fetchBills({ first: 50 }); }

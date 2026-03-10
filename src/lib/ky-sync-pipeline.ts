@@ -138,16 +138,21 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       return { source, status: 'success', itemsSynced: legislators.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    const rows = legislators.map((leg) => ({
-      openstates_id: leg.id,
-      name: leg.name,
-      party: leg.party || null,
-      chamber: leg.currentRole?.chamber === 'upper' ? ('senate' as const) : leg.currentRole?.chamber === 'lower' ? ('house' as const) : null,
-      district: leg.currentRole?.district || null,
-      photo_url: leg.image || null,
-      email: leg.email || null,
-      active: true,
-    }));
+    const rows = legislators.map((leg) => {
+      const org = leg.currentRole?.org_classification;
+      const chamber = org === 'upper' ? ('senate' as const) : org === 'lower' ? ('house' as const) : null;
+      const district = leg.currentRole?.district != null ? String(leg.currentRole.district) : null;
+      return {
+        openstates_id: leg.id,
+        name: leg.name,
+        party: leg.party || null,
+        chamber,
+        district,
+        photo_url: leg.image || null,
+        email: leg.email || null,
+        active: true,
+      };
+    });
     const { error } = await db.from('ky_legislators').upsert(rows, { onConflict: 'openstates_id' });
     const synced = error ? 0 : rows.length;
     if (error) logError(source, error.message);
