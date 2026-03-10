@@ -1,0 +1,42 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "crons": [
+    { "path": "/api/sync?source=bills", "schedule": "0 */2 * * *" },
+    { "path": "/api/sync?source=legislators", "schedule": "0 6 * * *" },
+    { "path": "/api/sync?source=ordinances", "schedule": "0 8 * * *" },
+    { "path": "/api/sync?source=executive-orders", "schedule": "0 9 * * *" },
+    { "path": "/api/sync?source=school-boards", "schedule": "0 10 * * 1" },
+    { "path": "/api/sync?source=county-actions", "schedule": "0 11 * * 1" }
+  ]
+}
