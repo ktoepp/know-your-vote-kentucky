@@ -46,8 +46,6 @@ import {
   Event as EventIcon,
   AccountCircle,
 } from '@mui/icons-material';
-import DarkModeToggle from '../../components/ui/DarkModeToggle';
-import { useDarkMode } from '@/lib/useDarkMode';
 import { useThemeUtils } from '@/components/ui/ThemeUtils';
 import { ThemedIcon } from '@/lib/icons';
 import { useTooltips } from '@/lib/TooltipContext';
@@ -157,16 +155,7 @@ function UserMenu() {
       </>
     );
   }
-  return (
-    <>
-      <Button component={Link} href="/auth/login" color="primary" variant="outlined" sx={{ ml: 1, mr: 1 }}>
-        Log In
-      </Button>
-      <Button component={Link} href="/auth/register" color="primary" variant="contained">
-        Register
-      </Button>
-    </>
-  );
+  return null;
 }
 
 export default function Navigation() {
@@ -175,7 +164,6 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
-  const { isDark } = useDarkMode();
   const { getAdaptiveBackground, getAdaptiveBorder, getHoverBackground, getTextColor } = useThemeUtils();
   const { tooltipsEnabled, toggleTooltips } = useTooltips();
   const { user, loading } = useUser();
@@ -378,15 +366,6 @@ export default function Navigation() {
               </MuiTooltip>
             </Box>
             
-            {/* Dark mode toggle - hidden on mobile */}
-            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-              <DarkModeToggle 
-                size="medium" 
-                showTooltip={true}
-                variant="nav"
-              />
-            </Box>
-            
             {/* User menu */}
             <UserMenu />
             
@@ -500,15 +479,6 @@ export default function Navigation() {
             }} />
             <Box sx={{ px: 2, pb: 2 }}>
               <GlobalSearchBar />
-            </Box>
-            
-            {/* Mobile Dark Mode Toggle */}
-            <Box sx={{ px: 2, pb: 1 }}>
-              <DarkModeToggle 
-                size="medium" 
-                showTooltip={false}
-                variant="nav"
-              />
             </Box>
             
             {/* Mobile Tooltip Toggle */}

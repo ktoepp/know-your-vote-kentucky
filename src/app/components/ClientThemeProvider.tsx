@@ -3,15 +3,11 @@
 import React from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
-import { lightTheme, darkTheme } from '@/lib/theme';
-import { useDarkMode } from '@/lib/useDarkMode';
+import { lightTheme } from '@/lib/theme';
 
 export default function ClientThemeProvider({ children }: { children: React.ReactNode }) {
-  const { isDark } = useDarkMode();
-  const theme = isDark ? darkTheme : lightTheme;
-
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={lightTheme}>
       <CssBaseline />
       {children}
     </ThemeProvider>
