@@ -40,6 +40,20 @@ Visit `http://localhost:3000` to see the application.
 - **Intelligence Scoring** — Multi-factor relevance scoring for civic items
 - **Plain-Language Summaries** — AI-generated "why this matters" explanations
 
+## Data Sync
+
+Sync sources and status (as of last verification):
+
+| Source | Status | Notes |
+|--------|--------|-------|
+| bills | Working | LegiScan |
+| legislators | Working | OpenStates |
+| votes | Working | Requires bills synced first |
+| ordinances | Working | Louisville + Lexington via Legistar |
+| school-boards | Working | JCPS + FCPS via KSBA portal |
+| executive-orders | Not working | 404 on governor.ky.gov/executive-orders — path may have changed |
+| county-actions | Not working | Louisville 403, Lexington 404 — URLs may have changed |
+
 ## API Endpoints
 
 | Endpoint | Description |
