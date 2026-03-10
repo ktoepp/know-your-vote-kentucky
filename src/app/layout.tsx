@@ -74,35 +74,10 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              // Initialize theme before page loads to prevent flash
+              // Always use light mode
               (function() {
-                try {
-                  // Check for saved theme preference
-                  const savedTheme = localStorage.getItem('darkMode');
-                  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  
-                  if (savedTheme !== null) {
-                    const isDark = JSON.parse(savedTheme);
-                    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-                    if (isDark) {
-                      document.documentElement.classList.add('dark');
-                    } else {
-                      document.documentElement.classList.remove('dark');
-                    }
-                  } else {
-                    // Use system preference
-                    document.documentElement.setAttribute('data-theme', systemPrefersDark ? 'dark' : 'light');
-                    if (systemPrefersDark) {
-                      document.documentElement.classList.add('dark');
-                    } else {
-                      document.documentElement.classList.remove('dark');
-                    }
-                  }
-                } catch (e) {
-                  // Fallback to light mode if localStorage fails
-                  document.documentElement.classList.remove('dark');
-                  document.documentElement.setAttribute('data-theme', 'light');
-                }
+                document.documentElement.classList.remove('dark');
+                document.documentElement.setAttribute('data-theme', 'light');
               })()
             `,
           }}

@@ -73,8 +73,6 @@ import {
   ViewModule,
   ViewList,
   ViewComfy,
-  LightMode,
-  DarkMode,
   Event,
   EventNote,
   Add
@@ -394,7 +392,6 @@ const getEventTypeMeta = (type: string): { label: string; icon: React.ReactEleme
 
 export default function LiveContentPage() {
   const theme = useMuiTheme();
-  const isDark = theme.palette.mode === 'dark';
   const router = useRouter();
   const { bills, loading: billsLoading } = useBillsData();
   
@@ -1176,14 +1173,6 @@ export default function LiveContentPage() {
     }
   };
 
-  // Simple theme toggle function
-  const toggleTheme = () => {
-    const currentTheme = localStorage.getItem('theme') || 'dark';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('theme', newTheme);
-    window.location.reload(); // Simple approach - reload to apply theme
-  };
-
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -1350,19 +1339,6 @@ export default function LiveContentPage() {
               </Tooltip>
             </Box>
 
-            {/* Dark Mode Toggle */}
-            <Tooltip content={`Switch to ${isDark ? 'light' : 'dark'} mode`}>
-              <IconButton
-                size="small"
-                onClick={toggleTheme}
-                sx={{ 
-                  bgcolor: 'action.hover',
-                  '&:hover': { bgcolor: 'action.selected' }
-                }}
-              >
-                {isDark ? <LightMode /> : <DarkMode />}
-              </IconButton>
-            </Tooltip>
           </Box>
         </Box>
 

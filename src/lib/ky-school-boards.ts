@@ -1,6 +1,6 @@
 /**
  * Kentucky School Board Scraper — JCPS & Fayette County
- * Scrapes jefferson.kyschools.us and fcps.net for board meeting agendas/decisions
+ * Scrapes KSBA Public Portal (portal.ksba.org) for board meeting agendas/decisions
  * No API key required
  */
 import axios from 'axios';
@@ -24,14 +24,8 @@ export interface SchoolBoardItemDetail extends SchoolBoardItem {
   attachments: { name: string; url: string }[];
 }
 
-const DISTRICT_URLS: Record<SchoolDistrict, string> = {
-  jcps: 'https://www.jefferson.kyschools.us',
-  fcps: 'https://www.fcps.net',
-};
-const BOARD_PATHS: Record<SchoolDistrict, string> = {
-  jcps: '/board/meetings',
-  fcps: '/board-of-education/board-meetings',
-};
+const KSBA_BASE = 'https://portal.ksba.org';
+const KSBA_AGENCY_IDS: Record<SchoolDistrict, number> = { jcps: 89, fcps: 57 };
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const MAX_RETRIES = 3;
 
@@ -67,30 +61,34 @@ export class KySchoolBoardsClient {
     const cached = this.getCached<SchoolBoardItem[]>(ck);
     if (cached) return cached;
 
-    const base = DISTRICT_URLS[district];
-    const path = BOARD_PATHS[district];
-    console.log(`[KySchoolBoards] Fetching ${district} board items`);
-    const $ = await this.fetchPage(`${base}${path}`);
+    const agencyId = KSBA_AGENCY_IDS[district];
+    const url = `${KSBA_BASE}/public/Agency.aspx?PublicAgencyID=${agencyId}`;
+    console.log(`[KySchoolBoards] Fetching ${district} board items from KSBA`);
+    const $ = await this.fetchPage(url);
     const items: SchoolBoardItem[] = [];
 
-    $('article, .view-content .views-row, .list-item, .meeting-item, li a[href*="meeting"], .board-meeting').each((_, el) => {
+    $('table tbody tr').each((_, el) => {
       const $el = $(el);
-      const link = $el.find('a').first();
-      const href = link.attr('href') || $el.attr('href') || '';
-      const title = link.text().trim() || $el.find('h3, h4, .title').text().trim() || $el.text().trim();
+      const link = $el.find('a[href*="Meeting.aspx"]').first();
+      const href = link.attr('href') || '';
+      if (!href) return;
+
+      const cells = $el.find('td');
+      const dateText = link.text().trim();
+      const title = cells.length >= 2 ? cells.eq(1).text().trim() : dateText;
       if (!title || title.length < 3) return;
 
-      const fullUrl = href.startsWith('http') ? href : `${base}${href}`;
-      const dateMatch = title.match(/(\w+ \d{1,2},?\s*\d{4}|\d{1,2}\/\d{1,2}\/\d{4})/);
+      const fullUrl = href.startsWith('http') ? href : new URL(href, `${KSBA_BASE}/public/`).href;
+      const meetingId = href.match(/PublicMeetingID=(\d+)/)?.[1];
 
       items.push({
-        id: href.split('/').pop() || `${district}-${items.length}`,
+        id: meetingId || `${district}-${items.length}`,
         district,
         title: title.replace(/\s+/g, ' ').substring(0, 200),
-        date: dateMatch?.[1] || '',
-        category: 'board-meeting',
+        date: dateText,
+        category: cells.eq(3)?.text().trim() || 'board-meeting',
         url: fullUrl,
-        summary: $el.find('.summary, .description, p').first().text().trim().substring(0, 300),
+        summary: cells.eq(2)?.text().trim().substring(0, 300) || '',
         voteResult: '',
       });
     });
@@ -116,7 +114,7 @@ export class KySchoolBoardsClient {
       $('a[href$=".pdf"], a[href$=".doc"], a[href$=".docx"]').each((_, el) => {
         const $a = $(el);
         const href = $a.attr('href') || '';
-        attachments.push({ name: $a.text().trim(), url: href.startsWith('http') ? href : `${DISTRICT_URLS[district]}${href}` });
+        attachments.push({ name: $a.text().trim(), url: href.startsWith('http') ? href : `${KSBA_BASE}${href.startsWith('/') ? '' : '/'}${href}` });
       });
       const detail: SchoolBoardItemDetail = { ...item, fullText: content.substring(0, 10000), attachments };
       this.cache.set(ck, { data: detail, ts: Date.now() });

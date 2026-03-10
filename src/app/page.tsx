@@ -12,6 +12,7 @@ import {
   CircularProgress,
   Alert,
   Grid,
+  Tooltip,
 } from '@mui/material';
 import {
   Gavel,
@@ -51,9 +52,52 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function formatSponsors(sponsors: Record<string, unknown> | null): string {
+  if (!sponsors) return '';
+  if (Array.isArray(sponsors)) {
+    return sponsors
+      .map((s: unknown) => (typeof s === 'object' && s !== null && 'name' in s ? (s as { name: string }).name : typeof s === 'string' ? s : ''))
+      .filter(Boolean)
+      .join(', ');
+  }
+  if (typeof sponsors === 'object') {
+    const nested = (sponsors as { sponsors?: { name?: string }[] }).sponsors;
+    if (Array.isArray(nested)) {
+      return nested.map((s) => s?.name).filter(Boolean).join(', ');
+    }
+  }
+  return '';
+}
+
 function KYBillCard({ bill }: { bill: KYBill }) {
   const theme = useTheme();
-  return (
+  const sponsorText = formatSponsors(bill.sponsors);
+
+  const tooltipTitle = (
+    <Box component="span" sx={{ display: 'block', maxWidth: 360 }}>
+      <Typography component="span" variant="subtitle2" display="block" sx={{ fontWeight: 600, mb: 1 }}>
+        {bill.bill_number}: {bill.title}
+      </Typography>
+      {bill.ai_summary && (
+        <Typography component="span" variant="body2" display="block" sx={{ mb: 1.5 }}>
+          {bill.ai_summary}
+        </Typography>
+      )}
+      {sponsorText && (
+        <Typography component="span" variant="caption" display="block" sx={{ fontWeight: 600 }}>
+          Sponsor{sponsorText.includes(',') ? 's' : ''}: {sponsorText}
+        </Typography>
+      )}
+      {bill.last_action_date && (
+        <Typography component="span" variant="caption" display="block" sx={{ mt: 1, opacity: 0.9 }}>
+          Last action: {new Date(bill.last_action_date).toLocaleDateString()}
+          {bill.last_action ? ` - ${bill.last_action}` : ''}
+        </Typography>
+      )}
+    </Box>
+  );
+
+  const card = (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3, border: `1px solid ${theme.palette.divider}`, transition: 'all 0.2s', '&:hover': { boxShadow: 4, transform: 'translateY(-2px)' } }}>
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
@@ -77,11 +121,48 @@ function KYBillCard({ bill }: { bill: KYBill }) {
       </CardContent>
     </Card>
   );
+
+  return (
+    <Tooltip title={tooltipTitle} placement="top" arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 400 } } }}>
+      <Box component="span" sx={{ display: 'block', height: '100%' }}>
+        {card}
+      </Box>
+    </Tooltip>
+  );
+}
+
+function formatOrdinanceSponsors(sponsors: Record<string, unknown> | null): string {
+  if (!sponsors) return '';
+  if (Array.isArray(sponsors)) {
+    return sponsors
+      .map((s: unknown) => (typeof s === 'object' && s !== null && 'name' in s ? (s as { name: string }).name : typeof s === 'string' ? s : ''))
+      .filter(Boolean)
+      .join(', ');
+  }
+  return '';
 }
 
 function KYOrdinanceCard({ ordinance }: { ordinance: KYOrdinance }) {
   const theme = useTheme();
-  return (
+  const sponsorText = formatOrdinanceSponsors(ordinance.sponsors);
+  const tooltipTitle = (
+    <Box component="span" sx={{ display: 'block', maxWidth: 360 }}>
+      <Typography component="span" variant="subtitle2" display="block" sx={{ fontWeight: 600, mb: 1 }}>
+        {ordinance.ordinance_number ? `${ordinance.ordinance_number}: ` : ''}{ordinance.title}
+      </Typography>
+      {ordinance.ai_summary && (
+        <Typography component="span" variant="body2" display="block" sx={{ mb: 1.5 }}>
+          {ordinance.ai_summary}
+        </Typography>
+      )}
+      {sponsorText && (
+        <Typography component="span" variant="caption" display="block" sx={{ fontWeight: 600 }}>
+          Sponsor{sponsorText.includes(',') ? 's' : ''}: {sponsorText}
+        </Typography>
+      )}
+    </Box>
+  );
+  const card = (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3, border: `1px solid ${theme.palette.divider}`, transition: 'all 0.2s', '&:hover': { boxShadow: 4, transform: 'translateY(-2px)' } }}>
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
@@ -95,11 +176,36 @@ function KYOrdinanceCard({ ordinance }: { ordinance: KYOrdinance }) {
       </CardContent>
     </Card>
   );
+  return (
+    <Tooltip title={tooltipTitle} placement="top" arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 400 } } }}>
+      <Box component="span" sx={{ display: 'block', height: '100%' }}>
+        {card}
+      </Box>
+    </Tooltip>
+  );
 }
 
 function KYEOCard({ eo }: { eo: KYExecutiveOrder }) {
   const theme = useTheme();
-  return (
+  const tooltipTitle = (
+    <Box component="span" sx={{ display: 'block', maxWidth: 360 }}>
+      <Typography component="span" variant="subtitle2" display="block" sx={{ fontWeight: 600, mb: 1 }}>
+        {eo.eo_number}: {eo.title}
+      </Typography>
+      {eo.ai_summary && (
+        <Typography component="span" variant="body2" display="block" sx={{ mb: 1.5 }}>
+          {eo.ai_summary}
+        </Typography>
+      )}
+      {eo.signed_date && (
+        <Typography component="span" variant="caption" display="block">Signed: {new Date(eo.signed_date).toLocaleDateString()}</Typography>
+      )}
+      {eo.governor && (
+        <Typography component="span" variant="caption" display="block">Governor: {eo.governor}</Typography>
+      )}
+    </Box>
+  );
+  const card = (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3, border: `1px solid ${theme.palette.divider}`, transition: 'all 0.2s', '&:hover': { boxShadow: 4, transform: 'translateY(-2px)' } }}>
       <CardContent sx={{ flexGrow: 1 }}>
         <Typography variant="subtitle1" fontWeight={600} gutterBottom>{eo.eo_number}</Typography>
@@ -115,11 +221,33 @@ function KYEOCard({ eo }: { eo: KYExecutiveOrder }) {
       </CardContent>
     </Card>
   );
+  return (
+    <Tooltip title={tooltipTitle} placement="top" arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 400 } } }}>
+      <Box component="span" sx={{ display: 'block', height: '100%' }}>
+        {card}
+      </Box>
+    </Tooltip>
+  );
 }
 
 function KYSchoolBoardCard({ item }: { item: KYSchoolBoardItem }) {
   const theme = useTheme();
-  return (
+  const tooltipTitle = (
+    <Box component="span" sx={{ display: 'block', maxWidth: 360 }}>
+      <Typography component="span" variant="subtitle2" display="block" sx={{ fontWeight: 600, mb: 1 }}>
+        {item.title}
+      </Typography>
+      {item.ai_summary && (
+        <Typography component="span" variant="body2" display="block" sx={{ mb: 1.5 }}>
+          {item.ai_summary}
+        </Typography>
+      )}
+      {item.vote_result && (
+        <Typography component="span" variant="caption" display="block">Result: {item.vote_result}</Typography>
+      )}
+    </Box>
+  );
+  const card = (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3, border: `1px solid ${theme.palette.divider}`, transition: 'all 0.2s', '&:hover': { boxShadow: 4, transform: 'translateY(-2px)' } }}>
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
@@ -134,6 +262,13 @@ function KYSchoolBoardCard({ item }: { item: KYSchoolBoardItem }) {
         )}
       </CardContent>
     </Card>
+  );
+  return (
+    <Tooltip title={tooltipTitle} placement="top" arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 400 } } }}>
+      <Box component="span" sx={{ display: 'block', height: '100%' }}>
+        {card}
+      </Box>
+    </Tooltip>
   );
 }
 

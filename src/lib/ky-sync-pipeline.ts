@@ -170,6 +170,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
 export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult> {
   const start = Date.now();
   const source = 'votes';
+  const billLimit = options.limit ?? 5;
   log(source, 'Starting votes sync from LegiScan');
   try {
     const legiscanClient = getKyLegiScanClient();
@@ -179,20 +180,19 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
       .select('id, legiscan_id')
       .not('legiscan_id', 'is', null)
       .order('last_action_date', { ascending: false })
-      .limit(50);
+      .limit(billLimit);
     if (billsError || !bills?.length) {
       log(source, 'No bills with legiscan_ids found');
       return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
     }
-    log(source, `Fetching votes for ${bills.length} bills`);
-    let synced = 0;
+    log(source, `Fetching votes for ${bills.length} bills (limit ${billLimit})`);
+    const rows: Record<string, unknown>[] = [];
     for (const bill of bills) {
       try {
         const votes = await legiscanClient.fetchVotes(bill.legiscan_id!);
         if (!votes.length) continue;
-        if (options.dryRun) { synced += votes.length; continue; }
         for (const vote of votes) {
-          const row = {
+          rows.push({
             bill_id: bill.id,
             date: vote.date || null,
             description: vote.desc || null,
@@ -201,13 +201,22 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
             absent_count: vote.absent || 0,
             passed: vote.passed === 1,
             roll_call: vote.votes?.map((v: any) => ({ legislator_id: String(v.people_id), vote: v.vote_text })) || null,
-          };
-          const { error } = await db.from('ky_votes').insert(row);
-          if (!error) synced++;
+          });
         }
       } catch (err: any) {
         logError(source, `Failed to fetch votes for bill ${bill.legiscan_id}: ${err.message}`);
       }
+    }
+    let synced = 0;
+    if (rows.length > 0 && !options.dryRun) {
+      const BATCH = 50;
+      for (let i = 0; i < rows.length; i += BATCH) {
+        const batch = rows.slice(i, i + BATCH);
+        const { error } = await db.from('ky_votes').insert(batch);
+        if (!error) synced += batch.length;
+      }
+    } else if (options.dryRun) {
+      synced = rows.length;
     }
     if (options.dryRun) log(source, `[DRY RUN] Would insert ${synced} votes`);
     else { log(source, `Synced ${synced} votes`); await updateSourceStatus(source, 'success', synced); }
@@ -243,7 +252,7 @@ async function syncOrdinances(jurisdiction: 'louisville' | 'lexington', options:
     }
     const db = getSupabase();
     const rows = ordinances.map((ord) => ({
-      legistar_id: ord.MatterId,
+      legistar_id: jurisdiction === 'lexington' ? ord.MatterId + 1_000_000 : ord.MatterId,
       jurisdiction,
       ordinance_number: ord.MatterFile || null,
       title: ord.MatterName || ord.MatterTitle,
@@ -314,7 +323,21 @@ export async function syncSchoolBoardItems(options: SyncOptions = {}): Promise<S
       return { source, status: 'success', itemsSynced: items.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    let synced = 0;
+    const { data: existing } = await db.from('ky_school_board_items').select('id, district, title, meeting_date');
+    const normDate = (d: string | null) => {
+      if (!d) return '';
+      const s = String(d);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+      const parsed = new Date(s);
+      return isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
+    };
+    const key = (d: string, t: string, m: string | null) => `${d}|${t}|${normDate(m)}`;
+    const existingMap = new Map<string, { id: string }>();
+    for (const e of existing || []) {
+      existingMap.set(key(e.district, e.title, e.meeting_date), { id: e.id });
+    }
+    const toInsert: Record<string, unknown>[] = [];
+    const toUpdate: { id: string; row: Record<string, unknown> }[] = [];
     for (const item of items) {
       const row = {
         district: item.district,
@@ -325,21 +348,17 @@ export async function syncSchoolBoardItems(options: SyncOptions = {}): Promise<S
         vote_result: item.voteResult || null,
         document_url: item.url || null,
       };
-      // Use title + district + meeting_date as a natural key for dedup
-      const { data: existing } = await db
-        .from('ky_school_board_items')
-        .select('id')
-        .eq('district', item.district)
-        .eq('title', item.title)
-        .limit(1);
-      if (existing?.length) {
-        const { error } = await db.from('ky_school_board_items').update(row).eq('id', existing[0].id);
-        if (!error) synced++;
-      } else {
-        const { error } = await db.from('ky_school_board_items').insert(row);
-        if (!error) synced++;
-      }
+      const match = existingMap.get(key(item.district, item.title, item.date));
+      if (match) toUpdate.push({ id: match.id, row });
+      else toInsert.push(row);
     }
+    let synced = 0;
+    if (toInsert.length > 0) {
+      const { error } = await db.from('ky_school_board_items').insert(toInsert);
+      if (!error) synced += toInsert.length;
+    }
+    await Promise.all(toUpdate.map(({ id, row }) => db.from('ky_school_board_items').update(row).eq('id', id)));
+    synced += toUpdate.length;
     log(source, `Synced ${synced}/${items.length} school board items`);
     await updateSourceStatus(source, 'success', synced);
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
@@ -364,7 +383,21 @@ export async function syncCountyActions(options: SyncOptions = {}): Promise<Sync
       return { source, status: 'success', itemsSynced: actions.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    let synced = 0;
+    const { data: existing } = await db.from('ky_county_actions').select('id, county, title, meeting_date');
+    const normDate = (d: string | null) => {
+      if (!d) return '';
+      const s = String(d);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+      const parsed = new Date(s);
+      return isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
+    };
+    const key = (c: string, t: string, m: string | null) => `${c}|${t}|${normDate(m)}`;
+    const existingMap = new Map<string, { id: string }>();
+    for (const e of existing || []) {
+      existingMap.set(key(e.county, e.title, e.meeting_date), { id: e.id });
+    }
+    const toInsert: Record<string, unknown>[] = [];
+    const toUpdate: { id: string; row: Record<string, unknown> }[] = [];
     for (const action of actions) {
       const row = {
         county: action.county,
@@ -374,21 +407,17 @@ export async function syncCountyActions(options: SyncOptions = {}): Promise<Sync
         action_type: action.type || null,
         document_url: action.url || null,
       };
-      // Use title + county + date as natural key for dedup
-      const { data: existing } = await db
-        .from('ky_county_actions')
-        .select('id')
-        .eq('county', action.county)
-        .eq('title', action.title)
-        .limit(1);
-      if (existing?.length) {
-        const { error } = await db.from('ky_county_actions').update(row).eq('id', existing[0].id);
-        if (!error) synced++;
-      } else {
-        const { error } = await db.from('ky_county_actions').insert(row);
-        if (!error) synced++;
-      }
+      const match = existingMap.get(key(action.county, action.title, action.date));
+      if (match) toUpdate.push({ id: match.id, row });
+      else toInsert.push(row);
     }
+    let synced = 0;
+    if (toInsert.length > 0) {
+      const { error } = await db.from('ky_county_actions').insert(toInsert);
+      if (!error) synced += toInsert.length;
+    }
+    await Promise.all(toUpdate.map(({ id, row }) => db.from('ky_county_actions').update(row).eq('id', id)));
+    synced += toUpdate.length;
     log(source, `Synced ${synced}/${actions.length} county actions`);
     await updateSourceStatus(source, 'success', synced);
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };

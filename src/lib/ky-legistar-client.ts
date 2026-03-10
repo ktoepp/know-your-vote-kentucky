@@ -24,7 +24,7 @@ export interface LocalGovDataSource {
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const MAX_RETRIES = 3;
-const JURISDICTION_MAP: Record<LegistarJurisdiction, string> = { louisville: 'louisvilleky', lexington: 'lexingtonky' };
+const JURISDICTION_MAP: Record<LegistarJurisdiction, string> = { louisville: 'louisville', lexington: 'lexington' };
 
 export class KyLegistarClient implements LocalGovDataSource {
   private clients: Record<LegistarJurisdiction, AxiosInstance>;
@@ -50,7 +50,10 @@ export class KyLegistarClient implements LocalGovDataSource {
     if (cached) return cached;
     for (let i = 1; i <= MAX_RETRIES; i++) {
       try {
-        const r = await this.clients[jurisdiction].get(path, { params });
+        const r = await this.clients[jurisdiction].get(path, {
+          params,
+          headers: { Accept: 'application/json' },
+        });
         this.cache.set(ck, { data: r.data, ts: Date.now() });
         return r.data as T;
       } catch (err: any) {
