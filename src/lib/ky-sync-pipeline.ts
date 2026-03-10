@@ -89,23 +89,26 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
       return { source, status: 'success', itemsSynced: bills.length, duration: Date.now() - start };
     }
     const db = getSupabase();
+    const rows = bills.map((bill) => ({
+      legiscan_id: bill.bill_id,
+      bill_number: bill.number,
+      title: bill.title,
+      description: bill.description || null,
+      session: latestSession.session_name,
+      status: bill.status_desc || null,
+      last_action: bill.last_action || null,
+      last_action_date: bill.last_action_date || null,
+      bill_text_url: bill.url || null,
+      source: 'legiscan',
+    }));
+    // Batch upsert (100 per batch to avoid payload limits)
+    const BATCH = 100;
     let synced = 0;
-    for (const bill of bills) {
-      const row = {
-        legiscan_id: bill.bill_id,
-        bill_number: bill.number,
-        title: bill.title,
-        description: bill.description || null,
-        session: latestSession.session_name,
-        status: bill.status_desc || null,
-        last_action: bill.last_action || null,
-        last_action_date: bill.last_action_date || null,
-        bill_text_url: bill.url || null,
-        source: 'legiscan',
-      };
-      const { error } = await db.from('ky_bills').upsert(row, { onConflict: 'legiscan_id' });
-      if (error) logError(source, `Failed to upsert bill ${bill.number}: ${error.message}`);
-      else synced++;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const batch = rows.slice(i, i + BATCH);
+      const { error } = await db.from('ky_bills').upsert(batch, { onConflict: 'legiscan_id' });
+      if (error) logError(source, `Batch ${i / BATCH + 1}: ${error.message}`);
+      else synced += batch.length;
     }
     log(source, `Synced ${synced}/${bills.length} bills`);
     await updateSourceStatus(source, 'success', synced);
@@ -131,22 +134,19 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       return { source, status: 'success', itemsSynced: legislators.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    let synced = 0;
-    for (const leg of legislators) {
-      const row = {
-        openstates_id: leg.id,
-        name: leg.name,
-        party: leg.party || null,
-        chamber: leg.currentRole?.chamber === 'upper' ? 'senate' as const : leg.currentRole?.chamber === 'lower' ? 'house' as const : null,
-        district: leg.currentRole?.district || null,
-        photo_url: leg.image || null,
-        email: leg.email || null,
-        active: true,
-      };
-      const { error } = await db.from('ky_legislators').upsert(row, { onConflict: 'openstates_id' });
-      if (error) logError(source, `Failed to upsert legislator ${leg.name}: ${error.message}`);
-      else synced++;
-    }
+    const rows = legislators.map((leg) => ({
+      openstates_id: leg.id,
+      name: leg.name,
+      party: leg.party || null,
+      chamber: leg.currentRole?.chamber === 'upper' ? ('senate' as const) : leg.currentRole?.chamber === 'lower' ? ('house' as const) : null,
+      district: leg.currentRole?.district || null,
+      photo_url: leg.image || null,
+      email: leg.email || null,
+      active: true,
+    }));
+    const { error } = await db.from('ky_legislators').upsert(rows, { onConflict: 'openstates_id' });
+    const synced = error ? 0 : rows.length;
+    if (error) logError(source, error.message);
     log(source, `Synced ${synced}/${legislators.length} legislators`);
     await updateSourceStatus(source, 'success', synced);
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
@@ -233,22 +233,19 @@ async function syncOrdinances(jurisdiction: 'louisville' | 'lexington', options:
       return { source, status: 'success', itemsSynced: ordinances.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    let synced = 0;
-    for (const ord of ordinances) {
-      const row = {
-        legistar_id: ord.MatterId,
-        jurisdiction,
-        ordinance_number: ord.MatterFile || null,
-        title: ord.MatterName || ord.MatterTitle,
-        description: ord.MatterTitle || null,
-        status: ord.MatterStatusName || null,
-        introduced_date: ord.MatterIntroDate || null,
-        adopted_date: ord.MatterPassedDate || null,
-      };
-      const { error } = await db.from('ky_ordinances').upsert(row, { onConflict: 'legistar_id' });
-      if (error) logError(source, `Failed to upsert ordinance ${ord.MatterFile}: ${error.message}`);
-      else synced++;
-    }
+    const rows = ordinances.map((ord) => ({
+      legistar_id: ord.MatterId,
+      jurisdiction,
+      ordinance_number: ord.MatterFile || null,
+      title: ord.MatterName || ord.MatterTitle,
+      description: ord.MatterTitle || null,
+      status: ord.MatterStatusName || null,
+      introduced_date: ord.MatterIntroDate || null,
+      adopted_date: ord.MatterPassedDate || null,
+    }));
+    const { error } = await db.from('ky_ordinances').upsert(rows, { onConflict: 'legistar_id' });
+    const synced = error ? 0 : rows.length;
+    if (error) logError(source, error.message);
     log(source, `Synced ${synced}/${ordinances.length} ordinances`);
     await updateSourceStatus(source, 'success', synced);
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
@@ -273,21 +270,17 @@ export async function syncExecutiveOrders(options: SyncOptions = {}): Promise<Sy
       return { source, status: 'success', itemsSynced: orders.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    let synced = 0;
-    for (const eo of orders) {
-      if (!eo.number) continue;
-      const row = {
-        eo_number: eo.number,
-        title: eo.title,
-        description: eo.summary || null,
-        signed_date: eo.date || null,
-        governor: eo.governor || null,
-        full_text_url: eo.url || null,
-      };
-      const { error } = await db.from('ky_executive_orders').upsert(row, { onConflict: 'eo_number' });
-      if (error) logError(source, `Failed to upsert EO ${eo.number}: ${error.message}`);
-      else synced++;
-    }
+    const rows = orders.filter((eo) => eo.number).map((eo) => ({
+      eo_number: eo.number,
+      title: eo.title,
+      description: eo.summary || null,
+      signed_date: eo.date || null,
+      governor: eo.governor || null,
+      full_text_url: eo.url || null,
+    }));
+    const { error } = await db.from('ky_executive_orders').upsert(rows, { onConflict: 'eo_number' });
+    const synced = error ? 0 : rows.length;
+    if (error) logError(source, error.message);
     log(source, `Synced ${synced}/${orders.length} executive orders`);
     await updateSourceStatus(source, 'success', synced);
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
