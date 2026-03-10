@@ -1,0 +1,15 @@
+name: Poll Congress.gov Bills
+
+on:
+  schedule:
+    # Runs at 6am and 6pm UTC every day
+    - cron: '0 6,18 * * *'
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Congress Poll Endpoint
+        run: |
+          curl -X POST "https://seespan.vercel.app/api/congress/poll" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" 

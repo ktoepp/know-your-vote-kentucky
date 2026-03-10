@@ -1,0 +1,47 @@
+# Large backup files
+*.tar.gz
+seespan-backup-*
+
+# Build cache
+.next/cache/
+.next/server/
+
+# Node modules (will be installed on Vercel)
+node_modules/
+
+# Development files
+.env.local
+.env.development
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Git
+.git/
+
+# Test files
+test-*
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Temporary files
+*.tmp
+*.temp
+
+# Framer plugin directory (separate from main app)
+seespan-video-sync/
+
+# Local development files for Framer plugin
+src/local-dev.tsx
+src/sync.ts 
