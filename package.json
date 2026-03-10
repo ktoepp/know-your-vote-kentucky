@@ -57,7 +57,8 @@
     "test-url-validation": "tsx scripts/test-url-validation.ts",
     "setup-env": "tsx scripts/setup-env.ts",
     "sync:ky": "tsx scripts/manual-sync.ts",
-    "sync:ky:dry": "tsx scripts/manual-sync.ts --dry-run"
+    "sync:ky:dry": "tsx scripts/manual-sync.ts --dry-run",
+    "seed:test": "tsx scripts/seed-test-data.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

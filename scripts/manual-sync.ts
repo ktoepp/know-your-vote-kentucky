@@ -14,9 +14,7 @@
  *   npm run sync:ky -- --source=bills
  */
 
-// Load environment variables
-import 'dotenv/config';
-
+import './load-env';
 import { syncAll, SYNC_SOURCES, type SyncResult } from '../src/lib/ky-sync-pipeline';
 
 const args = process.argv.slice(2);
