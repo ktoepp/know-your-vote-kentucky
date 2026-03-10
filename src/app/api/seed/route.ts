@@ -41,11 +41,13 @@ export async function POST(req: NextRequest) {
       });
     } catch (fetchErr: any) {
       const cause = fetchErr.cause?.code || fetchErr.cause?.message || fetchErr.cause;
+      const host = supabaseUrl ? new URL(supabaseUrl).host : 'not set';
       return NextResponse.json({
         error: 'Cannot reach Supabase',
         message: fetchErr.message,
         cause: cause || undefined,
-        hint: cause === 'ENOTFOUND' ? 'Check URL (project may be deleted/paused). Format: https://PROJECT_REF.supabase.co' : 
+        host,
+        hint: cause === 'ENOTFOUND' ? 'Verify this host matches Supabase Dashboard > Settings > API. Redeploy after changing Vercel env vars.' : 
               cause === 'ECONNREFUSED' ? 'Connection refused - project may be paused' : undefined,
       }, { status: 500 });
     }
