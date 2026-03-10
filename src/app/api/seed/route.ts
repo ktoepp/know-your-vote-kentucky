@@ -24,14 +24,35 @@ export async function POST(req: NextRequest) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceKey) {
-    return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'Supabase not configured. Add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel env vars, then redeploy.' }, { status: 500 });
   }
 
   try {
     const supabase = createClient(supabaseUrl, serviceKey);
+    // Quick connectivity check
+    const { error: probe } = await supabase.from('ky_bills').select('id').limit(1);
+    if (probe && probe.code === '42P01') {
+      return NextResponse.json({
+        error: 'Tables not found. Run migrations in Supabase SQL Editor: 001_kentucky_schema.sql and 002_indexes_and_rls.sql',
+        hint: probe.message,
+      }, { status: 500 });
+    }
+    if (probe) {
+      return NextResponse.json({
+        error: 'Supabase connection failed',
+        code: probe.code,
+        message: probe.message,
+        hint: probe.code === 'PGRST301' ? 'Invalid API key or URL' : undefined,
+      }, { status: 500 });
+    }
     const result = await runSeed(supabase);
     return NextResponse.json(result);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const cause = err.cause?.message || err.cause?.code;
+    return NextResponse.json({
+      error: err.message,
+      cause: cause || undefined,
+      hint: cause === 'ENOTFOUND' ? 'Supabase URL may be wrong or project paused' : undefined,
+    }, { status: 500 });
   }
 }
