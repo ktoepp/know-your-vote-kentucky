@@ -49,8 +49,12 @@ export class KyOpenStatesClient {
         this.cache.set(ck, { data: r.data, ts: Date.now() });
         return r.data as T;
       } catch (err: any) {
-        console.error(`[KyOpenStates] Attempt ${i}/${MAX_RETRIES}: ${err.message}`);
-        if (i === MAX_RETRIES) throw err;
+        const status = err.response?.status;
+        const body = err.response?.data?.detail || err.response?.data?.message || JSON.stringify(err.response?.data);
+        console.error(`[KyOpenStates] Attempt ${i}/${MAX_RETRIES}: ${err.message} (${status}) ${body}`);
+        if (i === MAX_RETRIES) {
+          throw new Error(`OpenStates API ${status || 'error'}: ${body || err.message}. Check OPENSTATES_API_KEY at open.pluralpolicy.com/accounts/profile`);
+        }
         await new Promise(r => setTimeout(r, 1000 * i));
       }
     }
@@ -59,8 +63,9 @@ export class KyOpenStatesClient {
 
   async fetchBills(params: { session?: string; query?: string; first?: number } = {}): Promise<OpenStatesBill[]> {
     console.log('[KyOpenStates] Fetching KY bills');
+    const jurisdiction = 'ocd-jurisdiction/country:us/state:ky/government';
     const data = await this.get<{ results: any[] }>('/bills', {
-      jurisdiction: 'ky',
+      jurisdiction,
       ...(params.session && { session: params.session }),
       ...(params.query && { q: params.query }),
       per_page: String(params.first || 50),
@@ -73,9 +78,10 @@ export class KyOpenStatesClient {
     const all: OpenStatesLegislator[] = [];
     let page = 1;
     let hasMore = true;
+    const jurisdiction = 'ocd-jurisdiction/country:us/state:ky/government';
     while (hasMore) {
       const data = await this.get<{ results: any[]; pagination: { max_page: number } }>('/people', {
-        jurisdiction: 'ky',
+        jurisdiction,
         per_page: '100',
         page: String(page),
       });
