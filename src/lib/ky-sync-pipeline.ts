@@ -73,10 +73,17 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
       log(source, 'No sessions found');
       return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
     }
-    const latestSession = sessions[sessions.length - 1];
-    log(source, `Fetching bills from session: ${latestSession.session_name}`);
-    const bills = await client.fetchBills(latestSession.session_id);
-    log(source, `Fetched ${bills.length} bills`);
+    // Pick most recent session by year_end (last in array may be future/empty)
+    const sorted = [...sessions].sort((a, b) => (b.year_end || 0) - (a.year_end || 0));
+    let latestSession = sorted[0];
+    let bills = await client.fetchBills(latestSession.session_id);
+    // If empty, try next most recent session
+    for (let i = 1; i < sorted.length && bills.length === 0; i++) {
+      latestSession = sorted[i];
+      log(source, `Session ${sorted[i - 1].session_name} had 0 bills, trying ${latestSession.session_name}`);
+      bills = await client.fetchBills(latestSession.session_id);
+    }
+    log(source, `Fetched ${bills.length} bills from ${latestSession.session_name}`);
     if (options.dryRun) {
       log(source, `[DRY RUN] Would upsert ${bills.length} bills`);
       return { source, status: 'success', itemsSynced: bills.length, duration: Date.now() - start };
