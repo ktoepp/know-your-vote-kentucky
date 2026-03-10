@@ -82,13 +82,13 @@ export class KyOpenStatesClient {
     while (hasMore) {
       const data = await this.get<{ results: any[]; pagination: { max_page: number } }>('/people', {
         jurisdiction,
-        per_page: '100',
+        per_page: '50',
         page: String(page),
       });
       const results = data?.results || [];
       all.push(...results);
       const maxPage = data?.pagination?.max_page ?? 1;
-      hasMore = results.length === 100 && page < maxPage && page < 5;
+      hasMore = results.length === 50 && page < maxPage && page < 5;
       page++;
     }
     return all;
