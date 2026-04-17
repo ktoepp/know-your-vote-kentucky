@@ -212,15 +212,16 @@ export const lightTheme = createTheme({
             borderWidth: 1.5,
             borderColor: theme.palette.divider,
             '&.MuiButton-outlinedPrimary': {
-              color: theme.palette.primary.contrastText,
+              color: theme.palette.primary.main,
+              borderColor: theme.palette.primary.main,
               '& .MuiButton-startIcon, & .MuiButton-endIcon': {
-                color: theme.palette.primary.contrastText,
+                color: theme.palette.primary.main,
               },
             },
             '&:hover': {
               borderWidth: 1.5,
               borderColor: theme.palette.primary.light,
-              backgroundColor: 'rgba(30,64,175,0.16)',
+              backgroundColor: 'rgba(30,64,175,0.08)',
             },
           };
         },
@@ -555,15 +556,16 @@ export const darkTheme = createTheme({
             borderWidth: 1.5,
             borderColor: theme.palette.divider,
             '&.MuiButton-outlinedPrimary': {
-              color: theme.palette.primary.contrastText,
+              color: theme.palette.primary.light,
+              borderColor: theme.palette.primary.light,
               '& .MuiButton-startIcon, & .MuiButton-endIcon': {
-                color: theme.palette.primary.contrastText,
+                color: theme.palette.primary.light,
               },
             },
             '&:hover': {
               borderWidth: 1.5,
               borderColor: theme.palette.primary.light,
-              backgroundColor: 'rgba(30,64,175,0.16)',
+              backgroundColor: 'rgba(96,165,250,0.12)',
             },
           };
         },

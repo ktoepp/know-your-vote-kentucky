@@ -27,6 +27,72 @@ import { alpha } from '@mui/material/styles';
 import { supabase } from './lib/supabaseClient';
 import type { KYBill, KYOrdinance, KYExecutiveOrder, KYSchoolBoardItem } from '../types/kentucky';
 
+/**
+ * Session dates sourced from OpenStates (verified against legislature.ky.gov).
+ * Update `KY_SESSIONS` when a new session begins.
+ */
+const KY_SESSIONS = [
+  { name: '2026 Regular Session', start: '2026-01-06', end: '2026-04-15', type: 'regular' },
+  { name: '2025 Regular Session', start: '2025-01-07', end: '2025-04-15', type: 'regular' },
+];
+
+function SessionBanner() {
+  const theme = useTheme();
+  const today = new Date();
+
+  const active = KY_SESSIONS.find(s => {
+    const start = new Date(s.start);
+    const end = new Date(s.end);
+    return today >= start && today <= end;
+  });
+
+  const mostRecent = KY_SESSIONS[0];
+  const session = active || mostRecent;
+  const isInSession = !!active;
+
+  const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  return (
+    <Box sx={{
+      borderBottom: `1px solid ${theme.palette.divider}`,
+      bgcolor: isInSession ? alpha(theme.palette.success.main, 0.08) : alpha(theme.palette.grey[500], 0.08),
+      py: 1,
+    }}>
+      <Container maxWidth="lg">
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          <Box sx={{
+            width: 8, height: 8, borderRadius: '50%',
+            bgcolor: isInSession ? theme.palette.success.main : theme.palette.grey[500],
+            flexShrink: 0,
+            ...(isInSession && { animation: 'pulse 2s infinite', '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } } }),
+          }} />
+          <Typography variant="body2" fontWeight={600} color={isInSession ? 'success.main' : 'text.secondary'}>
+            {isInSession ? 'Legislature In Session' : 'Legislature Adjourned'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {session.name} &bull; {fmtDate(session.start)} – {fmtDate(session.end)}
+          </Typography>
+          {!isInSession && (
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+              Next session typically begins January
+            </Typography>
+          )}
+          <Button
+            component={Link}
+            href="https://legislature.ky.gov"
+            target="_blank"
+            rel="noopener noreferrer"
+            size="small"
+            sx={{ ml: 'auto', fontSize: '0.75rem' }}
+          >
+            Official Calendar
+          </Button>
+        </Box>
+      </Container>
+    </Box>
+  );
+}
+
 // Helper components
 function SectionHeader({ title, icon, href }: { title: string; icon: React.ReactNode; href: string }) {
   const theme = useTheme();
@@ -69,53 +135,114 @@ function formatSponsors(sponsors: Record<string, unknown> | null): string {
   return '';
 }
 
+function getPrimarySponsors(sponsors: Record<string, unknown> | null, max = 2): { name: string; party?: string }[] {
+  if (!sponsors) return [];
+  if (Array.isArray(sponsors)) {
+    return sponsors.slice(0, max).map((s: any) => ({ name: s?.name || '', party: s?.party })).filter(s => s.name);
+  }
+  return [];
+}
+
+function memberSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function partyColor(party?: string): string {
+  if (party === 'D') return '#1565c0';
+  if (party === 'R') return '#c62828';
+  return '#555';
+}
+
+function SponsorChip({ name, party }: { name: string; party?: string }) {
+  const slug = memberSlug(name);
+  return (
+    <Chip
+      component={Link}
+      href={`/members#${slug}`}
+      label={name}
+      size="small"
+      clickable
+      sx={{
+        fontWeight: 600,
+        fontSize: '0.72rem',
+        bgcolor: partyColor(party),
+        color: '#fff',
+        '&:hover': { opacity: 0.85 },
+        mr: 0.5,
+        mb: 0.5,
+      }}
+    />
+  );
+}
+
 function KYBillCard({ bill }: { bill: KYBill }) {
   const theme = useTheme();
-  const sponsorText = formatSponsors(bill.sponsors);
+  const primarySponsors = getPrimarySponsors(bill.sponsors);
 
   const tooltipTitle = (
-    <Box component="span" sx={{ display: 'block', maxWidth: 360 }}>
-      <Typography component="span" variant="subtitle2" display="block" sx={{ fontWeight: 600, mb: 1 }}>
-        {bill.bill_number}: {bill.title}
-      </Typography>
-      {bill.ai_summary && (
-        <Typography component="span" variant="body2" display="block" sx={{ mb: 1.5 }}>
-          {bill.ai_summary}
-        </Typography>
+    <Box component="span" sx={{ display: 'block', maxWidth: 380, p: 0.5 }}>
+      {/* Latest action — most important */}
+      {bill.last_action && (
+        <Box component="span" sx={{ display: 'block', mb: 1.5, p: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+          <Typography component="span" variant="caption" display="block" sx={{ opacity: 0.75, mb: 0.25, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Latest Action {bill.last_action_date ? `· ${new Date(bill.last_action_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+          </Typography>
+          <Typography component="span" variant="body2" display="block" sx={{ fontWeight: 500 }}>
+            {bill.last_action}
+          </Typography>
+        </Box>
       )}
-      {sponsorText && (
-        <Typography component="span" variant="caption" display="block" sx={{ fontWeight: 600 }}>
-          Sponsor{sponsorText.includes(',') ? 's' : ''}: {sponsorText}
-        </Typography>
+      {/* Primary sponsor(s) */}
+      {primarySponsors.length > 0 && (
+        <Box component="span" sx={{ display: 'block', mb: 1.25 }}>
+          <Typography component="span" variant="caption" display="block" sx={{ opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.5 }}>
+            {primarySponsors.length > 1 ? 'Sponsors' : 'Sponsor'}
+          </Typography>
+          <Box component="span" sx={{ display: 'flex', flexWrap: 'wrap' }}>
+            {primarySponsors.map((s, i) => (
+              <SponsorChip key={i} name={s.name} party={s.party} />
+            ))}
+          </Box>
+        </Box>
       )}
-      {bill.last_action_date && (
-        <Typography component="span" variant="caption" display="block" sx={{ mt: 1, opacity: 0.9 }}>
-          Last action: {new Date(bill.last_action_date).toLocaleDateString()}
-          {bill.last_action ? ` - ${bill.last_action}` : ''}
-        </Typography>
+      {/* Topic tags */}
+      {bill.topics && bill.topics.length > 0 && (
+        <Box component="span" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+          {bill.topics.slice(0, 4).map(t => (
+            <Box key={t} component="span" sx={{ display: 'inline-block', px: 1, py: 0.25, borderRadius: 1, bgcolor: 'action.selected', color: 'text.primary', fontSize: '0.7rem' }}>
+              {t}
+            </Box>
+          ))}
+        </Box>
       )}
     </Box>
   );
 
+  const slug = bill.bill_number?.replace(/\s+/g, '') || bill.id;
+
   const card = (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3, border: `1px solid ${theme.palette.divider}`, transition: 'all 0.2s', '&:hover': { boxShadow: 4, transform: 'translateY(-2px)' } }}>
+    <Card
+      component={Link}
+      href={`/bills/${slug}`}
+      sx={{
+        height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3,
+        border: `1px solid ${theme.palette.divider}`, transition: 'all 0.2s',
+        textDecoration: 'none', color: 'inherit',
+        '&:hover': { boxShadow: 4, transform: 'translateY(-2px)', borderColor: theme.palette.primary.main },
+      }}
+    >
       <CardContent sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
           {bill.chamber && <Chip label={bill.chamber === 'house' ? 'House' : 'Senate'} size="small" color={bill.chamber === 'senate' ? 'secondary' : 'primary'} />}
           {bill.status && <Chip label={bill.status} size="small" variant="outlined" />}
         </Box>
         <Typography variant="subtitle1" fontWeight={600} gutterBottom>{bill.bill_number}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {bill.title}
         </Typography>
-        {bill.ai_summary && (
-          <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-            {bill.ai_summary.substring(0, 120)}...
-          </Typography>
-        )}
         {bill.last_action_date && (
-          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-            Last action: {new Date(bill.last_action_date).toLocaleDateString()}
+          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 'auto' }}>
+            {new Date(bill.last_action_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </Typography>
         )}
       </CardContent>
@@ -123,7 +250,25 @@ function KYBillCard({ bill }: { bill: KYBill }) {
   );
 
   return (
-    <Tooltip title={tooltipTitle} placement="top" arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 400 } } }}>
+    <Tooltip
+      title={tooltipTitle}
+      placement="top"
+      arrow
+      enterDelay={400}
+      componentsProps={{
+        tooltip: {
+          sx: {
+            maxWidth: 420,
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: 4,
+            '& .MuiTooltip-arrow': { color: 'background.paper' },
+          },
+        },
+      }}
+    >
       <Box component="span" sx={{ display: 'block', height: '100%' }}>
         {card}
       </Box>
@@ -311,6 +456,7 @@ export default function HomePage() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <SessionBanner />
       {/* Hero Section */}
       <Box sx={{
         background: theme.palette.mode === 'dark'

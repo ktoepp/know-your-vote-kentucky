@@ -87,7 +87,7 @@ Remember: Keep it factual, engaging, and suitable for young voters who are learn
 
     // Call Claude API
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-6',
       max_tokens: 500,
       temperature: 0.3, // Lower temperature for more consistent, factual output
       messages: [

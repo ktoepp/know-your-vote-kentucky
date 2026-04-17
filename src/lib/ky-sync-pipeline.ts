@@ -13,7 +13,53 @@ import {
   getKyCountyCourtsClient,
 } from './ky-data-sources';
 import { supabaseAdmin } from '../app/lib/supabaseClient';
+import { classifyTopics } from './ky-topic-classifier';
 import type { KYSource } from '../types/kentucky';
+
+/**
+ * LegiScan numeric status codes for state bills.
+ * Cross-validated against last_action text for accuracy.
+ */
+const LEGISCAN_STATUS_MAP: Record<number, string> = {
+  1: 'Introduced',
+  2: 'Engrossed',
+  3: 'Enrolled',
+  4: 'Passed',
+  5: 'Vetoed',
+  6: 'Failed',
+  7: 'Veto Override',
+  8: 'Chaptered',
+  9: 'Referred',
+  10: 'Reported',
+  11: 'Failed in Committee',
+  12: 'Draft',
+};
+
+/**
+ * Map LegiScan status code to display string, cross-checked against
+ * last_action text so Kentucky-specific language (e.g. "delivered to
+ * Secretary of State" = signed) is always accurate.
+ */
+function mapLegiScanStatus(statusCode: number, lastAction: string): string {
+  const action = (lastAction || '').toLowerCase();
+  if (action.includes('signed by governor')) return 'Signed';
+  if (action.includes('delivered to secretary of state')) return 'Signed';
+  if (action.includes('vetoed by governor') || action.includes('veto')) return 'Vetoed';
+  if (action.includes('veto override')) return 'Veto Override';
+  if (action.includes('died') || action.includes('failed')) return 'Failed';
+  if (action.includes('third reading, passed') || action.includes('passed') && action.includes('third reading')) return 'Passed Chamber';
+  if (action.includes('committee') || action.includes('referred to')) return 'In Committee';
+  if (action.includes('introduced') || action.includes('filed')) return 'Introduced';
+  return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';
+}
+
+/** Derive chamber from bill number prefix (HB/HR = house, SB/SR = senate). */
+function chamberFromBillNumber(billNumber: string): 'house' | 'senate' | null {
+  const upper = billNumber.toUpperCase();
+  if (upper.startsWith('H')) return 'house';
+  if (upper.startsWith('S')) return 'senate';
+  return null;
+}
 
 export interface SyncOptions {
   dryRun?: boolean;
@@ -93,18 +139,23 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
       return { source, status: 'success', itemsSynced: toSync.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    const rows = toSync.map((bill) => ({
-      legiscan_id: bill.bill_id,
-      bill_number: bill.number,
-      title: bill.title,
-      description: bill.description || null,
-      session: latestSession.session_name,
-      status: bill.status_desc || null,
-      last_action: bill.last_action || null,
-      last_action_date: bill.last_action_date || null,
-      bill_text_url: bill.url || null,
-      source: 'legiscan',
-    }));
+    const rows = toSync.map((bill) => {
+      const topics = classifyTopics(bill.title, bill.description || '');
+      return {
+        legiscan_id: bill.bill_id,
+        bill_number: bill.number,
+        title: bill.title,
+        description: bill.description || null,
+        session: latestSession.session_name,
+        status: mapLegiScanStatus(bill.status, bill.last_action || ''),
+        chamber: chamberFromBillNumber(bill.number),
+        last_action: bill.last_action || null,
+        last_action_date: bill.last_action_date || null,
+        bill_text_url: bill.url || null,
+        topics: topics.length > 0 ? topics : null,
+        source: 'legiscan',
+      };
+    });
     // Batch upsert (100 per batch to avoid payload limits)
     const BATCH = 100;
     let synced = 0;

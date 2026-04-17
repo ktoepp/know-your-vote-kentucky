@@ -25,7 +25,7 @@ export function validateEnvironmentVariables(requiredVars: string[] = []): {
   const warnings: string[] = [];
 
   // Default required variables for KY content processing
-  const defaultRequired = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY'];
+  const defaultRequired = ['ANTHROPIC_API_KEY'];
   const allRequired = [...new Set([...defaultRequired, ...requiredVars])];
 
   for (const varName of allRequired) {

@@ -132,7 +132,7 @@ export async function generateWhyItMatters(item: any): Promise<string> {
   try {
     const anthropic = new Anthropic();
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 150,
       system: 'You are a non-partisan civic education assistant for Kentucky. In 1-2 sentences, explain why this item matters to everyday Kentuckians. Be specific and practical.',
       messages: [{

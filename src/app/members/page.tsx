@@ -125,7 +125,7 @@ export default function MembersPage() {
           <Grid container spacing={3}>
             {filtered.map((leg) => (
               <Grid item xs={12} sm={6} md={4} key={leg.id}>
-                <Card sx={{
+                <Card id={leg.name ? leg.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : leg.id} sx={{
                   height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3,
                   border: `1px solid ${theme.palette.divider}`, transition: 'all 0.2s',
                   '&:hover': { boxShadow: 4, transform: 'translateY(-2px)' },
