@@ -1,6 +1,8 @@
 # Know Your Vote Kentucky (KYVK)
 
-A civic transparency platform for Kentucky citizens. Track state bills, local ordinances, executive orders, school board actions, and county government — all in one place with AI-powered plain-language summaries.
+A civic transparency platform for Kentucky citizens. Track state bills, local ordinances, school board actions, and county government — all in one place with AI-powered plain-language summaries.
+
+**Deferred — executive orders:** Not part of the MVP while governor.ky.gov listings are unreliable for automated sync (404s, client-only rendering). Revisit when there is a stable index URL, an official feed/API, or a maintainable headless fetch path. The scraper (`src/lib/ky-executive-orders.ts`), DB table, `syncExecutiveOrders()`, and `generateEOSummary()` remain in the codebase for a future re-enable; they are omitted from the product surface, search, intelligence API, automated sync map, and Vercel cron until then.
 
 ## 🚀 Quick Start
 
@@ -14,7 +16,7 @@ A civic transparency platform for Kentucky citizens. Track state bills, local or
 ### Installation
 ```bash
 git clone <repository-url>
-cd know-your-vote-ky
+cd know-your-vote-kentucky
 
 npm install
 cp env-template.txt .env.local   # fill in your keys
@@ -22,6 +24,8 @@ npm run dev
 ```
 
 Visit `http://localhost:3000` to see the application.
+
+If `next dev` returns 500s or missing webpack chunks, stop every process on port 3000, then run `npm run dev:clean` (deletes `.next` and starts the dev server).
 
 ## Tech Stack
 
@@ -31,11 +35,14 @@ Visit `http://localhost:3000` to see the application.
 - **Data Sources**: LegiScan, OpenStates, KY LRC
 - **Deployment**: Vercel with cron-based data sync
 
+## MVP scope (public story)
+
+Primary navigation highlights **bills, ordinances, meetings, members, search, and about**. Legacy or experimental tools (explore, live content, table/activity dashboards, etc.) remain reachable by URL for development but use **`noindex`** metadata so they are not promoted in search results.
+
 ## Key Features
 
 - **Bill Tracking** — Kentucky General Assembly bills with status, sponsors, and AI summaries
 - **Local Ordinances** — City/county ordinance monitoring
-- **Executive Orders** — Governor's executive actions
 - **School Boards** — District-level education policy tracking
 - **Intelligence Scoring** — Multi-factor relevance scoring for civic items
 - **Plain-Language Summaries** — AI-generated "why this matters" explanations
@@ -51,8 +58,7 @@ Sync sources and status (as of last verification):
 | votes | Working | Requires bills synced first |
 | ordinances | Working | Louisville + Lexington via Legistar |
 | school-boards | Working | JCPS + FCPS via KSBA portal |
-| executive-orders | Not working | 404 on governor.ky.gov/executive-orders — path may have changed |
-| county-actions | Not working | Louisville 403, Lexington 404 — URLs may have changed |
+| county-actions | Working | Jefferson & Fayette **Legistar** public calendars (`louisville.legistar.com`, `lexington.legistar.com`); meeting rows sync to `ky_county_actions` |
 
 ## API Endpoints
 
@@ -61,22 +67,23 @@ Sync sources and status (as of last verification):
 | `GET /api/bills` | Kentucky bills with filtering |
 | `GET /api/search` | Full-text search across all content types |
 | `GET /api/intelligence` | Top-scored items with AI analysis |
-| `POST /api/sync` | Trigger data sync (protected by SYNC_API_KEY) |
-| `GET /api/sync` | Check sync status |
+| `POST /api/sync` | Trigger data sync (Bearer `SYNC_API_KEY` or `CRON_SECRET`) |
+| `GET /api/sync` | Without `?source=`: sync status. With `?source=bills` etc.: run that source (used by Vercel Cron; same auth) |
 
 ## Deployment
 
-Configured for Vercel with automatic cron jobs for data sync:
-- Bills: every 2 hours
-- Legislators: daily at 6 AM
-- Ordinances: daily at 8 AM
-- Executive orders: daily at 9 AM
-- School boards: weekly on Mondays
-- County actions: weekly on Mondays
+Set `CRON_SECRET` in Vercel (16+ random characters). Vercel Cron invokes `/api/sync?source=…` with `Authorization: Bearer <CRON_SECRET>`. The sync route also accepts `SYNC_API_KEY` for manual runs. Configure at least one of `CRON_SECRET` or `SYNC_API_KEY`.
+
+Configured for Vercel with automatic cron jobs for data sync (see `vercel.json` for exact schedules):
+- Bills, legislators, votes, ordinances, school boards, county actions
+
+Executive-order sync is not scheduled (deferred); see the note at the top of this file.
 
 ## Environment Variables
 
 See `env-template.txt` for the full list of required and optional environment variables.
+
+To show **data freshness** on the home, search, bills, and ordinances pages, the anonymous Supabase client must be allowed to **`SELECT` on `ky_sources`** (or the note is omitted silently). Civic tables used for browsing typically already allow read; add a read policy for `ky_sources` if needed.
 
 ## License
 

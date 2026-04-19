@@ -21,7 +21,10 @@ export interface ExecutiveOrderDetail extends ExecutiveOrder {
 }
 
 const BASE_URL = 'https://governor.ky.gov';
+/** Legacy listing (often 404); we scan multiple pages for PDF links. */
 const EO_PATH = '/executive-orders';
+/** Pages that may include direct links to /attachments/...Executive-Order....pdf (server-rendered portions). */
+const DISCOVERY_PATHS = [EO_PATH, '/news', '/'];
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const MAX_RETRIES = 3;
 
@@ -57,32 +60,91 @@ export class KyExecutiveOrdersClient {
     const cached = this.getCached<ExecutiveOrder[]>(ck);
     if (cached) return cached;
 
-    console.log('[KyEO] Fetching executive orders list');
-    const $ = await this.fetchPage(`${BASE_URL}${EO_PATH}`);
     const orders: ExecutiveOrder[] = [];
+    const seenUrl = new Set<string>();
+    const toAbs = (href: string) =>
+      href.startsWith('http') ? href : `${BASE_URL}${href.startsWith('/') ? href : `/${href}`}`;
 
-    // Parse executive order listing page - adapt selectors to actual site structure
-    $('article, .view-content .views-row, .field-content, li a[href*="executive-order"]').each((_, el) => {
-      const $el = $(el);
-      const link = $el.find('a').first();
-      const href = link.attr('href') || $el.attr('href') || '';
-      const title = link.text().trim() || $el.text().trim();
-      if (!title || !href) return;
-
-      const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
-      const numberMatch = title.match(/(\d{4}-\d{3,4}|\d+-\d+)/);
-      const dateMatch = title.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    const addFromPdfHref = (href: string, titleText: string) => {
+      if (!href) return;
+      if (!/\/attachments\//i.test(href)) return;
+      if (!/Executive-Order|executive-order/i.test(href)) return;
+      const fullUrl = toAbs(href);
+      if (seenUrl.has(fullUrl)) return;
+      seenUrl.add(fullUrl);
+      const fileSlug = href.split('/').pop() || '';
+      const numberMatch =
+        fileSlug.match(/(?:Executive-Order_|Executive-Order-)(\d{4}-\d{1,4})/i) ||
+        fileSlug.match(/(\d{4}-\d{1,4})/);
+      const dateMatch = fileSlug.match(/(\d{8})/);
+      const isoHint =
+        dateMatch?.[1] && dateMatch[1].length === 8
+          ? `${dateMatch[1].slice(4, 6)}/${dateMatch[1].slice(6, 8)}/${dateMatch[1].slice(0, 4)}`
+          : '';
+      const title =
+        titleText.replace(/\s+/g, ' ').trim().substring(0, 200) ||
+        fileSlug.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
 
       orders.push({
-        id: numberMatch?.[1] || href.split('/').pop() || '',
+        id: numberMatch?.[1] || fileSlug,
         number: numberMatch?.[1] || '',
-        title: title.replace(/\s+/g, ' ').substring(0, 200),
-        date: dateMatch?.[1] || '',
+        title,
+        date: isoHint,
         url: fullUrl,
         summary: '',
         governor: '',
       });
-    });
+    };
+
+    for (const path of DISCOVERY_PATHS) {
+      try {
+        console.log(`[KyEO] Discovering PDF links from ${BASE_URL}${path}`);
+        const $ = await this.fetchPage(`${BASE_URL}${path}`);
+
+        $('a[href*=".pdf"]').each((_, el) => {
+          const href = $(el).attr('href') || '';
+          const text = $(el).text().trim();
+          addFromPdfHref(href, text);
+        });
+
+        $('article, .view-content .views-row, .field-content, li a[href*="executive-order"]').each((_, el) => {
+          const $el = $(el);
+          const link = $el.find('a').first();
+          const href = link.attr('href') || $el.attr('href') || '';
+          const title = link.text().trim() || $el.text().trim();
+          if (!href) return;
+          if (href.toLowerCase().includes('.pdf')) {
+            addFromPdfHref(href, title);
+            return;
+          }
+          if (!title || !href) return;
+          const fullUrl = toAbs(href);
+          const numberMatch = title.match(/(\d{4}-\d{3,4}|\d+-\d+)/);
+          const dateMatch = title.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+          if (seenUrl.has(fullUrl)) return;
+          seenUrl.add(fullUrl);
+          orders.push({
+            id: numberMatch?.[1] || href.split('/').pop() || '',
+            number: numberMatch?.[1] || '',
+            title: title.replace(/\s+/g, ' ').substring(0, 200),
+            date: dateMatch?.[1] || '',
+            url: fullUrl,
+            summary: '',
+            governor: '',
+          });
+        });
+      } catch (err: any) {
+        console.error(`[KyEO] Discovery failed for ${path}: ${err.message}`);
+      }
+    }
+
+    if (orders.length === 0) {
+      console.warn(
+        '[KyEO] No executive orders found in static HTML. The governor site may render listings only in the browser; consider a headless fetch or an official index URL when available.',
+      );
+    } else {
+      console.log(`[KyEO] Discovered ${orders.length} executive order link(s)`);
+    }
 
     this.cache.set(ck, { data: orders, ts: Date.now() });
     return orders;

@@ -15,7 +15,7 @@ export default function DashboardPage() {
   return (
     <ComingSoonPage
       title="Personal Dashboard"
-      description="We're building a personalized dashboard where you can track your congressional activity, save searches, set up alerts, and manage your preferences. This will help you stay informed about the issues that matter most to you."
+      description="We're building a personalized dashboard where you can track Kentucky legislation and local civics you care about, save searches, set up alerts, and manage your preferences."
       features={[
         { icon: <Dashboard />, label: "Activity Overview" },
         { icon: <Bookmark />, label: "Saved Searches" },

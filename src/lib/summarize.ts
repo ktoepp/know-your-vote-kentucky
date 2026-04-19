@@ -261,8 +261,7 @@ JSON Response:`;
  */
 export async function summarizeForYoungVoters(
   transcript: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  options: SummaryOptions = {}
+  _options: SummaryOptions = {}
 ): Promise<SummaryResult> {
   try {
     // Check if API key is available

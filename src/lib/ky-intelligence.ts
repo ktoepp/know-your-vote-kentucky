@@ -3,11 +3,7 @@
  * Multi-factor relevance scoring adapted from congressional context to state/local.
  */
 import Anthropic from '@anthropic-ai/sdk';
-import type {
-  KYBill,
-  KYOrdinance,
-  KYExecutiveOrder,
-} from '@/types/kentucky';
+import type { KYBill, KYOrdinance } from '@/types/kentucky';
 
 export interface RelevanceScore {
   score: number; // 0-100
@@ -21,7 +17,7 @@ export interface RelevanceScore {
   tags: string[];
 }
 
-type ScoredItem = KYBill | KYOrdinance | KYExecutiveOrder;
+type ScoredItem = KYBill | KYOrdinance;
 
 // --- High-interest topic keywords ---
 const PUBLIC_INTEREST_KEYWORDS = [
@@ -67,15 +63,9 @@ export function scoreRelevance(item: ScoredItem): RelevanceScore {
     tags.push('local');
     reasoning.push(`Local ordinance affecting ${(item as KYOrdinance).jurisdiction}`);
   }
-  if ('eo_number' in item) {
-    // Executive order = statewide, immediate
-    factors.impact += 30;
-    tags.push('executive-action');
-    reasoning.push('Executive order with immediate statewide effect');
-  }
 
   // --- Urgency ---
-  const lastAction = (item as KYBill).last_action_date ?? (item as KYOrdinance).adopted_date ?? (item as KYExecutiveOrder).signed_date;
+  const lastAction = (item as KYBill).last_action_date ?? (item as KYOrdinance).adopted_date;
   const days = daysSince(lastAction);
   if (days !== null && days < 7) {
     factors.urgency += 30;

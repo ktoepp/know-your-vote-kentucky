@@ -29,6 +29,7 @@ import {
   CalendarToday
 } from '@mui/icons-material';
 import { useBillsData, Bill } from '../lib/useBillsData';
+import { formatBillLabelText } from '@/lib/bill-display';
 
 // Utility function to format bill number with prefix
 const formatBillNumber = (bill: Bill) => {
@@ -82,7 +83,7 @@ export default function ActivityPage() {
             id: `action-${bill.id}`,
             type: 'bill_action',
             title: `Bill Action: ${bill.title || `H.R. ${bill.number}`}`,
-            description: bill.last_action,
+            description: formatBillLabelText(bill.last_action),
             date: bill.introduced_date || new Date().toISOString(),
             billNumber: bill.number ? `H.R. ${bill.number}` : undefined,
             billTitle: bill.title,

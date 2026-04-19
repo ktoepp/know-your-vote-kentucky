@@ -2,7 +2,7 @@
  * /api/intelligence — Kentucky Political Intelligence endpoint
  *
  * GET  — Returns top-scored items and daily briefing
- *   Query params: ?limit=10&type=bills|ordinances|executive-orders
+ *   Query params: ?limit=10&type=bills|ordinances
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
@@ -31,10 +31,6 @@ export async function GET(request: NextRequest) {
     if (!type || type === 'ordinances') {
       const { data } = await supabase.from('ky_ordinances').select('*').order('introduced_date', { ascending: false }).limit(limit);
       allItems.push(...(data || []).map((o: any) => ({ ...o, _type: 'ordinance' })));
-    }
-    if (!type || type === 'executive-orders') {
-      const { data } = await supabase.from('ky_executive_orders').select('*').order('signed_date', { ascending: false }).limit(limit);
-      allItems.push(...(data || []).map((e: any) => ({ ...e, _type: 'executive_order' })));
     }
 
     // Score and classify each item

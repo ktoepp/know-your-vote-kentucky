@@ -1,5 +1,8 @@
 # Know Your Vote Kentucky — Environment Configuration
-# Copy this file to .env.local and fill in your values
+# Copy this file to .env.local and fill in your values.
+#
+# Security: .env.local is gitignored — never commit it. Commit only this template
+# (or README instructions), never real keys.
 
 # =============================================================================
 # REQUIRED — Supabase (primary database)
@@ -29,13 +32,19 @@ OPENSTATES_API_KEY=your_openstates_api_key_here
 # =============================================================================
 # REQUIRED — Sync Protection
 # =============================================================================
-# Secret key to protect /api/sync endpoints (used as Bearer token)
+# Secret key to protect /api/sync endpoints (used as Bearer token for manual POST/GET)
 SYNC_API_KEY=your_sync_api_key_here
+
+# Optional: Vercel Cron sends this automatically as Authorization: Bearer …
+# Set the same value in Vercel Project → Environment Variables as CRON_SECRET
+# (see https://vercel.com/docs/cron-jobs/manage-cron-jobs)
+# CRON_SECRET=your_random_16_plus_char_secret
 
 # =============================================================================
 # OPTIONAL — Application Settings
 # =============================================================================
 NODE_ENV=development
+# Public site origin (sitemap.xml, robots.txt). In production set to your real domain, e.g. https://knowyourvotekentucky.org
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # Optional: Debug / Logging

@@ -17,12 +17,24 @@ import {
 } from '@mui/material';
 import {
   ArrowBack, OpenInNew, Gavel, Person, History,
-  Label, Description, HowToVote, CheckCircle, RadioButtonUnchecked,
+  Description, HowToVote, CheckCircle, RadioButtonUnchecked,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import NextLink from 'next/link';
+import { AiGeneratedBlock } from '@/components/civic/AiAttribution';
+import { CopyableEmail } from '@/components/civic/CopyableEmail';
+import {
+  formatBillLabelText,
+  formatLegislativeRoleLabel,
+  formatRepresentativePartyChipLabel,
+  formatSponsorDistrictLine,
+  partyBadgeBackgroundColor,
+} from '@/lib/bill-display';
+import { supabase } from '@/app/lib/supabaseClient';
+import type { KYLegislatorRoster } from '@/types/kentucky';
+import { matchLegislatorBySponsorName, memberSlug } from '@/lib/ky-member-utils';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                */
@@ -103,16 +115,6 @@ function fmtDate(d: string | null | undefined, opts?: Intl.DateTimeFormatOptions
   return new Date(d).toLocaleDateString('en-US', opts ?? { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-function memberSlug(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
-
-function partyColor(party: string) {
-  if (party === 'D') return '#1565c0';
-  if (party === 'R') return '#c62828';
-  return '#555';
-}
-
 function statusColor(status: string | null): 'success' | 'warning' | 'error' | 'default' {
   if (!status) return 'default';
   const s = status.toLowerCase();
@@ -125,9 +127,10 @@ function statusColor(status: string | null): 'success' | 'warning' | 'error' | '
 /* ------------------------------------------------------------------ */
 /* Sub-components                                                       */
 /* ------------------------------------------------------------------ */
-function SponsorCard({ sponsor }: { sponsor: LegiScanSponsor }) {
+function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; rosterPhoto?: string | null }) {
   const theme = useTheme();
-  const photo = sponsor.bio?.social?.image;
+  const photo = rosterPhoto || sponsor.bio?.social?.image;
+  const memberHref = `/members#${memberSlug(sponsor.name)}`;
   const ballotpediaUrl = sponsor.bio?.social?.ballotpedia || (sponsor.ballotpedia ? `https://ballotpedia.org/${sponsor.ballotpedia}` : null);
   const kyProfileUrl = sponsor.bio?.social?.biography;
   const isPrimary = sponsor.sponsor_type_id === 1;
@@ -136,32 +139,51 @@ function SponsorCard({ sponsor }: { sponsor: LegiScanSponsor }) {
     <MuiCard sx={{ borderRadius: 2, border: `1px solid ${theme.palette.divider}`, height: '100%' }}>
       <MuiCardContent>
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', mb: 1.5 }}>
-          <MuiAvatar src={photo} sx={{ width: 52, height: 52, flexShrink: 0 }}>
+          <MuiAvatar src={photo || undefined} sx={{ width: 52, height: 52, flexShrink: 0 }}>
             {sponsor.first_name?.[0]}{sponsor.last_name?.[0]}
           </MuiAvatar>
           <Box sx={{ minWidth: 0 }}>
-            <Typography variant="subtitle2" fontWeight={700} noWrap>{sponsor.name}</Typography>
+            <Typography
+              variant="subtitle2"
+              fontWeight={700}
+              noWrap
+              component={NextLink}
+              href={memberHref}
+              sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+            >
+              {sponsor.name}
+            </Typography>
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
               <MuiChip
-                label={sponsor.party}
+                component={NextLink}
+                href={memberHref}
+                clickable
+                label={formatRepresentativePartyChipLabel(sponsor.party)}
                 size="small"
-                sx={{ bgcolor: partyColor(sponsor.party), color: '#fff', fontWeight: 700, fontSize: '0.7rem', height: 20 }}
+                sx={{ bgcolor: partyBadgeBackgroundColor(sponsor.party), color: '#fff', fontWeight: 700, fontSize: '0.7rem', height: 20 }}
               />
-              <MuiChip label={sponsor.role} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 20 }} />
-              {isPrimary && <MuiChip label="Primary" size="small" color="primary" sx={{ fontSize: '0.7rem', height: 20 }} />}
+              {sponsor.role ? (
+                <MuiChip
+                  label={formatLegislativeRoleLabel(sponsor.role)}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontSize: '0.7rem', height: 20 }}
+                />
+              ) : null}
+              {isPrimary && <MuiChip label="Primary sponsor" size="small" color="primary" sx={{ fontSize: '0.7rem', height: 20 }} />}
             </Box>
           </Box>
         </Box>
 
         {sponsor.district && (
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-            District: {sponsor.district.replace('HD-', 'House Dist. ').replace('SD-', 'Senate Dist. ')}
+            {formatSponsorDistrictLine(sponsor.district)}
           </Typography>
         )}
         {sponsor.bio?.social?.email && (
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5, wordBreak: 'break-all' }}>
-            {sponsor.bio.social.email}
-          </Typography>
+          <Box sx={{ mb: 0.5 }}>
+            <CopyableEmail email={sponsor.bio.social.email} />
+          </Box>
         )}
 
         <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
@@ -225,7 +247,7 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
                 </Box>
               </Typography>
               <Typography variant="body2" color={isImportant ? 'text.primary' : 'text.secondary'} fontWeight={isImportant ? 500 : 400}>
-                {item.action}
+                {formatBillLabelText(item.action)}
               </Typography>
             </Box>
           </Box>
@@ -245,21 +267,45 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
 
   const [bill, setBill] = useState<KYBill | null>(null);
   const [detail, setDetail] = useState<BillDetail | null>(null);
+  const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let cancelled = false;
+    supabase
+      .from('ky_legislators')
+      .select('id,name,first_name,last_name,party,chamber,district,photo_url')
+      .eq('active', true)
+      .then(({ data }) => {
+        if (!cancelled) setLegislators(data || []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/bills/${encodeURIComponent(id)}`);
+        const res = await fetch(`/api/bills/${encodeURIComponent(id)}`, {
+          signal: AbortSignal.timeout(30_000),
+        });
         if (!res.ok) throw new Error(res.status === 404 ? 'Bill not found' : 'Failed to load bill');
         const json = await res.json();
         setBill(json.bill);
         setDetail(json.detail);
       } catch (err: any) {
-        setError(err.message);
+        const name = err?.name;
+        const msg = err?.message || '';
+        if (name === 'AbortError' || name === 'TimeoutError' || /aborted|timeout/i.test(msg)) {
+          setError('Request timed out while loading this bill. Try again in a moment.');
+        } else {
+          setError(err.message || 'Failed to load bill');
+        }
       } finally {
         setLoading(false);
       }
@@ -294,6 +340,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
   // Most recent text version first
   const latestText = texts.find(t => t.type === 'Chaptered' || t.type === 'Enrolled' || t.type === 'Engrossed') ?? texts[0];
   const originalText = texts.find(t => t.type === 'Introduced');
+  const officialTextForAi = latestText?.state_link || originalText?.state_link || bill.bill_text_url || null;
 
   const primarySponsors = sponsors.filter(s => s.sponsor_type_id === 1);
   const coSponsors = sponsors.filter(s => s.sponsor_type_id !== 1);
@@ -318,10 +365,10 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                 />
               )}
               {bill.status && (
-                <MuiChip label={bill.status} size="small" color={statusColor(bill.status)} />
+                <MuiChip label={formatBillLabelText(bill.status)} size="small" color={statusColor(bill.status)} />
               )}
               {bill.session && (
-                <MuiChip label={bill.session} size="small" variant="outlined" />
+                <MuiChip label={formatBillLabelText(bill.session)} size="small" variant="outlined" />
               )}
             </Box>
 
@@ -335,9 +382,17 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
             {/* Subject tags */}
             {subjects.length > 0 && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2 }}>
-                <Label sx={{ fontSize: 16, color: 'text.secondary', mr: 0.5, mt: 0.25 }} />
-                {subjects.map(s => (
-                  <MuiChip key={s.subject_id} label={s.subject_name} size="small" variant="outlined" sx={{ fontSize: '0.72rem' }} />
+                {subjects.map((s) => (
+                  <MuiChip
+                    key={s.subject_id}
+                    component={NextLink}
+                    href={`/search?q=${encodeURIComponent(s.subject_name)}`}
+                    clickable
+                    label={s.subject_name}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontSize: '0.72rem' }}
+                  />
                 ))}
               </Box>
             )}
@@ -358,7 +413,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
 
             {bill.last_action && (
               <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
-                <Typography variant="body2" fontWeight={500}>{bill.last_action}</Typography>
+                <Typography variant="body2" fontWeight={500}>{formatBillLabelText(bill.last_action)}</Typography>
               </Box>
             )}
           </MuiCardContent>
@@ -367,6 +422,15 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
         <MuiGrid container spacing={3}>
           {/* Left column */}
           <MuiGrid item xs={12} md={8}>
+            {bill.ai_summary && (
+              <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+                <MuiCardContent>
+                  <AiGeneratedBlock officialHref={officialTextForAi} officialLabel="Open official bill text (PDF)">
+                    {bill.ai_summary}
+                  </AiGeneratedBlock>
+                </MuiCardContent>
+              </MuiCard>
+            )}
 
             {/* Bill Text */}
             {texts.length > 0 && (
@@ -463,7 +527,13 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {primarySponsors.map(s => <SponsorCard key={s.people_id} sponsor={s} />)}
+                    {primarySponsors.map((s) => (
+                      <SponsorCard
+                        key={s.people_id}
+                        sponsor={s}
+                        rosterPhoto={matchLegislatorBySponsorName(legislators, s.name)?.photo_url}
+                      />
+                    ))}
                   </Box>
                 </MuiCardContent>
               </MuiCard>
@@ -477,9 +547,13 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                     Co-Sponsors ({coSponsors.length})
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    {coSponsors.map(s => (
+                    {coSponsors.map((s) => {
+                      const coHref = `/members#${memberSlug(s.name)}`;
+                      const coPhoto =
+                        matchLegislatorBySponsorName(legislators, s.name)?.photo_url || s.bio?.social?.image;
+                      return (
                       <Box key={s.people_id} sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                        <MuiAvatar src={s.bio?.social?.image} sx={{ width: 36, height: 36, flexShrink: 0 }}>
+                        <MuiAvatar src={coPhoto || undefined} sx={{ width: 36, height: 36, flexShrink: 0 }}>
                           {s.first_name?.[0]}{s.last_name?.[0]}
                         </MuiAvatar>
                         <Box sx={{ minWidth: 0 }}>
@@ -487,14 +561,22 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                             variant="body2"
                             fontWeight={600}
                             component={NextLink}
-                            href={`/members#${memberSlug(s.name)}`}
+                            href={coHref}
                             sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                             noWrap
                           >
                             {s.name}
                           </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.5, mt: 0.25 }}>
-                            <MuiChip label={s.party} size="small" sx={{ bgcolor: partyColor(s.party), color: '#fff', fontSize: '0.65rem', height: 18 }} />
+                          <Box sx={{ display: 'flex', gap: 0.5, mt: 0.25, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <MuiChip
+                              component={NextLink}
+                              href={coHref}
+                              clickable
+                              label={formatRepresentativePartyChipLabel(s.party)}
+                              size="small"
+                              sx={{ bgcolor: partyBadgeBackgroundColor(s.party), color: '#fff', fontSize: '0.65rem', height: 18 }}
+                            />
+                            <MuiChip label="Co sponsor" size="small" color="primary" sx={{ fontSize: '0.65rem', height: 18 }} />
                             {s.bio?.social?.ballotpedia && (
                               <MuiButton
                                 size="small"
@@ -510,7 +592,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                           </Box>
                         </Box>
                       </Box>
-                    ))}
+                      );
+                    })}
                   </Box>
                 </MuiCardContent>
               </MuiCard>

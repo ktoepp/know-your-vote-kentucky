@@ -14,6 +14,7 @@ import {
 } from './ky-data-sources';
 import { supabaseAdmin } from '../app/lib/supabaseClient';
 import { classifyTopics } from './ky-topic-classifier';
+import { normalizeLegistarOrdinanceText } from './legistar-text';
 import type { KYSource } from '../types/kentucky';
 
 /**
@@ -61,10 +62,68 @@ function chamberFromBillNumber(billNumber: string): 'house' | 'senate' | null {
   return null;
 }
 
+function compareLegiScanBillRecency(a: { last_action_date?: string }, b: { last_action_date?: string }): number {
+  const ta = a.last_action_date ? new Date(a.last_action_date).getTime() : 0;
+  const tb = b.last_action_date ? new Date(b.last_action_date).getTime() : 0;
+  return tb - ta;
+}
+
+/**
+ * LegiScan master lists are often ordered so House bills fill the first N rows.
+ * Taking `slice(0, limit)` would sync almost no Senate bills. Prefer a recent
+ * mix from both chambers, then backfill by recency.
+ */
+function selectBillsForSync<T extends { bill_id: number; number: string; last_action_date?: string }>(
+  bills: T[],
+  limit: number,
+): T[] {
+  if (bills.length <= limit) return bills;
+  const house: T[] = [];
+  const senate: T[] = [];
+  const other: T[] = [];
+  for (const b of bills) {
+    const c = chamberFromBillNumber(b.number);
+    if (c === 'house') house.push(b);
+    else if (c === 'senate') senate.push(b);
+    else other.push(b);
+  }
+  house.sort(compareLegiScanBillRecency);
+  senate.sort(compareLegiScanBillRecency);
+  const half = Math.ceil(limit / 2);
+  const takeHouse = Math.min(house.length, half);
+  const takeSenate = Math.min(senate.length, half);
+  const chosen: T[] = [...house.slice(0, takeHouse), ...senate.slice(0, takeSenate)];
+  const used = new Set(chosen.map((b) => b.bill_id));
+  if (chosen.length < limit) {
+    const remainder = [...house.slice(takeHouse), ...senate.slice(takeSenate), ...other]
+      .filter((b) => !used.has(b.bill_id))
+      .sort(compareLegiScanBillRecency);
+    for (const b of remainder) {
+      if (chosen.length >= limit) break;
+      chosen.push(b);
+      used.add(b.bill_id);
+    }
+  }
+  if (chosen.length < limit) {
+    const more = bills.filter((b) => !used.has(b.bill_id)).sort(compareLegiScanBillRecency);
+    for (const b of more) {
+      if (chosen.length >= limit) break;
+      chosen.push(b);
+      used.add(b.bill_id);
+    }
+  }
+  return chosen;
+}
+
 export interface SyncOptions {
   dryRun?: boolean;
   source?: string;
   limit?: number;
+  /**
+   * Skip per-bill LegiScan `getBill` calls (faster sync; `sponsors` on ky_bills will not be updated).
+   * Use for cron jobs if API time or quota is a concern; run a full sync periodically for sponsor JSON.
+   */
+  skipBillSponsorDetails?: boolean;
 }
 
 export interface SyncResult {
@@ -130,18 +189,40 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
       log(source, `Session ${sorted[i - 1].session_name} had 0 bills, trying ${latestSession.session_name}`);
       bills = await client.fetchBills(latestSession.session_id);
     }
-    const limit = options.limit ?? 150;
-    const toSync = bills.slice(0, limit);
-    if (bills.length > limit) log(source, `Limiting to ${limit} of ${bills.length} bills (use limit param for more)`);
-    log(source, `Fetched ${bills.length} bills from ${latestSession.session_name}, syncing ${toSync.length}`);
+    const limit = options.limit ?? 250;
+    const toSync = selectBillsForSync(bills, limit);
+    if (bills.length > limit) log(source, `Limiting to ${limit} of ${bills.length} bills (chamber-balanced recent; use limit param for more)`);
+    const nHouse = toSync.filter((b) => chamberFromBillNumber(b.number) === 'house').length;
+    const nSenate = toSync.filter((b) => chamberFromBillNumber(b.number) === 'senate').length;
+    log(
+      source,
+      `Fetched ${bills.length} bills from ${latestSession.session_name}, syncing ${toSync.length} (house ${nHouse}, senate ${nSenate}, other ${toSync.length - nHouse - nSenate})`,
+    );
     if (options.dryRun) {
       log(source, `[DRY RUN] Would upsert ${toSync.length} bills`);
       return { source, status: 'success', itemsSynced: toSync.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    const rows = toSync.map((bill) => {
+    const skipSponsors = options.skipBillSponsorDetails === true;
+    if (skipSponsors) {
+      log(source, 'skipBillSponsorDetails: true — sponsors column will not be refreshed this run');
+    }
+    const rows: Record<string, unknown>[] = [];
+    for (let i = 0; i < toSync.length; i++) {
+      const bill = toSync[i];
       const topics = classifyTopics(bill.title, bill.description || '');
-      return {
+      let sponsors: unknown = null;
+      if (!skipSponsors) {
+        try {
+          const detail = await client.fetchBillDetail(bill.bill_id);
+          if (detail?.sponsors?.length) {
+            sponsors = detail.sponsors;
+          }
+        } catch (err: any) {
+          log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
+        }
+      }
+      rows.push({
         legiscan_id: bill.bill_id,
         bill_number: bill.number,
         title: bill.title,
@@ -153,9 +234,13 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
         last_action_date: bill.last_action_date || null,
         bill_text_url: bill.url || null,
         topics: topics.length > 0 ? topics : null,
+        sponsors,
         source: 'legiscan',
-      };
-    });
+      });
+      if (!skipSponsors && (i + 1) % 25 === 0) {
+        log(source, `Enriched sponsors ${i + 1}/${toSync.length}`);
+      }
+    }
     // Batch upsert (100 per batch to avoid payload limits)
     const BATCH = 100;
     let synced = 0;
@@ -302,16 +387,21 @@ async function syncOrdinances(jurisdiction: 'louisville' | 'lexington', options:
       return { source, status: 'success', itemsSynced: ordinances.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    const rows = ordinances.map((ord) => ({
-      legistar_id: jurisdiction === 'lexington' ? ord.MatterId + 1_000_000 : ord.MatterId,
-      jurisdiction,
-      ordinance_number: ord.MatterFile || null,
-      title: ord.MatterName || ord.MatterTitle,
-      description: ord.MatterTitle || null,
-      status: ord.MatterStatusName || null,
-      introduced_date: ord.MatterIntroDate || null,
-      adopted_date: ord.MatterPassedDate || null,
-    }));
+    const rows = ordinances.map((ord) => {
+      const rawTitle = ord.MatterName || ord.MatterTitle;
+      const rawDesc = ord.MatterTitle || null;
+      const rawStatus = ord.MatterStatusName || null;
+      return {
+        legistar_id: jurisdiction === 'lexington' ? ord.MatterId + 1_000_000 : ord.MatterId,
+        jurisdiction,
+        ordinance_number: ord.MatterFile || null,
+        title: normalizeLegistarOrdinanceText(rawTitle),
+        description: rawDesc ? normalizeLegistarOrdinanceText(rawDesc) : null,
+        status: rawStatus ? normalizeLegistarOrdinanceText(rawStatus) : null,
+        introduced_date: ord.MatterIntroDate || null,
+        adopted_date: ord.MatterPassedDate || null,
+      };
+    });
     const { error } = await db.from('ky_ordinances').upsert(rows, { onConflict: 'legistar_id' });
     const synced = error ? 0 : rows.length;
     if (error) logError(source, error.message);
@@ -325,7 +415,8 @@ async function syncOrdinances(jurisdiction: 'louisville' | 'lexington', options:
   }
 }
 
-// --- Executive Orders (scraper) ---
+// --- Executive Orders (scraper) — not wired into SYNC_SOURCES while MVP omits EO (unreliable listing URL).
+// Re-add `'executive-orders': syncExecutiveOrders` when a stable index or official feed exists.
 export async function syncExecutiveOrders(options: SyncOptions = {}): Promise<SyncResult> {
   const start = Date.now();
   const source = 'executive-orders';
@@ -496,7 +587,6 @@ export const SYNC_SOURCES: Record<string, (options: SyncOptions) => Promise<Sync
       error: [lou.error, lex.error].filter(Boolean).join('; ') || undefined,
     };
   },
-  'executive-orders': syncExecutiveOrders,
   'school-boards': syncSchoolBoardItems,
   'county-actions': syncCountyActions,
 };

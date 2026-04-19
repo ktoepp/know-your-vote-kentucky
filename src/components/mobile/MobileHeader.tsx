@@ -15,15 +15,15 @@ import {
   ListItemText,
   Divider
 } from '@mui/material';
-import { 
-  Search, 
-  Menu, 
-  Home, 
-  Receipt, 
-  People, 
-  TrendingUp,
-  VideoLibrary,
-  AccountTree
+import {
+  Search,
+  Menu,
+  Home,
+  Receipt,
+  People,
+  AccountBalance,
+  Event as EventIcon,
+  InfoOutlined,
 } from '@mui/icons-material';
 import { styled, alpha } from '@mui/material/styles';
 import Link from 'next/link';
@@ -91,10 +91,11 @@ export default function MobileHeader({
   const navigationItems = [
     { text: 'Home', icon: <Home />, href: '/' },
     { text: 'Bills', icon: <Receipt />, href: '/bills' },
-    { text: 'Activity', icon: <TrendingUp />, href: '/activity' },
+    { text: 'Ordinances', icon: <AccountBalance />, href: '/ordinances' },
+    { text: 'Meetings', icon: <EventIcon />, href: '/events' },
     { text: 'Members', icon: <People />, href: '/members' },
-    { text: 'Videos', icon: <VideoLibrary />, href: '/videos' },
-    { text: 'Graph', icon: <AccountTree />, href: '/graph' },
+    { text: 'Search', icon: <Search />, href: '/search' },
+    { text: 'About', icon: <InfoOutlined />, href: '/about' },
   ];
 
   return (

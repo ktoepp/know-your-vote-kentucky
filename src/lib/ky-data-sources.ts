@@ -11,7 +11,7 @@
  *   - Legistar (Louisville/Lexington)
  *   - Governor Executive Orders (web scraper)
  *   - School Boards (web scraper)
- *   - County Fiscal Courts (web scraper)
+ *   - County meetings (Jefferson / Fayette via Legistar public calendars)
  */
 
 // --- LegiScan (primary KY legislature data) ---
@@ -81,7 +81,6 @@ export function getAllKyDataSources() {
   const { getKyLegiScanClient: legiscan } = require('./ky-legiscan-client');
   const { getKyOpenStatesClient: openstates } = require('./ky-openstates-client');
   const { getKyLegistarClient: legistar } = require('./ky-legistar-client');
-  const { getKyExecutiveOrdersClient: eo } = require('./ky-executive-orders');
   const { getKySchoolBoardsClient: schools } = require('./ky-school-boards');
   const { getKyCountyCourtsClient: courts } = require('./ky-county-courts');
 
@@ -89,7 +88,6 @@ export function getAllKyDataSources() {
     legiscan: legiscan(),
     openstates: openstates(),
     legistar: legistar(),
-    executiveOrders: eo(),
     schoolBoards: schools(),
     countyCourts: courts(),
   };

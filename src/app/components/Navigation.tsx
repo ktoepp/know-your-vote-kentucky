@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from '@mui/material/styles';
 import {
   AppBar,
@@ -32,11 +32,12 @@ import {
   Search as SearchIcon,
   Home as HomeIcon,
   LiveTv as LiveTvIcon,
-  Info as InfoIcon,
+  InfoOutlined,
   Menu as MenuIcon,
   Close as CloseIcon,
   AccountTree,
   Description,
+  Gavel,
   Groups,
   Timeline,
   Explore,
@@ -45,6 +46,7 @@ import {
   Help as HelpIcon,
   Event as EventIcon,
   AccountCircle,
+  Architecture,
 } from '@mui/icons-material';
 import { useThemeUtils } from '@/components/ui/ThemeUtils';
 import { ThemedIcon } from '@/lib/icons';
@@ -52,65 +54,121 @@ import { useTooltips } from '@/lib/TooltipContext';
 import { useUser } from "../lib/UserContext";
 
 // Primary navigation links - Kentucky civic engagement
-const primaryNavLinks = [
-  { href: '/bills', label: 'Bills', icon: <Description />, priority: 'primary' },
-  { href: '/ordinances', label: 'Ordinances', icon: <AccountTree />, priority: 'primary' },
-  { href: '/events', label: 'Meetings', icon: <EventIcon />, priority: 'primary' },
-  { href: '/members', label: 'Members', icon: <Groups />, priority: 'primary' },
-  { href: '/search', label: 'Search', icon: <SearchIcon />, priority: 'primary' },
+const primaryNavLinksBase = [
+  { href: '/bills', label: 'Bills', icon: <Description />, priority: 'primary' as const },
+  { href: '/bills/senate', label: 'Senate bills', icon: <Gavel />, priority: 'primary' as const },
+  { href: '/ordinances', label: 'Ordinances', icon: <AccountTree />, priority: 'primary' as const },
+  { href: '/events', label: 'Meetings', icon: <EventIcon />, priority: 'primary' as const },
+  { href: '/members', label: 'Members', icon: <Groups />, priority: 'primary' as const },
+  { href: '/search', label: 'Search', icon: <SearchIcon />, priority: 'primary' as const },
+  { href: '/about', label: 'About', icon: <InfoOutlined />, priority: 'primary' as const },
 ];
+
+const primaryNavLinks =
+  process.env.NODE_ENV === 'development'
+    ? [
+        ...primaryNavLinksBase,
+        { href: '/design-system', label: 'Design', icon: <Architecture />, priority: 'primary' as const },
+      ]
+    : primaryNavLinksBase;
 
 // Legacy navigation links (for backward compatibility)
 const navLinks = primaryNavLinks;
 
 function GlobalSearchBar() {
   const theme = useTheme();
-  
+  const router = useRouter();
+  const pathname = usePathname();
+  const [value, setValue] = useState('');
+
+  useEffect(() => {
+    if (pathname === '/search' && typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search).get('q') || '';
+      setValue(q);
+    }
+  }, [pathname]);
+
+  const submit = () => {
+    const q = value.trim();
+    if (!q) {
+      router.push('/search');
+      return;
+    }
+    router.push(`/search?q=${encodeURIComponent(q)}`);
+  };
+
   return (
-    <TextField
-      placeholder="Search Kentucky bills, ordinances, members..."
-      variant="outlined"
-      size="small"
-      sx={{
-        width: { xs: '100%', md: 320 },
-        '& .MuiOutlinedInput-root': {
-          backgroundColor: theme.palette.mode === 'dark' 
-            ? 'rgba(255,255,255,0.15)' 
-            : 'rgba(0,0,0,0.05)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: 2,
-          '& fieldset': {
-            borderColor: theme.palette.mode === 'dark' 
-              ? 'rgba(255,255,255,0.3)' 
-              : 'rgba(0,0,0,0.2)',
-          },
-          '&:hover fieldset': {
-            borderColor: theme.palette.mode === 'dark' 
-              ? 'rgba(255,255,255,0.5)' 
-              : 'rgba(0,0,0,0.3)',
-          },
-          '&.Mui-focused fieldset': {
-            borderColor: theme.palette.primary.main,
-          },
-        },
-        '& .MuiInputBase-input': {
-          color: theme.palette.mode === 'dark' ? theme.palette.primary.contrastText : theme.palette.text.primary,
-          '&::placeholder': {
-            color: theme.palette.mode === 'dark' 
-              ? 'rgba(255,255,255,0.8)' 
-              : 'rgba(0,0,0,0.6)',
-            opacity: 1,
-          },
-        },
+    <Box
+      component="form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
       }}
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <ThemedIcon icon={SearchIcon} />
-          </InputAdornment>
-        ),
-      }}
-    />
+      sx={{ width: { xs: '100%', md: 320 } }}
+    >
+      <TextField
+        name="q"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Search Kentucky bills, ordinances, members..."
+        variant="outlined"
+        size="small"
+        fullWidth
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            backgroundColor: theme.palette.mode === 'dark' 
+              ? 'rgba(255,255,255,0.15)' 
+              : 'rgba(0,0,0,0.05)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 2,
+            '& fieldset': {
+              borderColor: theme.palette.mode === 'dark' 
+                ? 'rgba(255,255,255,0.3)' 
+                : 'rgba(0,0,0,0.2)',
+            },
+            '&:hover fieldset': {
+              borderColor: theme.palette.mode === 'dark' 
+                ? 'rgba(255,255,255,0.5)' 
+                : 'rgba(0,0,0,0.3)',
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: theme.palette.primary.main,
+            },
+          },
+          '& .MuiInputBase-input': {
+            color: theme.palette.mode === 'dark' ? theme.palette.primary.contrastText : theme.palette.text.primary,
+            '&::placeholder': {
+              color: theme.palette.mode === 'dark' 
+                ? 'rgba(255,255,255,0.8)' 
+                : 'rgba(0,0,0,0.6)',
+              opacity: 1,
+            },
+          },
+        }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <ThemedIcon icon={SearchIcon} />
+            </InputAdornment>
+          ),
+          endAdornment: value.trim() ? (
+            <InputAdornment position="end">
+              <IconButton
+                type="submit"
+                size="small"
+                edge="end"
+                aria-label="Search"
+                sx={{
+                  color: theme.palette.mode === 'dark' ? theme.palette.primary.contrastText : theme.palette.text.secondary,
+                }}
+              >
+                <SearchIcon fontSize="small" />
+              </IconButton>
+            </InputAdornment>
+          ) : undefined,
+        }}
+      />
+    </Box>
   );
 }
 

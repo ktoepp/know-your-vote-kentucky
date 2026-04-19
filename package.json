@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "rm -rf .next && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -96,12 +97,7 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },
-  "description": "> **Note:** All documentation files are now located in the root of the Seespan project for easy discovery and linking. The former `docs/` folder has been removed.",
-  "main": "add-sample-content.js",
-  "directories": {
-    "doc": "docs"
-  },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "MIT"
 }

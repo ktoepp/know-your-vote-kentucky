@@ -327,7 +327,7 @@ export default function EventDetailPage() {
 
   // Navigation functions for interactive elements
   const navigateToSearch = (query: string, type: 'tag' | 'topic' | 'speaker' | 'bill') => {
-    const searchUrl = `/search?query=${encodeURIComponent(query)}&type=${type}`;
+    const searchUrl = `/search?q=${encodeURIComponent(query)}`;
     router.push(searchUrl);
     trackUserFlow({
       action: 'navigation',
@@ -338,24 +338,22 @@ export default function EventDetailPage() {
   };
 
   const navigateToGraph = (filterType: string, filterValue: string) => {
-    const graphUrl = `/explore?filter=${filterType}&value=${encodeURIComponent(filterValue)}`;
-    router.push(graphUrl);
+    router.push(`/search?q=${encodeURIComponent(filterValue)}`);
     trackUserFlow({
       action: 'navigation',
       page: 'event_detail',
       component: 'graph_link',
-      data: { filterType, filterValue, eventId }
+      data: { filterType, filterValue, eventId, destination: 'search' }
     });
   };
 
   const navigateToTable = (filterType: string, filterValue: string) => {
-    const tableUrl = `/table?filter=${filterType}&value=${encodeURIComponent(filterValue)}`;
-    router.push(tableUrl);
+    router.push(`/search?q=${encodeURIComponent(filterValue)}`);
     trackUserFlow({
       action: 'navigation',
       page: 'event_detail',
       component: 'table_link',
-      data: { filterType, filterValue, eventId }
+      data: { filterType, filterValue, eventId, destination: 'search' }
     });
   };
 

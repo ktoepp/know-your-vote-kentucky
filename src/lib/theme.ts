@@ -1,7 +1,7 @@
 import { createTheme, ThemeOptions, Theme } from '@mui/material/styles';
 
-// Government and Civic Color Palette
-const colors = {
+// Government and Civic Color Palette (source tokens for docs and light theme roots)
+export const civicPaletteTokens = {
   // Primary: Government Blue (trustworthy, authoritative) - Updated to match navigation
   primary: {
     main: '#1e40af', // Updated to match navigation
@@ -103,21 +103,21 @@ export const getPriorityColor = (theme: any, priority: number) => {
 export const lightTheme = createTheme({
   palette: {
     mode: 'light',
-    primary: colors.primary,
-    secondary: colors.secondary,
-    success: colors.success,
-    warning: colors.warning,
-    error: colors.error,
-    info: colors.info,
+    primary: civicPaletteTokens.primary,
+    secondary: civicPaletteTokens.secondary,
+    success: civicPaletteTokens.success,
+    warning: civicPaletteTokens.warning,
+    error: civicPaletteTokens.error,
+    info: civicPaletteTokens.info,
     background: {
-      default: colors.neutral[50],
+      default: civicPaletteTokens.neutral[50],
       paper: '#ffffff',
     },
     text: {
-      primary: colors.neutral[900],
-      secondary: colors.neutral[700],
+      primary: civicPaletteTokens.neutral[900],
+      secondary: civicPaletteTokens.neutral[700],
     },
-    divider: colors.neutral[200],
+    divider: civicPaletteTokens.neutral[200],
   },
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -156,12 +156,12 @@ export const lightTheme = createTheme({
     body1: {
       fontSize: '1rem',
       lineHeight: 1.6,
-      color: colors.neutral[700],
+      color: civicPaletteTokens.neutral[700],
     },
     body2: {
       fontSize: '0.875rem',
       lineHeight: 1.5,
-      color: colors.neutral[600],
+      color: civicPaletteTokens.neutral[600],
     },
     subtitle1: {
       fontSize: '1rem',
@@ -176,7 +176,7 @@ export const lightTheme = createTheme({
     caption: {
       fontSize: '0.75rem',
       lineHeight: 1.3,
-      color: colors.neutral[600],
+      color: civicPaletteTokens.neutral[600],
     },
     overline: {
       fontSize: '0.75rem',
@@ -323,9 +323,9 @@ export const lightTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundColor: '#ffffff',
-          color: colors.neutral[900],
+          color: civicPaletteTokens.neutral[900],
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          borderBottom: `1px solid ${colors.neutral[200]}`,
+          borderBottom: `1px solid ${civicPaletteTokens.neutral[200]}`,
         },
       },
     },
@@ -339,7 +339,7 @@ export const lightTheme = createTheme({
     MuiLink: {
       styleOverrides: {
         root: {
-          color: colors.primary.main,
+          color: civicPaletteTokens.primary.main,
           textDecoration: 'none',
           '&:hover': {
             textDecoration: 'underline',

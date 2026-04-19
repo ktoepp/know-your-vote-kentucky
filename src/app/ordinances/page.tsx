@@ -24,6 +24,10 @@ import { AccountBalance, Refresh, Search } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { supabase } from '../lib/supabaseClient';
 import type { KYOrdinance } from '../../types/kentucky';
+import { AiSummaryInline } from '@/components/civic/AiAttribution';
+import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
+import { normalizeLegistarOrdinanceText } from '@/lib/legistar-text';
+import { withTimeout } from '@/lib/async-utils';
 
 export default function OrdinancesPage() {
   const theme = useTheme();
@@ -42,7 +46,11 @@ export default function OrdinancesPage() {
       let query = supabase.from('ky_ordinances').select('*').order('introduced_date', { ascending: false }).limit(100);
       if (jurisdictionFilter !== 'all') query = query.eq('jurisdiction', jurisdictionFilter);
       if (statusFilter !== 'all') query = query.eq('status', statusFilter);
-      const { data, error: fetchError } = await query;
+      const { data, error: fetchError } = await withTimeout(
+        query,
+        30_000,
+        'Loading ordinances timed out. Check Supabase or your network.',
+      );
       if (fetchError) throw fetchError;
       setOrdinances(data || []);
     } catch (err: any) {
@@ -66,9 +74,10 @@ export default function OrdinancesPage() {
         <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
           Local Ordinances
         </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
           Browse ordinances from Louisville Metro Council and Lexington-Fayette Urban County Council.
         </Typography>
+        <DataFreshnessNote variant="page" />
 
         <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: 2 }}>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
@@ -124,16 +133,14 @@ export default function OrdinancesPage() {
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
                       <Chip label={ord.jurisdiction === 'louisville' ? 'Louisville' : 'Lexington'} size="small" color="info" />
-                      {ord.status && <Chip label={ord.status} size="small" variant="outlined" />}
+                      {ord.status && <Chip label={normalizeLegistarOrdinanceText(ord.status)} size="small" variant="outlined" />}
                     </Box>
                     {ord.ordinance_number && <Typography variant="subtitle1" fontWeight={600} gutterBottom>{ord.ordinance_number}</Typography>}
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {ord.title}
+                      {normalizeLegistarOrdinanceText(ord.title)}
                     </Typography>
                     {ord.ai_summary && (
-                      <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        {ord.ai_summary}
-                      </Typography>
+                      <AiSummaryInline>{ord.ai_summary}</AiSummaryInline>
                     )}
                     {ord.introduced_date && (
                       <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>

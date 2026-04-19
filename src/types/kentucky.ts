@@ -27,6 +27,12 @@ export interface KYLegislator {
   updated_at: string;
 }
 
+/** Subset returned by lightweight `select(...)` for roster matching (photos, names). */
+export type KYLegislatorRoster = Pick<
+  KYLegislator,
+  'id' | 'name' | 'first_name' | 'last_name' | 'party' | 'chamber' | 'district' | 'photo_url'
+>;
+
 export interface KYBill {
   id: string;
   legiscan_id: number | null;

@@ -4,6 +4,7 @@ import { Box, Typography, Button, CircularProgress, Alert } from '@mui/material'
 import { Refresh } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useBillsData, Bill } from '../lib/useBillsData';
+import { formatBillLabelText } from '@/lib/bill-display';
 
 // Utility function to format bill number with prefix
 const formatBillNumber = (bill: Bill) => {
@@ -88,7 +89,8 @@ export const BillListWithRefresh: React.FC<BillListWithRefreshProps> = ({
               <strong>Committees:</strong> {Array.isArray(bill.committees) && bill.committees.length > 0 ? bill.committees.join(', ') : 'No committee specified'}
             </div>
             <div>
-              <strong>Last Action:</strong> {bill.last_action || 'No recent action'}
+              <strong>Last Action:</strong>{' '}
+              {bill.last_action ? formatBillLabelText(bill.last_action) : 'No recent action'}
             </div>
             <div>
               <strong>Introduced:</strong> {bill.introduced_date || 'Unknown date'}
@@ -97,7 +99,10 @@ export const BillListWithRefresh: React.FC<BillListWithRefreshProps> = ({
               <strong>Actions:</strong> {Array.isArray(bill.actions) && bill.actions.length > 0 ? (
                 <ul>
                   {bill.actions.map((a, i) => (
-                    <li key={i}>{a.actionDate || 'No date'}: {a.text || 'No action text'}</li>
+                    <li key={i}>
+                      {a.actionDate || 'No date'}:{' '}
+                      {a.text ? formatBillLabelText(a.text) : 'No action text'}
+                    </li>
                   ))}
                 </ul>
               ) : (

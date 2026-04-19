@@ -26,6 +26,9 @@ import { Groups, Refresh, Search, Email, Phone, OpenInNew } from '@mui/icons-mat
 import { useTheme } from '@mui/material/styles';
 import { supabase } from '../lib/supabaseClient';
 import type { KYLegislator } from '../../types/kentucky';
+import { CopyableEmail } from '@/components/civic/CopyableEmail';
+import { withTimeout } from '@/lib/async-utils';
+import { formatPartyLabel, formatRepresentativePartyChipLabel } from '@/lib/bill-display';
 
 export default function MembersPage() {
   const theme = useTheme();
@@ -44,7 +47,11 @@ export default function MembersPage() {
       let query = supabase.from('ky_legislators').select('*').eq('active', true).order('last_name', { ascending: true });
       if (chamberFilter !== 'all') query = query.eq('chamber', chamberFilter);
       if (partyFilter !== 'all') query = query.eq('party', partyFilter);
-      const { data, error: fetchError } = await query;
+      const { data, error: fetchError } = await withTimeout(
+        query,
+        30_000,
+        'Loading legislators timed out. Check Supabase or your network.',
+      );
       if (fetchError) throw fetchError;
       setLegislators(data || []);
     } catch (err: any) {
@@ -62,11 +69,20 @@ export default function MembersPage() {
     return leg.name?.toLowerCase().includes(q) || leg.district?.toLowerCase().includes(q);
   });
 
+  useEffect(() => {
+    if (loading || filtered.length === 0) return;
+    const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
+    if (!hash) return;
+    requestAnimationFrame(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [loading, filtered, searchQuery, chamberFilter, partyFilter]);
+
   const getPartyColor = (party: string | null) => {
     if (!party) return 'default';
-    const p = party.toLowerCase();
-    if (p === 'democrat' || p === 'd') return 'info';
-    if (p === 'republican' || p === 'r') return 'error';
+    const p = formatPartyLabel(party).toLowerCase();
+    if (p.includes('democ')) return 'info';
+    if (p.includes('republic')) return 'error';
     return 'default';
   };
 
@@ -138,16 +154,22 @@ export default function MembersPage() {
                       <Box>
                         <Typography variant="subtitle1" fontWeight={600}>{leg.name}</Typography>
                         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                          {leg.party && <Chip label={leg.party} size="small" color={getPartyColor(leg.party) as any} />}
+                          {leg.party && (
+                            <Chip
+                              label={formatRepresentativePartyChipLabel(leg.party)}
+                              size="small"
+                              color={getPartyColor(leg.party) as any}
+                            />
+                          )}
                           {leg.chamber && <Chip label={leg.chamber === 'house' ? 'House' : 'Senate'} size="small" variant="outlined" />}
                         </Box>
                       </Box>
                     </Box>
                     {leg.district && <Typography variant="body2" color="text.secondary" gutterBottom>District: {leg.district}</Typography>}
                     {leg.email && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                        <Email sx={{ fontSize: 16, color: 'text.secondary' }} />
-                        <Typography variant="caption" color="text.secondary">{leg.email}</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5, minWidth: 0 }}>
+                        <Email sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0, mt: 0.15 }} />
+                        <CopyableEmail email={leg.email} display="block" />
                       </Box>
                     )}
                     {leg.phone && (

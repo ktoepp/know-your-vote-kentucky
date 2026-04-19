@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { GraphDatabase, Video, Speaker, Topic, Bill, Event, Node } from './graph-database';
+import { GraphDatabase, Video, Speaker, Topic, Bill, Event } from './graph-database';
 
 /**
  * Query functions for the graph database

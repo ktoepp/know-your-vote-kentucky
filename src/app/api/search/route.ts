@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
+import { fetchKyBillsMatchingSearch } from '@/lib/ky-search-bills';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,17 +22,22 @@ export async function GET(request: NextRequest) {
     }
 
     const q = query.trim();
-    const [billsRes, ordRes, eoRes, sbRes] = await Promise.all([
-      supabase.from('ky_bills').select('id, bill_number, title, status, chamber').or(`title.ilike.%${q}%,bill_number.ilike.%${q}%,description.ilike.%${q}%`).limit(limit),
+    const [bills, ordRes, sbRes] = await Promise.all([
+      fetchKyBillsMatchingSearch(supabase, q, limit),
       supabase.from('ky_ordinances').select('id, ordinance_number, title, status, jurisdiction').or(`title.ilike.%${q}%,ordinance_number.ilike.%${q}%,description.ilike.%${q}%`).limit(limit),
-      supabase.from('ky_executive_orders').select('id, eo_number, title, governor').or(`title.ilike.%${q}%,eo_number.ilike.%${q}%,description.ilike.%${q}%`).limit(limit),
       supabase.from('ky_school_board_items').select('id, title, district, category').or(`title.ilike.%${q}%,description.ilike.%${q}%`).limit(limit),
     ]);
 
     const results = [
-      ...(billsRes.data || []).map((b: any) => ({ ...b, type: 'bill' })),
+      ...bills.map((b) => ({
+        id: b.id,
+        bill_number: b.bill_number,
+        title: b.title,
+        status: b.status,
+        chamber: b.chamber,
+        type: 'bill' as const,
+      })),
       ...(ordRes.data || []).map((o: any) => ({ ...o, type: 'ordinance' })),
-      ...(eoRes.data || []).map((e: any) => ({ ...e, type: 'executive_order' })),
       ...(sbRes.data || []).map((s: any) => ({ ...s, type: 'school_board_item' })),
     ];
 

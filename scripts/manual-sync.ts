@@ -58,12 +58,17 @@ async function main() {
     process.exit(1);
   }
 
-  // Check required env vars
-  if (!process.env.SUPABASE_URL && !dryRun) {
-    console.warn('⚠️  SUPABASE_URL not set. Sync will fail for DB operations.');
-  }
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !dryRun) {
-    console.warn('⚠️  SUPABASE_SERVICE_ROLE_KEY not set. Sync will fail for DB operations.');
+  // Align with src/app/lib/supabaseClient.ts (URL from NEXT_PUBLIC_* or SUPABASE_URL)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  if (!dryRun) {
+    if (!supabaseUrl) {
+      console.warn(
+        '[manual-sync] No Supabase URL: set NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL. DB sync will fail.',
+      );
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.warn('[manual-sync] SUPABASE_SERVICE_ROLE_KEY not set. DB sync will fail.');
+    }
   }
 
   try {

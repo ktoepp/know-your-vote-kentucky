@@ -28,7 +28,10 @@ export class KyLegiScanClient {
   constructor(apiKey?: string) {
     this.apiKey = apiKey || process.env.LEGISCAN_API_KEY || '';
     if (!this.apiKey) console.warn('[KyLegiScan] LEGISCAN_API_KEY not set');
-    this.client = axios.create({ baseURL: 'https://api.legiscan.com/' });
+    this.client = axios.create({
+      baseURL: 'https://api.legiscan.com/',
+      timeout: 25_000,
+    });
   }
 
   private async throttle(): Promise<void> {
