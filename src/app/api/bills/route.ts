@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
+import { parseLimit, parseEnum, ValidationError } from '@/lib/api-validation';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const chamber = searchParams.get('chamber');
+    const limit = parseLimit(searchParams.get('limit'), { default: 20, max: 100 });
+    const chamber = parseEnum(searchParams.get('chamber'), ['house', 'senate'] as const, { allowNull: true });
     const status = searchParams.get('status');
 
     if (!supabase) {
@@ -41,6 +42,9 @@ export async function GET(request: NextRequest) {
       count: (data || []).length,
     });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error('Error in KY bills API:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

@@ -12,7 +12,7 @@ import {
   getKySchoolBoardsClient,
   getKyCountyCourtsClient,
 } from './ky-data-sources';
-import { supabaseAdmin } from '../app/lib/supabaseClient';
+import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 import { classifyTopics } from './ky-topic-classifier';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
 import {
@@ -29,7 +29,13 @@ import {
   openStatesLegislatorNames,
 } from './ky-openstates-client';
 import type { KYSource } from '../types/kentucky';
-import type { KyLegiScanClient, LegiScanBillSummary, LegiScanSession } from './ky-legiscan-client';
+import type {
+  KyLegiScanClient,
+  LegiScanBillDetail,
+  LegiScanBillSummary,
+  LegiScanMasterListRawBill,
+  LegiScanSession,
+} from './ky-legiscan-client';
 
 /**
  * LegiScan numeric status codes for state bills.
@@ -74,6 +80,31 @@ function chamberFromBillNumber(billNumber: string): 'house' | 'senate' | null {
   if (upper.startsWith('H')) return 'house';
   if (upper.startsWith('S')) return 'senate';
   return null;
+}
+
+/** Normalize a LegiScan date string to YYYY-MM-DD, or null if unparseable. */
+function toIsoDate(s: string | undefined | null): string | null {
+  if (!s) return null;
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+  if (m) return m[1];
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+/** Audit item #3: derive introduced_date from getBill detail (explicit field or earliest history entry). */
+function deriveIntroducedDate(detail: LegiScanBillDetail | null | undefined): string | null {
+  if (!detail) return null;
+  const direct = toIsoDate(detail.introduced);
+  if (direct) return direct;
+  if (!detail.history?.length) return null;
+  let earliest: string | null = null;
+  for (const h of detail.history) {
+    const d = toIsoDate(h.date);
+    if (!d) continue;
+    if (!earliest || d < earliest) earliest = d;
+  }
+  return earliest;
 }
 
 function compareLegiScanBillRecency(a: { last_action_date?: string }, b: { last_action_date?: string }): number {
@@ -163,6 +194,12 @@ export interface SyncOptions {
   sponsorDetailBudgetPerSession?: number;
   /** With `quotaBackfill`: write next cursor after success (default true). Dry run never advances. */
   quotaBackfillAdvanceCursor?: boolean;
+  /**
+   * Hash-gated incremental bills sync (LegiScan plan §3). When true, uses `getMasterListRaw`
+   * + stored `change_hash` to skip unchanged bills; only changed/new bills trigger `getBill`.
+   * Default off — standard path unchanged. Requires migration 007 columns on `ky_bills`.
+   */
+  useChangeHash?: boolean;
 }
 
 export interface SyncResult {
@@ -247,6 +284,24 @@ async function writeLegiscanBackfillCursor(db: ReturnType<typeof getSupabase>, i
   }
 }
 
+async function fetchExistingHashesByLegiscanIds(
+  db: ReturnType<typeof getSupabase>,
+  legiscanIds: number[],
+): Promise<Map<number, string | null>> {
+  const map = new Map<number, string | null>();
+  const CHUNK = 300;
+  for (let i = 0; i < legiscanIds.length; i += CHUNK) {
+    const chunk = legiscanIds.slice(i, i + CHUNK);
+    const { data } = await db.from('ky_bills').select('legiscan_id, change_hash').in('legiscan_id', chunk);
+    for (const row of data || []) {
+      if (row.legiscan_id != null) {
+        map.set(Number(row.legiscan_id), (row.change_hash as string | null) ?? null);
+      }
+    }
+  }
+  return map;
+}
+
 async function fetchExistingSponsorsByLegiscanIds(
   db: ReturnType<typeof getSupabase>,
   legiscanIds: number[],
@@ -276,17 +331,23 @@ async function buildBillRowsForSession(
     const bill = toSync[i];
     const topics = classifyTopics(bill.title, bill.description || '');
     let sponsors: unknown = null;
+    let introducedDate: string | null = null;
+    let detailFetched = false;
     if (!skipSponsors) {
       try {
         const detail = await client.fetchBillDetail(bill.bill_id);
-        if (detail?.sponsors?.length) {
-          sponsors = detail.sponsors;
+        if (detail) {
+          detailFetched = true;
+          if (detail.sponsors?.length) {
+            sponsors = detail.sponsors;
+          }
+          introducedDate = deriveIntroducedDate(detail);
         }
       } catch (err: any) {
         log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
       }
     }
-    rows.push({
+    const row: Record<string, unknown> = {
       legiscan_id: bill.bill_id,
       bill_number: bill.number,
       title: bill.title,
@@ -298,9 +359,20 @@ async function buildBillRowsForSession(
       last_action_date: bill.last_action_date || null,
       bill_text_url: bill.url || null,
       topics: topics.length > 0 ? topics : null,
-      sponsors,
       source: 'legiscan',
-    });
+    };
+    // Audit item #2: when sponsor details are skipped (e.g. daily cron), omit the
+    // sponsors key entirely so Supabase leaves the existing column value intact
+    // instead of overwriting sponsor data populated by manual backfill runs.
+    if (!skipSponsors) {
+      row.sponsors = sponsors;
+    }
+    // Audit item #3: only set introduced_date when getBill detail was fetched;
+    // otherwise omit the key to preserve any value populated by a prior enrich run.
+    if (detailFetched) {
+      row.introduced_date = introducedDate;
+    }
+    rows.push(row);
     if (!skipSponsors && (i + 1) % 25 === 0) {
       log(source, `Enriched sponsors ${i + 1}/${toSync.length}`);
     }
@@ -337,10 +409,16 @@ async function buildBillRowsQuotaSession(
   for (const bill of bills) {
     const topics = classifyTopics(bill.title, bill.description || '');
     let sponsors: unknown = null;
+    let introducedDate: string | null = null;
+    let detailFetched = false;
     if (enrichIds.has(bill.bill_id)) {
       try {
         const detail = await client.fetchBillDetail(bill.bill_id);
-        if (detail?.sponsors?.length) sponsors = detail.sponsors;
+        if (detail) {
+          detailFetched = true;
+          if (detail.sponsors?.length) sponsors = detail.sponsors;
+          introducedDate = deriveIntroducedDate(detail);
+        }
       } catch (err: any) {
         log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
       }
@@ -353,7 +431,7 @@ async function buildBillRowsQuotaSession(
         ? opts.existingSponsors.get(bill.bill_id)
         : null;
     }
-    rows.push({
+    const row: Record<string, unknown> = {
       legiscan_id: bill.bill_id,
       bill_number: bill.number,
       title: bill.title,
@@ -365,9 +443,20 @@ async function buildBillRowsQuotaSession(
       last_action_date: bill.last_action_date || null,
       bill_text_url: bill.url || null,
       topics: topics.length > 0 ? topics : null,
-      sponsors,
       source: 'legiscan',
-    });
+    };
+    // Audit item #2: when sponsor details are skipped (e.g. daily cron), omit the
+    // sponsors key entirely so Supabase leaves the existing column value intact
+    // instead of overwriting sponsor data populated by manual backfill runs.
+    if (!opts.skipSponsors) {
+      row.sponsors = sponsors;
+    }
+    // Audit item #3: only set introduced_date when getBill detail was fetched;
+    // otherwise omit the key to preserve any value populated by a prior enrich run.
+    if (detailFetched) {
+      row.introduced_date = introducedDate;
+    }
+    rows.push(row);
   }
   return rows;
 }
@@ -388,6 +477,164 @@ async function upsertKyBillRows(
   return synced;
 }
 
+/**
+ * Hash-gated incremental bills sync (LegiScan plan §3). Uses `getMasterListRaw` and
+ * stored `change_hash` on `ky_bills` to skip unchanged bills; `getBill` is only
+ * called for changed or new bills. Requires migration 007 columns.
+ */
+async function syncKyBillsByHash(
+  source: string,
+  client: KyLegiScanClient,
+  sortedSessions: LegiScanSession[],
+  options: SyncOptions,
+  start: number,
+): Promise<SyncResult> {
+  const skipSponsors = options.skipBillSponsorDetails === true;
+
+  let sessionJobs: { session: LegiScanSession; rawBills: LegiScanMasterListRawBill[] }[] = [];
+  if (options.legiscanSessionId != null && !Number.isNaN(options.legiscanSessionId)) {
+    const sid = options.legiscanSessionId;
+    const meta = sortedSessions.find((s) => s.session_id === sid);
+    if (!meta) {
+      const msg = `legiscanSessionId ${sid} not found in KY session list (check LegiScan getSessionList)`;
+      logError(source, msg);
+      await updateSourceStatus(source, 'error', 0, msg);
+      return { source, status: 'error', itemsSynced: 0, error: msg, duration: Date.now() - start };
+    }
+    const rawBills = await client.fetchMasterListRaw(sid);
+    if (!rawBills.length) {
+      log(source, `Session ${meta.session_name} has 0 bills on masterlistraw`);
+      if (!options.dryRun) await updateSourceStatus(source, 'success', 0);
+      return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
+    }
+    sessionJobs = [{ session: meta, rawBills }];
+    log(source, `Hash-gated single session: ${meta.session_name} (${rawBills.length} raw bills)`);
+  } else {
+    const wantSessions = Math.max(1, options.historicSessions ?? 1);
+    for (const s of sortedSessions) {
+      if (sessionJobs.length >= wantSessions) break;
+      const rawBills = await client.fetchMasterListRaw(s.session_id);
+      if (!rawBills.length) {
+        log(source, `Skipping ${s.session_name} (0 bills on masterlistraw)`);
+        continue;
+      }
+      sessionJobs.push({ session: s, rawBills });
+      log(source, `Queued ${s.session_name} (${rawBills.length} raw bills, hash-gated)`);
+    }
+  }
+
+  if (!sessionJobs.length) {
+    log(source, 'Hash-gated: no sessions with bills found');
+    if (!options.dryRun) await updateSourceStatus(source, 'success', 0);
+    return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
+  }
+
+  const db = options.dryRun ? null : getSupabase();
+  let grandScanned = 0;
+  let grandUnchanged = 0;
+  let grandChanged = 0;
+  let grandNew = 0;
+  let grandSynced = 0;
+
+  for (const { session, rawBills } of sessionJobs) {
+    const scanned = rawBills.length;
+    const existingHashes = db
+      ? await fetchExistingHashesByLegiscanIds(
+          db,
+          rawBills.map((b) => b.bill_id),
+        )
+      : new Map<number, string | null>();
+
+    const changedOrNew: LegiScanMasterListRawBill[] = [];
+    let unchanged = 0;
+    let changed = 0;
+    let inserted = 0;
+    for (const b of rawBills) {
+      const stored = existingHashes.get(b.bill_id);
+      if (stored === undefined) {
+        inserted++;
+        changedOrNew.push(b);
+      } else if (stored && b.change_hash && stored === b.change_hash) {
+        unchanged++;
+      } else {
+        changed++;
+        changedOrNew.push(b);
+      }
+    }
+    log(
+      source,
+      `${session.session_name} hash-gated: scanned=${scanned} unchanged_skipped=${unchanged} changed_updated=${changed} new_inserted=${inserted}`,
+    );
+
+    grandScanned += scanned;
+    grandUnchanged += unchanged;
+    grandChanged += changed;
+    grandNew += inserted;
+
+    if (options.dryRun || !changedOrNew.length || !db) continue;
+
+    const rows: Record<string, unknown>[] = [];
+    for (let i = 0; i < changedOrNew.length; i++) {
+      const raw = changedOrNew[i];
+      const topics = classifyTopics(raw.title, raw.description || '');
+      let sponsors: unknown = null;
+      let introducedDate: string | null = null;
+      let detailFetched = false;
+      if (!skipSponsors) {
+        try {
+          const detail = await client.fetchBillDetail(raw.bill_id);
+          if (detail) {
+            detailFetched = true;
+            if (detail.sponsors?.length) sponsors = detail.sponsors;
+            introducedDate = deriveIntroducedDate(detail);
+          }
+        } catch (err: any) {
+          log(source, `Sponsor fetch failed for ${raw.number}: ${err?.message || err}`);
+        }
+      }
+      const row: Record<string, unknown> = {
+        legiscan_id: raw.bill_id,
+        bill_number: raw.number,
+        title: raw.title,
+        description: raw.description || null,
+        session: session.session_name,
+        status: mapLegiScanStatus(raw.status, raw.last_action || ''),
+        chamber: chamberFromBillNumber(raw.number),
+        last_action: raw.last_action || null,
+        last_action_date: raw.last_action_date || null,
+        bill_text_url: raw.url || null,
+        topics: topics.length > 0 ? topics : null,
+        source: 'legiscan',
+        change_hash: raw.change_hash || null,
+        legiscan_session_id: session.session_id,
+        updated_from_legiscan_at: new Date().toISOString(),
+      };
+      if (!skipSponsors) row.sponsors = sponsors;
+      if (detailFetched) row.introduced_date = introducedDate;
+      rows.push(row);
+      if (!skipSponsors && (i + 1) % 25 === 0) {
+        log(source, `Hash-gated enrich ${i + 1}/${changedOrNew.length}`);
+      }
+    }
+    const synced = await upsertKyBillRows(source, db, rows);
+    grandSynced += synced;
+    log(source, `${session.session_name}: upserted ${synced}/${rows.length} (hash-gated)`);
+  }
+
+  log(
+    source,
+    `Hash-gated totals: scanned=${grandScanned} unchanged_skipped=${grandUnchanged} changed_updated=${grandChanged} new_inserted=${grandNew}`,
+  );
+
+  if (options.dryRun) {
+    log(source, `[DRY RUN] Would upsert ${grandChanged + grandNew} bill rows (hash-gated)`);
+    return { source, status: 'success', itemsSynced: grandChanged + grandNew, duration: Date.now() - start };
+  }
+
+  await updateSourceStatus(source, 'success', grandSynced);
+  return { source, status: 'success', itemsSynced: grandSynced, duration: Date.now() - start };
+}
+
 export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult> {
   const start = Date.now();
   const source = 'bills';
@@ -400,6 +647,11 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
       return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
     }
     const sorted = [...sessions].sort((a, b) => (b.year_end || 0) - (a.year_end || 0));
+
+    if (options.useChangeHash === true) {
+      return await syncKyBillsByHash(source, client, sorted, options, start);
+    }
+
     const limit = options.limit ?? 250;
     const skipSponsors = options.skipBillSponsorDetails === true;
     const quotaBackfill = options.quotaBackfill === true;
@@ -673,13 +925,19 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
     }
     log(source, `Fetching votes for ${bills.length} bills (limit ${billLimit})`);
     const rows: Record<string, unknown>[] = [];
+    let skippedNoRollCallId = 0;
     for (const bill of bills) {
       try {
         const votes = await legiscanClient.fetchVotes(bill.legiscan_id!);
         if (!votes.length) continue;
         for (const vote of votes) {
+          if (vote.roll_call_id == null) {
+            skippedNoRollCallId += 1;
+            continue;
+          }
           rows.push({
             bill_id: bill.id,
+            roll_call_id: vote.roll_call_id,
             date: vote.date || null,
             description: vote.desc || null,
             yea_count: vote.yea || 0,
@@ -693,12 +951,17 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
         logError(source, `Failed to fetch votes for bill ${bill.legiscan_id}: ${err.message}`);
       }
     }
+    if (skippedNoRollCallId > 0) {
+      log(source, `Skipped ${skippedNoRollCallId} vote(s) missing roll_call_id to avoid duplicate rows`);
+    }
     let synced = 0;
     if (rows.length > 0 && !options.dryRun) {
       const BATCH = 50;
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH);
-        const { error } = await db.from('ky_votes').insert(batch);
+        const { error } = await db
+          .from('ky_votes')
+          .upsert(batch, { onConflict: 'bill_id,roll_call_id', ignoreDuplicates: false });
         if (!error) synced += batch.length;
       }
     } else if (options.dryRun) {

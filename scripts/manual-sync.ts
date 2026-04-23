@@ -50,6 +50,11 @@ const quotaBackfill = args.includes('--quota-backfill');
 const quotaBackfillSessionsPerRun = intFlag('--quota-backfill-sessions-per-run');
 const sponsorDetailBudgetPerSession = intFlag('--sponsor-budget');
 const quotaBackfillAdvanceCursor = !args.includes('--no-advance-cursor');
+const useChangeHash =
+  args.includes('--useChangeHash=true') ||
+  args.includes('--use-change-hash=true') ||
+  args.includes('--useChangeHash') ||
+  args.includes('--use-change-hash');
 
 function printHeader() {
   console.log('');
@@ -112,6 +117,7 @@ async function main() {
       quotaBackfillSessionsPerRun,
       sponsorDetailBudgetPerSession,
       quotaBackfillAdvanceCursor,
+      useChangeHash: useChangeHash || undefined,
     });
     printResults(results);
     const failed = results.filter(r => r.status === 'error');

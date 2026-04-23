@@ -9,11 +9,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create client with fallback values for development
-export const supabase = supabaseUrl && supabaseAnonKey 
+export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
-
-// Use the service role key ONLY for server-side scripts, never in client
-export const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY && supabaseUrl
-  ? createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY)
-  : null; 

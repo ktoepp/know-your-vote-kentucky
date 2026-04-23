@@ -67,6 +67,7 @@ export async function POST(
   const sdb = searchParams.get('sponsorDetailBudgetPerSession');
   const sponsorDetailBudgetPerSession = sdb ? parseInt(sdb, 10) : undefined;
   const quotaBackfillAdvanceCursor = searchParams.get('quotaBackfillAdvanceCursor') !== 'false';
+  const useChangeHash = searchParams.get('useChangeHash') === 'true';
 
   try {
     const results = await syncAll({
@@ -84,6 +85,7 @@ export async function POST(
         ? undefined
         : sponsorDetailBudgetPerSession,
       quotaBackfillAdvanceCursor,
+      useChangeHash: useChangeHash || undefined,
     });
     const result = results[0];
     return NextResponse.json(
@@ -91,7 +93,8 @@ export async function POST(
       { status: result?.status === 'error' ? 500 : 200 },
     );
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[Sync API] per-source syncAll failed:', err);
+    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
 }
 

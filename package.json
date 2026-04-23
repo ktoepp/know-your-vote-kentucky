@@ -62,6 +62,7 @@
     "sync:ky:sessions": "tsx scripts/list-ky-legiscan-sessions.ts",
     "sync:ky:quota": "tsx scripts/manual-sync.ts bills --quota-backfill",
     "sync:ky:dry": "tsx scripts/manual-sync.ts --dry-run",
+    "bulk-seed:ky": "tsx scripts/ky-legiscan-bulk-seed.ts",
     "geo:ky-districts": "NODE_OPTIONS=--dns-result-order=ipv4first tsx scripts/build-ky-district-geojson.ts",
     "geo:ky-mask": "tsx scripts/build-ky-outside-mask.ts",
     "db:apply-sql": "tsx scripts/apply-migration-sql.ts"
@@ -96,6 +97,7 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-map-gl": "^8.1.1",
+    "server-only": "^0.0.1",
     "three": "^0.177.0"
   },
   "devDependencies": {
