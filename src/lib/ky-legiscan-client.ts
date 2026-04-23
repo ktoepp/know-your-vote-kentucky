@@ -11,7 +11,7 @@ export interface LegiScanBillSummary { bill_id: number; number: string; title: s
 export interface LegiScanSponsor { people_id: number; name: string; party: string; role: string; }
 export interface LegiScanHistoryEntry { date: string; action: string; chamber: string; }
 export interface LegiScanVoteSummary { roll_call_id: number; date: string; desc: string; yea: number; nay: number; }
-export interface LegiScanBillDetail extends LegiScanBillSummary { sponsors: LegiScanSponsor[]; history: LegiScanHistoryEntry[]; votes: LegiScanVoteSummary[]; texts: { doc_id: number; date: string; type: string; url: string }[]; committee: { committee_id: number; name: string } | null; }
+export interface LegiScanBillDetail extends LegiScanBillSummary { sponsors: LegiScanSponsor[]; history: LegiScanHistoryEntry[]; votes: LegiScanVoteSummary[]; texts: { doc_id: number; date: string; type: string; url: string }[]; committee: { committee_id: number; name: string } | null; introduced?: string; }
 export interface LegiScanVote { roll_call_id: number; bill_id: number; date: string; desc: string; yea: number; nay: number; nv: number; absent: number; passed: number; votes: { people_id: number; vote_text: string; name: string }[]; }
 export interface LegiScanSearchResult { relevance: number; bill_id: number; number: string; title: string; state: string; }
 

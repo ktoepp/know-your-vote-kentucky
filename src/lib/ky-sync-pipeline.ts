@@ -12,7 +12,7 @@ import {
   getKySchoolBoardsClient,
   getKyCountyCourtsClient,
 } from './ky-data-sources';
-import { supabaseAdmin } from '../app/lib/supabaseClient';
+import { supabaseAdmin } from '../app/lib/supabaseAdmin';
 import { classifyTopics } from './ky-topic-classifier';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
 import {
@@ -29,7 +29,7 @@ import {
   openStatesLegislatorNames,
 } from './ky-openstates-client';
 import type { KYSource } from '../types/kentucky';
-import type { KyLegiScanClient, LegiScanBillSummary, LegiScanSession } from './ky-legiscan-client';
+import type { KyLegiScanClient, LegiScanBillDetail, LegiScanBillSummary, LegiScanSession } from './ky-legiscan-client';
 
 /**
  * LegiScan numeric status codes for state bills.
@@ -74,6 +74,31 @@ function chamberFromBillNumber(billNumber: string): 'house' | 'senate' | null {
   if (upper.startsWith('H')) return 'house';
   if (upper.startsWith('S')) return 'senate';
   return null;
+}
+
+/** Normalize a LegiScan date string to YYYY-MM-DD, or null if unparseable. */
+function toIsoDate(s: string | undefined | null): string | null {
+  if (!s) return null;
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+  if (m) return m[1];
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+/** Audit item #3: derive introduced_date from getBill detail (explicit field or earliest history entry). */
+function deriveIntroducedDate(detail: LegiScanBillDetail | null | undefined): string | null {
+  if (!detail) return null;
+  const direct = toIsoDate(detail.introduced);
+  if (direct) return direct;
+  if (!detail.history?.length) return null;
+  let earliest: string | null = null;
+  for (const h of detail.history) {
+    const d = toIsoDate(h.date);
+    if (!d) continue;
+    if (!earliest || d < earliest) earliest = d;
+  }
+  return earliest;
 }
 
 function compareLegiScanBillRecency(a: { last_action_date?: string }, b: { last_action_date?: string }): number {
@@ -276,11 +301,17 @@ async function buildBillRowsForSession(
     const bill = toSync[i];
     const topics = classifyTopics(bill.title, bill.description || '');
     let sponsors: unknown = null;
+    let introducedDate: string | null = null;
+    let detailFetched = false;
     if (!skipSponsors) {
       try {
         const detail = await client.fetchBillDetail(bill.bill_id);
-        if (detail?.sponsors?.length) {
-          sponsors = detail.sponsors;
+        if (detail) {
+          detailFetched = true;
+          if (detail.sponsors?.length) {
+            sponsors = detail.sponsors;
+          }
+          introducedDate = deriveIntroducedDate(detail);
         }
       } catch (err: any) {
         log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
@@ -305,6 +336,11 @@ async function buildBillRowsForSession(
     // instead of overwriting sponsor data populated by manual backfill runs.
     if (!skipSponsors) {
       row.sponsors = sponsors;
+    }
+    // Audit item #3: only set introduced_date when getBill detail was fetched;
+    // otherwise omit the key to preserve any value populated by a prior enrich run.
+    if (detailFetched) {
+      row.introduced_date = introducedDate;
     }
     rows.push(row);
     if (!skipSponsors && (i + 1) % 25 === 0) {
@@ -343,10 +379,16 @@ async function buildBillRowsQuotaSession(
   for (const bill of bills) {
     const topics = classifyTopics(bill.title, bill.description || '');
     let sponsors: unknown = null;
+    let introducedDate: string | null = null;
+    let detailFetched = false;
     if (enrichIds.has(bill.bill_id)) {
       try {
         const detail = await client.fetchBillDetail(bill.bill_id);
-        if (detail?.sponsors?.length) sponsors = detail.sponsors;
+        if (detail) {
+          detailFetched = true;
+          if (detail.sponsors?.length) sponsors = detail.sponsors;
+          introducedDate = deriveIntroducedDate(detail);
+        }
       } catch (err: any) {
         log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
       }
@@ -378,6 +420,11 @@ async function buildBillRowsQuotaSession(
     // instead of overwriting sponsor data populated by manual backfill runs.
     if (!opts.skipSponsors) {
       row.sponsors = sponsors;
+    }
+    // Audit item #3: only set introduced_date when getBill detail was fetched;
+    // otherwise omit the key to preserve any value populated by a prior enrich run.
+    if (detailFetched) {
+      row.introduced_date = introducedDate;
     }
     rows.push(row);
   }
