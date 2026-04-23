@@ -84,7 +84,7 @@ export default function OrdinancesPage() {
         <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
           Browse ordinances from Louisville Metro Council and Lexington-Fayette Urban County Council.
         </Typography>
-        <DataFreshnessNote variant="page" />
+        <DataFreshnessNote variant="page" source="ordinances" />
 
         <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: 2 }}>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
