@@ -673,13 +673,19 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
     }
     log(source, `Fetching votes for ${bills.length} bills (limit ${billLimit})`);
     const rows: Record<string, unknown>[] = [];
+    let skippedNoRollCallId = 0;
     for (const bill of bills) {
       try {
         const votes = await legiscanClient.fetchVotes(bill.legiscan_id!);
         if (!votes.length) continue;
         for (const vote of votes) {
+          if (vote.roll_call_id == null) {
+            skippedNoRollCallId += 1;
+            continue;
+          }
           rows.push({
             bill_id: bill.id,
+            roll_call_id: vote.roll_call_id,
             date: vote.date || null,
             description: vote.desc || null,
             yea_count: vote.yea || 0,
@@ -693,12 +699,17 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
         logError(source, `Failed to fetch votes for bill ${bill.legiscan_id}: ${err.message}`);
       }
     }
+    if (skippedNoRollCallId > 0) {
+      log(source, `Skipped ${skippedNoRollCallId} vote(s) missing roll_call_id to avoid duplicate rows`);
+    }
     let synced = 0;
     if (rows.length > 0 && !options.dryRun) {
       const BATCH = 50;
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH);
-        const { error } = await db.from('ky_votes').insert(batch);
+        const { error } = await db
+          .from('ky_votes')
+          .upsert(batch, { onConflict: 'bill_id,roll_call_id', ignoreDuplicates: false });
         if (!error) synced += batch.length;
       }
     } else if (options.dryRun) {
