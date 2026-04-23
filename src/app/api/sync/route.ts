@@ -98,7 +98,8 @@ export async function GET(req: NextRequest) {
         availableSources: Object.keys(SYNC_SOURCES),
       });
     } catch (err: any) {
-      return NextResponse.json({ error: err.message }, { status: 500 });
+      console.error('[Sync API] getSyncStatus failed:', err);
+      return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
     }
   }
 
@@ -133,7 +134,8 @@ export async function GET(req: NextRequest) {
       { status: hasErrors ? 207 : 200 },
     );
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[Sync API] GET syncAll failed:', err);
+    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
 }
 
@@ -174,6 +176,7 @@ export async function POST(req: NextRequest) {
       { status: hasErrors ? 207 : 200 },
     );
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[Sync API] POST syncAll failed:', err);
+    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
 }

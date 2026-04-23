@@ -91,7 +91,8 @@ export async function POST(
       { status: result?.status === 'error' ? 500 : 200 },
     );
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[Sync API] per-source syncAll failed:', err);
+    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
 }
 
