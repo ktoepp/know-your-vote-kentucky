@@ -286,7 +286,7 @@ async function buildBillRowsForSession(
         log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
       }
     }
-    rows.push({
+    const row: Record<string, unknown> = {
       legiscan_id: bill.bill_id,
       bill_number: bill.number,
       title: bill.title,
@@ -298,9 +298,15 @@ async function buildBillRowsForSession(
       last_action_date: bill.last_action_date || null,
       bill_text_url: bill.url || null,
       topics: topics.length > 0 ? topics : null,
-      sponsors,
       source: 'legiscan',
-    });
+    };
+    // Audit item #2: when sponsor details are skipped (e.g. daily cron), omit the
+    // sponsors key entirely so Supabase leaves the existing column value intact
+    // instead of overwriting sponsor data populated by manual backfill runs.
+    if (!skipSponsors) {
+      row.sponsors = sponsors;
+    }
+    rows.push(row);
     if (!skipSponsors && (i + 1) % 25 === 0) {
       log(source, `Enriched sponsors ${i + 1}/${toSync.length}`);
     }
@@ -353,7 +359,7 @@ async function buildBillRowsQuotaSession(
         ? opts.existingSponsors.get(bill.bill_id)
         : null;
     }
-    rows.push({
+    const row: Record<string, unknown> = {
       legiscan_id: bill.bill_id,
       bill_number: bill.number,
       title: bill.title,
@@ -365,9 +371,15 @@ async function buildBillRowsQuotaSession(
       last_action_date: bill.last_action_date || null,
       bill_text_url: bill.url || null,
       topics: topics.length > 0 ? topics : null,
-      sponsors,
       source: 'legiscan',
-    });
+    };
+    // Audit item #2: when sponsor details are skipped (e.g. daily cron), omit the
+    // sponsors key entirely so Supabase leaves the existing column value intact
+    // instead of overwriting sponsor data populated by manual backfill runs.
+    if (!opts.skipSponsors) {
+      row.sponsors = sponsors;
+    }
+    rows.push(row);
   }
   return rows;
 }
