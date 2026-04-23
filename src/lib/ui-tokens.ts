@@ -75,3 +75,26 @@ export const CHIP = {
 } as const;
 
 export type ChipScale = keyof typeof CHIP;
+
+/**
+ * Card shell tokens consumed by `<CivicCard />` (see `components/ui/CivicCard.tsx`).
+ * `KYBillCard`, `MemberCard`, `OrdinanceCard`, and meeting cards adopt these so
+ * border radius, padding, elevation, and hover motion stay aligned across the app.
+ *
+ * Values use the MUI system scale (multiples of `theme.shape.borderRadius` / `theme.spacing`).
+ */
+export const CARD = {
+  /** Border radius on the outer Card (`sx` scale — 3 × 8px = 24px). */
+  borderRadius: 3,
+  /** Inner CardContent padding — responsive. */
+  padding: { xs: 2, sm: 2.5 },
+  /** MUI `elevation` prop values. */
+  elevation: {
+    rest: 0,
+    featured: 3,
+    hover: 4,
+  },
+  /** Hover motion — matches existing KYBillCard / MemberCard. */
+  hoverTransform: 'translateY(-2px)',
+  hoverTransition: 'all 0.2s ease',
+} as const;

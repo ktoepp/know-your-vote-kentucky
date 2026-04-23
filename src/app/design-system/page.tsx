@@ -37,6 +37,7 @@ import {
   BillNumberChip,
 } from '@/components/ui/Chip';
 import { KYBillCard } from '@/components/bills/KYBillCard';
+import { CivicCard } from '@/components/ui/CivicCard';
 import StatsGrid from '@/components/bills/StatsGrid';
 import type { KYBill } from '@/types/kentucky';
 import {
@@ -425,6 +426,89 @@ export default function DesignSystemPage() {
               <BillNumberChip billNumber="HCR 3" size="small" />
               <BillNumberChip billNumber="HB 199" variant="filled" tone="primary" />
             </Stack>
+          </section>
+
+          <section>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              CivicCard shell
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              <Typography component="span" sx={{ fontFamily: 'monospace' }}>CivicCard</Typography> — shared border, radius,
+              elevation, padding, and hover/focus treatment for bill, member, ordinance, and meeting cards.
+              Slots (<Typography component="span" sx={{ fontFamily: 'monospace' }}>header</Typography>,{' '}
+              <Typography component="span" sx={{ fontFamily: 'monospace' }}>body</Typography>,{' '}
+              <Typography component="span" sx={{ fontFamily: 'monospace' }}>footer</Typography>) are passed as named props.
+              Tokens live in <Typography component="span" sx={{ fontFamily: 'monospace' }}>ui-tokens.ts#CARD</Typography>.
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={4}>
+                <CivicCard
+                  variant="bill"
+                  href="/design-system"
+                  ariaLabel="CivicCard demo — bill variant"
+                  header={
+                    <Stack direction="row" gap={1} flexWrap="wrap">
+                      <ChamberChip chamber="house" />
+                      <MetaChip label="In committee" />
+                    </Stack>
+                  }
+                  body={
+                    <>
+                      <Typography variant="h6" component="p" fontWeight={700} gutterBottom>
+                        HB 199
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Interactive variant — full-card link with focus-visible ring (tab to see).
+                      </Typography>
+                    </>
+                  }
+                  footer={
+                    <Typography variant="caption" color="text.secondary">
+                      Last action · today
+                    </Typography>
+                  }
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <CivicCard
+                  variant="member"
+                  featured
+                  header={
+                    <Typography variant="overline" color="text.secondary">
+                      Featured · member
+                    </Typography>
+                  }
+                  body={
+                    <>
+                      <Typography variant="h6" component="p" fontWeight={700} gutterBottom>
+                        Featured card
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Non-interactive — thicker border and raised elevation via the{' '}
+                        <Typography component="span" sx={{ fontFamily: 'monospace' }}>featured</Typography> prop.
+                      </Typography>
+                    </>
+                  }
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <CivicCard
+                  variant="ordinance"
+                  body={
+                    <>
+                      <Typography variant="h6" component="p" fontWeight={700} gutterBottom>
+                        Static card
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        No <Typography component="span" sx={{ fontFamily: 'monospace' }}>href</Typography> or{' '}
+                        <Typography component="span" sx={{ fontFamily: 'monospace' }}>onClick</Typography> — renders as a
+                        plain container with no hover treatment.
+                      </Typography>
+                    </>
+                  }
+                />
+              </Grid>
+            </Grid>
           </section>
 
           <section>
