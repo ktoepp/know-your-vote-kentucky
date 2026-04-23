@@ -5,7 +5,7 @@
  * Required env: LEGISCAN_API_KEY
  */
 import axios, { AxiosInstance } from 'axios';
-import { supabaseAdmin } from '../app/lib/supabaseAdmin';
+import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 
 export interface LegiScanSession { session_id: number; state_id: number; year_start: number; year_end: number; session_name: string; special: number; }
 export interface LegiScanBillSummary { bill_id: number; number: string; title: string; description: string; state: string; session_id: number; status: number; status_desc: string; last_action: string; last_action_date: string; url: string; }

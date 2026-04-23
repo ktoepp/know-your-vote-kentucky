@@ -12,7 +12,7 @@ import {
   getKySchoolBoardsClient,
   getKyCountyCourtsClient,
 } from './ky-data-sources';
-import { supabaseAdmin } from '../app/lib/supabaseAdmin';
+import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 import { classifyTopics } from './ky-topic-classifier';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
 import {
