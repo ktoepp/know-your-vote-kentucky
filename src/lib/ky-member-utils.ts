@@ -1,5 +1,5 @@
 import type { KYLegislator, KYLegislatorRoster } from '@/types/kentucky';
-import { formatBillLabelText } from '@/lib/bill-display';
+import { formatBillLabelText, formatPartyLetterAbbrev } from '@/lib/bill-display';
 
 /** Two-letter initials for `Avatar` when photo is missing (uses first/last or parses `name`). */
 export function kyLegislatorAvatarInitials(leg: Pick<KYLegislator, 'name' | 'first_name' | 'last_name'>): string {
@@ -99,6 +99,74 @@ export function normalizeSponsorNameForMatch(name: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+/** Input shape for `formatMemberDisplay` — accepts `KYLegislator` or a LegiScan sponsor row. */
+export interface MemberDisplayInput {
+  name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  party?: string | null;
+  chamber?: 'house' | 'senate' | null;
+  district?: string | null;
+  role?: string | null;
+  role_title?: string | null;
+  lrc_profile_url?: string | null;
+  website?: string | null;
+}
+
+/** Canonical display variants from UX normalization spec §2c. */
+export type MemberDisplayVariant = 'primary' | 'compact' | 'long';
+
+function memberDisplayPrimaryName(input: MemberDisplayInput): string {
+  const raw = (input.name || '').trim();
+  if (raw) return raw;
+  const fi = (input.first_name || '').trim();
+  const la = (input.last_name || '').trim();
+  if (fi && la) return `${fi} ${la}`;
+  return fi || la || '';
+}
+
+function memberHonorificPrefix(input: MemberDisplayInput): string {
+  if (isKentuckyGovernor(input)) return 'Gov.';
+  const role = (input.role || '').trim().toUpperCase().replace(/\.$/, '');
+  if (role === 'REP' || role === 'REPRESENTATIVE') return 'Rep.';
+  if (role === 'SEN' || role === 'SENATOR') return 'Sen.';
+  if (role === 'DEL' || role === 'DELEGATE') return 'Del.';
+  if (input.chamber === 'house') return 'Rep.';
+  if (input.chamber === 'senate') return 'Sen.';
+  return '';
+}
+
+function memberDistrictNumber(district: string | null | undefined): string {
+  const raw = (district || '').trim();
+  if (!raw) return '';
+  const m = raw.match(/(\d+)\s*$/);
+  return m ? m[1] : raw;
+}
+
+/**
+ * Canonical name renderer from UX normalization spec §2c.
+ * - `primary`  → `"Jane Smith"` (card titles, sponsor headers)
+ * - `compact`  → `"Jane Smith (D)"` (sponsor chips)
+ * - `long`     → `"Rep. Jane Smith (D-KY-26)"` (dense inline attribution)
+ */
+export function formatMemberDisplay(
+  input: MemberDisplayInput,
+  variant: MemberDisplayVariant = 'primary',
+): string {
+  const name = memberDisplayPrimaryName(input);
+  if (variant === 'primary') return name;
+  const partyAbbrev = formatPartyLetterAbbrev(input.party);
+  if (variant === 'compact') return partyAbbrev ? `${name} (${partyAbbrev})` : name;
+  const honorific = memberHonorificPrefix(input);
+  const districtNum = memberDistrictNumber(input.district);
+  const clusterParts: string[] = [];
+  if (partyAbbrev) clusterParts.push(partyAbbrev);
+  if (districtNum) clusterParts.push('KY', districtNum);
+  const cluster = clusterParts.length ? clusterParts.join('-') : '';
+  const prefix = honorific ? `${honorific} ` : '';
+  return cluster ? `${prefix}${name} (${cluster})` : `${prefix}${name}`;
 }
 
 /** Match a bill sponsor string to a KY legislator (for official portrait). */

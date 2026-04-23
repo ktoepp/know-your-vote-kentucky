@@ -30,7 +30,14 @@ import { EmptyState } from '@/components/civic/EmptyState';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { SponsorAvatarChip } from '@/components/civic/SponsorAvatarChip';
 import { AiSummaryTooltip, AiSummaryInline } from '@/components/civic/AiAttribution';
+import {
+  MetaChip,
+  SeverityChip,
+  ChamberChip,
+  BillNumberChip,
+} from '@/components/ui/Chip';
 import { KYBillCard } from '@/components/bills/KYBillCard';
+import { CivicCard } from '@/components/ui/CivicCard';
 import StatsGrid from '@/components/bills/StatsGrid';
 import type { KYBill } from '@/types/kentucky';
 import {
@@ -369,6 +376,139 @@ export default function DesignSystemPage() {
                 Two-line clamped inline summary for dense list surfaces.
               </AiSummaryInline>
             </Paper>
+          </section>
+
+          <section>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Canonical chip primitives
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Shared <Typography component="span" sx={{ fontFamily: 'monospace' }}>Chip</Typography> components from{' '}
+              <Typography component="span" sx={{ fontFamily: 'monospace' }}>components/ui/Chip.tsx</Typography>. All four
+              accept <Typography component="span" sx={{ fontFamily: 'monospace' }}>{'{ label, icon?, tone?, size? }'}</Typography> and
+              pass remaining props through to MUI Chip.
+            </Typography>
+            <Typography variant="subtitle2" gutterBottom>
+              MetaChip
+            </Typography>
+            <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }} alignItems="center">
+              <MetaChip label="Education" />
+              <MetaChip label="Budget" tone="primary" />
+              <MetaChip label="With icon" icon={<Gavel />} />
+              <MetaChip label="Compact" size="small" />
+              <MetaChip label="Filled" variant="filled" tone="primary" />
+            </Stack>
+            <Typography variant="subtitle2" gutterBottom>
+              SeverityChip
+            </Typography>
+            <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }} alignItems="center">
+              <SeverityChip label="Info" severity="info" />
+              <SeverityChip label="Success" severity="success" icon={<CheckCircle />} />
+              <SeverityChip label="Warning" severity="warning" />
+              <SeverityChip label="Error" severity="error" />
+              <SeverityChip label="Compact" severity="success" size="small" />
+            </Stack>
+            <Typography variant="subtitle2" gutterBottom>
+              ChamberChip
+            </Typography>
+            <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }} alignItems="center">
+              <ChamberChip chamber="house" />
+              <ChamberChip chamber="senate" />
+              <ChamberChip chamber="house" variant="outlined" />
+              <ChamberChip chamber="senate" size="small" />
+            </Stack>
+            <Typography variant="subtitle2" gutterBottom>
+              BillNumberChip
+            </Typography>
+            <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }} alignItems="center">
+              <BillNumberChip billNumber="HB 1" />
+              <BillNumberChip billNumber="SB 12" tone="primary" />
+              <BillNumberChip billNumber="HCR 3" size="small" />
+              <BillNumberChip billNumber="HB 199" variant="filled" tone="primary" />
+            </Stack>
+          </section>
+
+          <section>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              CivicCard shell
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              <Typography component="span" sx={{ fontFamily: 'monospace' }}>CivicCard</Typography> — shared border, radius,
+              elevation, padding, and hover/focus treatment for bill, member, ordinance, and meeting cards.
+              Slots (<Typography component="span" sx={{ fontFamily: 'monospace' }}>header</Typography>,{' '}
+              <Typography component="span" sx={{ fontFamily: 'monospace' }}>body</Typography>,{' '}
+              <Typography component="span" sx={{ fontFamily: 'monospace' }}>footer</Typography>) are passed as named props.
+              Tokens live in <Typography component="span" sx={{ fontFamily: 'monospace' }}>ui-tokens.ts#CARD</Typography>.
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={4}>
+                <CivicCard
+                  variant="bill"
+                  href="/design-system"
+                  ariaLabel="CivicCard demo — bill variant"
+                  header={
+                    <Stack direction="row" gap={1} flexWrap="wrap">
+                      <ChamberChip chamber="house" />
+                      <MetaChip label="In committee" />
+                    </Stack>
+                  }
+                  body={
+                    <>
+                      <Typography variant="h6" component="p" fontWeight={700} gutterBottom>
+                        HB 199
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Interactive variant — full-card link with focus-visible ring (tab to see).
+                      </Typography>
+                    </>
+                  }
+                  footer={
+                    <Typography variant="caption" color="text.secondary">
+                      Last action · today
+                    </Typography>
+                  }
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <CivicCard
+                  variant="member"
+                  featured
+                  header={
+                    <Typography variant="overline" color="text.secondary">
+                      Featured · member
+                    </Typography>
+                  }
+                  body={
+                    <>
+                      <Typography variant="h6" component="p" fontWeight={700} gutterBottom>
+                        Featured card
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Non-interactive — thicker border and raised elevation via the{' '}
+                        <Typography component="span" sx={{ fontFamily: 'monospace' }}>featured</Typography> prop.
+                      </Typography>
+                    </>
+                  }
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <CivicCard
+                  variant="ordinance"
+                  body={
+                    <>
+                      <Typography variant="h6" component="p" fontWeight={700} gutterBottom>
+                        Static card
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        No <Typography component="span" sx={{ fontFamily: 'monospace' }}>href</Typography> or{' '}
+                        <Typography component="span" sx={{ fontFamily: 'monospace' }}>onClick</Typography> — renders as a
+                        plain container with no hover treatment.
+                      </Typography>
+                    </>
+                  }
+                />
+              </Grid>
+            </Grid>
           </section>
 
           <section>

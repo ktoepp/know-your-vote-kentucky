@@ -45,3 +45,56 @@ export const LINK = {
 
 /** External / “open in new tab” affordance — matches nav icon scale */
 export const EXTERNAL_LINK_ICON_SX = { fontSize: ICON_REM.nav } as const;
+
+/**
+ * Shared chip sizing/padding tokens. Canonical chip primitives in
+ * `src/components/ui/Chip.tsx` compose these; existing `STATUS_OUTLINED_CHIP_SX`
+ * / `MEMBER_SPONSOR_OUTLINED_CHIP_SX` constants continue to resolve to the same
+ * styles for current call sites.
+ */
+export const CHIP = {
+  /** Card-level chip (topic, chamber, status) — 0.875rem / 600, standard label padding */
+  standard: {
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    '& .MuiChip-label': { px: 1.1 },
+  },
+  /** Compact badge (sponsor role, governor, inline status) — 0.7rem / 700, 22px tall */
+  compact: {
+    fontSize: '0.7rem',
+    height: 22,
+    fontWeight: 700,
+    '& .MuiChip-label': { px: 0.9 },
+  },
+  /** Additional slot for chips that carry a leading avatar */
+  avatar: {
+    maxWidth: '100%',
+    '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis', px: 1.1 },
+    '& .MuiChip-avatar': { ml: 0.5 },
+  },
+} as const;
+
+export type ChipScale = keyof typeof CHIP;
+
+/**
+ * Card shell tokens consumed by `<CivicCard />` (see `components/ui/CivicCard.tsx`).
+ * `KYBillCard`, `MemberCard`, `OrdinanceCard`, and meeting cards adopt these so
+ * border radius, padding, elevation, and hover motion stay aligned across the app.
+ *
+ * Values use the MUI system scale (multiples of `theme.shape.borderRadius` / `theme.spacing`).
+ */
+export const CARD = {
+  /** Border radius on the outer Card (`sx` scale — 3 × 8px = 24px). */
+  borderRadius: 3,
+  /** Inner CardContent padding — responsive. */
+  padding: { xs: 2, sm: 2.5 },
+  /** MUI `elevation` prop values. */
+  elevation: {
+    rest: 0,
+    featured: 3,
+    hover: 4,
+  },
+  /** Hover motion — matches existing KYBillCard / MemberCard. */
+  hoverTransform: 'translateY(-2px)',
+  hoverTransition: 'all 0.2s ease',
+} as const;

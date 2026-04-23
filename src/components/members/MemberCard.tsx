@@ -18,6 +18,7 @@ import { useTheme } from '@mui/material/styles';
 import type { KYLegislator } from '@/types/kentucky';
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { KENTUCKY_GOVERNOR_OFFICE_URL } from '@/components/civic/GovernorBeshearChip';
+import { MemberName } from '@/components/civic/MemberName';
 import {
   formatKyLegislatorDistrict,
   formatRepresentativePartyChipLabel,
@@ -122,7 +123,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
               gutterBottom
               sx={{ lineHeight: 1.25 }}
             >
-              {leg.name}
+              <MemberName member={leg} variant="primary" />
             </Typography>
             <Typography
               variant="subtitle1"

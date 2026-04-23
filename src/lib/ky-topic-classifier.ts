@@ -21,6 +21,12 @@ export const KY_TOPICS = [
   'Voting Rights',
   'Local Government',
   'Budget',
+  'Corrections',
+  'Elections',
+  'Higher Education',
+  'Veterans Affairs',
+  'Alcohol & Cannabis',
+  'Gambling',
 ] as const;
 
 export type KYTopicTag = (typeof KY_TOPICS)[number];
@@ -39,22 +45,46 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Energy: ['energy', 'coal', 'natural gas', 'solar', 'wind', 'utility', 'electric', 'pipeline', 'power plant', 'renewable'],
   'Criminal Justice': ['prison', 'jail', 'sentencing', 'parole', 'probation', 'felony', 'misdemeanor', 'incarceration', 'juvenile', 'expungement'],
   'Voting Rights': ['voting', 'election', 'ballot', 'voter', 'registration', 'redistricting', 'poll', 'absentee', 'primary'],
-  'Local Government': ['county', 'city council', 'metro council', 'mayor', 'commissioner', 'ordinance', 'municipal', 'annexation', 'fiscal court'],
+  'Local Government': ['county', 'city council', 'metro council', 'mayor', 'commissioner', 'ordinance', 'municipal', 'annexation', 'fiscal court', 'planning commission', 'zoning board', 'louisville metro', 'lexington-fayette', 'special district', 'library district'],
   Budget: ['budget', 'appropriation', 'spending', 'deficit', 'surplus', 'general fund', 'pension', 'bond'],
+  Corrections: ['department of corrections', 'corrections officer', 'inmate', 'warden', 'reentry', 'halfway house', 'correctional facility', 'parole board'],
+  Elections: ['election administration', 'county clerk', 'poll worker', 'voting machine', 'canvass', 'secretary of state', 'election board', 'precinct', 'election official'],
+  'Higher Education': ['higher education', 'postsecondary', 'kctcs', 'council on postsecondary', 'board of regents', 'state university', 'community and technical college'],
+  'Veterans Affairs': ['veteran', 'veterans', 'military', 'national guard', 'gi bill', 'armed forces', 'servicemember', 'veterans affairs', 'veterans benefits'],
+  'Alcohol & Cannabis': ['alcohol', 'liquor', 'distillery', 'brewery', 'wet-dry', 'cannabis', 'marijuana', 'medical marijuana', 'thc', 'delta-8'],
+  Gambling: ['gambling', 'casino', 'sports betting', 'lottery', 'wagering', 'historical horse racing', 'pari-mutuel', 'charitable gaming', 'racing commission'],
 };
 
+/** Escape regex metacharacters in a keyword before embedding in a pattern. */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Compiled word-boundary regex cache, built once at module load. */
+const TOPIC_KEYWORD_REGEXES: { topic: KYTopicTag; keyword: string; regex: RegExp }[] =
+  (Object.entries(TOPIC_KEYWORDS) as [KYTopicTag, string[]][]).flatMap(([topic, keywords]) =>
+    keywords.map(keyword => ({
+      topic,
+      keyword,
+      regex: new RegExp(String.raw`\b${escapeRegex(keyword)}\b`, 'i'),
+    })),
+  );
+
 /**
- * Classify content into Kentucky topic tags using keyword matching.
+ * Classify content into Kentucky topic tags using word-boundary keyword matching.
  * Returns matched topics sorted by relevance (number of keyword hits).
  */
 export function classifyTopics(title: string, description: string): string[] {
-  const text = `${title} ${description}`.toLowerCase();
-  const scores: { topic: KYTopicTag; hits: number }[] = [];
+  const text = `${title} ${description}`;
+  const hitsByTopic = new Map<KYTopicTag, number>();
 
-  for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS) as [KYTopicTag, string[]][]) {
-    const hits = keywords.filter(k => text.includes(k)).length;
-    if (hits > 0) scores.push({ topic, hits });
+  for (const { topic, regex } of TOPIC_KEYWORD_REGEXES) {
+    if (regex.test(text)) {
+      hitsByTopic.set(topic, (hitsByTopic.get(topic) ?? 0) + 1);
+    }
   }
+
+  const scores = Array.from(hitsByTopic, ([topic, hits]) => ({ topic, hits }));
 
   // Sort by number of keyword hits descending
   scores.sort((a, b) => b.hits - a.hits);
@@ -63,6 +93,16 @@ export function classifyTopics(title: string, description: string): string[] {
   const matched = scores.slice(0, 4).map(s => s.topic);
 
   return matched;
+}
+
+/**
+ * Debug helper: returns every keyword→topic pair that matched the title.
+ * Used by Wave 3 coverage checks to log exactly what matched.
+ */
+export function classifyTopicsForDebug(title: string): { keyword: string; topic: KYTopicTag }[] {
+  return TOPIC_KEYWORD_REGEXES
+    .filter(({ regex }) => regex.test(title))
+    .map(({ keyword, topic }) => ({ keyword, topic }));
 }
 
 /**

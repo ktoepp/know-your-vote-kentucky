@@ -14,7 +14,7 @@
   },
   "headers": [
     {
-      "source": "/api/(.*)",
+      "source": "/api/:group(bills|search|intelligence|geo)/:path*",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",

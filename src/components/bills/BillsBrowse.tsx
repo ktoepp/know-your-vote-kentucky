@@ -139,7 +139,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
         <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
           {subtitle}
         </Typography>
-        <DataFreshnessNote variant="page" />
+        <DataFreshnessNote variant="page" source="bills" />
 
         {!supabase && (
           <Alert severity="warning" sx={{ mb: 2 }}>

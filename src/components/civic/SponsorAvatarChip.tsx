@@ -3,9 +3,8 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Chip, Avatar } from '@mui/material';
-import { memberSlug } from '@/lib/ky-member-utils';
+import { formatMemberDisplay, memberSlug } from '@/lib/ky-member-utils';
 import {
-  formatPartyLetterAbbrev,
   formatRepresentativePartyChipLabel,
   MEMBER_SPONSOR_OUTLINED_CHIP_SX,
 } from '@/lib/bill-display';
@@ -32,8 +31,7 @@ export function SponsorAvatarChip({
   const router = useRouter();
   const slug = memberSlug(name);
   const href = `/members#${slug}`;
-  const partyAbbrev = party ? formatPartyLetterAbbrev(party) : '';
-  const label = partyAbbrev ? `${name} (${partyAbbrev})` : name;
+  const label = formatMemberDisplay({ name, party }, 'compact');
   return (
     <Chip
       clickable

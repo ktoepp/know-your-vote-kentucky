@@ -33,6 +33,7 @@ import { alpha } from '@mui/material/styles';
 import NextLink from 'next/link';
 import { AiGeneratedBlock } from '@/components/civic/AiAttribution';
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
+import { MemberName } from '@/components/civic/MemberName';
 import {
   billStatusChipLabel,
   formatBillLabelText,
@@ -169,7 +170,7 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
                 '&:hover': { textDecoration: 'underline' },
               }}
             >
-              {sponsor.name}
+              <MemberName member={sponsor} variant="primary" />
             </Typography>
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
               <MuiChip

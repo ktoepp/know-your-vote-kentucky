@@ -26,6 +26,7 @@ import type { KYLegislator } from '../../types/kentucky';
 import { withTimeout } from '@/lib/async-utils';
 import { isKentuckyGovernor } from '@/lib/ky-member-utils';
 import { MemberCard } from '@/components/members/MemberCard';
+import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 
 function sortLegislatorsByName(a: KYLegislator, b: KYLegislator) {
   const al = (a.last_name || '').trim().toLowerCase() || a.name.trim().toLowerCase();
@@ -151,12 +152,13 @@ export default function MembersPage() {
           and listed under Governor. Other statewide roles (if present in the data) appear under{' '}
           <strong>Other statewide officials</strong>.
         </Typography>
-        <Typography variant="body2" sx={{ mb: 3 }}>
+        <Typography variant="body2" sx={{ mb: 1 }}>
           <MuiLink component={Link} href="/members/map" fontWeight={600}>
             District map
           </MuiLink>{' '}
           — explore House and Senate districts and search by ZIP code.
         </Typography>
+        <DataFreshnessNote variant="page" source="legislators" />
 
         <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: 2 }}>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>

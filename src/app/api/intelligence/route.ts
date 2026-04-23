@@ -7,12 +7,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
 import { scoreRelevance, classifyIntelligence, generateWhyItMatters } from '../../../lib/ky-intelligence';
+import { parseLimit, parseEnum, ValidationError } from '@/lib/api-validation';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import {
+  makeCacheKey,
+  getCached,
+  setCached,
+  INTELLIGENCE_PROMPT_VERSION,
+} from '@/lib/anthropic-cache';
 
 export async function GET(request: NextRequest) {
   try {
+    const ip = getClientIp(request.headers);
+    const limiter = rateLimit(ip);
+    if (!limiter.allowed) {
+      console.log(`[Intelligence API] rate-limited ip=${ip} retryAfter=${limiter.retryAfterSec}s`);
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(limiter.retryAfterSec) } },
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const type = searchParams.get('type');
+    const limit = parseLimit(searchParams.get('limit'), { default: 10, max: 100 });
+    const type = parseEnum(searchParams.get('type'), ['bills', 'ordinances'] as const, { allowNull: true });
 
     if (!supabase) {
       return NextResponse.json({
@@ -47,23 +65,47 @@ export async function GET(request: NextRequest) {
     scored.sort((a: any, b: any) => b.relevance.score - a.relevance.score);
     const topItems = scored.slice(0, limit);
 
-    // Generate "why it matters" for the top 3
+    // Generate "why it matters" for the top 3, with a short-TTL cache.
+    let cacheHits = 0;
+    let cacheMisses = 0;
     const withAnalysis = await Promise.all(
       topItems.map(async (item: any, i: number) => {
-        if (i < 3) {
-          const whyItMatters = await generateWhyItMatters(item);
-          return { ...item, whyItMatters };
+        if (i >= 3) return item;
+        const updatedAt =
+          item.updated_at ?? item.last_action_date ?? item.adopted_date ?? item.introduced_date ?? null;
+        const cacheKey = makeCacheKey({
+          type: item._type,
+          id: item.id,
+          updated_at: updatedAt,
+          promptVersion: INTELLIGENCE_PROMPT_VERSION,
+        });
+        const cached = getCached(cacheKey);
+        if (cached !== null) {
+          cacheHits += 1;
+          return { ...item, whyItMatters: cached };
         }
-        return item;
+        cacheMisses += 1;
+        const whyItMatters = await generateWhyItMatters(item);
+        setCached(cacheKey, whyItMatters);
+        return { ...item, whyItMatters };
       })
     );
+    console.log(
+      `[Intelligence API] ip=${ip} cache hits=${cacheHits} misses=${cacheMisses} remaining=${limiter.remaining}`,
+    );
 
-    return NextResponse.json({
-      items: withAnalysis,
-      count: withAnalysis.length,
-      generated: new Date().toISOString(),
-    });
+    return NextResponse.json(
+      {
+        items: withAnalysis,
+        count: withAnalysis.length,
+        generated: new Date().toISOString(),
+      },
+      { headers: { 'x-kyvk-cache': `hits=${cacheHits};misses=${cacheMisses}` } },
+    );
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error('[Intelligence API] Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
