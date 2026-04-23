@@ -10,9 +10,14 @@
  * Vercel Cron automatically sends CRON_SECRET when the env var is set in the project.
  *
  * Bills sync tuning:
- *   `limit` — max bills to upsert (LegiScan master list is chamber-balanced before limiting).
+ *   `limit` — max bills per LegiScan session (master list is chamber-balanced before limiting).
  *   `skipBillSponsorDetails=true` — omit per-bill LegiScan getBill calls (required for serverless
  *   time limits on cron; run a manual sync without this periodically for sponsor JSON).
+ *   `historicSessions=N` — sync N most recent KY sessions that have bills (default 1). Backfills prior GAs.
+ *   `legiscanSessionId=N` — sync only that session (from `npm run sync:ky:sessions`); overrides historicSessions.
+ *   `quotaBackfill=true` — full master list per session + sponsor cap + `ky_sync_state` cursor (migration 005).
+ *   `quotaBackfillSessionsPerRun` — sessions per invocation (default 1). `sponsorDetailBudgetPerSession` — getBill cap (default 20).
+ *   `quotaBackfillAdvanceCursor=false` — do not advance cursor after success (testing).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { syncAll, getSyncStatus, SYNC_SOURCES } from '../../../lib/ky-sync-pipeline';
@@ -48,7 +53,32 @@ function syncParamsFromUrl(req: NextRequest) {
   const limitParam = searchParams.get('limit');
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;
   const skipBillSponsorDetails = searchParams.get('skipBillSponsorDetails') === 'true';
-  return { source, dryRun, limit, skipBillSponsorDetails };
+  const hs = searchParams.get('historicSessions');
+  const historicSessions = hs ? parseInt(hs, 10) : undefined;
+  const ls = searchParams.get('legiscanSessionId');
+  const legiscanSessionId = ls ? parseInt(ls, 10) : undefined;
+  const quotaBackfill = searchParams.get('quotaBackfill') === 'true';
+  const qbs = searchParams.get('quotaBackfillSessionsPerRun');
+  const quotaBackfillSessionsPerRun = qbs ? parseInt(qbs, 10) : undefined;
+  const sdb = searchParams.get('sponsorDetailBudgetPerSession');
+  const sponsorDetailBudgetPerSession = sdb ? parseInt(sdb, 10) : undefined;
+  const quotaBackfillAdvanceCursor = searchParams.get('quotaBackfillAdvanceCursor') !== 'false';
+  return {
+    source,
+    dryRun,
+    limit,
+    skipBillSponsorDetails,
+    historicSessions: Number.isNaN(historicSessions as number) ? undefined : historicSessions,
+    legiscanSessionId: Number.isNaN(legiscanSessionId as number) ? undefined : legiscanSessionId,
+    quotaBackfill: quotaBackfill || undefined,
+    quotaBackfillSessionsPerRun: Number.isNaN(quotaBackfillSessionsPerRun as number)
+      ? undefined
+      : quotaBackfillSessionsPerRun,
+    sponsorDetailBudgetPerSession: Number.isNaN(sponsorDetailBudgetPerSession as number)
+      ? undefined
+      : sponsorDetailBudgetPerSession,
+    quotaBackfillAdvanceCursor,
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -73,9 +103,30 @@ export async function GET(req: NextRequest) {
   }
 
   // Vercel Cron and scripted sync use GET with ?source=...
-  const { dryRun, limit, skipBillSponsorDetails } = syncParamsFromUrl(req);
+  const {
+    dryRun,
+    limit,
+    skipBillSponsorDetails,
+    historicSessions,
+    legiscanSessionId,
+    quotaBackfill,
+    quotaBackfillSessionsPerRun,
+    sponsorDetailBudgetPerSession,
+    quotaBackfillAdvanceCursor,
+  } = syncParamsFromUrl(req);
   try {
-    const results = await syncAll({ source, dryRun, limit, skipBillSponsorDetails });
+    const results = await syncAll({
+      source,
+      dryRun,
+      limit,
+      skipBillSponsorDetails,
+      historicSessions,
+      legiscanSessionId,
+      quotaBackfill,
+      quotaBackfillSessionsPerRun,
+      sponsorDetailBudgetPerSession,
+      quotaBackfillAdvanceCursor,
+    });
     const hasErrors = results.some((r) => r.status === 'error');
     return NextResponse.json(
       { results, dryRun },
@@ -91,10 +142,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { source, dryRun, limit, skipBillSponsorDetails } = syncParamsFromUrl(req);
+  const {
+    source,
+    dryRun,
+    limit,
+    skipBillSponsorDetails,
+    historicSessions,
+    legiscanSessionId,
+    quotaBackfill,
+    quotaBackfillSessionsPerRun,
+    sponsorDetailBudgetPerSession,
+    quotaBackfillAdvanceCursor,
+  } = syncParamsFromUrl(req);
 
   try {
-    const results = await syncAll({ source, dryRun, limit, skipBillSponsorDetails });
+    const results = await syncAll({
+      source,
+      dryRun,
+      limit,
+      skipBillSponsorDetails,
+      historicSessions,
+      legiscanSessionId,
+      quotaBackfill,
+      quotaBackfillSessionsPerRun,
+      sponsorDetailBudgetPerSession,
+      quotaBackfillAdvanceCursor,
+    });
     const hasErrors = results.some((r) => r.status === 'error');
     return NextResponse.json(
       { results, dryRun },

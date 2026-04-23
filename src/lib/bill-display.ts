@@ -25,6 +25,29 @@ export function formatBillLabelText(input: string | null | undefined): string {
   return lower.replace(/(^|[\s\-/([{&])([a-z])/g, (_m, sep: string, letter: string) => sep + letter.toUpperCase());
 }
 
+/** Governor has signed the bill (KY sync often stores short label "Signed"). */
+export function isSignedByGovernorBillStatus(status: string | null | undefined): boolean {
+  if (status == null) return false;
+  const s = String(status).trim().toLowerCase();
+  if (!s) return false;
+  if (s.includes('signed by governor')) return true;
+  if (s === 'signed') return true;
+  if (/\bsigned\b/.test(s) && s.includes('governor')) return true;
+  return false;
+}
+
+/**
+ * Label for status chips: use full "Signed by Governor" when the DB has only "Signed".
+ */
+export function billStatusChipLabel(status: string | null | undefined): string {
+  if (status == null || String(status).trim() === '') return '';
+  if (isSignedByGovernorBillStatus(status)) {
+    const t = String(status).trim().toLowerCase();
+    if (t === 'signed' || !t.includes('governor')) return 'Signed by Governor';
+  }
+  return formatBillLabelText(status);
+}
+
 /** Party abbrev or API string → full word for chips (R/D, Dem, Open States names). */
 export function formatPartyLabel(party: string | null | undefined): string {
   if (party == null || String(party).trim() === '') return '';
@@ -38,10 +61,8 @@ export function formatPartyLabel(party: string | null | undefined): string {
   return raw;
 }
 
-/**
- * Party text for representative/sponsor chips: full name plus letter, e.g. "Democrat (D)", "Republican (R)".
- */
-export function formatRepresentativePartyChipLabel(party: string | null | undefined): string {
+/** Single-letter (or short) party code for compact chips, e.g. R / D / I. */
+export function formatPartyLetterAbbrev(party: string | null | undefined): string {
   if (party == null || String(party).trim() === '') return '';
   const full = formatPartyLabel(party);
   if (!full) return '';
@@ -49,14 +70,21 @@ export function formatRepresentativePartyChipLabel(party: string | null | undefi
   const raw = String(party).trim();
   const u = raw.toUpperCase();
 
-  let abbrev: string;
-  if (u === 'R' || u === 'GOP' || full === 'Republican' || u.startsWith('REPUB')) abbrev = 'R';
-  else if (u === 'D' || u === 'DEM' || full === 'Democrat' || u.startsWith('DEMO')) abbrev = 'D';
-  else if (u === 'I' || u === 'IND' || full === 'Independent' || u.startsWith('INDEP')) abbrev = 'I';
-  else if (full === 'Libertarian' || u.startsWith('LIBERT')) abbrev = 'L';
-  else if (full === 'Green' || u.startsWith('GREEN')) abbrev = 'G';
-  else abbrev = full.length ? full.charAt(0).toUpperCase() : '?';
+  if (u === 'R' || u === 'GOP' || full === 'Republican' || u.startsWith('REPUB')) return 'R';
+  if (u === 'D' || u === 'DEM' || full === 'Democrat' || u.startsWith('DEMO')) return 'D';
+  if (u === 'I' || u === 'IND' || full === 'Independent' || u.startsWith('INDEP')) return 'I';
+  if (full === 'Libertarian' || u.startsWith('LIBERT')) return 'L';
+  if (full === 'Green' || u.startsWith('GREEN')) return 'G';
+  return full.length ? full.charAt(0).toUpperCase() : '?';
+}
 
+/**
+ * Party text for representative/sponsor chips: full name plus letter, e.g. "Democrat (D)", "Republican (R)".
+ */
+export function formatRepresentativePartyChipLabel(party: string | null | undefined): string {
+  const abbrev = formatPartyLetterAbbrev(party);
+  if (!abbrev) return '';
+  const full = formatPartyLabel(party);
   return `${full} (${abbrev})`;
 }
 
@@ -84,6 +112,47 @@ export function partyBadgeBackgroundColor(party: string | null | undefined): str
   return '#555';
 }
 
+/**
+ * Filled party label chips — same styling on bill detail, member roster cards, district map tooltip.
+ * Use with `label={formatRepresentativePartyChipLabel(party)}` and `size="small"`.
+ */
+export function partyFilledChipSx(party: string | null | undefined) {
+  return {
+    bgcolor: partyBadgeBackgroundColor(party),
+    color: '#fff',
+    fontWeight: 700,
+    fontSize: '0.7rem',
+    height: 22,
+    '& .MuiChip-label': { px: 0.9 },
+  } as const;
+}
+
+/**
+ * Compact outlined status chips: primary/co-sponsor, role, governor badge on member cards.
+ */
+export const STATUS_OUTLINED_CHIP_SX = {
+  fontSize: '0.7rem',
+  height: 22,
+  fontWeight: 700,
+  '& .MuiChip-label': { px: 0.9 },
+} as const;
+
+/**
+ * Outlined sponsor/member chip with leading avatar (bill cards, hover tooltips, design system).
+ * Pair with MUI Chip `size="medium"` and `variant="outlined"`.
+ */
+export const MEMBER_SPONSOR_OUTLINED_CHIP_SX = {
+  fontWeight: 600,
+  fontSize: '0.875rem',
+  maxWidth: '100%',
+  '& .MuiChip-label': {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    px: 1.1,
+  },
+  '& .MuiChip-avatar': { ml: 0.5 },
+} as const;
+
 /** HD-26 / SD-12 / legacy "House Dist." → "House District …" */
 export function formatSponsorDistrictLine(district: string | null | undefined): string {
   if (district == null || String(district).trim() === '') return '';
@@ -93,6 +162,24 @@ export function formatSponsorDistrictLine(district: string | null | undefined): 
   s = s.replace(/\bHouse\s+Dist\.?\s*/gi, 'House District ');
   s = s.replace(/\bSenate\s+Dist\.?\s*/gi, 'Senate District ');
   return s.trim();
+}
+
+/**
+ * Member roster cards: human-readable district with chamber when the DB has a bare number (e.g. "45").
+ */
+export function formatKyLegislatorDistrict(leg: {
+  chamber: 'house' | 'senate' | null;
+  district: string | null | undefined;
+}): string {
+  const raw = (leg.district || '').trim();
+  if (!raw) return '';
+  let s = formatSponsorDistrictLine(raw);
+  if (s.includes('House District') || s.includes('Senate District')) return s;
+  if (/^\d+$/.test(raw)) {
+    if (leg.chamber === 'house') return `House District ${raw}`;
+    if (leg.chamber === 'senate') return `Senate District ${raw}`;
+  }
+  return s || raw;
 }
 
 export interface KyBillNextAction {

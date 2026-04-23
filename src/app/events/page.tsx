@@ -30,6 +30,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { supabase } from '../lib/supabaseClient';
 import type { KYMeeting } from '../../types/kentucky';
+import { EXTERNAL_LINK_ICON_SX } from '@/lib/ui-tokens';
 
 export default function MeetingsPage() {
   const theme = useTheme();
@@ -163,7 +164,15 @@ export default function MeetingsPage() {
                   </CardContent>
                   {meeting.agenda_url && (
                     <Box sx={{ p: 1.5, pt: 0 }}>
-                      <Button size="small" variant="outlined" endIcon={<OpenInNew />} href={meeting.agenda_url} target="_blank" rel="noopener">
+                      <Button
+                        size="medium"
+                        variant="outlined"
+                        endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                        href={meeting.agenda_url}
+                        target="_blank"
+                        rel="noopener"
+                        sx={{ fontSize: '1rem', py: 1, px: 2 }}
+                      >
                         View Agenda
                       </Button>
                     </Box>

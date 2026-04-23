@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  /** Map libs ship modern ESM; transpiling avoids occasional webpack chunk/module id mismatches in the App Router. */
+  transpilePackages: ['mapbox-gl', 'react-map-gl'],
   webpack: (config, { isServer }) => {
     // Fix MUI imports for Next.js 15 compatibility
     config.resolve.alias = {

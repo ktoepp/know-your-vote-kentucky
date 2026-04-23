@@ -11,6 +11,13 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
+# Optional: Postgres connection for CLI / scripts (Settings → Database → URI).
+# Used by: npm run db:apply-sql (apply SQL migrations when not using hosted SQL editor).
+# DATABASE_URL=postgresql://postgres.[ref]:[YOUR-PASSWORD]@db.[ref].supabase.co:5432/postgres
+#
+# If you omit DATABASE_URL, you can set only the DB password and this script will build the URI:
+# SUPABASE_DB_PASSWORD=your_database_password_here
+
 # =============================================================================
 # REQUIRED — AI / Summarization
 # =============================================================================
@@ -46,6 +53,15 @@ SYNC_API_KEY=your_sync_api_key_here
 NODE_ENV=development
 # Public site origin (sitemap.xml, robots.txt). In production set to your real domain, e.g. https://knowyourvotekentucky.org
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# =============================================================================
+# REQUIRED — District map (/members/map) — Mapbox GL
+# =============================================================================
+# Create a token at https://account.mapbox.com/access-tokens/ (URL restrictions recommended).
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
+
+# Optional: Identify your app when geocoding ZIP codes (Nominatim). Recommended in production.
+# NOMINATIM_USER_AGENT=KnowYourVoteKentucky/1.0 (https://your-domain.example/contact)
 
 # Optional: Debug / Logging
 # DEBUG_MODE=false

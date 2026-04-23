@@ -17,11 +17,15 @@ export interface KYLegislator {
   last_name: string | null;
   party: string | null;
   chamber: 'house' | 'senate' | null;
+  /** Open States currentRole.title (e.g. State Senator, Secretary of State). */
+  role_title: string | null;
   district: string | null;
   photo_url: string | null;
   email: string | null;
   phone: string | null;
   website: string | null;
+  /** legislature.ky.gov profile (from Open States links). */
+  lrc_profile_url: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;

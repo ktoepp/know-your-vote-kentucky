@@ -6,7 +6,7 @@
  * POST /api/sync/ordinances — Sync ordinances only
  * etc.
  *
- * Query params: ?dryRun=true&limit=200&skipBillSponsorDetails=true
+ * Query params: ?dryRun=true&limit=200&skipBillSponsorDetails=true&historicSessions=2&legiscanSessionId=1234&quotaBackfill=true
  * Protected by SYNC_API_KEY or CRON_SECRET bearer token.
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -57,9 +57,34 @@ export async function POST(
   const limitParam = searchParams.get('limit');
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;
   const skipBillSponsorDetails = searchParams.get('skipBillSponsorDetails') === 'true';
+  const hs = searchParams.get('historicSessions');
+  const historicSessions = hs ? parseInt(hs, 10) : undefined;
+  const ls = searchParams.get('legiscanSessionId');
+  const legiscanSessionId = ls ? parseInt(ls, 10) : undefined;
+  const quotaBackfill = searchParams.get('quotaBackfill') === 'true';
+  const qbs = searchParams.get('quotaBackfillSessionsPerRun');
+  const quotaBackfillSessionsPerRun = qbs ? parseInt(qbs, 10) : undefined;
+  const sdb = searchParams.get('sponsorDetailBudgetPerSession');
+  const sponsorDetailBudgetPerSession = sdb ? parseInt(sdb, 10) : undefined;
+  const quotaBackfillAdvanceCursor = searchParams.get('quotaBackfillAdvanceCursor') !== 'false';
 
   try {
-    const results = await syncAll({ source, dryRun, limit, skipBillSponsorDetails });
+    const results = await syncAll({
+      source,
+      dryRun,
+      limit,
+      skipBillSponsorDetails,
+      historicSessions: Number.isNaN(historicSessions as number) ? undefined : historicSessions,
+      legiscanSessionId: Number.isNaN(legiscanSessionId as number) ? undefined : legiscanSessionId,
+      quotaBackfill: quotaBackfill || undefined,
+      quotaBackfillSessionsPerRun: Number.isNaN(quotaBackfillSessionsPerRun as number)
+        ? undefined
+        : quotaBackfillSessionsPerRun,
+      sponsorDetailBudgetPerSession: Number.isNaN(sponsorDetailBudgetPerSession as number)
+        ? undefined
+        : sponsorDetailBudgetPerSession,
+      quotaBackfillAdvanceCursor,
+    });
     const result = results[0];
     return NextResponse.json(
       { result, dryRun },

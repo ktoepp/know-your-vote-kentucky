@@ -14,6 +14,12 @@
  *   - County meetings (Jefferson / Fayette via Legistar public calendars)
  */
 
+import { getKyCountyCourtsClient } from './ky-county-courts';
+import { getKyLegiScanClient } from './ky-legiscan-client';
+import { getKyLegistarClient } from './ky-legistar-client';
+import { getKyOpenStatesClient } from './ky-openstates-client';
+import { getKySchoolBoardsClient } from './ky-school-boards';
+
 // --- LegiScan (primary KY legislature data) ---
 export {
   KyLegiScanClient,
@@ -78,18 +84,12 @@ export {
  * Useful for the sync pipeline to iterate over all sources.
  */
 export function getAllKyDataSources() {
-  const { getKyLegiScanClient: legiscan } = require('./ky-legiscan-client');
-  const { getKyOpenStatesClient: openstates } = require('./ky-openstates-client');
-  const { getKyLegistarClient: legistar } = require('./ky-legistar-client');
-  const { getKySchoolBoardsClient: schools } = require('./ky-school-boards');
-  const { getKyCountyCourtsClient: courts } = require('./ky-county-courts');
-
   return {
-    legiscan: legiscan(),
-    openstates: openstates(),
-    legistar: legistar(),
-    schoolBoards: schools(),
-    countyCourts: courts(),
+    legiscan: getKyLegiScanClient(),
+    openstates: getKyOpenStatesClient(),
+    legistar: getKyLegistarClient(),
+    schoolBoards: getKySchoolBoardsClient(),
+    countyCourts: getKyCountyCourtsClient(),
   };
 }
 

@@ -15,7 +15,21 @@ import {
 import { supabaseAdmin } from '../app/lib/supabaseClient';
 import { classifyTopics } from './ky-topic-classifier';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
+import {
+  buildOrdinanceSponsorsJson,
+  isLegistarMatterLikelyTestNoise,
+  matterTopicsFromLegistar,
+  normalizeLegistarOrdinanceNumber,
+  parseLegistarApiDate,
+  splitLegistarMatterTitleAndDescription,
+} from './legistar-matter';
+import {
+  extractOpenStatesLegislatorWebLinks,
+  openStatesCurrentRole,
+  openStatesLegislatorNames,
+} from './ky-openstates-client';
 import type { KYSource } from '../types/kentucky';
+import type { KyLegiScanClient, LegiScanBillSummary, LegiScanSession } from './ky-legiscan-client';
 
 /**
  * LegiScan numeric status codes for state bills.
@@ -124,6 +138,31 @@ export interface SyncOptions {
    * Use for cron jobs if API time or quota is a concern; run a full sync periodically for sponsor JSON.
    */
   skipBillSponsorDetails?: boolean;
+  /**
+   * LegiScan `session_id` from `getSessionList` (KY). When set, only this General Assembly is synced
+   * and `historicSessions` is ignored. Use for a targeted historic backfill.
+   */
+  legiscanSessionId?: number;
+  /**
+   * How many recent KY sessions to sync (default `1`). Each session pulls up to `limit` bills
+   * (LegiScan master list, chamber-balanced). Set `2` or higher to backfill prior assemblies.
+   * Skips sessions whose master list is empty. Requires more LegiScan API time and quota.
+   * Ignored when `quotaBackfill` is true (session choice uses `ky_sync_state` cursor instead).
+   */
+  historicSessions?: number;
+  /**
+   * Quota-friendly backfill: one `getMasterList` per session, upsert **all** bill rows from that list,
+   * but call `getBill` (sponsors) only for the `sponsorDetailBudgetPerSession` most recently acted-on bills.
+   * Preserves existing `sponsors` in DB for other rows. Uses `ky_sync_state` to advance to older GAs each run
+   * (`quotaBackfillSessionsPerRun` sessions per invocation). Apply migration `005_ky_sync_state.sql`.
+   */
+  quotaBackfill?: boolean;
+  /** With `quotaBackfill`: how many sessions to process per sync (default `1`). Cursor advances by this amount. */
+  quotaBackfillSessionsPerRun?: number;
+  /** With `quotaBackfill`: max `getBill` calls per session (default `20`). */
+  sponsorDetailBudgetPerSession?: number;
+  /** With `quotaBackfill`: write next cursor after success (default true). Dry run never advances. */
+  quotaBackfillAdvanceCursor?: boolean;
 }
 
 export interface SyncResult {
@@ -136,6 +175,11 @@ export interface SyncResult {
 
 const log = (source: string, msg: string) => console.log(`[Sync:${source}] ${msg}`);
 const logError = (source: string, msg: string) => console.error(`[Sync:${source}] ERROR: ${msg}`);
+
+/** PostgREST when `lrc_profile_url` column exists in repo migrations but remote DB was not migrated. */
+function isMissingLrcProfileUrlColumn(err: { message?: string } | null): boolean {
+  return (err?.message || '').toLowerCase().includes('lrc_profile_url');
+}
 
 function getSupabase() {
   if (!supabaseAdmin) {
@@ -167,7 +211,183 @@ async function updateSourceStatus(
   }
 }
 
+const LEGISCAN_BILL_BACKFILL_CURSOR_KEY = 'legiscan_bill_backfill';
+
+async function readLegiscanBackfillCursor(db: ReturnType<typeof getSupabase>): Promise<number> {
+  const { data, error } = await db
+    .from('ky_sync_state')
+    .select('payload')
+    .eq('key', LEGISCAN_BILL_BACKFILL_CURSOR_KEY)
+    .maybeSingle();
+  if (error) {
+    log(
+      'bills',
+      `ky_sync_state unreadable (${error.message}). Apply supabase/migrations/005_ky_sync_state.sql — using cursor 0`,
+    );
+    return 0;
+  }
+  const idx = (data?.payload as { next_session_index?: number } | null)?.next_session_index;
+  return typeof idx === 'number' && idx >= 0 ? idx : 0;
+}
+
+async function writeLegiscanBackfillCursor(db: ReturnType<typeof getSupabase>, index: number): Promise<void> {
+  const { error } = await db.from('ky_sync_state').upsert(
+    {
+      key: LEGISCAN_BILL_BACKFILL_CURSOR_KEY,
+      payload: { next_session_index: index },
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'key' },
+  );
+  if (error) {
+    log(
+      'bills',
+      `ky_sync_state not updated (${error.message}). Apply supabase/migrations/005_ky_sync_state.sql so the backfill cursor persists; next run will start at cursor 0 again.`,
+    );
+  }
+}
+
+async function fetchExistingSponsorsByLegiscanIds(
+  db: ReturnType<typeof getSupabase>,
+  legiscanIds: number[],
+): Promise<Map<number, unknown>> {
+  const map = new Map<number, unknown>();
+  const CHUNK = 300;
+  for (let i = 0; i < legiscanIds.length; i += CHUNK) {
+    const chunk = legiscanIds.slice(i, i + CHUNK);
+    const { data } = await db.from('ky_bills').select('legiscan_id, sponsors').in('legiscan_id', chunk);
+    for (const row of data || []) {
+      if (row.legiscan_id != null) map.set(Number(row.legiscan_id), row.sponsors);
+    }
+  }
+  return map;
+}
+
 // --- Bills (LegiScan) ---
+async function buildBillRowsForSession(
+  source: string,
+  client: KyLegiScanClient,
+  latestSession: LegiScanSession,
+  toSync: LegiScanBillSummary[],
+  skipSponsors: boolean,
+): Promise<Record<string, unknown>[]> {
+  const rows: Record<string, unknown>[] = [];
+  for (let i = 0; i < toSync.length; i++) {
+    const bill = toSync[i];
+    const topics = classifyTopics(bill.title, bill.description || '');
+    let sponsors: unknown = null;
+    if (!skipSponsors) {
+      try {
+        const detail = await client.fetchBillDetail(bill.bill_id);
+        if (detail?.sponsors?.length) {
+          sponsors = detail.sponsors;
+        }
+      } catch (err: any) {
+        log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
+      }
+    }
+    rows.push({
+      legiscan_id: bill.bill_id,
+      bill_number: bill.number,
+      title: bill.title,
+      description: bill.description || null,
+      session: latestSession.session_name,
+      status: mapLegiScanStatus(bill.status, bill.last_action || ''),
+      chamber: chamberFromBillNumber(bill.number),
+      last_action: bill.last_action || null,
+      last_action_date: bill.last_action_date || null,
+      bill_text_url: bill.url || null,
+      topics: topics.length > 0 ? topics : null,
+      sponsors,
+      source: 'legiscan',
+    });
+    if (!skipSponsors && (i + 1) % 25 === 0) {
+      log(source, `Enriched sponsors ${i + 1}/${toSync.length}`);
+    }
+  }
+  return rows;
+}
+
+/** Full master list: enrich sponsors only for the `sponsorBudget` most recent bills; keep existing sponsors for others. */
+async function buildBillRowsQuotaSession(
+  source: string,
+  client: KyLegiScanClient,
+  session: LegiScanSession,
+  bills: LegiScanBillSummary[],
+  opts: { skipSponsors: boolean; sponsorBudget: number; existingSponsors: Map<number, unknown> },
+): Promise<Record<string, unknown>[]> {
+  const sortedByDate = [...bills].sort((a, b) => {
+    const ta = a.last_action_date ? new Date(a.last_action_date).getTime() : 0;
+    const tb = b.last_action_date ? new Date(b.last_action_date).getTime() : 0;
+    return tb - ta;
+  });
+  const enrichIds = new Set<number>();
+  if (!opts.skipSponsors && opts.sponsorBudget > 0) {
+    for (const b of sortedByDate.slice(0, opts.sponsorBudget)) {
+      enrichIds.add(b.bill_id);
+    }
+  }
+  log(
+    source,
+    `Quota session ${session.session_name}: ${bills.length} rows, ${enrichIds.size} getBill sponsor pulls (cap ${opts.sponsorBudget})`,
+  );
+
+  const rows: Record<string, unknown>[] = [];
+  let enrichDone = 0;
+  for (const bill of bills) {
+    const topics = classifyTopics(bill.title, bill.description || '');
+    let sponsors: unknown = null;
+    if (enrichIds.has(bill.bill_id)) {
+      try {
+        const detail = await client.fetchBillDetail(bill.bill_id);
+        if (detail?.sponsors?.length) sponsors = detail.sponsors;
+      } catch (err: any) {
+        log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
+      }
+      enrichDone++;
+      if (enrichDone % 10 === 0) {
+        log(source, `Sponsor enrichment ${enrichDone}/${enrichIds.size}`);
+      }
+    } else {
+      sponsors = opts.existingSponsors.has(bill.bill_id)
+        ? opts.existingSponsors.get(bill.bill_id)
+        : null;
+    }
+    rows.push({
+      legiscan_id: bill.bill_id,
+      bill_number: bill.number,
+      title: bill.title,
+      description: bill.description || null,
+      session: session.session_name,
+      status: mapLegiScanStatus(bill.status, bill.last_action || ''),
+      chamber: chamberFromBillNumber(bill.number),
+      last_action: bill.last_action || null,
+      last_action_date: bill.last_action_date || null,
+      bill_text_url: bill.url || null,
+      topics: topics.length > 0 ? topics : null,
+      sponsors,
+      source: 'legiscan',
+    });
+  }
+  return rows;
+}
+
+async function upsertKyBillRows(
+  source: string,
+  db: ReturnType<typeof getSupabase>,
+  rows: Record<string, unknown>[],
+): Promise<number> {
+  const BATCH = 100;
+  let synced = 0;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH);
+    const { error } = await db.from('ky_bills').upsert(batch, { onConflict: 'legiscan_id' });
+    if (error) logError(source, `Batch ${i / BATCH + 1}: ${error.message}`);
+    else synced += batch.length;
+  }
+  return synced;
+}
+
 export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult> {
   const start = Date.now();
   const source = 'bills';
@@ -179,80 +399,183 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
       log(source, 'No sessions found');
       return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
     }
-    // Pick most recent session by year_end (last in array may be future/empty)
     const sorted = [...sessions].sort((a, b) => (b.year_end || 0) - (a.year_end || 0));
-    let latestSession = sorted[0];
-    let bills = await client.fetchBills(latestSession.session_id);
-    // If empty, try next most recent session
-    for (let i = 1; i < sorted.length && bills.length === 0; i++) {
-      latestSession = sorted[i];
-      log(source, `Session ${sorted[i - 1].session_name} had 0 bills, trying ${latestSession.session_name}`);
-      bills = await client.fetchBills(latestSession.session_id);
-    }
     const limit = options.limit ?? 250;
-    const toSync = selectBillsForSync(bills, limit);
-    if (bills.length > limit) log(source, `Limiting to ${limit} of ${bills.length} bills (chamber-balanced recent; use limit param for more)`);
-    const nHouse = toSync.filter((b) => chamberFromBillNumber(b.number) === 'house').length;
-    const nSenate = toSync.filter((b) => chamberFromBillNumber(b.number) === 'senate').length;
-    log(
-      source,
-      `Fetched ${bills.length} bills from ${latestSession.session_name}, syncing ${toSync.length} (house ${nHouse}, senate ${nSenate}, other ${toSync.length - nHouse - nSenate})`,
-    );
-    if (options.dryRun) {
-      log(source, `[DRY RUN] Would upsert ${toSync.length} bills`);
-      return { source, status: 'success', itemsSynced: toSync.length, duration: Date.now() - start };
-    }
-    const db = getSupabase();
     const skipSponsors = options.skipBillSponsorDetails === true;
+    const quotaBackfill = options.quotaBackfill === true;
+    const sponsorBudget = Math.max(0, options.sponsorDetailBudgetPerSession ?? 20);
+    const sessionsPerRun = Math.max(1, options.quotaBackfillSessionsPerRun ?? 1);
+    const advanceCursor = options.quotaBackfillAdvanceCursor !== false;
+
     if (skipSponsors) {
-      log(source, 'skipBillSponsorDetails: true — sponsors column will not be refreshed this run');
+      log(source, 'skipBillSponsorDetails: true — no getBill sponsor pulls this run');
     }
-    const rows: Record<string, unknown>[] = [];
-    for (let i = 0; i < toSync.length; i++) {
-      const bill = toSync[i];
-      const topics = classifyTopics(bill.title, bill.description || '');
-      let sponsors: unknown = null;
-      if (!skipSponsors) {
-        try {
-          const detail = await client.fetchBillDetail(bill.bill_id);
-          if (detail?.sponsors?.length) {
-            sponsors = detail.sponsors;
-          }
-        } catch (err: any) {
-          log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
+
+    let sessionJobs: { session: LegiScanSession; bills: LegiScanBillSummary[] }[] = [];
+    /** Next cursor index after this run (quota mode only); `null` = do not advance. */
+    let nextCursorAfterRun: number | null = null;
+
+    if (quotaBackfill && options.legiscanSessionId != null && !Number.isNaN(options.legiscanSessionId)) {
+      const sid = options.legiscanSessionId;
+      const meta = sorted.find((s) => s.session_id === sid);
+      if (!meta) {
+        const msg = `legiscanSessionId ${sid} not found in KY session list (check LegiScan getSessionList)`;
+        logError(source, msg);
+        await updateSourceStatus(source, 'error', 0, msg);
+        return { source, status: 'error', itemsSynced: 0, error: msg, duration: Date.now() - start };
+      }
+      const bills = await client.fetchBills(sid);
+      if (!bills.length) {
+        log(source, `Session ${meta.session_name} has 0 bills on master list`);
+        return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
+      }
+      sessionJobs = [{ session: meta, bills }];
+      nextCursorAfterRun = null;
+      log(
+        source,
+        `Quota backfill (single session): ${meta.session_name} — full master list ${bills.length} bills`,
+      );
+    } else if (quotaBackfill) {
+      let cursorStart = 0;
+      try {
+        const dbRead = getSupabase();
+        cursorStart = await readLegiscanBackfillCursor(dbRead);
+      } catch {
+        log(source, 'Supabase unavailable — cursor 0');
+      }
+      if (cursorStart >= sorted.length) cursorStart = 0;
+      const end = Math.min(cursorStart + sessionsPerRun, sorted.length);
+      const slice = sorted.slice(cursorStart, end);
+      nextCursorAfterRun = end >= sorted.length ? 0 : end;
+      log(
+        source,
+        `Quota backfill cursor: sessions [${cursorStart}, ${end}) of ${sorted.length}; next cursor → ${nextCursorAfterRun}`,
+      );
+      for (const s of slice) {
+        const bills = await client.fetchBills(s.session_id);
+        if (!bills.length) {
+          log(source, `Skipping ${s.session_name} (0 bills on master list)`);
+          continue;
         }
+        sessionJobs.push({ session: s, bills });
+        log(source, `Queued ${s.session_name} (${bills.length} bills, master list)`);
       }
-      rows.push({
-        legiscan_id: bill.bill_id,
-        bill_number: bill.number,
-        title: bill.title,
-        description: bill.description || null,
-        session: latestSession.session_name,
-        status: mapLegiScanStatus(bill.status, bill.last_action || ''),
-        chamber: chamberFromBillNumber(bill.number),
-        last_action: bill.last_action || null,
-        last_action_date: bill.last_action_date || null,
-        bill_text_url: bill.url || null,
-        topics: topics.length > 0 ? topics : null,
-        sponsors,
-        source: 'legiscan',
-      });
-      if (!skipSponsors && (i + 1) % 25 === 0) {
-        log(source, `Enriched sponsors ${i + 1}/${toSync.length}`);
+    } else if (options.legiscanSessionId != null && !Number.isNaN(options.legiscanSessionId)) {
+      const sid = options.legiscanSessionId;
+      const meta = sorted.find((s) => s.session_id === sid);
+      if (!meta) {
+        const msg = `legiscanSessionId ${sid} not found in KY session list (check LegiScan getSessionList)`;
+        logError(source, msg);
+        await updateSourceStatus(source, 'error', 0, msg);
+        return { source, status: 'error', itemsSynced: 0, error: msg, duration: Date.now() - start };
+      }
+      const bills = await client.fetchBills(sid);
+      if (!bills.length) {
+        log(source, `Session ${meta.session_name} has 0 bills on master list`);
+        return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
+      }
+      sessionJobs = [{ session: meta, bills }];
+      log(source, `Single session mode: ${meta.session_name} (${bills.length} bills on master list)`);
+    } else {
+      const wantSessions = Math.max(1, options.historicSessions ?? 1);
+      for (const s of sorted) {
+        if (sessionJobs.length >= wantSessions) break;
+        const bills = await client.fetchBills(s.session_id);
+        if (!bills.length) {
+          log(source, `Skipping ${s.session_name} (0 bills on master list)`);
+          continue;
+        }
+        sessionJobs.push({ session: s, bills });
+        log(source, `Queued ${s.session_name} (${bills.length} bills on master list)`);
+      }
+      if (!sessionJobs.length) {
+        log(source, 'No sessions with bills found');
+        return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
+      }
+      if (wantSessions > 1) {
+        log(source, `Historic mode: syncing ${sessionJobs.length} session(s), up to ${limit} bills each`);
       }
     }
-    // Batch upsert (100 per batch to avoid payload limits)
-    const BATCH = 100;
-    let synced = 0;
-    for (let i = 0; i < rows.length; i += BATCH) {
-      const batch = rows.slice(i, i + BATCH);
-      const { error } = await db.from('ky_bills').upsert(batch, { onConflict: 'legiscan_id' });
-      if (error) logError(source, `Batch ${i / BATCH + 1}: ${error.message}`);
-      else synced += batch.length;
+
+    if (options.dryRun) {
+      if (quotaBackfill) {
+        let n = 0;
+        let enrich = 0;
+        for (const { bills } of sessionJobs) {
+          n += bills.length;
+          enrich += skipSponsors ? 0 : Math.min(sponsorBudget, bills.length);
+        }
+        log(
+          source,
+          `[DRY RUN] Would upsert ${n} bill rows, ~${enrich} getBill calls, ${sessionJobs.length} session(s); cursor advance: ${advanceCursor && nextCursorAfterRun != null ? nextCursorAfterRun : 'no'}`,
+        );
+        return { source, status: 'success', itemsSynced: n, duration: Date.now() - start };
+      }
+      let totalDry = 0;
+      for (const { session, bills } of sessionJobs) {
+        const toSync = selectBillsForSync(bills, limit);
+        if (bills.length > limit) {
+          log(
+            source,
+            `Would limit ${session.session_name} to ${limit} of ${bills.length} bills (chamber-balanced)`,
+          );
+        }
+        totalDry += toSync.length;
+      }
+      log(source, `[DRY RUN] Would upsert ${totalDry} bills across ${sessionJobs.length} session(s)`);
+      return { source, status: 'success', itemsSynced: totalDry, duration: Date.now() - start };
     }
-    log(source, `Synced ${synced}/${toSync.length} bills`);
-    await updateSourceStatus(source, 'success', synced);
-    return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
+
+    if (!sessionJobs.length) {
+      log(source, 'Nothing to sync (no bills in selected sessions)');
+      if (quotaBackfill && advanceCursor && nextCursorAfterRun != null) {
+        const db = getSupabase();
+        await writeLegiscanBackfillCursor(db, nextCursorAfterRun);
+        log(source, `Advanced cursor to ${nextCursorAfterRun} (empty slice)`);
+      }
+      await updateSourceStatus(source, 'success', 0);
+      return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
+    }
+
+    const db = getSupabase();
+    let totalSynced = 0;
+
+    for (const { session, bills } of sessionJobs) {
+      if (quotaBackfill) {
+        const existing = await fetchExistingSponsorsByLegiscanIds(
+          db,
+          bills.map((b) => b.bill_id),
+        );
+        const rows = await buildBillRowsQuotaSession(source, client, session, bills, {
+          skipSponsors,
+          sponsorBudget,
+          existingSponsors: existing,
+        });
+        const synced = await upsertKyBillRows(source, db, rows);
+        totalSynced += synced;
+        log(source, `Upserted ${synced}/${bills.length} for ${session.session_name} (quota backfill)`);
+      } else {
+        const toSync = selectBillsForSync(bills, limit);
+        const nHouse = toSync.filter((b) => chamberFromBillNumber(b.number) === 'house').length;
+        const nSenate = toSync.filter((b) => chamberFromBillNumber(b.number) === 'senate').length;
+        log(
+          source,
+          `${session.session_name}: syncing ${toSync.length} of ${bills.length} bills (house ${nHouse}, senate ${nSenate}, other ${toSync.length - nHouse - nSenate})`,
+        );
+        const rows = await buildBillRowsForSession(source, client, session, toSync, skipSponsors);
+        const synced = await upsertKyBillRows(source, db, rows);
+        totalSynced += synced;
+        log(source, `Upserted ${synced}/${toSync.length} for ${session.session_name}`);
+      }
+    }
+
+    if (quotaBackfill && advanceCursor && nextCursorAfterRun != null) {
+      await writeLegiscanBackfillCursor(db, nextCursorAfterRun);
+      log(source, `LegiScan backfill cursor → ${nextCursorAfterRun}`);
+    }
+
+    await updateSourceStatus(source, 'success', totalSynced);
+    return { source, status: 'success', itemsSynced: totalSynced, duration: Date.now() - start };
   } catch (err: any) {
     logError(source, err.message);
     await updateSourceStatus(source, 'error', 0, err.message);
@@ -275,23 +598,50 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
     }
     const db = getSupabase();
     const rows = legislators.map((leg) => {
-      const org = leg.currentRole?.org_classification;
+      const cr = openStatesCurrentRole(leg);
+      const org = cr?.org_classification;
       const chamber = org === 'upper' ? ('senate' as const) : org === 'lower' ? ('house' as const) : null;
-      const district = leg.currentRole?.district != null ? String(leg.currentRole.district) : null;
+      const district = cr?.district != null && cr.district !== '' ? String(cr.district) : null;
+      const { lrcProfileUrl, otherWebsiteUrl } = extractOpenStatesLegislatorWebLinks(leg);
+      const { first_name, last_name } = openStatesLegislatorNames(leg);
       return {
         openstates_id: leg.id,
         name: leg.name,
+        first_name,
+        last_name,
         party: leg.party || null,
         chamber,
+        role_title: cr?.title?.trim() || null,
         district,
         photo_url: leg.image || null,
         email: leg.email || null,
+        lrc_profile_url: lrcProfileUrl,
+        website: otherWebsiteUrl,
         active: true,
       };
     });
-    const { error } = await db.from('ky_legislators').upsert(rows, { onConflict: 'openstates_id' });
+    let { error } = await db.from('ky_legislators').upsert(rows, { onConflict: 'openstates_id' });
+    if (error && isMissingLrcProfileUrlColumn(error)) {
+      log(
+        source,
+        'Retrying without lrc_profile_url (run supabase/migrations/004_ky_legislators_lrc_profile_url.sql for split LRC vs campaign URLs)',
+      );
+      const rowsLegacy = rows.map((r) => {
+        const { lrc_profile_url: lrc, website: w, ...rest } = r;
+        return {
+          ...rest,
+          website: w || lrc || null,
+        };
+      });
+      const second = await db.from('ky_legislators').upsert(rowsLegacy, { onConflict: 'openstates_id' });
+      error = second.error;
+    }
     const synced = error ? 0 : rows.length;
-    if (error) logError(source, error.message);
+    if (error) {
+      logError(source, error.message);
+      await updateSourceStatus(source, 'error', 0, error.message);
+      return { source, status: 'error', itemsSynced: 0, error: error.message, duration: Date.now() - start };
+    }
     log(source, `Synced ${synced}/${legislators.length} legislators`);
     await updateSourceStatus(source, 'success', synced);
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
@@ -387,21 +737,29 @@ async function syncOrdinances(jurisdiction: 'louisville' | 'lexington', options:
       return { source, status: 'success', itemsSynced: ordinances.length, duration: Date.now() - start };
     }
     const db = getSupabase();
-    const rows = ordinances.map((ord) => {
-      const rawTitle = ord.MatterName || ord.MatterTitle;
-      const rawDesc = ord.MatterTitle || null;
-      const rawStatus = ord.MatterStatusName || null;
-      return {
-        legistar_id: jurisdiction === 'lexington' ? ord.MatterId + 1_000_000 : ord.MatterId,
-        jurisdiction,
-        ordinance_number: ord.MatterFile || null,
-        title: normalizeLegistarOrdinanceText(rawTitle),
-        description: rawDesc ? normalizeLegistarOrdinanceText(rawDesc) : null,
-        status: rawStatus ? normalizeLegistarOrdinanceText(rawStatus) : null,
-        introduced_date: ord.MatterIntroDate || null,
-        adopted_date: ord.MatterPassedDate || null,
-      };
-    });
+    const rows = ordinances.filter((ord) => !isLegistarMatterLikelyTestNoise(ord)).map((ord) => {
+        const { title, description } = splitLegistarMatterTitleAndDescription(ord);
+        const rawStatus = ord.MatterStatusName || null;
+        const sponsors = buildOrdinanceSponsorsJson(ord);
+        const topics = matterTopicsFromLegistar(ord);
+        return {
+          legistar_id: jurisdiction === 'lexington' ? ord.MatterId + 1_000_000 : ord.MatterId,
+          jurisdiction,
+          ordinance_number: normalizeLegistarOrdinanceNumber(ord.MatterFile),
+          title,
+          description,
+          status: rawStatus ? normalizeLegistarOrdinanceText(rawStatus) : null,
+          introduced_date: parseLegistarApiDate(ord.MatterIntroDate),
+          adopted_date: parseLegistarApiDate(ord.MatterPassedDate),
+          sponsors,
+          topics,
+        };
+      });
+    if (rows.length === 0) {
+      log(source, 'No ordinances to sync after quality filters');
+      await updateSourceStatus(source, 'success', 0);
+      return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
+    }
     const { error } = await db.from('ky_ordinances').upsert(rows, { onConflict: 'legistar_id' });
     const synced = error ? 0 : rows.length;
     if (error) logError(source, error.message);

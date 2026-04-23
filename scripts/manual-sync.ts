@@ -10,8 +10,20 @@
  *
  * Or via npm script:
  *   npm run sync:ky
+ *   npm run sync:ky:legislators
  *   npm run sync:ky -- --dry-run
  *   npm run sync:ky -- --source=bills
+ *
+ * Bills / LegiScan historic backfill:
+ *   npm run sync:ky:sessions              # print KY session ids (for --legiscan-session-id)
+ *   npm run sync:ky -- bills --historic-sessions=3
+ *   npm run sync:ky -- bills --historic-sessions=2 --limit=400
+ *   npm run sync:ky -- bills --legiscan-session-id=1234
+ *
+ * Quota-friendly backfill (full master list + sponsor cap + cursor; see 005_ky_sync_state migration):
+ *   npm run sync:ky -- bills --quota-backfill
+ *   npm run sync:ky -- bills --quota-backfill --quota-backfill-sessions-per-run=1 --sponsor-budget=20
+ *   npm run sync:ky -- bills --quota-backfill --dry-run
  */
 
 import './load-env';
@@ -20,7 +32,24 @@ import { syncAll, SYNC_SOURCES, type SyncResult } from '../src/lib/ky-sync-pipel
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const sourceFlag = args.find(a => a.startsWith('--source='));
-const sourceArg = sourceFlag ? sourceFlag.split('=')[1] : args.find(a => !a.startsWith('--'));
+const sourceArg = sourceFlag ? sourceFlag.split('=')[1] : args.find(a => !a.startsWith('--') && !a.includes('='));
+
+function intFlag(longOpt: string): number | undefined {
+  const a = args.find((x) => x.startsWith(`${longOpt}=`));
+  if (!a) return undefined;
+  const n = parseInt(a.split('=')[1], 10);
+  return Number.isNaN(n) ? undefined : n;
+}
+
+const historicSessions = intFlag('--historic-sessions');
+const legiscanSessionId = intFlag('--legiscan-session-id');
+const limit = intFlag('--limit');
+const skipBillSponsorDetails =
+  args.includes('--skipBillSponsorDetails') || args.includes('--skip-bill-sponsor-details');
+const quotaBackfill = args.includes('--quota-backfill');
+const quotaBackfillSessionsPerRun = intFlag('--quota-backfill-sessions-per-run');
+const sponsorDetailBudgetPerSession = intFlag('--sponsor-budget');
+const quotaBackfillAdvanceCursor = !args.includes('--no-advance-cursor');
 
 function printHeader() {
   console.log('');
@@ -75,6 +104,14 @@ async function main() {
     const results = await syncAll({
       source: sourceArg,
       dryRun,
+      limit,
+      skipBillSponsorDetails,
+      historicSessions,
+      legiscanSessionId,
+      quotaBackfill: quotaBackfill || undefined,
+      quotaBackfillSessionsPerRun,
+      sponsorDetailBudgetPerSession,
+      quotaBackfillAdvanceCursor,
     });
     printResults(results);
     const failed = results.filter(r => r.status === 'error');

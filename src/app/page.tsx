@@ -30,10 +30,11 @@ import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { SectionHeader } from '@/components/civic/SectionHeader';
 import { EmptyState } from '@/components/civic/EmptyState';
 import { normalizeLegistarOrdinanceText } from '@/lib/legistar-text';
+import { parseOrdinanceSponsorsPayload } from '@/lib/legistar-matter';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
-import { GovernorBeshearChip } from '@/components/civic/GovernorBeshearChip';
+import { ICON_REM, TYPE } from '@/lib/ui-tokens';
 
 const HOME_SECTION_PAGE_SIZE = 6;
 const HOME_SECTION_FETCH = 24;
@@ -93,8 +94,8 @@ function SessionBanner() {
             href="https://legislature.ky.gov"
             target="_blank"
             rel="noopener noreferrer"
-            size="small"
-            sx={{ ml: 'auto', fontSize: '0.75rem' }}
+            size="medium"
+            sx={{ ml: 'auto', fontSize: '0.95rem', py: 0.75, px: 1.5 }}
           >
             Official Calendar
           </Button>
@@ -104,33 +105,53 @@ function SessionBanner() {
   );
 }
 
-function formatOrdinanceSponsors(sponsors: Record<string, unknown> | null): string {
-  if (!sponsors) return '';
+function ordinanceSponsorMetaLines(sponsors: Record<string, unknown> | null): string[] {
+  if (!sponsors) return [];
   if (Array.isArray(sponsors)) {
-    return sponsors
+    const names = sponsors
       .map((s: unknown) => (typeof s === 'object' && s !== null && 'name' in s ? (s as { name: string }).name : typeof s === 'string' ? s : ''))
-      .filter(Boolean)
-      .join(', ');
+      .filter(Boolean);
+    return names.length ? [`Sponsor${names.length > 1 ? 's' : ''}: ${names.join(', ')}`] : [];
   }
-  return '';
+  const p = parseOrdinanceSponsorsPayload(sponsors);
+  const lines: string[] = [];
+  if (p.names.length) lines.push(`Sponsor${p.names.length > 1 ? 's' : ''}: ${p.names.join(', ')}`);
+  if (p.requester) lines.push(`Requester: ${p.requester}`);
+  if (p.body) lines.push(`Body: ${p.body}`);
+  return lines;
 }
 
 function KYOrdinanceCard({ ordinance }: { ordinance: KYOrdinance }) {
   const theme = useTheme();
   const titleDisplay = normalizeLegistarOrdinanceText(ordinance.title);
   const statusDisplay = ordinance.status ? normalizeLegistarOrdinanceText(ordinance.status) : '';
-  const sponsorText = formatOrdinanceSponsors(ordinance.sponsors);
+  const metaLines = ordinanceSponsorMetaLines(ordinance.sponsors);
+  const typeLabel = ordinance.topics?.[0] ? normalizeLegistarOrdinanceText(ordinance.topics[0]) : '';
+  const descDisplay =
+    ordinance.description && ordinance.description.trim() !== ordinance.title.trim()
+      ? normalizeLegistarOrdinanceText(ordinance.description)
+      : '';
   const tooltipTitle = (
     <Box component="span" sx={{ display: 'block', maxWidth: 360 }}>
       <Typography component="span" variant="subtitle2" display="block" sx={{ fontWeight: 600, mb: 1 }}>
         {ordinance.ordinance_number ? `${ordinance.ordinance_number}: ` : ''}{titleDisplay}
       </Typography>
-      {ordinance.ai_summary && <AiSummaryTooltip>{ordinance.ai_summary}</AiSummaryTooltip>}
-      {sponsorText && (
-        <Typography component="span" variant="caption" display="block" sx={{ fontWeight: 600 }}>
-          Sponsor{sponsorText.includes(',') ? 's' : ''}: {sponsorText}
+      {typeLabel && (
+        <Typography component="span" variant="caption" display="block" color="text.secondary" sx={{ mb: 0.75 }}>
+          Type: {typeLabel}
         </Typography>
       )}
+      {descDisplay && (
+        <Typography component="span" variant="body2" display="block" sx={{ mb: 1, opacity: 0.92 }}>
+          {descDisplay}
+        </Typography>
+      )}
+      {ordinance.ai_summary && <AiSummaryTooltip>{ordinance.ai_summary}</AiSummaryTooltip>}
+      {metaLines.map((line) => (
+        <Typography key={line} component="span" variant="caption" display="block" sx={{ fontWeight: 600 }}>
+          {line}
+        </Typography>
+      ))}
     </Box>
   );
   const searchHref = `/search?q=${encodeURIComponent(ordinance.ordinance_number || titleDisplay || '')}`;
@@ -151,8 +172,9 @@ function KYOrdinanceCard({ ordinance }: { ordinance: KYOrdinance }) {
       }}
     >
       <CardContent sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
           <Chip label={ordinance.jurisdiction === 'louisville' ? 'Louisville' : 'Lexington'} size="small" color="info" />
+          {typeLabel && <Chip label={typeLabel} size="small" variant="outlined" />}
           {statusDisplay && <Chip label={statusDisplay} size="small" variant="outlined" />}
         </Box>
         {ordinance.ordinance_number && <Typography variant="subtitle1" fontWeight={600} gutterBottom>{ordinance.ordinance_number}</Typography>}
@@ -324,27 +346,38 @@ export default function HomePage() {
         mb: 4,
       }}>
         <Container maxWidth="lg">
-          <Typography variant="h3" component="h1" fontWeight={700} gutterBottom>
+          <Typography variant={TYPE.heroTitle.variant} component="h1" fontWeight={TYPE.heroTitle.fontWeight} gutterBottom>
             Know Your Vote Kentucky
           </Typography>
-          <Typography variant="h6" sx={{ opacity: 0.9, mb: 2, maxWidth: 600 }}>
+          <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2, maxWidth: 600, fontWeight: 400 }}>
             Track Kentucky legislation, local ordinances, and school board decisions.
             Stay informed about the issues that affect your community.
           </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 2 }}>
-            <GovernorBeshearChip variant="hero" />
-          </Box>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Button component={Link} href="/bills" variant="contained" color="secondary" endIcon={<ArrowForward />}>
+            <Button component={Link} href="/bills" variant="contained" color="secondary" endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
               Browse Bills
             </Button>
-            <Button component={Link} href="/bills/house" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward />}>
+            <Button component={Link} href="/bills/house" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
               House Bills
             </Button>
-            <Button component={Link} href="/bills/senate" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward />}>
+            <Button component={Link} href="/bills/senate" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
               Senate Bills
             </Button>
-            <Button component={Link} href="/search" variant="outlined" sx={{ color: 'inherit', borderColor: 'rgba(255,255,255,0.5)' }}>
+            <Button
+              component={Link}
+              href="/search"
+              variant="outlined"
+              color="inherit"
+              sx={{
+                color: 'common.white',
+                borderColor: 'rgba(255, 255, 255, 0.55)',
+                '&:hover': {
+                  color: 'common.white',
+                  borderColor: 'common.white',
+                  bgcolor: 'rgba(255, 255, 255, 0.12)',
+                },
+              }}
+            >
               Search Everything
             </Button>
           </Box>
@@ -472,7 +505,7 @@ export default function HomePage() {
               title="Local Ordinances"
               icon={<AccountBalance />}
               href="/ordinances"
-              caption="Louisville Metro & Lexington-Fayette (core MVP local coverage)."
+              caption="Louisville Metro & Lexington-Fayette."
             />
             {ordinances.length === 0 ? (
               <Grid container spacing={3} sx={{ mb: 6 }}>
@@ -505,7 +538,7 @@ export default function HomePage() {
               icon={<School />}
               href="/search"
               beta
-              caption="Jefferson County (JCPS) and Fayette County (FCPS) — not all Kentucky districts."
+              caption="Jefferson County (JCPS) and Fayette County (FCPS)."
             />
             {schoolBoardItems.length === 0 ? (
               <Grid container spacing={3} sx={{ mb: 6 }}>

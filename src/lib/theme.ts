@@ -340,6 +340,8 @@ export const lightTheme = createTheme({
       styleOverrides: {
         root: {
           color: civicPaletteTokens.primary.main,
+          fontSize: '1.0625rem',
+          fontWeight: 500,
           textDecoration: 'none',
           '&:hover': {
             textDecoration: 'underline',
@@ -689,6 +691,8 @@ export const darkTheme = createTheme({
       styleOverrides: {
         root: {
           color: '#64b5f6',
+          fontSize: '1.0625rem',
+          fontWeight: 500,
           textDecoration: 'none',
           '&:hover': {
             textDecoration: 'underline',

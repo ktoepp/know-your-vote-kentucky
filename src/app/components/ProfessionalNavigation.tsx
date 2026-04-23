@@ -20,7 +20,6 @@ import {
 import {
   Menu as MenuIcon,
   Explore,
-  Search,
   CloudUpload,
   ListAlt,
   Brightness4,
@@ -44,24 +43,9 @@ const navigationItems: NavigationItem[] = [
     icon: <ListAlt />,
   },
   {
-    label: 'Ordinances',
-    path: '/ordinances',
-    icon: <ListAlt />,
-  },
-  {
-    label: 'Meetings',
-    path: '/events',
-    icon: <ListAlt />,
-  },
-  {
     label: 'Members',
     path: '/members',
     icon: <Explore />,
-  },
-  {
-    label: 'Search',
-    path: '/search',
-    icon: <Search />,
   },
 ];
 

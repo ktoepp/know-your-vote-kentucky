@@ -5,12 +5,7 @@ import ClientThemeProvider from './components/ClientThemeProvider';
 import Navigation from "./components/Navigation";
 import { TooltipProvider } from '@/lib/TooltipContext';
 import { UserProvider } from "./lib/UserContext";
-
-// Dev-only contrast checker
-let ContrastTester = () => null;
-if (process.env.NODE_ENV === 'development') {
-  ContrastTester = require('../components/dev/ContrastTester').default;
-}
+import ContrastTester from '../components/dev/ContrastTester';
 
 export const metadata: Metadata = {
   title: 'Know Your Vote Kentucky',

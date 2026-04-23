@@ -12,7 +12,7 @@ interface DataFreshnessNoteProps {
 }
 
 /**
- * Shows when the sync pipeline last reported success for any source (from ky_sources).
+ * Shows the most recent `ky_sources` sync timestamp and a short AI / verification disclaimer.
  * Renders nothing if Supabase is missing, table is unreadable, or no timestamps exist.
  */
 export default function DataFreshnessNote({ variant = 'page' }: DataFreshnessNoteProps) {
@@ -24,21 +24,17 @@ export default function DataFreshnessNote({ variant = 'page' }: DataFreshnessNot
 
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase.from('ky_sources').select('source_name,last_sync_at,status').order('last_sync_at', { ascending: false });
+      const { data, error } = await supabase.from('ky_sources').select('last_sync_at').order('last_sync_at', { ascending: false });
       if (cancelled || error || !data?.length) return;
 
-      const withDates = data.filter((s): s is KYSource & { last_sync_at: string } => !!s.last_sync_at);
+      const withDates = data.filter((s): s is Pick<KYSource, 'last_sync_at'> & { last_sync_at: string } => !!s.last_sync_at);
       if (!withDates.length) return;
 
       const maxTs = Math.max(...withDates.map((s) => new Date(s.last_sync_at).getTime()));
       const when = new Date(maxTs).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
-      const failed = data.filter((s) => s.status === 'error').map((s) => s.source_name);
-      const failedSuffix =
-        failed.length > 0 ? ` Some sources reported errors (${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '…' : ''}).` : '';
-
       setLine(
-        `Data pipeline last reported activity: ${when}.${failedSuffix}`,
+        `Last updated ${when}. This site compiles and presents information with AI assistance—please verify important details with official sources.`,
       );
     })();
 

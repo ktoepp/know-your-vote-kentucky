@@ -243,11 +243,11 @@ export const ThemedIcon: React.FC<ThemedIconProps> = ({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
-  // Define size mappings
+  // Align with `ICON_REM` in `@/lib/ui-tokens` (inline / nav / section / hero)
   const sizeMap = {
     small: 16,
     medium: 24,
-    large: 32
+    large: 28,
   };
 
   // Define color mappings for dark mode

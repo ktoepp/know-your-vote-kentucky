@@ -26,7 +26,11 @@ import { KYBillCard } from '@/components/bills/KYBillCard';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { normalizeLegistarOrdinanceText } from '@/lib/legistar-text';
 import { withTimeout } from '@/lib/async-utils';
-import { fetchKyBillsMatchingSearch } from '@/lib/ky-search-bills';
+import {
+  fetchKyBillsMatchingSearch,
+  fetchKyOrdinancesMatchingSearch,
+  fetchKySchoolBoardMatchingSearch,
+} from '@/lib/ky-search-bills';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 
 const SEARCH_SECTION_PAGE_SIZE = 6;
@@ -75,19 +79,19 @@ function SearchPageContent() {
         return;
       }
       const q = searchQuery.trim();
-      const [bills, ordRes, sbRes] = await withTimeout(
+      const [bills, ordinances, schoolBoardItems] = await withTimeout(
         Promise.all([
           fetchKyBillsMatchingSearch(supabase, q, 20),
-          supabase.from('ky_ordinances').select('*').or(`title.ilike.%${q}%,ordinance_number.ilike.%${q}%,description.ilike.%${q}%`).limit(20),
-          supabase.from('ky_school_board_items').select('*').or(`title.ilike.%${q}%,description.ilike.%${q}%`).limit(20),
+          fetchKyOrdinancesMatchingSearch(supabase, q, 20),
+          fetchKySchoolBoardMatchingSearch(supabase, q, 20),
         ]),
         25_000,
         'Search timed out. Check your connection or try a shorter query.',
       );
       setResults({
         bills,
-        ordinances: ordRes.data || [],
-        schoolBoardItems: sbRes.data || [],
+        ordinances,
+        schoolBoardItems,
       });
     } catch (err: any) {
       setError(err.message || 'Search failed');

@@ -27,6 +27,7 @@ import type { KYOrdinance } from '../../types/kentucky';
 import { AiSummaryInline } from '@/components/civic/AiAttribution';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { normalizeLegistarOrdinanceText } from '@/lib/legistar-text';
+import { parseOrdinanceSponsorsPayload } from '@/lib/legistar-matter';
 import { withTimeout } from '@/lib/async-utils';
 
 export default function OrdinancesPage() {
@@ -65,7 +66,13 @@ export default function OrdinancesPage() {
   const filtered = ordinances.filter((ord) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    return ord.title?.toLowerCase().includes(q) || ord.ordinance_number?.toLowerCase().includes(q) || ord.description?.toLowerCase().includes(q);
+    const topicHay = (ord.topics || []).join(' ').toLowerCase();
+    return (
+      ord.title?.toLowerCase().includes(q) ||
+      ord.ordinance_number?.toLowerCase().includes(q) ||
+      ord.description?.toLowerCase().includes(q) ||
+      topicHay.includes(q)
+    );
   });
 
   return (
@@ -123,7 +130,14 @@ export default function OrdinancesPage() {
           </Paper>
         ) : (
           <Grid container spacing={3}>
-            {filtered.map((ord) => (
+            {filtered.map((ord) => {
+              const typeLabel = ord.topics?.[0] ? normalizeLegistarOrdinanceText(ord.topics[0]) : '';
+              const sponsorMeta = parseOrdinanceSponsorsPayload(ord.sponsors);
+              const desc =
+                ord.description && ord.description.trim() !== ord.title.trim()
+                  ? normalizeLegistarOrdinanceText(ord.description)
+                  : '';
+              return (
               <Grid item xs={12} sm={6} md={4} key={ord.id}>
                 <Card sx={{
                   height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3,
@@ -133,12 +147,27 @@ export default function OrdinancesPage() {
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
                       <Chip label={ord.jurisdiction === 'louisville' ? 'Louisville' : 'Lexington'} size="small" color="info" />
+                      {typeLabel && <Chip label={typeLabel} size="small" variant="outlined" />}
                       {ord.status && <Chip label={normalizeLegistarOrdinanceText(ord.status)} size="small" variant="outlined" />}
                     </Box>
                     {ord.ordinance_number && <Typography variant="subtitle1" fontWeight={600} gutterBottom>{ord.ordinance_number}</Typography>}
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: desc ? 0.75 : 1, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       {normalizeLegistarOrdinanceText(ord.title)}
                     </Typography>
+                    {desc && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mb: 1, display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                      >
+                        {desc}
+                      </Typography>
+                    )}
+                    {(sponsorMeta.requester || sponsorMeta.body) && (
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 0.5 }}>
+                        {[sponsorMeta.requester ? `Requester: ${sponsorMeta.requester}` : null, sponsorMeta.body ? `Body: ${sponsorMeta.body}` : null].filter(Boolean).join(' · ')}
+                      </Typography>
+                    )}
                     {ord.ai_summary && (
                       <AiSummaryInline>{ord.ai_summary}</AiSummaryInline>
                     )}
@@ -155,7 +184,8 @@ export default function OrdinancesPage() {
                   </CardContent>
                 </Card>
               </Grid>
-            ))}
+            );
+            })}
           </Grid>
         )}
       </Container>

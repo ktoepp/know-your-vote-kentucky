@@ -16,8 +16,16 @@ import {
   Grid as MuiGrid,
 } from '@mui/material';
 import {
-  ArrowBack, OpenInNew, Gavel, Person, History,
-  Description, HowToVote, CheckCircle, RadioButtonUnchecked,
+  ArrowBack,
+  OpenInNew,
+  Gavel,
+  Person,
+  History,
+  Description,
+  HowToVote,
+  Check,
+  CheckCircle,
+  RadioButtonUnchecked,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@mui/material/styles';
@@ -26,15 +34,19 @@ import NextLink from 'next/link';
 import { AiGeneratedBlock } from '@/components/civic/AiAttribution';
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import {
+  billStatusChipLabel,
   formatBillLabelText,
   formatLegislativeRoleLabel,
   formatRepresentativePartyChipLabel,
   formatSponsorDistrictLine,
-  partyBadgeBackgroundColor,
+  isSignedByGovernorBillStatus,
+  partyFilledChipSx,
+  STATUS_OUTLINED_CHIP_SX,
 } from '@/lib/bill-display';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYLegislatorRoster } from '@/types/kentucky';
 import { matchLegislatorBySponsorName, memberSlug } from '@/lib/ky-member-utils';
+import { EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-tokens';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                */
@@ -149,7 +161,13 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
               noWrap
               component={NextLink}
               href={memberHref}
-              sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+              sx={{
+                fontSize: LINK.fontSize,
+                fontWeight: 700,
+                color: 'inherit',
+                textDecoration: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
             >
               {sponsor.name}
             </Typography>
@@ -160,17 +178,19 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
                 clickable
                 label={formatRepresentativePartyChipLabel(sponsor.party)}
                 size="small"
-                sx={{ bgcolor: partyBadgeBackgroundColor(sponsor.party), color: '#fff', fontWeight: 700, fontSize: '0.7rem', height: 20 }}
+                sx={partyFilledChipSx(sponsor.party)}
               />
               {sponsor.role ? (
                 <MuiChip
                   label={formatLegislativeRoleLabel(sponsor.role)}
                   size="small"
                   variant="outlined"
-                  sx={{ fontSize: '0.7rem', height: 20 }}
+                  sx={STATUS_OUTLINED_CHIP_SX}
                 />
               ) : null}
-              {isPrimary && <MuiChip label="Primary sponsor" size="small" color="primary" sx={{ fontSize: '0.7rem', height: 20 }} />}
+              {isPrimary && (
+                <MuiChip label="Primary sponsor" size="small" color="primary" sx={STATUS_OUTLINED_CHIP_SX} />
+              )}
             </Box>
           </Box>
         </Box>
@@ -189,26 +209,26 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
         <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
           {ballotpediaUrl && (
             <MuiButton
-              size="small"
+              size="medium"
               variant="contained"
               href={ballotpediaUrl}
               target="_blank"
               rel="noopener noreferrer"
-              endIcon={<OpenInNew sx={{ fontSize: '0.8rem !important' }} />}
-              sx={{ fontSize: '0.7rem', py: 0.25 }}
+              endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+              sx={{ fontSize: '0.9rem', py: 0.75, px: 1.5 }}
             >
               Ballotpedia
             </MuiButton>
           )}
           {kyProfileUrl && (
             <MuiButton
-              size="small"
+              size="medium"
               variant="outlined"
               href={kyProfileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              endIcon={<OpenInNew sx={{ fontSize: '0.8rem !important' }} />}
-              sx={{ fontSize: '0.7rem', py: 0.25, color: 'primary.main', borderColor: 'primary.main' }}
+              endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+              sx={{ fontSize: '0.9rem', py: 0.75, px: 1.5, color: 'primary.main', borderColor: 'primary.main' }}
             >
               KY Profile
             </MuiButton>
@@ -228,13 +248,25 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
       {sorted.map((item, i) => {
         const isLast = i === sorted.length - 1;
         const isImportant = item.importance === 1;
+        /** LegiScan `importance === 1` marks major steps; both use solid fills (blue vs neutral grey). */
+        const pinBg = isImportant
+          ? theme.palette.primary.main
+          : theme.palette.mode === 'dark'
+            ? theme.palette.grey[600]
+            : theme.palette.grey[500];
+        const pinBorder = isImportant
+          ? theme.palette.primary.dark
+          : theme.palette.mode === 'dark'
+            ? theme.palette.grey[500]
+            : theme.palette.grey[600];
         return (
           <Box key={i} sx={{ display: 'flex', gap: 2, mb: isLast ? 0 : 2 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
               <Box sx={{
                 width: 10, height: 10, borderRadius: '50%', mt: 0.6,
-                bgcolor: isImportant ? theme.palette.primary.main : theme.palette.divider,
-                border: `2px solid ${isImportant ? theme.palette.primary.main : theme.palette.text.disabled}`,
+                bgcolor: pinBg,
+                border: `2px solid ${pinBorder}`,
+                boxSizing: 'border-box',
               }} />
               {!isLast && <Box sx={{ width: 2, flexGrow: 1, bgcolor: theme.palette.divider, mt: 0.5 }} />}
             </Box>
@@ -248,6 +280,12 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
               </Typography>
               <Typography variant="body2" color={isImportant ? 'text.primary' : 'text.secondary'} fontWeight={isImportant ? 500 : 400}>
                 {formatBillLabelText(item.action)}
+                {!isImportant && (
+                  <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>
+                    {' '}
+                    (clerical)
+                  </Box>
+                )}
               </Typography>
             </Box>
           </Box>
@@ -349,7 +387,11 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <MuiContainer maxWidth="lg" sx={{ py: 3 }}>
         {/* Back */}
-        <MuiButton startIcon={<ArrowBack />} onClick={() => router.back()} sx={{ mb: 2 }}>
+        <MuiButton
+          startIcon={<ArrowBack />}
+          onClick={() => router.back()}
+          sx={{ mb: 2, fontSize: '1rem', fontWeight: 600 }}
+        >
           Bills
         </MuiButton>
 
@@ -361,23 +403,67 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                 <MuiChip
                   label={bill.chamber === 'house' ? 'House' : 'Senate'}
                   color={bill.chamber === 'senate' ? 'secondary' : 'primary'}
-                  size="small"
+                  size="medium"
+                  sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
                 />
               )}
-              {bill.status && (
-                <MuiChip label={formatBillLabelText(bill.status)} size="small" color={statusColor(bill.status)} />
-              )}
+              {bill.status &&
+                (isSignedByGovernorBillStatus(bill.status) ? (
+                  <MuiChip
+                    icon={<Check sx={{ fontSize: '1.125rem !important' }} />}
+                    label={billStatusChipLabel(bill.status)}
+                    size="medium"
+                    color="success"
+                    variant="outlined"
+                    sx={{
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      color: 'success.main',
+                      borderColor: 'success.main',
+                      '& .MuiChip-label': { px: 1.25 },
+                      '& .MuiChip-icon': { color: 'success.main' },
+                    }}
+                  />
+                ) : (
+                  <MuiChip
+                    label={formatBillLabelText(bill.status)}
+                    size="medium"
+                    color={statusColor(bill.status)}
+                    sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
+                  />
+                ))}
               {bill.session && (
-                <MuiChip label={formatBillLabelText(bill.session)} size="small" variant="outlined" />
+                <MuiChip
+                  label={formatBillLabelText(bill.session)}
+                  size="medium"
+                  variant="outlined"
+                  sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
+                />
               )}
             </Box>
 
-            <Typography variant="h4" fontWeight={700} gutterBottom color="primary.main">
+            <Typography variant="h5" fontWeight={700} color="primary.main" gutterBottom>
               {bill.bill_number}
             </Typography>
-            <Typography variant="h6" fontWeight={400} color="text.primary" sx={{ mb: 2, lineHeight: 1.4 }}>
+            <Typography
+              component="h1"
+              variant="h4"
+              fontWeight={700}
+              color="text.primary"
+              sx={{
+                mb: 2,
+                lineHeight: 1.3,
+                fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' },
+              }}
+            >
               {bill.title}
             </Typography>
+
+            {bill.description && (
+              <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.75, mb: 2, fontSize: '1.05rem' }}>
+                {bill.description}
+              </Typography>
+            )}
 
             {/* Subject tags */}
             {subjects.length > 0 && (
@@ -389,9 +475,9 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                     href={`/search?q=${encodeURIComponent(s.subject_name)}`}
                     clickable
                     label={s.subject_name}
-                    size="small"
+                    size="medium"
                     variant="outlined"
-                    sx={{ fontSize: '0.72rem' }}
+                    sx={{ fontSize: '0.875rem', fontWeight: 500, '& .MuiChip-label': { px: 1.25 } }}
                   />
                 ))}
               </Box>
@@ -400,12 +486,12 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
             {/* Meta row */}
             <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
               {bill.introduced_date && (
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.95rem' }}>
                   Introduced: {fmtDate(bill.introduced_date)}
                 </Typography>
               )}
               {bill.last_action_date && (
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.95rem' }}>
                   Last action: {fmtDate(bill.last_action_date)}
                 </Typography>
               )}
@@ -413,7 +499,9 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
 
             {bill.last_action && (
               <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
-                <Typography variant="body2" fontWeight={500}>{formatBillLabelText(bill.last_action)}</Typography>
+                <Typography variant="body1" fontWeight={500} sx={{ fontSize: '1.02rem' }}>
+                  {formatBillLabelText(bill.last_action)}
+                </Typography>
               </Box>
             )}
           </MuiCardContent>
@@ -437,8 +525,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Description color="primary" />
-                    <Typography variant="h6" fontWeight={700}>Bill Text</Typography>
+                    <Description color="primary" sx={{ fontSize: ICON_REM.section }} />
+                    <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>Bill Text</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: latestText?.state_link ? 2 : 0 }}>
                     {latestText?.state_link && (
@@ -447,7 +535,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                         href={latestText.state_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        endIcon={<OpenInNew />}
+                        endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                        sx={{ fontSize: '1rem', py: 1, px: 2 }}
                       >
                         {latestText.type} Version (PDF)
                       </MuiButton>
@@ -458,7 +547,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                         href={originalText.state_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        endIcon={<OpenInNew />}
+                        endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                        sx={{ fontSize: '1rem', py: 1, px: 2 }}
                       >
                         Introduced Version (PDF)
                       </MuiButton>
@@ -475,7 +565,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                             target="_blank"
                             rel="noopener noreferrer"
                             size="small"
-                            sx={{ fontSize: '0.7rem', minWidth: 0, px: 0.75, py: 0, ml: 0.5 }}
+                            sx={{ fontSize: '0.875rem', minWidth: 0, px: 1, py: 0.35, ml: 0.5 }}
                           >
                             {t.type}
                           </MuiButton>
@@ -492,23 +582,11 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-                    <History color="primary" />
-                    <Typography variant="h6" fontWeight={700}>Legislative History</Typography>
+                    <History color="primary" sx={{ fontSize: ICON_REM.section }} />
+                    <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>Legislative History</Typography>
                     <MuiChip label={`${history.length} actions`} size="small" variant="outlined" sx={{ ml: 'auto' }} />
                   </Box>
                   <HistoryTimeline history={history} />
-                </MuiCardContent>
-              </MuiCard>
-            )}
-
-            {/* Description */}
-            {bill.description && (
-              <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
-                <MuiCardContent>
-                  <Typography variant="h6" fontWeight={700} gutterBottom>Full Description</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                    {bill.description}
-                  </Typography>
                 </MuiCardContent>
               </MuiCard>
             )}
@@ -521,8 +599,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Person color="primary" />
-                    <Typography variant="h6" fontWeight={700}>
+                    <Person color="primary" sx={{ fontSize: ICON_REM.section }} />
+                    <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>
                       {primarySponsors.length === 1 ? 'Primary Sponsor' : 'Primary Sponsors'}
                     </Typography>
                   </Box>
@@ -543,7 +621,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
             {coSponsors.length > 0 && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                  <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
                     Co-Sponsors ({coSponsors.length})
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -562,7 +640,13 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                             fontWeight={600}
                             component={NextLink}
                             href={coHref}
-                            sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                            sx={{
+                              fontSize: LINK.fontSize,
+                              fontWeight: 600,
+                              color: 'inherit',
+                              textDecoration: 'none',
+                              '&:hover': { textDecoration: 'underline' },
+                            }}
                             noWrap
                           >
                             {s.name}
@@ -574,17 +658,17 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                               clickable
                               label={formatRepresentativePartyChipLabel(s.party)}
                               size="small"
-                              sx={{ bgcolor: partyBadgeBackgroundColor(s.party), color: '#fff', fontSize: '0.65rem', height: 18 }}
+                              sx={partyFilledChipSx(s.party)}
                             />
-                            <MuiChip label="Co sponsor" size="small" color="primary" sx={{ fontSize: '0.65rem', height: 18 }} />
+                            <MuiChip label="Co sponsor" size="small" color="primary" sx={STATUS_OUTLINED_CHIP_SX} />
                             {s.bio?.social?.ballotpedia && (
                               <MuiButton
                                 size="small"
                                 href={s.bio.social.ballotpedia}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                endIcon={<OpenInNew sx={{ fontSize: '0.65rem !important' }} />}
-                                sx={{ fontSize: '0.65rem', py: 0, px: 0.5, minWidth: 0, lineHeight: 1.2 }}
+                                endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                                sx={{ fontSize: '0.875rem', py: 0.5, px: 1, minWidth: 0, lineHeight: 1.2 }}
                               >
                                 Ballotpedia
                               </MuiButton>
@@ -604,8 +688,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <HowToVote color="primary" />
-                    <Typography variant="h6" fontWeight={700}>Votes</Typography>
+                    <HowToVote color="primary" sx={{ fontSize: ICON_REM.section }} />
+                    <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>Votes</Typography>
                   </Box>
                   {detail.votes.map((v: any, i: number) => (
                     <Box key={i} sx={{ mb: i < detail.votes.length - 1 ? 1.5 : 0, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.background.default, 0.5), border: `1px solid ${theme.palette.divider}` }}>
@@ -625,7 +709,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
             {/* Official links */}
             <MuiCard sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
               <MuiCardContent>
-                <Typography variant="h6" fontWeight={700} gutterBottom>Official Sources</Typography>
+                <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>Official Sources</Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {bill.bill_text_url && (
                     <MuiButton
@@ -634,9 +718,9 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                       href={bill.bill_text_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      endIcon={<OpenInNew />}
-                      size="small"
-                      sx={{ color: 'primary.main', borderColor: 'primary.main' }}
+                      endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                      size="medium"
+                      sx={{ color: 'primary.main', borderColor: 'primary.main', fontSize: '1rem', py: 1.25 }}
                     >
                       View on LegiScan
                     </MuiButton>
@@ -647,9 +731,9 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                     href={`https://legislature.ky.gov/Legislation/Pages/bill-details.aspx?legislation=${encodeURIComponent(bill.bill_number)}&session=${encodeURIComponent(bill.session || '2026 RS')}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    endIcon={<OpenInNew />}
-                    size="small"
-                    sx={{ color: 'primary.main', borderColor: 'primary.main' }}
+                    endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                    size="medium"
+                    sx={{ color: 'primary.main', borderColor: 'primary.main', fontSize: '1rem', py: 1.25 }}
                   >
                     KY Legislature
                   </MuiButton>

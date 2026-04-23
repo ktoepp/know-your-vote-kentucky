@@ -8,7 +8,21 @@ import axios, { AxiosInstance } from 'axios';
 
 export type LegistarJurisdiction = 'louisville' | 'lexington';
 
-export interface LegistarOrdinance { MatterId: number; MatterFile: string; MatterName: string; MatterTitle: string; MatterTypeName: string; MatterStatusName: string; MatterIntroDate: string; MatterAgendaDate: string; MatterPassedDate: string | null; MatterBodyName: string; }
+/** Matter row from Legistar OData `matters` (fields optional when API omits them). */
+export interface LegistarOrdinance {
+  MatterId: number;
+  MatterFile: string;
+  MatterName: string | null;
+  MatterTitle: string | null;
+  MatterText1?: string | null;
+  MatterRequester?: string | null;
+  MatterTypeName?: string;
+  MatterStatusName?: string;
+  MatterIntroDate: string;
+  MatterAgendaDate: string;
+  MatterPassedDate: string | null;
+  MatterBodyName: string;
+}
 export interface LegistarMeeting { EventId: number; EventBodyName: string; EventDate: string; EventTime: string; EventLocation: string; EventAgendaFile: string | null; EventMinutesFile: string | null; EventItems: LegistarEventItem[]; }
 export interface LegistarEventItem { EventItemId: number; EventItemTitle: string; EventItemMatterId: number | null; EventItemActionName: string | null; EventItemPassedFlag: number | null; }
 
@@ -67,7 +81,11 @@ export class KyLegistarClient implements LocalGovDataSource {
 
   async fetchOrdinances(jurisdiction: LegistarJurisdiction): Promise<LegistarOrdinance[]> {
     console.log(`[KyLegistar] Fetching ordinances for ${jurisdiction}`);
-    return this.req<LegistarOrdinance[]>(jurisdiction, 'matters', { '$orderby': 'MatterIntroDate desc', '$top': '50' });
+    return this.req<LegistarOrdinance[]>(jurisdiction, 'matters', {
+      $orderby: 'MatterIntroDate desc',
+      $top: '100',
+      $filter: "MatterIntroDate ge datetime'2000-01-01T00:00:00' and MatterIntroDate lt datetime'2035-01-01T00:00:00'",
+    });
   }
 
   async fetchMeetings(jurisdiction: LegistarJurisdiction): Promise<LegistarMeeting[]> {

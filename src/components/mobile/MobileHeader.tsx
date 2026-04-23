@@ -21,12 +21,10 @@ import {
   Home,
   Receipt,
   People,
-  AccountBalance,
-  Event as EventIcon,
-  InfoOutlined,
 } from '@mui/icons-material';
 import { styled, alpha } from '@mui/material/styles';
 import Link from 'next/link';
+import { ICON_REM, TYPE } from '@/lib/ui-tokens';
 
 const SearchWrapper = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -91,11 +89,7 @@ export default function MobileHeader({
   const navigationItems = [
     { text: 'Home', icon: <Home />, href: '/' },
     { text: 'Bills', icon: <Receipt />, href: '/bills' },
-    { text: 'Ordinances', icon: <AccountBalance />, href: '/ordinances' },
-    { text: 'Meetings', icon: <EventIcon />, href: '/events' },
     { text: 'Members', icon: <People />, href: '/members' },
-    { text: 'Search', icon: <Search />, href: '/search' },
-    { text: 'About', icon: <InfoOutlined />, href: '/about' },
   ];
 
   return (
@@ -116,15 +110,15 @@ export default function MobileHeader({
             onClick={() => setDrawerOpen(true)}
             sx={{ mr: 2 }}
           >
-            <Menu />
+            <Menu sx={{ fontSize: ICON_REM.nav }} />
           </IconButton>
           
           <Typography 
-            variant="h6" 
+            variant={TYPE.cardTitle.variant}
             component="div" 
             sx={{ 
               flexGrow: 1, 
-              fontWeight: 700,
+              fontWeight: TYPE.cardTitle.fontWeight,
               color: 'primary.main'
             }}
           >
@@ -135,7 +129,7 @@ export default function MobileHeader({
             <Box component="form" onSubmit={handleSearch} sx={{ flexGrow: 1, maxWidth: 300 }}>
               <SearchWrapper>
                 <SearchIconWrapper>
-                  <Search />
+                  <Search sx={{ fontSize: ICON_REM.nav }} />
                 </SearchIconWrapper>
                 <StyledInputBase
                   placeholder="Search bills, members..."
@@ -161,7 +155,7 @@ export default function MobileHeader({
         }}
       >
         <Box sx={{ p: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main', mb: 2 }}>
+          <Typography variant={TYPE.sectionTitle.variant} sx={{ fontWeight: TYPE.sectionTitle.fontWeight, color: 'primary.main', mb: 2 }}>
             Know Your Vote KY
           </Typography>
           <Divider sx={{ mb: 2 }} />
@@ -181,7 +175,7 @@ export default function MobileHeader({
                   }
                 }}
               >
-                <ListItemIcon sx={{ color: 'primary.main' }}>
+                <ListItemIcon sx={{ color: 'primary.main', minWidth: 40, '& .MuiSvgIcon-root': { fontSize: ICON_REM.section } }}>
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText 

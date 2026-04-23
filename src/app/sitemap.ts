@@ -26,6 +26,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/ordinances', changeFrequency: 'daily', priority: 0.85 },
     { path: '/events', changeFrequency: 'daily', priority: 0.85 },
     { path: '/members', changeFrequency: 'weekly', priority: 0.8 },
+    { path: '/members/map', changeFrequency: 'monthly', priority: 0.75 },
     { path: '/search', changeFrequency: 'weekly', priority: 0.75 },
     { path: '/about', changeFrequency: 'monthly', priority: 0.5 },
   ];
