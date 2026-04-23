@@ -5,6 +5,7 @@
  * Required env: LEGISCAN_API_KEY
  */
 import axios, { AxiosInstance } from 'axios';
+import { supabaseAdmin } from '../app/lib/supabaseAdmin';
 
 export interface LegiScanSession { session_id: number; state_id: number; year_start: number; year_end: number; session_name: string; special: number; }
 export interface LegiScanBillSummary { bill_id: number; number: string; title: string; description: string; state: string; session_id: number; status: number; status_desc: string; last_action: string; last_action_date: string; url: string; }
@@ -14,6 +15,11 @@ export interface LegiScanVoteSummary { roll_call_id: number; date: string; desc:
 export interface LegiScanBillDetail extends LegiScanBillSummary { sponsors: LegiScanSponsor[]; history: LegiScanHistoryEntry[]; votes: LegiScanVoteSummary[]; texts: { doc_id: number; date: string; type: string; url: string }[]; committee: { committee_id: number; name: string } | null; introduced?: string; }
 export interface LegiScanVote { roll_call_id: number; bill_id: number; date: string; desc: string; yea: number; nay: number; nv: number; absent: number; passed: number; votes: { people_id: number; vote_text: string; name: string }[]; }
 export interface LegiScanSearchResult { relevance: number; bill_id: number; number: string; title: string; state: string; }
+export interface LegiScanMasterListRawBill { bill_id: number; number: string; change_hash: string; url: string; status_date: string; status: number; last_action_date: string; last_action: string; title: string; description: string; }
+export interface LegiScanDatasetListEntry { state_id: number; session_id: number; session_name: string; session_title?: string; year_start: number; year_end: number; special: number; prior?: number; dataset_hash: string; dataset_date: string; dataset_size: number; access_key: string; }
+export interface LegiScanDataset { state: string; session_id: number; session_name?: string; dataset_hash: string; dataset_date: string; dataset_size: number; mime: string; zip: string; }
+
+const LEGISCAN_QUERY_COUNTER_KEY = 'legiscan_query_counter';
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const RATE_DELAY = 500;
@@ -55,6 +61,7 @@ export class KyLegiScanClient {
     for (let i = 1; i <= MAX_RETRIES; i++) {
       try {
         const r = await this.client.get('/', { params: { key: this.apiKey, ...params } });
+        void this.incrementQueryCounter();
         if (r.data?.status === 'ERROR') throw new Error(`LegiScan: ${r.data.alert?.message || 'unknown error'}`);
         this.cache.set(ck, { data: r.data, ts: Date.now() });
         return r.data as T;
@@ -65,6 +72,50 @@ export class KyLegiScanClient {
       }
     }
     throw new Error('Unreachable');
+  }
+
+  private static monthKey(d: Date = new Date()): string {
+    return d.toISOString().slice(0, 7);
+  }
+
+  private async incrementQueryCounter(): Promise<void> {
+    try {
+      if (!supabaseAdmin) return;
+      const month = KyLegiScanClient.monthKey();
+      const { data, error } = await supabaseAdmin
+        .from('ky_sync_state')
+        .select('payload')
+        .eq('key', LEGISCAN_QUERY_COUNTER_KEY)
+        .maybeSingle();
+      if (error) throw error;
+      const payload = (data?.payload as Record<string, number> | null) ?? {};
+      payload[month] = (payload[month] || 0) + 1;
+      const { error: upErr } = await supabaseAdmin
+        .from('ky_sync_state')
+        .upsert(
+          { key: LEGISCAN_QUERY_COUNTER_KEY, payload, updated_at: new Date().toISOString() },
+          { onConflict: 'key' },
+        );
+      if (upErr) throw upErr;
+    } catch (err: any) {
+      console.warn(`[KyLegiScan] Failed to increment query counter: ${err?.message || err}`);
+    }
+  }
+
+  async getMonthlyQueryCount(month?: string): Promise<number> {
+    if (!supabaseAdmin) return 0;
+    const m = month || KyLegiScanClient.monthKey();
+    const { data, error } = await supabaseAdmin
+      .from('ky_sync_state')
+      .select('payload')
+      .eq('key', LEGISCAN_QUERY_COUNTER_KEY)
+      .maybeSingle();
+    if (error) {
+      console.warn(`[KyLegiScan] Failed to read query counter: ${error.message}`);
+      return 0;
+    }
+    const payload = (data?.payload as Record<string, number> | null) ?? {};
+    return payload[m] || 0;
   }
 
   async fetchSessions(): Promise<LegiScanSession[]> {
@@ -78,6 +129,25 @@ export class KyLegiScanClient {
     const d = await this.request<any>({ op: 'getMasterList', id: String(sessionId) });
     if (!d?.masterlist) return [];
     return Object.values(d.masterlist).filter((b: any) => b.bill_id) as LegiScanBillSummary[];
+  }
+
+  async fetchMasterListRaw(sessionId: number): Promise<LegiScanMasterListRawBill[]> {
+    console.log(`[KyLegiScan] Fetching masterlistraw for session ${sessionId}`);
+    const d = await this.request<any>({ op: 'getMasterListRaw', id: String(sessionId) });
+    if (!d?.masterlist) return [];
+    return Object.values(d.masterlist).filter((b: any) => b && b.bill_id) as LegiScanMasterListRawBill[];
+  }
+
+  async fetchDatasetList(state: string = 'KY'): Promise<LegiScanDatasetListEntry[]> {
+    console.log(`[KyLegiScan] Fetching dataset list for ${state}`);
+    const d = await this.request<any>({ op: 'getDatasetList', state });
+    return Array.isArray(d?.datasetlist) ? (d.datasetlist as LegiScanDatasetListEntry[]) : [];
+  }
+
+  async fetchDataset(sessionId: number, accessKey: string): Promise<LegiScanDataset | null> {
+    console.log(`[KyLegiScan] Fetching dataset for session ${sessionId}`);
+    const d = await this.request<any>({ op: 'getDataset', id: String(sessionId), access_key: accessKey });
+    return (d?.dataset as LegiScanDataset) || null;
   }
 
   async fetchBillDetail(billId: number): Promise<LegiScanBillDetail | null> {
