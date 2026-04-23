@@ -63,6 +63,7 @@ function syncParamsFromUrl(req: NextRequest) {
   const sdb = searchParams.get('sponsorDetailBudgetPerSession');
   const sponsorDetailBudgetPerSession = sdb ? parseInt(sdb, 10) : undefined;
   const quotaBackfillAdvanceCursor = searchParams.get('quotaBackfillAdvanceCursor') !== 'false';
+  const useChangeHash = searchParams.get('useChangeHash') === 'true';
   return {
     source,
     dryRun,
@@ -78,6 +79,7 @@ function syncParamsFromUrl(req: NextRequest) {
       ? undefined
       : sponsorDetailBudgetPerSession,
     quotaBackfillAdvanceCursor,
+    useChangeHash: useChangeHash || undefined,
   };
 }
 
@@ -114,6 +116,7 @@ export async function GET(req: NextRequest) {
     quotaBackfillSessionsPerRun,
     sponsorDetailBudgetPerSession,
     quotaBackfillAdvanceCursor,
+    useChangeHash,
   } = syncParamsFromUrl(req);
   try {
     const results = await syncAll({
@@ -127,6 +130,7 @@ export async function GET(req: NextRequest) {
       quotaBackfillSessionsPerRun,
       sponsorDetailBudgetPerSession,
       quotaBackfillAdvanceCursor,
+      useChangeHash,
     });
     const hasErrors = results.some((r) => r.status === 'error');
     return NextResponse.json(
@@ -155,6 +159,7 @@ export async function POST(req: NextRequest) {
     quotaBackfillSessionsPerRun,
     sponsorDetailBudgetPerSession,
     quotaBackfillAdvanceCursor,
+    useChangeHash,
   } = syncParamsFromUrl(req);
 
   try {
@@ -169,6 +174,7 @@ export async function POST(req: NextRequest) {
       quotaBackfillSessionsPerRun,
       sponsorDetailBudgetPerSession,
       quotaBackfillAdvanceCursor,
+      useChangeHash,
     });
     const hasErrors = results.some((r) => r.status === 'error');
     return NextResponse.json(

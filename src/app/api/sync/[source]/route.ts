@@ -67,6 +67,7 @@ export async function POST(
   const sdb = searchParams.get('sponsorDetailBudgetPerSession');
   const sponsorDetailBudgetPerSession = sdb ? parseInt(sdb, 10) : undefined;
   const quotaBackfillAdvanceCursor = searchParams.get('quotaBackfillAdvanceCursor') !== 'false';
+  const useChangeHash = searchParams.get('useChangeHash') === 'true';
 
   try {
     const results = await syncAll({
@@ -84,6 +85,7 @@ export async function POST(
         ? undefined
         : sponsorDetailBudgetPerSession,
       quotaBackfillAdvanceCursor,
+      useChangeHash: useChangeHash || undefined,
     });
     const result = results[0];
     return NextResponse.json(
