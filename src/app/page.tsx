@@ -6,31 +6,22 @@ import {
   Button,
   Container,
   Typography,
-  Card,
-  CardContent,
-  Chip,
   CircularProgress,
   Alert,
   Grid,
-  Tooltip,
 } from '@mui/material';
 import {
   Gavel,
   ArrowForward,
-  AccountBalance,
-  School,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import { useTheme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import { supabase } from './lib/supabaseClient';
-import type { KYBill, KYLegislatorRoster, KYOrdinance, KYSchoolBoardItem } from '../types/kentucky';
-import { AiSummaryTooltip } from '@/components/civic/AiAttribution';
+import type { KYBill, KYLegislatorRoster } from '../types/kentucky';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { SectionHeader } from '@/components/civic/SectionHeader';
 import { EmptyState } from '@/components/civic/EmptyState';
-import { normalizeLegistarOrdinanceText } from '@/lib/legistar-text';
-import { parseOrdinanceSponsorsPayload } from '@/lib/legistar-matter';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
@@ -105,147 +96,6 @@ function SessionBanner() {
   );
 }
 
-function ordinanceSponsorMetaLines(sponsors: Record<string, unknown> | null): string[] {
-  if (!sponsors) return [];
-  if (Array.isArray(sponsors)) {
-    const names = sponsors
-      .map((s: unknown) => (typeof s === 'object' && s !== null && 'name' in s ? (s as { name: string }).name : typeof s === 'string' ? s : ''))
-      .filter(Boolean);
-    return names.length ? [`Sponsor${names.length > 1 ? 's' : ''}: ${names.join(', ')}`] : [];
-  }
-  const p = parseOrdinanceSponsorsPayload(sponsors);
-  const lines: string[] = [];
-  if (p.names.length) lines.push(`Sponsor${p.names.length > 1 ? 's' : ''}: ${p.names.join(', ')}`);
-  if (p.requester) lines.push(`Requester: ${p.requester}`);
-  if (p.body) lines.push(`Body: ${p.body}`);
-  return lines;
-}
-
-function KYOrdinanceCard({ ordinance }: { ordinance: KYOrdinance }) {
-  const theme = useTheme();
-  const titleDisplay = normalizeLegistarOrdinanceText(ordinance.title);
-  const statusDisplay = ordinance.status ? normalizeLegistarOrdinanceText(ordinance.status) : '';
-  const metaLines = ordinanceSponsorMetaLines(ordinance.sponsors);
-  const typeLabel = ordinance.topics?.[0] ? normalizeLegistarOrdinanceText(ordinance.topics[0]) : '';
-  const descDisplay =
-    ordinance.description && ordinance.description.trim() !== ordinance.title.trim()
-      ? normalizeLegistarOrdinanceText(ordinance.description)
-      : '';
-  const tooltipTitle = (
-    <Box component="span" sx={{ display: 'block', maxWidth: 360 }}>
-      <Typography component="span" variant="subtitle2" display="block" sx={{ fontWeight: 600, mb: 1 }}>
-        {ordinance.ordinance_number ? `${ordinance.ordinance_number}: ` : ''}{titleDisplay}
-      </Typography>
-      {typeLabel && (
-        <Typography component="span" variant="caption" display="block" color="text.secondary" sx={{ mb: 0.75 }}>
-          Type: {typeLabel}
-        </Typography>
-      )}
-      {descDisplay && (
-        <Typography component="span" variant="body2" display="block" sx={{ mb: 1, opacity: 0.92 }}>
-          {descDisplay}
-        </Typography>
-      )}
-      {ordinance.ai_summary && <AiSummaryTooltip>{ordinance.ai_summary}</AiSummaryTooltip>}
-      {metaLines.map((line) => (
-        <Typography key={line} component="span" variant="caption" display="block" sx={{ fontWeight: 600 }}>
-          {line}
-        </Typography>
-      ))}
-    </Box>
-  );
-  const searchHref = `/search?q=${encodeURIComponent(ordinance.ordinance_number || titleDisplay || '')}`;
-  const card = (
-    <Card
-      component={Link}
-      href={searchHref}
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        borderRadius: 3,
-        border: `1px solid ${theme.palette.divider}`,
-        transition: 'all 0.2s',
-        textDecoration: 'none',
-        color: 'inherit',
-        '&:hover': { boxShadow: 4, transform: 'translateY(-2px)', borderColor: theme.palette.primary.main },
-      }}
-    >
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
-          <Chip label={ordinance.jurisdiction === 'louisville' ? 'Louisville' : 'Lexington'} size="small" color="info" />
-          {typeLabel && <Chip label={typeLabel} size="small" variant="outlined" />}
-          {statusDisplay && <Chip label={statusDisplay} size="small" variant="outlined" />}
-        </Box>
-        {ordinance.ordinance_number && <Typography variant="subtitle1" fontWeight={600} gutterBottom>{ordinance.ordinance_number}</Typography>}
-        <Typography variant="body2" color="text.secondary" sx={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {titleDisplay}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
-  return (
-    <Tooltip title={tooltipTitle} placement="top" arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 400 } } }}>
-      <Box component="span" sx={{ display: 'block', height: '100%' }}>
-        {card}
-      </Box>
-    </Tooltip>
-  );
-}
-
-function KYSchoolBoardCard({ item }: { item: KYSchoolBoardItem }) {
-  const theme = useTheme();
-  const tooltipTitle = (
-    <Box component="span" sx={{ display: 'block', maxWidth: 360 }}>
-      <Typography component="span" variant="subtitle2" display="block" sx={{ fontWeight: 600, mb: 1 }}>
-        {item.title}
-      </Typography>
-      {item.ai_summary && <AiSummaryTooltip>{item.ai_summary}</AiSummaryTooltip>}
-      {item.vote_result && (
-        <Typography component="span" variant="caption" display="block">Result: {item.vote_result}</Typography>
-      )}
-    </Box>
-  );
-  const searchHref = `/search?q=${encodeURIComponent(item.title || '')}`;
-  const card = (
-    <Card
-      component={Link}
-      href={searchHref}
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        borderRadius: 3,
-        border: `1px solid ${theme.palette.divider}`,
-        transition: 'all 0.2s',
-        textDecoration: 'none',
-        color: 'inherit',
-        '&:hover': { boxShadow: 4, transform: 'translateY(-2px)', borderColor: theme.palette.primary.main },
-      }}
-    >
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
-          <Chip label={item.district === 'jcps' ? 'JCPS' : 'FCPS'} size="small" color="warning" />
-          {item.category && <Chip label={item.category} size="small" variant="outlined" />}
-        </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {item.title}
-        </Typography>
-        {item.vote_result && (
-          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>Result: {item.vote_result}</Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
-  return (
-    <Tooltip title={tooltipTitle} placement="top" arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 400 } } }}>
-      <Box component="span" sx={{ display: 'block', height: '100%' }}>
-        {card}
-      </Box>
-    </Tooltip>
-  );
-}
-
 export default function HomePage() {
   const theme = useTheme();
   const [bills, setBills] = useState<KYBill[]>([]);
@@ -253,8 +103,6 @@ export default function HomePage() {
   const [senateBills, setSenateBills] = useState<KYBill[]>([]);
   const [showChamberSections, setShowChamberSections] = useState(false);
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
-  const [ordinances, setOrdinances] = useState<KYOrdinance[]>([]);
-  const [schoolBoardItems, setSchoolBoardItems] = useState<KYSchoolBoardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -267,7 +115,7 @@ export default function HomePage() {
           setLoading(false);
           return;
         }
-        const [billsRes, senateCountRes, legRes, ordRes, sbRes] = await withTimeout(
+        const [billsRes, senateCountRes, legRes] = await withTimeout(
           Promise.all([
             supabase.from('ky_bills').select('*').order('last_action_date', { ascending: false }).limit(HOME_SECTION_FETCH),
             supabase
@@ -276,10 +124,8 @@ export default function HomePage() {
               .or('chamber.eq.senate,bill_number.ilike.S%'),
             supabase
               .from('ky_legislators')
-              .select('id,name,first_name,last_name,party,chamber,district,photo_url')
+              .select('id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url')
               .eq('active', true),
-            supabase.from('ky_ordinances').select('*').order('introduced_date', { ascending: false }).limit(HOME_SECTION_FETCH),
-            supabase.from('ky_school_board_items').select('*').order('meeting_date', { ascending: false }).limit(HOME_SECTION_FETCH),
           ]),
           30_000,
           'Could not reach database (timed out). Check your connection and Supabase status.',
@@ -287,12 +133,8 @@ export default function HomePage() {
         if (billsRes.error) console.warn('[Home] ky_bills:', billsRes.error.message);
         if (senateCountRes.error) console.warn('[Home] ky_bills (senate count):', senateCountRes.error.message);
         if (legRes.error) console.warn('[Home] ky_legislators:', legRes.error.message);
-        if (ordRes.error) console.warn('[Home] ky_ordinances:', ordRes.error.message);
-        if (sbRes.error) console.warn('[Home] ky_school_board_items:', sbRes.error.message);
         if (billsRes.data) setBills(billsRes.data);
         if (legRes.data) setLegislators(legRes.data);
-        if (ordRes.data) setOrdinances(ordRes.data);
-        if (sbRes.data) setSchoolBoardItems(sbRes.data);
 
         const senateCount = senateCountRes.count ?? 0;
         const bicameral = senateCount > 0;
@@ -350,7 +192,7 @@ export default function HomePage() {
             Know Your Vote Kentucky
           </Typography>
           <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2, maxWidth: 600, fontWeight: 400 }}>
-            Track Kentucky legislation, local ordinances, and school board decisions.
+            Track Kentucky legislation and your representatives.
             Stay informed about the issues that affect your community.
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -378,7 +220,7 @@ export default function HomePage() {
                 },
               }}
             >
-              Search Everything
+              Search bills
             </Button>
           </Box>
           <DataFreshnessNote variant="hero" />
@@ -498,71 +340,6 @@ export default function HomePage() {
                   </Box>
                 )}
               </>
-            )}
-
-            {/* Local Ordinances */}
-            <SectionHeader
-              title="Local Ordinances"
-              icon={<AccountBalance />}
-              href="/ordinances"
-              caption="Louisville Metro & Lexington-Fayette."
-            />
-            {ordinances.length === 0 ? (
-              <Grid container spacing={3} sx={{ mb: 6 }}>
-                <Grid item xs={12}><EmptyState message="No ordinances yet. Louisville and Lexington data will appear once synced." /></Grid>
-              </Grid>
-            ) : (
-              <Box sx={{ mb: 6 }}>
-                <PaginatedSection
-                  items={ordinances}
-                  pageSize={HOME_SECTION_PAGE_SIZE}
-                  resetKey={`o-${ordinances.length}-${ordinances[0]?.id ?? ''}`}
-                  variant="responsive"
-                >
-                  {(pageOrds) => (
-                    <Grid container spacing={3}>
-                      {pageOrds.map((ord) => (
-                        <Grid item xs={12} sm={6} md={4} key={ord.id}>
-                          <KYOrdinanceCard ordinance={ord} />
-                        </Grid>
-                      ))}
-                    </Grid>
-                  )}
-                </PaginatedSection>
-              </Box>
-            )}
-
-            {/* School Board Updates */}
-            <SectionHeader
-              title="School Board Updates"
-              icon={<School />}
-              href="/search"
-              beta
-              caption="Jefferson County (JCPS) and Fayette County (FCPS)."
-            />
-            {schoolBoardItems.length === 0 ? (
-              <Grid container spacing={3} sx={{ mb: 6 }}>
-                <Grid item xs={12}><EmptyState message="No school board items yet. JCPS and FCPS data will appear once synced." /></Grid>
-              </Grid>
-            ) : (
-              <Box sx={{ mb: 6 }}>
-                <PaginatedSection
-                  items={schoolBoardItems}
-                  pageSize={HOME_SECTION_PAGE_SIZE}
-                  resetKey={`sb-${schoolBoardItems.length}-${schoolBoardItems[0]?.id ?? ''}`}
-                  variant="responsive"
-                >
-                  {(pageItems) => (
-                    <Grid container spacing={3}>
-                      {pageItems.map((item) => (
-                        <Grid item xs={12} sm={6} md={4} key={item.id}>
-                          <KYSchoolBoardCard item={item} />
-                        </Grid>
-                      ))}
-                    </Grid>
-                  )}
-                </PaginatedSection>
-              </Box>
             )}
           </>
         )}

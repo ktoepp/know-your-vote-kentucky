@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
-import {
-  fetchKyBillsMatchingSearch,
-  fetchKyOrdinancesMatchingSearch,
-  fetchKySchoolBoardMatchingSearch,
-} from '@/lib/ky-search-bills';
+import { fetchKyBillsMatchingSearch } from '@/lib/ky-search-bills';
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,24 +22,16 @@ export async function GET(request: NextRequest) {
     }
 
     const q = query.trim();
-    const [bills, ordinances, schoolItems] = await Promise.all([
-      fetchKyBillsMatchingSearch(supabase, q, limit),
-      fetchKyOrdinancesMatchingSearch(supabase, q, limit, 'id, ordinance_number, title, status, jurisdiction'),
-      fetchKySchoolBoardMatchingSearch(supabase, q, limit, 'id, title, district, category'),
-    ]);
+    const bills = await fetchKyBillsMatchingSearch(supabase, q, limit);
 
-    const results = [
-      ...bills.map((b) => ({
-        id: b.id,
-        bill_number: b.bill_number,
-        title: b.title,
-        status: b.status,
-        chamber: b.chamber,
-        type: 'bill' as const,
-      })),
-      ...ordinances.map((o) => ({ ...o, type: 'ordinance' as const })),
-      ...schoolItems.map((s) => ({ ...s, type: 'school_board_item' as const })),
-    ];
+    const results = bills.map((b) => ({
+      id: b.id,
+      bill_number: b.bill_number,
+      title: b.title,
+      status: b.status,
+      chamber: b.chamber,
+      type: 'bill' as const,
+    }));
 
     return NextResponse.json({
       results,

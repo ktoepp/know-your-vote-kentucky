@@ -23,7 +23,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/bills', changeFrequency: 'daily', priority: 0.9 },
     { path: '/bills/house', changeFrequency: 'daily', priority: 0.85 },
     { path: '/bills/senate', changeFrequency: 'daily', priority: 0.85 },
-    { path: '/ordinances', changeFrequency: 'daily', priority: 0.85 },
     { path: '/events', changeFrequency: 'daily', priority: 0.85 },
     { path: '/members', changeFrequency: 'weekly', priority: 0.8 },
     { path: '/members/map', changeFrequency: 'monthly', priority: 0.75 },

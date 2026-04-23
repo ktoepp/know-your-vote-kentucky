@@ -83,7 +83,7 @@ export default function MeetingsPage() {
           Kentucky Meetings
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Upcoming and recent meetings across Kentucky government bodies — General Assembly committees, Metro Council, school boards, and more.
+          Upcoming and recent meetings across Kentucky government bodies — General Assembly committees, Metro Council, and more.
         </Typography>
 
         {/* Filters */}

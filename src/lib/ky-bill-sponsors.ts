@@ -32,13 +32,24 @@ export function getSponsorRecordDisplayName(s: Record<string, unknown>): string 
   return '';
 }
 
+function legislatorNameByPeopleId(legislators: KYLegislatorRoster[], peopleId: unknown): string {
+  if (typeof peopleId !== 'number' || !Number.isFinite(peopleId)) return '';
+  const leg = legislators.find((l) => l.legiscan_id != null && Number(l.legiscan_id) === peopleId);
+  return (leg?.name && leg.name.trim()) || '';
+}
+
+/** Display name for a sponsor row, including LegiScan `people_id` looked up on the roster. */
+function resolvedSponsorName(s: Record<string, unknown>, legislators: KYLegislatorRoster[]): string {
+  return getSponsorName(s) || legislatorNameByPeopleId(legislators, s.people_id);
+}
+
 function getSponsorName(s: Record<string, unknown>): string {
   return getSponsorRecordDisplayName(s);
 }
 
-/** Normalize LegiScan / JSON `sponsors` blob into a list of sponsor objects. */
-export function parseLegiscanSponsorRecords(sponsors: Record<string, unknown> | null): Record<string, unknown>[] {
-  if (!sponsors) return [];
+/** Normalize LegiScan / Open States JSON `sponsors` blob into a list of sponsor objects. */
+export function parseLegiscanSponsorRecords(sponsors: unknown): Record<string, unknown>[] {
+  if (sponsors == null) return [];
 
   let list: unknown[] = [];
   if (Array.isArray(sponsors)) {
@@ -67,7 +78,10 @@ export function parseLegiscanSponsorRecords(sponsors: Record<string, unknown> | 
 }
 
 function recordToDisplay(s: Record<string, unknown>, legislators: KYLegislatorRoster[]): PrimarySponsorDisplay | null {
-  const name = getSponsorName(s);
+  let name = getSponsorName(s);
+  if (!name) {
+    name = legislatorNameByPeopleId(legislators, s.people_id);
+  }
   if (!name) return null;
   const leg = matchLegislatorBySponsorName(legislators, name);
   const bio = s.bio as { social?: { image?: string } } | undefined;
@@ -78,12 +92,22 @@ function recordToDisplay(s: Record<string, unknown>, legislators: KYLegislatorRo
 
 function isExplicitPrimary(s: Record<string, unknown>): boolean {
   const st = s.sponsor_type_id;
-  return st === 1 || st === '1';
+  if (st === 1 || st === '1') return true;
+  if (s.primary === true) return true;
+  const c = s.classification;
+  if (typeof c === 'string' && c.toLowerCase() === 'primary') return true;
+  return false;
 }
 
 function isExplicitCosponsor(s: Record<string, unknown>): boolean {
   const st = s.sponsor_type_id;
-  return st === 2 || st === '2' || st === 3 || st === '3';
+  if (st === 2 || st === '2' || st === 3 || st === '3') return true;
+  const c = s.classification;
+  if (typeof c === 'string') {
+    const t = c.toLowerCase();
+    if (t === 'cosponsor' || t === 'co-sponsor' || t === 'secondary') return true;
+  }
+  return false;
 }
 
 function isLegacyPrimary(s: Record<string, unknown>): boolean {
@@ -93,7 +117,7 @@ function isLegacyPrimary(s: Record<string, unknown>): boolean {
 
 /** Primary sponsors first (LegiScan sponsor_type_id === 1), then first entries; enrich with roster photos. */
 export function getPrimarySponsorsFromBill(
-  sponsors: Record<string, unknown> | null,
+  sponsors: unknown,
   legislators: KYLegislatorRoster[],
   max = 2,
 ): PrimarySponsorDisplay[] {
@@ -115,7 +139,7 @@ export function getPrimarySponsorsFromBill(
  * When types are missing, first listed sponsor is treated as primary and the rest as cosponsors.
  */
 export function getSponsorGroupsFromBill(
-  sponsors: Record<string, unknown> | null,
+  sponsors: unknown,
   legislators: KYLegislatorRoster[],
   opts: { maxPrimary?: number; maxCosponsor?: number } = {},
 ): SponsorGroups {
@@ -130,15 +154,19 @@ export function getSponsorGroupsFromBill(
 
   if (primaryRaw.length === 0) {
     primaryRaw = [typed[0]];
-    const firstName = getSponsorName(typed[0]).toLowerCase();
-    coRaw = typed.slice(1).filter((s) => getSponsorName(s).toLowerCase() !== firstName);
+    const firstKey = resolvedSponsorName(typed[0], legislators).toLowerCase();
+    coRaw = typed.slice(1).filter(
+      (s) => resolvedSponsorName(s, legislators).toLowerCase() !== firstKey,
+    );
   } else {
-    const primaryNames = new Set(primaryRaw.map((s) => getSponsorName(s).toLowerCase()));
+    const primaryNames = new Set(
+      primaryRaw.map((s) => resolvedSponsorName(s, legislators).toLowerCase()).filter(Boolean),
+    );
     const remainder = typed.filter((s) => !isExplicitPrimary(s));
     const seenCo = new Set<string>();
     coRaw = [];
     for (const s of remainder) {
-      const n = getSponsorName(s).toLowerCase();
+      const n = resolvedSponsorName(s, legislators).toLowerCase();
       if (!n || primaryNames.has(n) || seenCo.has(n)) continue;
       seenCo.add(n);
       coRaw.push(s);
@@ -172,8 +200,8 @@ export function getSponsorGroupsFromBill(
   const cosponsor: PrimarySponsorDisplay[] = [];
   for (const s of coRaw) {
     if (cosponsor.length >= maxCosponsor) break;
-    const n = getSponsorName(s).toLowerCase();
-    if (primaryNames.has(n)) continue;
+    const n = resolvedSponsorName(s, legislators).toLowerCase();
+    if (!n || primaryNames.has(n)) continue;
     const row = recordToDisplay(s, legislators);
     if (row) cosponsor.push(row);
   }

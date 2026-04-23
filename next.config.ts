@@ -8,6 +8,15 @@ import type { NextConfig } from "next";
  * To re-enable ESLint in production builds for stricter code quality, remove or set `ignoreDuringBuilds: false`.
  */
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: '/ordinances',
+        destination: '/',
+        permanent: false,
+      },
+    ];
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },

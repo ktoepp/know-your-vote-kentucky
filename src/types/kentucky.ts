@@ -34,7 +34,7 @@ export interface KYLegislator {
 /** Subset returned by lightweight `select(...)` for roster matching (photos, names). */
 export type KYLegislatorRoster = Pick<
   KYLegislator,
-  'id' | 'name' | 'first_name' | 'last_name' | 'party' | 'chamber' | 'district' | 'photo_url'
+  'id' | 'legiscan_id' | 'name' | 'first_name' | 'last_name' | 'party' | 'chamber' | 'district' | 'photo_url'
 >;
 
 export interface KYBill {

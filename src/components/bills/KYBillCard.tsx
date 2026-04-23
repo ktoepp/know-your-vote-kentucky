@@ -100,6 +100,14 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
 
   const slug = bill.bill_number?.replace(/\s+/g, '') || bill.id;
 
+  const primarySponsorLine =
+    sponsorGroups.primary.length > 0
+      ? sponsorGroups.primary
+          .map((s) => s.name.trim())
+          .filter(Boolean)
+          .join(', ')
+      : '';
+
   const card = (
     <Card
       component={Link}
@@ -120,7 +128,13 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
         },
       }}
     >
-      <CardContent sx={{ flexGrow: 1 }}>
+      <CardContent
+        sx={{
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
           {chamber && (
             <Chip
@@ -173,61 +187,77 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
         >
           {bill.title}
         </Typography>
-        {sponsorGroups.primary.length > 0 && (
-          <Box sx={{ mb: 1.5 }}>
-            <Typography
-              variant="caption"
-              display="block"
-              color="text.secondary"
-              sx={{
-                mb: 0.75,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                fontWeight: 600,
-                fontSize: '0.7rem',
-              }}
-            >
-              {sponsorGroups.primary.length > 1 ? 'Sponsors' : 'Sponsor'}
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-              {sponsorGroups.primary.map((s, i) => (
-                <SponsorAvatarChip key={`face-p-${s.name}-${i}`} name={s.name} party={s.party} photoUrl={s.photoUrl} />
-              ))}
-            </Box>
-          </Box>
-        )}
-        {(bill.last_action_date || bill.last_action) && (
-          <Box sx={{ mt: 'auto' }}>
-            <Typography
-              variant="caption"
-              display="block"
-              color="text.secondary"
-              sx={{
-                mb: bill.last_action ? 0.5 : 0,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                fontWeight: 600,
-                fontSize: '0.7rem',
-              }}
-            >
-              Latest action{actionDateCard ? ` · ${actionDateCard}` : ''}
-            </Typography>
-            {bill.last_action && (
-              <Typography
-                variant="body2"
-                display="block"
-                color="text.secondary"
-                sx={{
-                  fontSize: '0.875rem',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  lineHeight: 1.35,
-                }}
-              >
-                {formatBillLabelText(bill.last_action)}
-              </Typography>
+        {(primarySponsorLine || bill.last_action_date || bill.last_action) && (
+          <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {primarySponsorLine && (
+              <Box>
+                <Typography
+                  variant="caption"
+                  display="block"
+                  color="text.secondary"
+                  sx={{
+                    mb: 0.5,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontWeight: 600,
+                    fontSize: '0.7rem',
+                  }}
+                >
+                  {sponsorGroups.primary.length > 1 ? 'Primary sponsors' : 'Primary sponsor'}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  display="block"
+                  color="text.primary"
+                  sx={{
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    lineHeight: 1.35,
+                    opacity: 0.9,
+                  }}
+                >
+                  {primarySponsorLine}
+                </Typography>
+              </Box>
+            )}
+            {(bill.last_action_date || bill.last_action) && (
+              <Box>
+                <Typography
+                  variant="caption"
+                  display="block"
+                  color="text.secondary"
+                  sx={{
+                    mb: bill.last_action ? 0.5 : 0,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontWeight: 600,
+                    fontSize: '0.7rem',
+                  }}
+                >
+                  Latest action{actionDateCard ? ` · ${actionDateCard}` : ''}
+                </Typography>
+                {bill.last_action && (
+                  <Typography
+                    variant="body2"
+                    display="block"
+                    color="text.secondary"
+                    sx={{
+                      fontSize: '0.875rem',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {formatBillLabelText(bill.last_action)}
+                  </Typography>
+                )}
+              </Box>
             )}
           </Box>
         )}
