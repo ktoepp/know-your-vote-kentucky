@@ -21,6 +21,12 @@ export const KY_TOPICS = [
   'Voting Rights',
   'Local Government',
   'Budget',
+  'Corrections',
+  'Elections',
+  'Higher Education',
+  'Veterans Affairs',
+  'Alcohol & Cannabis',
+  'Gambling',
 ] as const;
 
 export type KYTopicTag = (typeof KY_TOPICS)[number];
@@ -39,8 +45,14 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Energy: ['energy', 'coal', 'natural gas', 'solar', 'wind', 'utility', 'electric', 'pipeline', 'power plant', 'renewable'],
   'Criminal Justice': ['prison', 'jail', 'sentencing', 'parole', 'probation', 'felony', 'misdemeanor', 'incarceration', 'juvenile', 'expungement'],
   'Voting Rights': ['voting', 'election', 'ballot', 'voter', 'registration', 'redistricting', 'poll', 'absentee', 'primary'],
-  'Local Government': ['county', 'city council', 'metro council', 'mayor', 'commissioner', 'ordinance', 'municipal', 'annexation', 'fiscal court'],
+  'Local Government': ['county', 'city council', 'metro council', 'mayor', 'commissioner', 'ordinance', 'municipal', 'annexation', 'fiscal court', 'planning commission', 'zoning board', 'louisville metro', 'lexington-fayette', 'special district', 'library district'],
   Budget: ['budget', 'appropriation', 'spending', 'deficit', 'surplus', 'general fund', 'pension', 'bond'],
+  Corrections: ['department of corrections', 'corrections officer', 'inmate', 'warden', 'reentry', 'halfway house', 'correctional facility', 'parole board'],
+  Elections: ['election administration', 'county clerk', 'poll worker', 'voting machine', 'canvass', 'secretary of state', 'election board', 'precinct', 'election official'],
+  'Higher Education': ['higher education', 'postsecondary', 'kctcs', 'council on postsecondary', 'board of regents', 'state university', 'community and technical college'],
+  'Veterans Affairs': ['veteran', 'veterans', 'military', 'national guard', 'gi bill', 'armed forces', 'servicemember', 'veterans affairs', 'veterans benefits'],
+  'Alcohol & Cannabis': ['alcohol', 'liquor', 'distillery', 'brewery', 'wet-dry', 'cannabis', 'marijuana', 'medical marijuana', 'thc', 'delta-8'],
+  Gambling: ['gambling', 'casino', 'sports betting', 'lottery', 'wagering', 'historical horse racing', 'pari-mutuel', 'charitable gaming', 'racing commission'],
 };
 
 /** Escape regex metacharacters in a keyword before embedding in a pattern. */
