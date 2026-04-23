@@ -43,18 +43,36 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Budget: ['budget', 'appropriation', 'spending', 'deficit', 'surplus', 'general fund', 'pension', 'bond'],
 };
 
+/** Escape regex metacharacters in a keyword before embedding in a pattern. */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Compiled word-boundary regex cache, built once at module load. */
+const TOPIC_KEYWORD_REGEXES: { topic: KYTopicTag; keyword: string; regex: RegExp }[] =
+  (Object.entries(TOPIC_KEYWORDS) as [KYTopicTag, string[]][]).flatMap(([topic, keywords]) =>
+    keywords.map(keyword => ({
+      topic,
+      keyword,
+      regex: new RegExp(String.raw`\b${escapeRegex(keyword)}\b`, 'i'),
+    })),
+  );
+
 /**
- * Classify content into Kentucky topic tags using keyword matching.
+ * Classify content into Kentucky topic tags using word-boundary keyword matching.
  * Returns matched topics sorted by relevance (number of keyword hits).
  */
 export function classifyTopics(title: string, description: string): string[] {
-  const text = `${title} ${description}`.toLowerCase();
-  const scores: { topic: KYTopicTag; hits: number }[] = [];
+  const text = `${title} ${description}`;
+  const hitsByTopic = new Map<KYTopicTag, number>();
 
-  for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS) as [KYTopicTag, string[]][]) {
-    const hits = keywords.filter(k => text.includes(k)).length;
-    if (hits > 0) scores.push({ topic, hits });
+  for (const { topic, regex } of TOPIC_KEYWORD_REGEXES) {
+    if (regex.test(text)) {
+      hitsByTopic.set(topic, (hitsByTopic.get(topic) ?? 0) + 1);
+    }
   }
+
+  const scores = Array.from(hitsByTopic, ([topic, hits]) => ({ topic, hits }));
 
   // Sort by number of keyword hits descending
   scores.sort((a, b) => b.hits - a.hits);
@@ -63,6 +81,16 @@ export function classifyTopics(title: string, description: string): string[] {
   const matched = scores.slice(0, 4).map(s => s.topic);
 
   return matched;
+}
+
+/**
+ * Debug helper: returns every keyword→topic pair that matched the title.
+ * Used by Wave 3 coverage checks to log exactly what matched.
+ */
+export function classifyTopicsForDebug(title: string): { keyword: string; topic: KYTopicTag }[] {
+  return TOPIC_KEYWORD_REGEXES
+    .filter(({ regex }) => regex.test(title))
+    .map(({ keyword, topic }) => ({ keyword, topic }));
 }
 
 /**
