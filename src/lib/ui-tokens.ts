@@ -45,3 +45,33 @@ export const LINK = {
 
 /** External / “open in new tab” affordance — matches nav icon scale */
 export const EXTERNAL_LINK_ICON_SX = { fontSize: ICON_REM.nav } as const;
+
+/**
+ * Shared chip sizing/padding tokens. Canonical chip primitives in
+ * `src/components/ui/Chip.tsx` compose these; existing `STATUS_OUTLINED_CHIP_SX`
+ * / `MEMBER_SPONSOR_OUTLINED_CHIP_SX` constants continue to resolve to the same
+ * styles for current call sites.
+ */
+export const CHIP = {
+  /** Card-level chip (topic, chamber, status) — 0.875rem / 600, standard label padding */
+  standard: {
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    '& .MuiChip-label': { px: 1.1 },
+  },
+  /** Compact badge (sponsor role, governor, inline status) — 0.7rem / 700, 22px tall */
+  compact: {
+    fontSize: '0.7rem',
+    height: 22,
+    fontWeight: 700,
+    '& .MuiChip-label': { px: 0.9 },
+  },
+  /** Additional slot for chips that carry a leading avatar */
+  avatar: {
+    maxWidth: '100%',
+    '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis', px: 1.1 },
+    '& .MuiChip-avatar': { ml: 0.5 },
+  },
+} as const;
+
+export type ChipScale = keyof typeof CHIP;

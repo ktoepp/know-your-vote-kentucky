@@ -30,6 +30,12 @@ import { EmptyState } from '@/components/civic/EmptyState';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { SponsorAvatarChip } from '@/components/civic/SponsorAvatarChip';
 import { AiSummaryTooltip, AiSummaryInline } from '@/components/civic/AiAttribution';
+import {
+  MetaChip,
+  SeverityChip,
+  ChamberChip,
+  BillNumberChip,
+} from '@/components/ui/Chip';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import StatsGrid from '@/components/bills/StatsGrid';
 import type { KYBill } from '@/types/kentucky';
@@ -369,6 +375,56 @@ export default function DesignSystemPage() {
                 Two-line clamped inline summary for dense list surfaces.
               </AiSummaryInline>
             </Paper>
+          </section>
+
+          <section>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Canonical chip primitives
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Shared <Typography component="span" sx={{ fontFamily: 'monospace' }}>Chip</Typography> components from{' '}
+              <Typography component="span" sx={{ fontFamily: 'monospace' }}>components/ui/Chip.tsx</Typography>. All four
+              accept <Typography component="span" sx={{ fontFamily: 'monospace' }}>{'{ label, icon?, tone?, size? }'}</Typography> and
+              pass remaining props through to MUI Chip.
+            </Typography>
+            <Typography variant="subtitle2" gutterBottom>
+              MetaChip
+            </Typography>
+            <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }} alignItems="center">
+              <MetaChip label="Education" />
+              <MetaChip label="Budget" tone="primary" />
+              <MetaChip label="With icon" icon={<Gavel />} />
+              <MetaChip label="Compact" size="small" />
+              <MetaChip label="Filled" variant="filled" tone="primary" />
+            </Stack>
+            <Typography variant="subtitle2" gutterBottom>
+              SeverityChip
+            </Typography>
+            <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }} alignItems="center">
+              <SeverityChip label="Info" severity="info" />
+              <SeverityChip label="Success" severity="success" icon={<CheckCircle />} />
+              <SeverityChip label="Warning" severity="warning" />
+              <SeverityChip label="Error" severity="error" />
+              <SeverityChip label="Compact" severity="success" size="small" />
+            </Stack>
+            <Typography variant="subtitle2" gutterBottom>
+              ChamberChip
+            </Typography>
+            <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }} alignItems="center">
+              <ChamberChip chamber="house" />
+              <ChamberChip chamber="senate" />
+              <ChamberChip chamber="house" variant="outlined" />
+              <ChamberChip chamber="senate" size="small" />
+            </Stack>
+            <Typography variant="subtitle2" gutterBottom>
+              BillNumberChip
+            </Typography>
+            <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }} alignItems="center">
+              <BillNumberChip billNumber="HB 1" />
+              <BillNumberChip billNumber="SB 12" tone="primary" />
+              <BillNumberChip billNumber="HCR 3" size="small" />
+              <BillNumberChip billNumber="HB 199" variant="filled" tone="primary" />
+            </Stack>
           </section>
 
           <section>
