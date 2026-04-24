@@ -5,7 +5,7 @@ import { Avatar, Box, Button, Card, Chip, Divider, Stack, Typography } from '@mu
 import type { KYLegislator } from '@/types/kentucky';
 import { formatKyLegislatorDistrict, formatRepresentativePartyChipLabel, partyBadgeBackgroundColor } from '@/lib/bill-display';
 import { CHIP } from '@/lib/ui-tokens';
-import { isKentuckyGovernor, kyLegislatorAvatarInitials, kyMemberTitleShort, memberSlug } from '@/lib/ky-member-utils';
+import { isKentuckyGovernor, kyLegislatorAvatarInitials, kyMemberTitleShort, memberProfilePath } from '@/lib/ky-member-utils';
 import { MemberName } from '@/components/civic/MemberName';
 
 /** Role line for map tooltip: district is already shown above, so omit repeating it. */
@@ -14,10 +14,6 @@ function mapTooltipRoleLine(leg: KYLegislator): string {
   const district = formatKyLegislatorDistrict(leg);
   if (isKentuckyGovernor(leg) && !district) return `${title} · Statewide`;
   return title;
-}
-
-function memberProfileHash(leg: KYLegislator): string {
-  return memberSlug(leg.name || leg.id);
 }
 
 export type DistrictMapTooltipSection = {
@@ -54,7 +50,7 @@ export function DistrictMapMemberTooltip({ model }: { model: DistrictMapTooltipM
 
 function DistrictMapTooltipSectionView({ section }: { section: DistrictMapTooltipSection }) {
   const { chamberLabel, districtSummary, leg } = section;
-  const href = leg ? `/members#${memberProfileHash(leg)}` : undefined;
+  const href = leg ? memberProfilePath(leg) : undefined;
 
   return (
     <Box sx={{ px: 2, py: 1.75 }}>

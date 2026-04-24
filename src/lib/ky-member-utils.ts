@@ -23,6 +23,66 @@ export function memberSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+/** App Router path: `/members/{slug}` (same value as `memberSlug(leg.name || leg.id)`). */
+export function memberProfilePath(leg: Pick<KYLegislator, 'name' | 'id'>): string {
+  return `/members/${memberSlug(leg.name || leg.id)}`;
+}
+
+/** Turn a URL slug back into a guess for sponsor-style name matching. */
+function humanizeProfileSlug(profileSlug: string): string {
+  return profileSlug.replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Slug values we consider equivalent for the same person (roster name vs first/last vs id). */
+function memberProfileSlugVariants(leg: Pick<KYLegislator, 'id' | 'name' | 'first_name' | 'last_name'>): string[] {
+  const s = new Set<string>();
+  const add = (raw: string) => {
+    const m = memberSlug(raw);
+    if (m) s.add(m);
+  };
+  add(leg.name || '');
+  add(leg.id);
+  const fl = [leg.first_name, leg.last_name]
+    .map((x) => (x || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  if (fl) add(fl);
+  return [...s];
+}
+
+/**
+ * Find a member by the profile URL segment (unencoded slug).
+ * Uses exact slug variants first, then the same name matcher as bill sponsors
+ * (LegiScan / Open States strings often differ from `leg.name` formatting).
+ */
+export function findLegislatorByProfileSlug(
+  legislators: KYLegislator[],
+  profileSlug: string,
+): KYLegislator | null {
+  const key = (profileSlug || '').trim().toLowerCase();
+  if (!key) return null;
+
+  for (const leg of legislators) {
+    for (const v of memberProfileSlugVariants(leg)) {
+      if (v === key) return leg;
+    }
+  }
+
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)) {
+    const byId = legislators.find((l) => l.id.toLowerCase() === key);
+    if (byId) return byId;
+  }
+
+  const human = humanizeProfileSlug(key);
+  if (human.length >= 2) {
+    const roster: KYLegislatorRoster[] = legislators;
+    const m = matchLegislatorBySponsorName(roster, human);
+    if (m) return legislators.find((l) => l.id === m.id) ?? null;
+  }
+
+  return null;
+}
+
 /**
  * Ballotpedia search for this person (we don't store slugs). "Kentucky" narrows results.
  */

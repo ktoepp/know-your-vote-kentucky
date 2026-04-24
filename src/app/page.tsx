@@ -15,6 +15,7 @@ import {
   ArrowForward,
 } from '@mui/icons-material';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useTheme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import { supabase } from './lib/supabaseClient';
@@ -178,16 +179,46 @@ export default function HomePage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <SessionBanner />
-      {/* Hero Section */}
-      <Box sx={{
-        background: theme.palette.mode === 'dark'
-          ? `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.background.default} 100%)`
-          : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-        color: theme.palette.primary.contrastText,
-        py: { xs: 6, md: 8 },
-        mb: 4,
-      }}>
-        <Container maxWidth="lg">
+      {/* Hero: Kentucky State Capitol, Frankfort (Wikimedia: File:KY_State_Capitol.jpg, public domain) */}
+      <Box
+        sx={{
+          position: 'relative',
+          overflow: 'hidden',
+          color: 'common.white',
+          py: { xs: 6, md: 8 },
+          mb: 4,
+        }}
+      >
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 0,
+          }}
+        >
+          <Image
+            src="/images/ky-capitol-hero.jpg"
+            alt="Kentucky State Capitol in Frankfort"
+            fill
+            priority
+            sizes="100vw"
+            style={{ objectFit: 'cover', objectPosition: 'center' }}
+          />
+        </Box>
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 1,
+            background:
+              theme.palette.mode === 'dark'
+                ? 'linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,24,48,0.6) 100%)'
+                : 'linear-gradient(135deg, rgba(0,40,80,0.78) 0%, rgba(0,60,110,0.5) 45%, rgba(0,0,0,0.4) 100%)',
+          }}
+        />
+        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
           <Typography variant={TYPE.heroTitle.variant} component="h1" fontWeight={TYPE.heroTitle.fontWeight} gutterBottom>
             Know Your Vote Kentucky
           </Typography>

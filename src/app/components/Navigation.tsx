@@ -42,6 +42,7 @@ import {
   Help as HelpIcon,
   AccountCircle,
   KeyboardArrowDown,
+  Map as MapIcon,
 } from '@mui/icons-material';
 import { useThemeUtils } from '@/components/ui/ThemeUtils';
 import { useTooltips } from '@/lib/TooltipContext';
@@ -75,7 +76,12 @@ const navLinks: NavLinkConfig[] = [
     label: 'Members',
     icon: <Groups />,
     priority: 'primary',
-    subLinks: [{ href: '/members/map', label: 'District map' }],
+  },
+  {
+    href: '/members/map',
+    label: 'District map',
+    icon: <MapIcon />,
+    priority: 'primary',
   },
 ];
 
@@ -87,7 +93,11 @@ function isNavPathActive(path: string, pathname: string): boolean {
   if (path === '/bills') {
     return pathname === '/bills' || pathname.startsWith('/bills/');
   }
+  if (path === '/members/map') {
+    return pathname === '/members/map' || pathname.startsWith('/members/map/');
+  }
   if (path === '/members') {
+    if (pathname.startsWith('/members/map')) return false;
     return pathname === '/members' || pathname.startsWith('/members/');
   }
   return pathname === path;
@@ -468,12 +478,14 @@ export default function Navigation() {
     <AppBar 
       position="sticky" 
       elevation={0}
+      color="inherit"
       sx={{
-        background: theme.palette.mode === 'dark' 
-          ? `linear-gradient(135deg, ${theme.palette.background.default} 0%, ${theme.palette.background.paper} 50%, ${theme.palette.primary.dark} 100%)`
-          : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 50%, ${theme.palette.primary.light} 100%)`,
+        backgroundColor: theme.palette.mode === 'dark' 
+          ? theme.palette.background.paper 
+          : '#ffffff',
+        color: 'text.primary',
         borderBottom: `1px solid ${theme.palette.divider}`,
-        backdropFilter: 'blur(10px)',
+        boxShadow: 'none',
       }}
     >
       <Container maxWidth="xl">

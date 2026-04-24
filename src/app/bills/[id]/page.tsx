@@ -45,7 +45,7 @@ import {
 } from '@/lib/bill-display';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYLegislatorRoster } from '@/types/kentucky';
-import { matchLegislatorBySponsorName, memberSlug } from '@/lib/ky-member-utils';
+import { matchLegislatorBySponsorName, memberProfilePath } from '@/lib/ky-member-utils';
 import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-tokens';
 
 /* ------------------------------------------------------------------ */
@@ -142,7 +142,7 @@ function statusColor(status: string | null): 'success' | 'warning' | 'error' | '
 function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; rosterPhoto?: string | null }) {
   const theme = useTheme();
   const photo = rosterPhoto || sponsor.bio?.social?.image;
-  const memberHref = `/members#${memberSlug(sponsor.name)}`;
+  const memberHref = memberProfilePath({ name: sponsor.name, id: sponsor.name });
   const ballotpediaUrl = sponsor.bio?.social?.ballotpedia || (sponsor.ballotpedia ? `https://ballotpedia.org/${sponsor.ballotpedia}` : null);
   const kyProfileUrl = sponsor.bio?.social?.biography;
   const isPrimary = sponsor.sponsor_type_id === 1;
@@ -626,7 +626,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     {coSponsors.map((s) => {
-                      const coHref = `/members#${memberSlug(s.name)}`;
+                      const coHref = memberProfilePath({ name: s.name, id: s.name });
                       const coPhoto =
                         matchLegislatorBySponsorName(legislators, s.name)?.photo_url || s.bio?.social?.image;
                       return (

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Avatar,
   Box,
@@ -61,10 +62,15 @@ export interface MemberCardProps {
    * @default true
    */
   showDistrictInSubtitle?: boolean;
+  /**
+   * When set, clicking the card (outside of links, email, and phone) navigates to the individual profile.
+   */
+  profileHref?: string;
 }
 
-export function MemberCard({ leg, featured = false, showDistrictInSubtitle = true }: MemberCardProps) {
+export function MemberCard({ leg, featured = false, showDistrictInSubtitle = true, profileHref }: MemberCardProps) {
   const theme = useTheme();
+  const router = useRouter();
   const anchorId = memberSlug(leg.name || leg.id);
   const governor = isKentuckyGovernor(leg);
   const avatarSize = featured || governor ? 88 : 72;
@@ -72,10 +78,17 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
   const lrcUrl = kyLegislatureProfileUrl(leg);
   const campaignUrl = kyLegislatorCampaignWebsite(leg);
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (!profileHref) return;
+    if ((e.target as HTMLElement).closest('a, button, [role="button"], [data-no-card-nav]')) return;
+    router.push(profileHref);
+  };
+
   return (
     <Card
       id={anchorId}
       elevation={governor ? 3 : 1}
+      onClick={handleCardClick}
       sx={{
         height: '100%',
         display: 'flex',
@@ -84,6 +97,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
         border: governor ? `2px solid ${theme.palette.success.main}` : `1px solid ${theme.palette.divider}`,
         bgcolor: governor ? (theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.08)' : 'rgba(46, 125, 50, 0.04)') : undefined,
         transition: 'all 0.2s ease',
+        cursor: profileHref ? 'pointer' : undefined,
         '&:hover': {
           boxShadow: governor ? 8 : 4,
           transform: 'translateY(-2px)',

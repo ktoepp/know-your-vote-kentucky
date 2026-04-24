@@ -27,6 +27,7 @@ import {
   parseKyDistrictNumber,
 } from '@/lib/ky-district-geo';
 import { MemberCard } from '@/components/members/MemberCard';
+import { memberProfilePath } from '@/lib/ky-member-utils';
 import {
   DistrictMapMemberTooltip,
   type DistrictMapTooltipModel,
@@ -797,8 +798,20 @@ export default function DistrictMapExplorer() {
             )}
           </Paper>
 
-          {selectedHouseLeg && <MemberCard leg={selectedHouseLeg} showDistrictInSubtitle={false} />}
-          {selectedSenateLeg && <MemberCard leg={selectedSenateLeg} showDistrictInSubtitle={false} />}
+          {selectedHouseLeg && (
+            <MemberCard
+              leg={selectedHouseLeg}
+              showDistrictInSubtitle={false}
+              profileHref={memberProfilePath(selectedHouseLeg)}
+            />
+          )}
+          {selectedSenateLeg && (
+            <MemberCard
+              leg={selectedSenateLeg}
+              showDistrictInSubtitle={false}
+              profileHref={memberProfilePath(selectedSenateLeg)}
+            />
+          )}
         </Stack>
       </Box>
     </Stack>

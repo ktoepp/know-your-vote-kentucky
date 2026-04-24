@@ -28,7 +28,7 @@ export function SponsorAvatarChip({
 }: SponsorAvatarChipProps) {
   const router = useRouter();
   const slug = memberSlug(name);
-  const href = `/members#${slug}`;
+  const href = `/members/${slug}`;
   const label = formatMemberDisplay({ name, party }, 'compact');
   return (
     <Chip

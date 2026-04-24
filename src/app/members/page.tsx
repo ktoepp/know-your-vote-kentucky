@@ -24,7 +24,7 @@ import { AccountBalance, Groups, House, Refresh, Search } from '@mui/icons-mater
 import { supabase } from '../lib/supabaseClient';
 import type { KYLegislator } from '../../types/kentucky';
 import { withTimeout } from '@/lib/async-utils';
-import { isKentuckyGovernor } from '@/lib/ky-member-utils';
+import { isKentuckyGovernor, memberProfilePath } from '@/lib/ky-member-utils';
 import { MemberCard } from '@/components/members/MemberCard';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 
@@ -67,7 +67,7 @@ function ChamberSection({
       <Grid container spacing={3}>
         {legislators.map((leg) => (
           <Grid item xs={12} sm={cardFeatured ? 12 : 6} md={cardFeatured ? 8 : 4} lg={cardFeatured ? 6 : 4} key={leg.id}>
-            <MemberCard leg={leg} featured={cardFeatured} />
+            <MemberCard leg={leg} featured={cardFeatured} profileHref={memberProfilePath(leg)} />
           </Grid>
         ))}
       </Grid>
