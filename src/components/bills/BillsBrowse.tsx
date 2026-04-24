@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -16,17 +16,27 @@ import {
   Select,
   MenuItem,
   IconButton,
+  ToggleButtonGroup,
+  ToggleButton,
+  Tooltip,
 } from '@mui/material';
 import { Search, Refresh, Gavel } from '@mui/icons-material';
+import { LayoutGrid, List } from 'lucide-react';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import { KYBillCard } from '@/components/bills/KYBillCard';
+import { BillsListTable } from '@/components/bills/BillsListTable';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
-import { effectiveBillChamber } from '@/lib/bill-display';
+import { compareKyBills, effectiveBillChamber, type KyBillSortKey } from '@/lib/bill-display';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 
 const BROWSE_PAGE_SIZE = 12;
+const LIST_PAGE_SIZE = 25;
+
+function defaultSortDirForKey(key: KyBillSortKey): 'asc' | 'desc' {
+  return key === 'last_action_date' || key === 'introduced_date' ? 'desc' : 'asc';
+}
 
 export type BillsBrowseChamberMode = 'all' | 'house' | 'senate';
 
@@ -66,6 +76,9 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [sortBy, setSortBy] = useState<KyBillSortKey>('last_action_date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     if (!supabase) return;
@@ -122,11 +135,36 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
       bill.bill_number?.toLowerCase().includes(q) ||
       bill.title?.toLowerCase().includes(q) ||
       bill.description?.toLowerCase().includes(q) ||
-      bill.ai_summary?.toLowerCase().includes(q)
+      bill.ai_summary?.toLowerCase().includes(q) ||
+      bill.session?.toLowerCase().includes(q) ||
+      bill.last_action?.toLowerCase().includes(q) ||
+      bill.status?.toLowerCase().includes(q)
     );
   });
 
-  const browsePagerResetKey = `${searchQuery}|${chamberFilter}|${statusFilter}|${filteredBills.length}|${filteredBills[0]?.id ?? ''}`;
+  const sortedBills = useMemo(() => {
+    const next = [...filteredBills];
+    next.sort((a, b) => {
+      const c = compareKyBills(a, b, sortBy);
+      return sortDir === 'asc' ? c : -c;
+    });
+    return next;
+  }, [filteredBills, sortBy, sortDir]);
+
+  const handleRequestSort = useCallback(
+    (key: KyBillSortKey) => {
+      if (sortBy === key) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+      } else {
+        setSortBy(key);
+        setSortDir(defaultSortDirForKey(key));
+      }
+    },
+    [sortBy],
+  );
+
+  const pageSize = viewMode === 'list' ? LIST_PAGE_SIZE : BROWSE_PAGE_SIZE;
+  const browsePagerResetKey = `${searchQuery}|${chamberFilter}|${statusFilter}|${viewMode}|${sortBy}|${sortDir}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
 
   const showChamberSelect = chamberMode === 'all';
 
@@ -152,7 +190,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
             <TextField
               fullWidth
-              placeholder="Search bills by number, title, or summary..."
+              placeholder="Search by bill number, title, session, status, or summary..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               InputProps={{
@@ -190,6 +228,23 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
                 <MenuItem value="vetoed">Vetoed</MenuItem>
               </Select>
             </FormControl>
+            <Tooltip title="Grid or list">
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={viewMode}
+                onChange={(_, v) => v && setViewMode(v)}
+                aria-label="View mode"
+                sx={{ flexShrink: 0 }}
+              >
+                <ToggleButton value="grid" aria-label="Grid view">
+                  <LayoutGrid size={18} strokeWidth={2} />
+                </ToggleButton>
+                <ToggleButton value="list" aria-label="List view">
+                  <List size={18} strokeWidth={2} />
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Tooltip>
             <IconButton
               onClick={() => {
                 void (async () => {
@@ -226,7 +281,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Gavel sx={{ fontSize: '1.2rem', color: 'primary.main' }} />
           <Typography variant="body2" fontWeight={600}>
-            {filteredBills.length} bill{filteredBills.length !== 1 ? 's' : ''} found
+            {sortedBills.length} bill{sortedBills.length !== 1 ? 's' : ''} found
           </Typography>
           {loading && <CircularProgress size={18} />}
         </Box>
@@ -237,7 +292,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
           </Alert>
         )}
 
-        {!loading && filteredBills.length === 0 ? (
+        {!loading && sortedBills.length === 0 ? (
           <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
             <Search sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -251,20 +306,29 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
           </Paper>
         ) : (
           <PaginatedSection
-            items={filteredBills}
-            pageSize={BROWSE_PAGE_SIZE}
+            items={sortedBills}
+            pageSize={pageSize}
             resetKey={browsePagerResetKey}
             variant="pagination"
           >
-            {(pageBills) => (
-              <Grid container spacing={3}>
-                {pageBills.map((bill) => (
-                  <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                    <KYBillCard bill={bill} legislators={legislators} />
-                  </Grid>
-                ))}
-              </Grid>
-            )}
+            {(pageBills) =>
+              viewMode === 'list' ? (
+                <BillsListTable
+                  bills={pageBills}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onRequestSort={handleRequestSort}
+                />
+              ) : (
+                <Grid container spacing={3}>
+                  {pageBills.map((bill) => (
+                    <Grid item xs={12} sm={6} md={4} key={bill.id}>
+                      <KYBillCard bill={bill} legislators={legislators} />
+                    </Grid>
+                  ))}
+                </Grid>
+              )
+            }
           </PaginatedSection>
         )}
       </Container>

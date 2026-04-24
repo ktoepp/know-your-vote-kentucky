@@ -859,34 +859,6 @@ export default function Navigation() {
                 ),
               )}
             </List>
-            
-            {/* Mobile Search Bar */}
-            <Divider sx={{ my: 2, borderColor: alpha(theme.palette.primary.contrastText, 0.22) }} />
-            <Box sx={{ px: 2, pb: 2 }}>
-              <GlobalSearchBar tone="onPrimary" />
-            </Box>
-            
-            {/* Mobile Tooltip Toggle */}
-            <Box sx={{ px: 2, pb: 1 }}>
-              <Button
-                onClick={toggleTooltips}
-                startIcon={<HelpIcon sx={{ fontSize: ICON_REM.nav }} />}
-                fullWidth
-                sx={{
-                  justifyContent: 'flex-start',
-                  color: tooltipsEnabled ? mobileNav.colorActive : mobileNav.color,
-                  backgroundColor: tooltipsEnabled ? mobileNav.activeBg : 'transparent',
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  '&:hover': {
-                    backgroundColor: mobileNav.hover,
-                  },
-                }}
-              >
-                {tooltipsEnabled ? 'Disable Tooltips' : 'Enable Tooltips'}
-              </Button>
-            </Box>
           </Container>
         </Box>
       </Collapse>

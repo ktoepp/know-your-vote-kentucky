@@ -1,3 +1,5 @@
+import type { KYBill } from '@/types/kentucky';
+
 /**
  * Chamber from DB, or inferred from Kentucky bill number (HB/HR/… vs SB/SR/…).
  * Matches sync logic in ky-sync-pipeline when `chamber` was not stored.
@@ -249,4 +251,73 @@ export function getKyBillNextAction(bill: {
   return {
     body: 'Further committee and floor action as the session schedule allows.',
   };
+}
+
+export type KyBillSortKey =
+  | 'bill_number'
+  | 'title'
+  | 'chamber'
+  | 'status'
+  | 'session'
+  | 'introduced_date'
+  | 'last_action_date';
+
+/** Prefix + numeric part for natural ordering of designations like HB 6 vs HB 123. */
+export function billNumberSortParts(billNumber: string | null | undefined): {
+  prefix: string;
+  num: number;
+  raw: string;
+} {
+  const raw = (billNumber || '').trim();
+  const m = raw.match(/^([A-Za-z]+)\s*0*(\d+)\s*$/);
+  if (m) return { prefix: m[1].toUpperCase(), num: parseInt(m[2], 10), raw };
+  const m2 = raw.match(/^([A-Za-z]+)/);
+  return { prefix: m2 ? m2[1].toUpperCase() : raw.toUpperCase(), num: 0, raw };
+}
+
+function compareStringsLoose(a: string | null | undefined, b: string | null | undefined): number {
+  const sa = (a || '').toLowerCase();
+  const sb = (b || '').toLowerCase();
+  if (sa < sb) return -1;
+  if (sa > sb) return 1;
+  return 0;
+}
+
+function compareIsoDates(a: string | null | undefined, b: string | null | undefined): number {
+  const ta = a ? Date.parse(a) : NaN;
+  const tb = b ? Date.parse(b) : NaN;
+  if (Number.isNaN(ta) && Number.isNaN(tb)) return 0;
+  if (Number.isNaN(ta)) return 1;
+  if (Number.isNaN(tb)) return -1;
+  return ta - tb;
+}
+
+/** Comparator for one sort key (ascending). Multiply result by -1 for descending. */
+export function compareKyBills(a: KYBill, b: KYBill, key: KyBillSortKey): number {
+  switch (key) {
+    case 'bill_number': {
+      const pa = billNumberSortParts(a.bill_number);
+      const pb = billNumberSortParts(b.bill_number);
+      const prefixCmp = pa.prefix.localeCompare(pb.prefix);
+      if (prefixCmp !== 0) return prefixCmp;
+      return pa.num - pb.num;
+    }
+    case 'title':
+      return compareStringsLoose(a.title, b.title);
+    case 'chamber': {
+      const ca = effectiveBillChamber(a) || '';
+      const cb = effectiveBillChamber(b) || '';
+      return ca.localeCompare(cb);
+    }
+    case 'status':
+      return compareStringsLoose(a.status, b.status);
+    case 'session':
+      return compareStringsLoose(a.session, b.session);
+    case 'introduced_date':
+      return compareIsoDates(a.introduced_date, b.introduced_date);
+    case 'last_action_date':
+      return compareIsoDates(a.last_action_date, b.last_action_date);
+    default:
+      return 0;
+  }
 }
