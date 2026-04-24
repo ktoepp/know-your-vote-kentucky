@@ -1,6 +1,6 @@
 {
   "name": "know-your-vote-kentucky",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Know Your Vote Kentucky - Track Kentucky legislation, representatives, and civic engagement",
   "private": true,
   "scripts": {
