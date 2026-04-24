@@ -70,6 +70,33 @@ Sync sources and status (as of last verification):
 | `POST /api/sync` | Trigger data sync (Bearer `SYNC_API_KEY` or `CRON_SECRET`) |
 | `GET /api/sync` | Without `?source=`: sync status. With `?source=bills` etc.: run that source (used by Vercel Cron; same auth) |
 
+## Operations
+
+### Rate Limiting
+
+`/api/intelligence` is rate-limited to **30 requests/min per IP** using a shared Postgres token bucket so the limit holds across all Vercel serverless instances.
+
+- **Table:** `ky_rate_limit_buckets` (migration `008_ky_rate_limit.sql`)
+- **RPC:** `ky_rate_limit_consume(p_key, p_capacity, p_refill_per_sec)`
+- **Fail-open:** if Supabase is unreachable the request is allowed through and a warning is logged — the route never hard-fails due to the limiter
+- **No new env vars** — backed by the existing `SUPABASE_SERVICE_ROLE_KEY`
+- **Deny log format:** `[rate-limit] denied route=<route> ip_hash=<sha256[:8]> remaining=0 retry_after=<n>`
+
+### Observability counters
+
+All counters land in `ky_sync_state` (JSONB payload, bucketed by date) via the `ky_increment_counter` RPC (migration `009_ky_atomic_counters.sql`):
+
+| Counter key | Bucket | What it tracks |
+|---|---|---|
+| `legiscan_query_counter` | `YYYY-MM` | LegiScan API calls this month (30k/month cap) |
+| `rate_limit_denies` | `YYYY-MM-DD` | `/api/intelligence` 429s per day |
+| `anthropic_cache_hits` | `YYYY-MM-DD` | Anthropic response cache hits |
+| `anthropic_cache_misses` | `YYYY-MM-DD` | Anthropic response cache misses |
+
+These counters feed the `/admin/sync-status` dashboard (see 3a.2).
+
+Operator dashboard: `/admin/sync-status` (requires `ADMIN_TOKEN` header)
+
 ## Deployment
 
 Set `CRON_SECRET` in Vercel (16+ random characters). Vercel Cron invokes `/api/sync?source=…` with `Authorization: Bearer <CRON_SECRET>`. The sync route also accepts `SYNC_API_KEY` for manual runs. Configure at least one of `CRON_SECRET` or `SYNC_API_KEY`.

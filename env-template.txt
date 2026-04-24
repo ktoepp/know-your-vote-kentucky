@@ -10,6 +10,8 @@
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+# ^ Also backs the shared rate limiter (ky_rate_limit_buckets table, migration 008).
+# No extra env vars needed — the existing service role key is reused.
 
 # Optional: Postgres connection for CLI / scripts (Settings → Database → URI).
 # Used by: npm run db:apply-sql (apply SQL migrations when not using hosted SQL editor).
@@ -66,6 +68,14 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # Optional: Debug / Logging
 # DEBUG_MODE=false
 # LOG_LEVEL=info
+
+# =============================================================================
+# OPTIONAL — Operator Dashboard
+# =============================================================================
+# Protects GET /admin/sync-status. Set to a random secret and pass it as the
+# x-admin-token request header. If unset, the page is accessible without auth
+# (safe for local dev; always set this in production).
+# ADMIN_TOKEN=your_admin_token_here
 
 # Note: Replace all "your_*_here" placeholders with actual values.
 # Keep this file secure and never commit it to version control.

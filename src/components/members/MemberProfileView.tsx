@@ -7,6 +7,7 @@ import { Alert, Box, Breadcrumbs, Button, Container, Link as MuiLink, Typography
 import { ArrowBack, ContentCopy, Groups, Map as MapIcon } from '@mui/icons-material';
 import type { KYLegislator } from '@/types/kentucky';
 import { memberProfilePath } from '@/lib/ky-member-utils';
+import { MemberName } from '@/components/civic/MemberName';
 import { MemberCard } from '@/components/members/MemberCard';
 import { ICON_REM } from '@/lib/ui-tokens';
 
@@ -32,7 +33,7 @@ export function MemberProfileView({ leg }: { leg: KYLegislator }) {
             Members
           </MuiLink>
           <Typography variant="body2" color="text.primary" fontWeight={600} sx={{ maxWidth: 360 }} noWrap>
-            {leg.name}
+            <MemberName member={leg} variant="primary" />
           </Typography>
         </Breadcrumbs>
 

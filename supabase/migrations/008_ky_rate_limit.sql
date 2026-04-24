@@ -45,3 +45,8 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- Lock down the table: only service role (used by supabaseAdmin) can read/write.
+-- Anon/authenticated users have no business touching rate-limit state.
+ALTER TABLE ky_rate_limit_buckets ENABLE ROW LEVEL SECURITY;
+-- No public policies → only service_role (which bypasses RLS) can access.

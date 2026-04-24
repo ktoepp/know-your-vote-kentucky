@@ -13,7 +13,18 @@ export interface LegiScanSponsor { people_id: number; name: string; party: strin
 export interface LegiScanHistoryEntry { date: string; action: string; chamber: string; }
 export interface LegiScanVoteSummary { roll_call_id: number; date: string; desc: string; yea: number; nay: number; }
 export interface LegiScanBillDetail extends LegiScanBillSummary { sponsors: LegiScanSponsor[]; history: LegiScanHistoryEntry[]; votes: LegiScanVoteSummary[]; texts: { doc_id: number; date: string; type: string; url: string }[]; committee: { committee_id: number; name: string } | null; introduced?: string; }
-export interface LegiScanVote { roll_call_id: number; bill_id: number; date: string; desc: string; yea: number; nay: number; nv: number; absent: number; passed: number; votes: { people_id: number; vote_text: string; name: string }[]; }
+export interface LegiScanVote {
+  roll_call_id: number;
+  bill_id: number;
+  date: string;
+  desc: string;
+  yea: number;
+  nay: number;
+  nv: number;
+  absent: number;
+  passed: number;
+  votes: { people_id: number; vote_text: string; name: string; vote_id?: number }[];
+}
 export interface LegiScanSearchResult { relevance: number; bill_id: number; number: string; title: string; state: string; }
 export interface LegiScanMasterListRawBill { bill_id: number; number: string; change_hash: string; url: string; status_date: string; status: number; last_action_date: string; last_action: string; title: string; description: string; }
 export interface LegiScanDatasetListEntry { state_id: number; session_id: number; session_name: string; session_title?: string; year_start: number; year_end: number; special: number; prior?: number; dataset_hash: string; dataset_date: string; dataset_size: number; access_key: string; }
@@ -146,13 +157,19 @@ export class KyLegiScanClient {
     return d?.bill || null;
   }
 
+  /** Full roll call (accurate yea/nay/nv/absent + per-member votes). Bill-embedded vote rows are sometimes incomplete. */
+  async fetchRollCall(rollCallId: number): Promise<LegiScanVote | null> {
+    const vd = await this.request<any>({ op: 'getRollCall', id: String(rollCallId) });
+    return vd?.roll_call ? (vd.roll_call as LegiScanVote) : null;
+  }
+
   async fetchVotes(billId: number): Promise<LegiScanVote[]> {
     const detail = await this.fetchBillDetail(billId);
     if (!detail?.votes?.length) return [];
     const results: LegiScanVote[] = [];
     for (const v of detail.votes) {
-      const vd = await this.request<any>({ op: 'getRollCall', id: String(v.roll_call_id) });
-      if (vd?.roll_call) results.push(vd.roll_call);
+      const rc = await this.fetchRollCall(v.roll_call_id);
+      if (rc) results.push(rc);
     }
     return results;
   }
