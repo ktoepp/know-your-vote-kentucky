@@ -4,10 +4,8 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Chip, Avatar } from '@mui/material';
 import { formatMemberDisplay, memberSlug } from '@/lib/ky-member-utils';
-import {
-  formatRepresentativePartyChipLabel,
-  MEMBER_SPONSOR_OUTLINED_CHIP_SX,
-} from '@/lib/bill-display';
+import { formatRepresentativePartyChipLabel } from '@/lib/bill-display';
+import { CHIP } from '@/lib/ui-tokens';
 
 function initials(name: string) {
   const parts = name.split(/\s+/).filter(Boolean);
@@ -56,7 +54,7 @@ export function SponsorAvatarChip({
       }
       label={label}
       title={party ? `${name} · ${formatRepresentativePartyChipLabel(party)}` : name}
-      sx={MEMBER_SPONSOR_OUTLINED_CHIP_SX}
+      sx={{ ...CHIP.standard, ...CHIP.avatar }}
     />
   );
 }

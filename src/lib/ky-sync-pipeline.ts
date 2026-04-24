@@ -530,6 +530,7 @@ async function syncKyBillsByHash(
   }
 
   const db = options.dryRun ? null : getSupabase();
+  const readDb = db ?? getSupabase(); // always read, even in dry-run
   let grandScanned = 0;
   let grandUnchanged = 0;
   let grandChanged = 0;
@@ -538,12 +539,10 @@ async function syncKyBillsByHash(
 
   for (const { session, rawBills } of sessionJobs) {
     const scanned = rawBills.length;
-    const existingHashes = db
-      ? await fetchExistingHashesByLegiscanIds(
-          db,
-          rawBills.map((b) => b.bill_id),
-        )
-      : new Map<number, string | null>();
+    const existingHashes = await fetchExistingHashesByLegiscanIds(
+      readDb,
+      rawBills.map((b) => b.bill_id),
+    );
 
     const changedOrNew: LegiScanMasterListRawBill[] = [];
     let unchanged = 0;

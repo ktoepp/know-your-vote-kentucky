@@ -41,13 +41,12 @@ import {
   formatRepresentativePartyChipLabel,
   formatSponsorDistrictLine,
   isSignedByGovernorBillStatus,
-  partyFilledChipSx,
-  STATUS_OUTLINED_CHIP_SX,
+  partyBadgeBackgroundColor,
 } from '@/lib/bill-display';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYLegislatorRoster } from '@/types/kentucky';
 import { matchLegislatorBySponsorName, memberSlug } from '@/lib/ky-member-utils';
-import { EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-tokens';
+import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-tokens';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                */
@@ -179,18 +178,18 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
                 clickable
                 label={formatRepresentativePartyChipLabel(sponsor.party)}
                 size="small"
-                sx={partyFilledChipSx(sponsor.party)}
+                sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(sponsor.party), color: '#fff' }}
               />
               {sponsor.role ? (
                 <MuiChip
                   label={formatLegislativeRoleLabel(sponsor.role)}
                   size="small"
                   variant="outlined"
-                  sx={STATUS_OUTLINED_CHIP_SX}
+                  sx={CHIP.compact}
                 />
               ) : null}
               {isPrimary && (
-                <MuiChip label="Primary sponsor" size="small" color="primary" sx={STATUS_OUTLINED_CHIP_SX} />
+                <MuiChip label="Primary sponsor" size="small" color="primary" sx={CHIP.compact} />
               )}
             </Box>
           </Box>
@@ -659,9 +658,9 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                               clickable
                               label={formatRepresentativePartyChipLabel(s.party)}
                               size="small"
-                              sx={partyFilledChipSx(s.party)}
+                              sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(s.party), color: '#fff' }}
                             />
-                            <MuiChip label="Co sponsor" size="small" color="primary" sx={STATUS_OUTLINED_CHIP_SX} />
+                            <MuiChip label="Co sponsor" size="small" color="primary" sx={CHIP.compact} />
                             {s.bio?.social?.ballotpedia && (
                               <MuiButton
                                 size="small"

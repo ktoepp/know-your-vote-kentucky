@@ -19,7 +19,7 @@ import {
 export async function GET(request: NextRequest) {
   try {
     const ip = getClientIp(request.headers);
-    const limiter = rateLimit(ip);
+    const limiter = await rateLimit(ip);
     if (!limiter.allowed) {
       console.log(`[Intelligence API] rate-limited ip=${ip} retryAfter=${limiter.retryAfterSec}s`);
       return NextResponse.json(

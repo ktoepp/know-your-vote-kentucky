@@ -22,9 +22,9 @@ import { MemberName } from '@/components/civic/MemberName';
 import {
   formatKyLegislatorDistrict,
   formatRepresentativePartyChipLabel,
-  partyFilledChipSx,
-  STATUS_OUTLINED_CHIP_SX,
+  partyBadgeBackgroundColor,
 } from '@/lib/bill-display';
+import { CHIP } from '@/lib/ui-tokens';
 import {
   ballotpediaMemberSearchUrl,
   isKentuckyGovernor,
@@ -142,7 +142,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
                 <Chip
                   label={formatRepresentativePartyChipLabel(leg.party)}
                   size="small"
-                  sx={partyFilledChipSx(leg.party)}
+                  sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(leg.party), color: '#fff' }}
                 />
               )}
               {governor && (
@@ -151,7 +151,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
                   size="small"
                   color="success"
                   variant="outlined"
-                  sx={STATUS_OUTLINED_CHIP_SX}
+                  sx={CHIP.compact}
                 />
               )}
             </Stack>

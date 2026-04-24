@@ -14,6 +14,7 @@
  */
 import './load-env';
 import { inflateRawSync } from 'node:zlib';
+import AdmZip from 'adm-zip';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { getKyLegiScanClient } from '../src/lib/ky-data-sources';
 import { classifyTopics } from '../src/lib/ky-topic-classifier';
@@ -23,6 +24,15 @@ const args = process.argv.slice(2);
 const stateFlag = args.find((a) => a.startsWith('--state='))?.split('=')[1];
 const state = (stateFlag || 'KY').toUpperCase();
 const dryRun = args.includes('--dryRun') || args.includes('--dry-run');
+
+const ALLOWED_STATES = new Set(['KY']);
+if (!ALLOWED_STATES.has(state)) {
+  console.error(
+    `[bulk-seed] Unknown state "${state}". Allowed: ${[...ALLOWED_STATES].join(', ')}. ` +
+    `Pass --state=KY to import Kentucky data.`
+  );
+  process.exit(1);
+}
 
 const LEGISCAN_STATUS_MAP: Record<number, string> = {
   1: 'Introduced', 2: 'Engrossed', 3: 'Enrolled', 4: 'Passed', 5: 'Vetoed',
@@ -114,7 +124,10 @@ function iterateZipEntries(buf: Buffer): ZipEntry[] {
     let data: Buffer;
     if (method === 0) data = raw;
     else if (method === 8) data = inflateRawSync(raw);
-    else throw new Error(`ZIP: unsupported compression method ${method} for ${name}`);
+    else {
+      console.warn(`[bulk-seed] ZIP: unsupported method ${method} for ${name}, falling back to adm-zip`);
+      throw new Error(`__ADM_ZIP_FALLBACK__:${method}`);
+    }
     if (name.endsWith('/')) continue;
     entries.push({ name, data });
   }
@@ -129,7 +142,20 @@ interface DatasetPayloads {
 
 function parseDatasetZip(b64: string): DatasetPayloads {
   const buf = Buffer.from(b64, 'base64');
-  const entries = iterateZipEntries(buf);
+  let entries: ZipEntry[];
+  try {
+    entries = iterateZipEntries(buf);
+  } catch (err: any) {
+    if (typeof err?.message === 'string' && err.message.startsWith('__ADM_ZIP_FALLBACK__')) {
+      console.log('[bulk-seed] Using adm-zip fallback for ZIP decoding');
+      const zip = new AdmZip(buf);
+      entries = zip.getEntries()
+        .filter(e => !e.isDirectory && e.entryName.endsWith('.json'))
+        .map(e => ({ name: e.entryName, data: e.getData() }));
+    } else {
+      throw err;
+    }
+  }
   const out: DatasetPayloads = { bills: [], people: [], rollCalls: [] };
   for (const e of entries) {
     if (!e.name.endsWith('.json')) continue;
@@ -168,7 +194,7 @@ function buildBillRow(bill: any, sessionName: string, sessionId: number): Record
     topics: topics.length > 0 ? topics : null,
     sponsors,
     introduced_date: deriveIntroducedDate(bill),
-    source: 'legiscan-dataset',
+    source: 'legiscan',
     change_hash: bill?.change_hash || null,
     legiscan_session_id: sessionId,
     updated_from_legiscan_at: new Date().toISOString(),

@@ -112,47 +112,6 @@ export function partyBadgeBackgroundColor(party: string | null | undefined): str
   return '#555';
 }
 
-/**
- * Filled party label chips — same styling on bill detail, member roster cards, district map tooltip.
- * Use with `label={formatRepresentativePartyChipLabel(party)}` and `size="small"`.
- */
-export function partyFilledChipSx(party: string | null | undefined) {
-  return {
-    bgcolor: partyBadgeBackgroundColor(party),
-    color: '#fff',
-    fontWeight: 700,
-    fontSize: '0.7rem',
-    height: 22,
-    '& .MuiChip-label': { px: 0.9 },
-  } as const;
-}
-
-/**
- * Compact outlined status chips: primary/co-sponsor, role, governor badge on member cards.
- */
-export const STATUS_OUTLINED_CHIP_SX = {
-  fontSize: '0.7rem',
-  height: 22,
-  fontWeight: 700,
-  '& .MuiChip-label': { px: 0.9 },
-} as const;
-
-/**
- * Outlined sponsor/member chip with leading avatar (bill cards, hover tooltips, design system).
- * Pair with MUI Chip `size="medium"` and `variant="outlined"`.
- */
-export const MEMBER_SPONSOR_OUTLINED_CHIP_SX = {
-  fontWeight: 600,
-  fontSize: '0.875rem',
-  maxWidth: '100%',
-  '& .MuiChip-label': {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    px: 1.1,
-  },
-  '& .MuiChip-avatar': { ml: 0.5 },
-} as const;
-
 /** HD-26 / SD-12 / legacy "House Dist." → "House District …" */
 export function formatSponsorDistrictLine(district: string | null | undefined): string {
   if (district == null || String(district).trim() === '') return '';

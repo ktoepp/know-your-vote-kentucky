@@ -3,8 +3,10 @@
 import NextLink from 'next/link';
 import { Avatar, Box, Button, Card, Chip, Divider, Stack, Typography } from '@mui/material';
 import type { KYLegislator } from '@/types/kentucky';
-import { formatKyLegislatorDistrict, formatRepresentativePartyChipLabel, partyFilledChipSx } from '@/lib/bill-display';
+import { formatKyLegislatorDistrict, formatRepresentativePartyChipLabel, partyBadgeBackgroundColor } from '@/lib/bill-display';
+import { CHIP } from '@/lib/ui-tokens';
 import { isKentuckyGovernor, kyLegislatorAvatarInitials, kyMemberTitleShort, memberSlug } from '@/lib/ky-member-utils';
+import { MemberName } from '@/components/civic/MemberName';
 
 /** Role line for map tooltip: district is already shown above, so omit repeating it. */
 function mapTooltipRoleLine(leg: KYLegislator): string {
@@ -83,13 +85,13 @@ function DistrictMapTooltipSectionView({ section }: { section: DistrictMapToolti
           </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="subtitle1" fontWeight={800} color="text.primary" sx={{ lineHeight: 1.25 }} gutterBottom>
-              {leg.name}
+              <MemberName member={leg} variant="primary" />
             </Typography>
             <Typography variant="body2" fontWeight={700} color="primary.main" sx={{ mb: 0.75, lineHeight: 1.35 }}>
               {mapTooltipRoleLine(leg)}
             </Typography>
             {leg.party && (
-              <Chip label={formatRepresentativePartyChipLabel(leg.party)} size="small" sx={partyFilledChipSx(leg.party)} />
+              <Chip label={formatRepresentativePartyChipLabel(leg.party)} size="small" sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(leg.party), color: '#fff' }} />
             )}
           </Box>
         </Box>

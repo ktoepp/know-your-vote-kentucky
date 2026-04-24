@@ -5,8 +5,6 @@ import {
   Container,
   Typography,
   Box,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Alert,
@@ -19,6 +17,8 @@ import {
   IconButton,
   Button,
 } from '@mui/material';
+import { CivicCard } from '@/components/ui/CivicCard';
+import { MetaChip } from '@/components/ui/Chip';
 import {
   Event,
   Refresh,
@@ -27,13 +27,11 @@ import {
   Schedule,
   OpenInNew,
 } from '@mui/icons-material';
-import { useTheme } from '@mui/material/styles';
 import { supabase } from '../lib/supabaseClient';
 import type { KYMeeting } from '../../types/kentucky';
 import { EXTERNAL_LINK_ICON_SX } from '@/lib/ui-tokens';
 
 export default function MeetingsPage() {
-  const theme = useTheme();
   const [meetings, setMeetings] = useState<KYMeeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,39 +129,40 @@ export default function MeetingsPage() {
           <Grid container spacing={3}>
             {meetings.map((meeting) => (
               <Grid item xs={12} sm={6} md={4} key={meeting.id}>
-                <Card sx={{
-                  height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3,
-                  border: `1px solid ${theme.palette.divider}`, transition: 'all 0.2s',
-                  '&:hover': { boxShadow: 4, transform: 'translateY(-2px)' },
-                }}>
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
-                      <Chip label={meeting.jurisdiction} size="small" color="primary" />
-                      <Chip label={meeting.body} size="small" variant="outlined" />
-                      {meeting.status && <Chip label={meeting.status} size="small" variant="outlined" />}
+                <CivicCard
+                  variant="meeting"
+                  header={
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {meeting.jurisdiction && <MetaChip label={meeting.jurisdiction} tone="primary" size="small" variant="filled" />}
+                      {meeting.body && <MetaChip label={meeting.body} size="small" />}
+                      {meeting.status && <MetaChip label={meeting.status} size="small" />}
                     </Box>
-                    {meeting.title && (
-                      <Typography variant="subtitle1" fontWeight={600} gutterBottom>{meeting.title}</Typography>
-                    )}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                      <CalendarToday sx={{ fontSize: 16, color: 'text.secondary' }} />
-                      <Typography variant="body2" color="text.secondary">{formatDate(meeting.date)}</Typography>
-                    </Box>
-                    {meeting.time && (
+                  }
+                  body={
+                    <>
+                      {meeting.title && (
+                        <Typography variant="subtitle1" fontWeight={600} gutterBottom>{meeting.title}</Typography>
+                      )}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                        <Schedule sx={{ fontSize: 16, color: 'text.secondary' }} />
-                        <Typography variant="body2" color="text.secondary">{meeting.time}</Typography>
+                        <CalendarToday sx={{ fontSize: 16, color: 'text.secondary' }} />
+                        <Typography variant="body2" color="text.secondary">{formatDate(meeting.date)}</Typography>
                       </Box>
-                    )}
-                    {meeting.location && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <LocationOn sx={{ fontSize: 16, color: 'text.secondary' }} />
-                        <Typography variant="body2" color="text.secondary">{meeting.location}</Typography>
-                      </Box>
-                    )}
-                  </CardContent>
-                  {meeting.agenda_url && (
-                    <Box sx={{ p: 1.5, pt: 0 }}>
+                      {meeting.time && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                          <Schedule sx={{ fontSize: 16, color: 'text.secondary' }} />
+                          <Typography variant="body2" color="text.secondary">{meeting.time}</Typography>
+                        </Box>
+                      )}
+                      {meeting.location && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <LocationOn sx={{ fontSize: 16, color: 'text.secondary' }} />
+                          <Typography variant="body2" color="text.secondary">{meeting.location}</Typography>
+                        </Box>
+                      )}
+                    </>
+                  }
+                  footer={
+                    meeting.agenda_url ? (
                       <Button
                         size="medium"
                         variant="outlined"
@@ -175,9 +174,9 @@ export default function MeetingsPage() {
                       >
                         View Agenda
                       </Button>
-                    </Box>
-                  )}
-                </Card>
+                    ) : undefined
+                  }
+                />
               </Grid>
             ))}
           </Grid>

@@ -48,9 +48,8 @@ export const EXTERNAL_LINK_ICON_SX = { fontSize: ICON_REM.nav } as const;
 
 /**
  * Shared chip sizing/padding tokens. Canonical chip primitives in
- * `src/components/ui/Chip.tsx` compose these; existing `STATUS_OUTLINED_CHIP_SX`
- * / `MEMBER_SPONSOR_OUTLINED_CHIP_SX` constants continue to resolve to the same
- * styles for current call sites.
+ * `src/components/ui/Chip.tsx` compose these for consistent sizing across
+ * bill cards, member cards, and detail surfaces.
  */
 export const CHIP = {
   /** Card-level chip (topic, chamber, status) — 0.875rem / 600, standard label padding */

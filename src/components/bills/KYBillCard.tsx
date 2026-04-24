@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Box, Card, CardContent, Chip, Tooltip, Typography } from '@mui/material';
+import { Box, Chip, Tooltip, Typography } from '@mui/material';
 import { Check } from '@mui/icons-material';
 import Link from 'next/link';
-import { useTheme } from '@mui/material/styles';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import { SponsorAvatarChip } from '@/components/civic/SponsorAvatarChip';
+import { CivicCard } from '@/components/ui/CivicCard';
+import { ChamberChip, MetaChip } from '@/components/ui/Chip';
 import {
   billStatusChipLabel,
   effectiveBillChamber,
@@ -23,7 +24,6 @@ export interface KYBillCardProps {
 
 /** Bill grid card — matches home page layout (face + hover tooltip). */
 export function KYBillCard({ bill, legislators }: KYBillCardProps) {
-  const theme = useTheme();
   const chamber = effectiveBillChamber(bill);
   const sponsorGroups = getSponsorGroupsFromBill(bill.sponsors, legislators, {
     maxPrimary: 4,
@@ -108,164 +108,136 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
           .join(', ')
       : '';
 
-  const card = (
-    <Card
-      component={Link}
-      href={`/bills/${slug}`}
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        borderRadius: 3,
-        border: `1px solid ${theme.palette.divider}`,
-        transition: 'all 0.2s',
-        textDecoration: 'none',
-        color: 'inherit',
-        '&:hover': {
-          boxShadow: 4,
-          transform: 'translateY(-2px)',
-          borderColor: theme.palette.primary.main,
-        },
-      }}
-    >
-      <CardContent
+  const cardHeader = (
+    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+      {chamber && <ChamberChip chamber={chamber} />}
+      {bill.status &&
+        (isSignedByGovernorBillStatus(bill.status) ? (
+          <MetaChip
+            icon={<Check sx={{ fontSize: '1.125rem !important' }} />}
+            label={billStatusChipLabel(bill.status)}
+            tone="success"
+            variant="outlined"
+          />
+        ) : (
+          <MetaChip
+            label={formatBillLabelText(bill.status)}
+            tone="default"
+            variant="outlined"
+          />
+        ))}
+    </Box>
+  );
+
+  const cardBody = (
+    <>
+      <Typography variant="h6" component="p" fontWeight={700} gutterBottom sx={{ fontSize: '1.1rem' }}>
+        {bill.bill_number}
+      </Typography>
+      <Typography
+        variant="body1"
+        color="text.secondary"
         sx={{
-          flexGrow: 1,
-          display: 'flex',
-          flexDirection: 'column',
+          mb: 1.5,
+          fontSize: '0.95rem',
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
-          {chamber && (
-            <Chip
-              label={chamber === 'house' ? 'House' : 'Senate'}
-              size="medium"
-              color={chamber === 'senate' ? 'secondary' : 'primary'}
-              sx={{ fontSize: '0.875rem', fontWeight: 600, '& .MuiChip-label': { px: 1.1 } }}
-            />
-          )}
-          {bill.status &&
-            (isSignedByGovernorBillStatus(bill.status) ? (
-              <Chip
-                icon={<Check sx={{ fontSize: '1.125rem !important' }} />}
-                label={billStatusChipLabel(bill.status)}
-                size="medium"
-                color="success"
-                variant="outlined"
+        {bill.title}
+      </Typography>
+    </>
+  );
+
+  const cardFooter =
+    (primarySponsorLine || bill.last_action_date || bill.last_action) ? (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        {primarySponsorLine && (
+          <Box>
+            <Typography
+              variant="caption"
+              display="block"
+              color="text.secondary"
+              sx={{
+                mb: 0.5,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                fontWeight: 600,
+                fontSize: '0.7rem',
+              }}
+            >
+              {sponsorGroups.primary.length > 1 ? 'Primary sponsors' : 'Primary sponsor'}
+            </Typography>
+            <Typography
+              variant="body2"
+              display="block"
+              color="text.primary"
+              sx={{
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                lineHeight: 1.35,
+                opacity: 0.9,
+              }}
+            >
+              {primarySponsorLine}
+            </Typography>
+          </Box>
+        )}
+        {(bill.last_action_date || bill.last_action) && (
+          <Box>
+            <Typography
+              variant="caption"
+              display="block"
+              color="text.secondary"
+              sx={{
+                mb: bill.last_action ? 0.5 : 0,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                fontWeight: 600,
+                fontSize: '0.7rem',
+              }}
+            >
+              Latest action{actionDateCard ? ` · ${actionDateCard}` : ''}
+            </Typography>
+            {bill.last_action && (
+              <Typography
+                variant="body2"
+                display="block"
+                color="text.secondary"
                 sx={{
                   fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: 'success.main',
-                  borderColor: 'success.main',
-                  '& .MuiChip-label': { px: 1.1 },
-                  '& .MuiChip-icon': { color: 'success.main' },
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  lineHeight: 1.35,
                 }}
-              />
-            ) : (
-              <Chip
-                label={formatBillLabelText(bill.status)}
-                size="medium"
-                variant="outlined"
-                sx={{ fontSize: '0.875rem', fontWeight: 600, '& .MuiChip-label': { px: 1.1 } }}
-              />
-            ))}
-        </Box>
-        <Typography variant="h6" component="p" fontWeight={700} gutterBottom sx={{ fontSize: '1.1rem' }}>
-          {bill.bill_number}
-        </Typography>
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          sx={{
-            mb: 1.5,
-            fontSize: '0.95rem',
-            display: '-webkit-box',
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {bill.title}
-        </Typography>
-        {(primarySponsorLine || bill.last_action_date || bill.last_action) && (
-          <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {primarySponsorLine && (
-              <Box>
-                <Typography
-                  variant="caption"
-                  display="block"
-                  color="text.secondary"
-                  sx={{
-                    mb: 0.5,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    fontWeight: 600,
-                    fontSize: '0.7rem',
-                  }}
-                >
-                  {sponsorGroups.primary.length > 1 ? 'Primary sponsors' : 'Primary sponsor'}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  display="block"
-                  color="text.primary"
-                  sx={{
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    lineHeight: 1.35,
-                    opacity: 0.9,
-                  }}
-                >
-                  {primarySponsorLine}
-                </Typography>
-              </Box>
-            )}
-            {(bill.last_action_date || bill.last_action) && (
-              <Box>
-                <Typography
-                  variant="caption"
-                  display="block"
-                  color="text.secondary"
-                  sx={{
-                    mb: bill.last_action ? 0.5 : 0,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    fontWeight: 600,
-                    fontSize: '0.7rem',
-                  }}
-                >
-                  Latest action{actionDateCard ? ` · ${actionDateCard}` : ''}
-                </Typography>
-                {bill.last_action && (
-                  <Typography
-                    variant="body2"
-                    display="block"
-                    color="text.secondary"
-                    sx={{
-                      fontSize: '0.875rem',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      lineHeight: 1.35,
-                    }}
-                  >
-                    {formatBillLabelText(bill.last_action)}
-                  </Typography>
-                )}
-              </Box>
+              >
+                {formatBillLabelText(bill.last_action)}
+              </Typography>
             )}
           </Box>
         )}
-      </CardContent>
-    </Card>
-  );
+      </Box>
+    ) : undefined;
 
-  const cardWrap = <Box component="span" sx={{ display: 'block', height: '100%' }}>{card}</Box>;
+  const cardWrap = (
+    <Box component="span" sx={{ display: 'block', height: '100%' }}>
+      <CivicCard
+        variant="bill"
+        href={`/bills/${slug}`}
+        header={cardHeader}
+        body={cardBody}
+        footer={cardFooter}
+      />
+    </Box>
+  );
 
   if (!hasTooltipContent) {
     return cardWrap;

@@ -4,8 +4,12 @@
  *
  * Scope: per serverless-instance (Vercel). A shared KV-backed cache is tracked
  * as Wave 3 follow-up.
+ *
+ * Hit/miss events are fire-and-forget incremented into the `ky_sync_state`
+ * table via the `ky_increment_counter` RPC for observability.
  */
 import { createHash } from 'node:crypto';
+import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 
 interface Entry {
   value: string;
@@ -40,11 +44,31 @@ export function makeCacheKey(parts: CacheKeyParts): string {
 /** Returns the cached value if present and not expired. */
 export function getCached(key: string): string | null {
   const entry = store.get(key);
-  if (!entry) return null;
-  if (entry.expiresAtMs <= Date.now()) {
-    store.delete(key);
+  if (!entry) {
+    void supabaseAdmin
+      ?.rpc('ky_increment_counter', {
+        counter_key: 'anthropic_cache_misses',
+        bucket_key: new Date().toISOString().slice(0, 10),
+      })
+      .then(() => undefined, () => undefined);
     return null;
   }
+  if (entry.expiresAtMs <= Date.now()) {
+    store.delete(key);
+    void supabaseAdmin
+      ?.rpc('ky_increment_counter', {
+        counter_key: 'anthropic_cache_misses',
+        bucket_key: new Date().toISOString().slice(0, 10),
+      })
+      .then(() => undefined, () => undefined);
+    return null;
+  }
+  void supabaseAdmin
+    ?.rpc('ky_increment_counter', {
+      counter_key: 'anthropic_cache_hits',
+      bucket_key: new Date().toISOString().slice(0, 10),
+    })
+    .then(() => undefined, () => undefined);
   return entry.value;
 }
 
@@ -57,4 +81,3 @@ export function setCached(key: string, value: string, ttlMs: number = DEFAULT_TT
 export function __resetCacheForTests(): void {
   store.clear();
 }
-

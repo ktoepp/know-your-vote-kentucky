@@ -82,21 +82,11 @@ export class KyLegiScanClient {
     try {
       if (!supabaseAdmin) return;
       const month = KyLegiScanClient.monthKey();
-      const { data, error } = await supabaseAdmin
-        .from('ky_sync_state')
-        .select('payload')
-        .eq('key', LEGISCAN_QUERY_COUNTER_KEY)
-        .maybeSingle();
+      const { error } = await supabaseAdmin.rpc('ky_increment_counter', {
+        counter_key: LEGISCAN_QUERY_COUNTER_KEY,
+        bucket_key: month,
+      });
       if (error) throw error;
-      const payload = (data?.payload as Record<string, number> | null) ?? {};
-      payload[month] = (payload[month] || 0) + 1;
-      const { error: upErr } = await supabaseAdmin
-        .from('ky_sync_state')
-        .upsert(
-          { key: LEGISCAN_QUERY_COUNTER_KEY, payload, updated_at: new Date().toISOString() },
-          { onConflict: 'key' },
-        );
-      if (upErr) throw upErr;
     } catch (err: any) {
       console.warn(`[KyLegiScan] Failed to increment query counter: ${err?.message || err}`);
     }
