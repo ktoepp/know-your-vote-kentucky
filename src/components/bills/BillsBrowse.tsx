@@ -47,7 +47,7 @@ function applyKyBillsFilters(
   statusFilter: string,
 ) {
   if (!supabase) return null;
-  let query = supabase.from('ky_bills').select('*').order('last_action_date', { ascending: false });
+  let query = supabase.from('ky_bills').select('*').order('session', { ascending: false }).order('last_action_date', { ascending: false });
   const effectiveChamber = chamberMode === 'all' ? chamberFilter : chamberMode;
   if (effectiveChamber === 'house') {
     query = query.or('chamber.eq.house,bill_number.ilike.H%');

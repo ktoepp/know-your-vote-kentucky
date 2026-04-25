@@ -45,7 +45,12 @@ import {
 } from '@/lib/bill-display';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYLegislatorRoster } from '@/types/kentucky';
-import { matchLegislatorBySponsorName, memberProfilePath } from '@/lib/ky-member-utils';
+import {
+  matchLegislatorByLegiscanId,
+  matchLegislatorBySponsorName,
+  memberProfilePath,
+  normalizeLegislatorPhotoUrl,
+} from '@/lib/ky-member-utils';
 import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-tokens';
 
 /* ------------------------------------------------------------------ */
@@ -141,7 +146,7 @@ function statusColor(status: string | null): 'success' | 'warning' | 'error' | '
 /* ------------------------------------------------------------------ */
 function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; rosterPhoto?: string | null }) {
   const theme = useTheme();
-  const photo = rosterPhoto || sponsor.bio?.social?.image;
+  const photo = normalizeLegislatorPhotoUrl(rosterPhoto || sponsor.bio?.social?.image);
   const memberHref = memberProfilePath({ name: sponsor.name, id: sponsor.name });
   const ballotpediaUrl = sponsor.bio?.social?.ballotpedia || (sponsor.ballotpedia ? `https://ballotpedia.org/${sponsor.ballotpedia}` : null);
   const kyProfileUrl = sponsor.bio?.social?.biography;
@@ -151,7 +156,11 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
     <MuiCard sx={{ borderRadius: 2, border: `1px solid ${theme.palette.divider}`, height: '100%' }}>
       <MuiCardContent>
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', mb: 1.5 }}>
-          <MuiAvatar src={photo || undefined} sx={{ width: 52, height: 52, flexShrink: 0 }}>
+          <MuiAvatar
+            src={photo || undefined}
+            imgProps={{ referrerPolicy: 'no-referrer' }}
+            sx={{ width: 52, height: 52, flexShrink: 0 }}
+          >
             {sponsor.first_name?.[0]}{sponsor.last_name?.[0]}
           </MuiAvatar>
           <Box sx={{ minWidth: 0 }}>
@@ -609,7 +618,12 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                       <SponsorCard
                         key={s.people_id}
                         sponsor={s}
-                        rosterPhoto={matchLegislatorBySponsorName(legislators, s.name)?.photo_url}
+                        rosterPhoto={
+                          normalizeLegislatorPhotoUrl(
+                            matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
+                              matchLegislatorBySponsorName(legislators, s.name)?.photo_url,
+                          )
+                        }
                       />
                     ))}
                   </Box>
@@ -627,11 +641,18 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     {coSponsors.map((s) => {
                       const coHref = memberProfilePath({ name: s.name, id: s.name });
-                      const coPhoto =
-                        matchLegislatorBySponsorName(legislators, s.name)?.photo_url || s.bio?.social?.image;
+                      const coPhoto = normalizeLegislatorPhotoUrl(
+                        matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
+                          matchLegislatorBySponsorName(legislators, s.name)?.photo_url ??
+                          s.bio?.social?.image,
+                      );
                       return (
                       <Box key={s.people_id} sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                        <MuiAvatar src={coPhoto || undefined} sx={{ width: 36, height: 36, flexShrink: 0 }}>
+                        <MuiAvatar
+                          src={coPhoto || undefined}
+                          imgProps={{ referrerPolicy: 'no-referrer' }}
+                          sx={{ width: 36, height: 36, flexShrink: 0 }}
+                        >
                           {s.first_name?.[0]}{s.last_name?.[0]}
                         </MuiAvatar>
                         <Box sx={{ minWidth: 0 }}>

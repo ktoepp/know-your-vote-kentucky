@@ -1,5 +1,5 @@
 import type { KYLegislatorRoster } from '@/types/kentucky';
-import { matchLegislatorBySponsorName } from './ky-member-utils';
+import { matchLegislatorByLegiscanId, matchLegislatorBySponsorName, normalizeLegislatorPhotoUrl } from './ky-member-utils';
 
 export interface PrimarySponsorDisplay {
   name: string;
@@ -83,9 +83,10 @@ function recordToDisplay(s: Record<string, unknown>, legislators: KYLegislatorRo
     name = legislatorNameByPeopleId(legislators, s.people_id);
   }
   if (!name) return null;
-  const leg = matchLegislatorBySponsorName(legislators, name);
+  const byId = matchLegislatorByLegiscanId(legislators, s.people_id);
+  const leg = byId ?? matchLegislatorBySponsorName(legislators, name);
   const bio = s.bio as { social?: { image?: string } } | undefined;
-  const photoUrl = leg?.photo_url ?? bio?.social?.image ?? null;
+  const photoUrl = normalizeLegislatorPhotoUrl(leg?.photo_url ?? bio?.social?.image);
   const party = typeof s.party === 'string' ? s.party : undefined;
   return { name, party, photoUrl };
 }

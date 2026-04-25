@@ -33,6 +33,48 @@ function humanizeProfileSlug(profileSlug: string): string {
   return profileSlug.replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Upgrades `http` to `https` for known image hosts, fixes protocol-relative URLs.
+ * (Some CDNs block hotlinking without a referrer; set `imgProps` on MUI `Avatar` too.)
+ */
+export function normalizeLegislatorPhotoUrl(url: string | null | undefined): string | null {
+  const raw = (url || '').trim();
+  if (!raw) return null;
+  if (raw.startsWith('//')) return `https:${raw}`;
+  try {
+    if (!/^https?:\/\//i.test(raw)) return raw;
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+    if (u.protocol === 'http:') {
+      if (
+        host.includes('openstates.org') ||
+        host.includes('civicteam.org') ||
+        host.includes('legislature.ky.gov') ||
+        host.includes('static.openstates.org')
+      ) {
+        u.protocol = 'https:';
+        return u.toString();
+      }
+    }
+    return raw;
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * Match by LegiScan `people_id` (stored on `ky_legislators.legiscan_id`) — reliable for bill sponsor photos.
+ */
+export function matchLegislatorByLegiscanId(
+  legislators: KYLegislatorRoster[],
+  peopleId: unknown,
+): KYLegislatorRoster | null {
+  if (peopleId == null || peopleId === '') return null;
+  const n = Number(peopleId);
+  if (!Number.isFinite(n)) return null;
+  return legislators.find((l) => l.legiscan_id != null && Number(l.legiscan_id) === n) ?? null;
+}
+
 /** Slug values we consider equivalent for the same person (roster name vs first/last vs id). */
 function memberProfileSlugVariants(leg: Pick<KYLegislator, 'id' | 'name' | 'first_name' | 'last_name'>): string[] {
   const s = new Set<string>();

@@ -63,7 +63,7 @@ function syncParamsFromUrl(req: NextRequest) {
   const sdb = searchParams.get('sponsorDetailBudgetPerSession');
   const sponsorDetailBudgetPerSession = sdb ? parseInt(sdb, 10) : undefined;
   const quotaBackfillAdvanceCursor = searchParams.get('quotaBackfillAdvanceCursor') !== 'false';
-  const useChangeHash = searchParams.get('useChangeHash') === 'true';
+  const useChangeHash = searchParams.get('useChangeHash') === 'true' || process.env.KY_SYNC_USE_CHANGE_HASH === 'true';
   return {
     source,
     dryRun,

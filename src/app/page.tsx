@@ -118,7 +118,7 @@ export default function HomePage() {
         }
         const [billsRes, senateCountRes, legRes] = await withTimeout(
           Promise.all([
-            supabase.from('ky_bills').select('*').order('last_action_date', { ascending: false }).limit(HOME_SECTION_FETCH),
+            supabase.from('ky_bills').select('*').order('session', { ascending: false }).order('last_action_date', { ascending: false }).limit(HOME_SECTION_FETCH),
             supabase
               .from('ky_bills')
               .select('id', { count: 'exact', head: true })
@@ -150,12 +150,14 @@ export default function HomePage() {
                 .from('ky_bills')
                 .select('*')
                 .or('chamber.eq.house,bill_number.ilike.H%')
+                .order('session', { ascending: false })
                 .order('last_action_date', { ascending: false })
                 .limit(HOME_SECTION_FETCH),
               supabase
                 .from('ky_bills')
                 .select('*')
                 .or('chamber.eq.senate,bill_number.ilike.S%')
+                .order('session', { ascending: false })
                 .order('last_action_date', { ascending: false })
                 .limit(HOME_SECTION_FETCH),
             ]),

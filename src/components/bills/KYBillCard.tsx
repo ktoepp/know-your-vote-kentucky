@@ -98,7 +98,8 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
   const hasTooltipContent =
     Boolean(nextAction) || sponsorGroups.cosponsor.length > 0 || Boolean(bill.topics && bill.topics.length > 0);
 
-  const slug = bill.bill_number?.replace(/\s+/g, '') || bill.id;
+  /** Use row id so list cards match detail when the same bill number exists in multiple sessions. */
+  const detailHref = `/bills/${bill.id}`;
 
   const primarySponsorLine =
     sponsorGroups.primary.length > 0
@@ -231,7 +232,7 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
     <Box component="span" sx={{ display: 'block', height: '100%' }}>
       <CivicCard
         variant="bill"
-        href={`/bills/${slug}`}
+        href={detailHref}
         header={cardHeader}
         body={cardBody}
         footer={cardFooter}

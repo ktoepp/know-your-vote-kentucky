@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     const results = bills.map((b) => ({
       id: b.id,
       bill_number: b.bill_number,
+      session: b.session,
       title: b.title,
       status: b.status,
       chamber: b.chamber,

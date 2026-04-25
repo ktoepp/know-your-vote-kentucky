@@ -1,5 +1,86 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { KYBill, KYOrdinance, KYSchoolBoardItem } from '@/types/kentucky';
+import { effectiveBillChamber } from '@/lib/bill-display';
+
+/** Optional filters (URL: chamber, dateRange, status, committee). */
+export type KyBillSearchFilters = {
+  chamber?: 'house' | 'senate';
+  dateRange?: string;
+  /** Exact `ky_bills.status` match; omit or `all` for any. */
+  status?: string;
+  /** SearchBar committee slug — matched loosely on title / last_action. */
+  committee?: string;
+};
+
+const COMMITTEE_SLUG_HINTS: Record<string, string> = {
+  appropriations: 'appropriation',
+  budget: 'budget',
+  finance: 'finance',
+  'foreign-relations': 'foreign',
+  judiciary: 'judiciary',
+};
+
+function kyBillsSearchSelect(supabase: SupabaseClient, filters: KyBillSearchFilters) {
+  let q = supabase.from('ky_bills').select('*');
+  if (filters.chamber === 'house') {
+    q = q.or('chamber.eq.house,bill_number.ilike.H%');
+  } else if (filters.chamber === 'senate') {
+    q = q.or('chamber.eq.senate,bill_number.ilike.S%');
+  }
+  if (filters.status && filters.status !== 'all') {
+    q = q.eq('status', filters.status);
+  }
+  return q;
+}
+
+function minDateForRange(key: string): Date | null {
+  if (!key) return null;
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  switch (key) {
+    case 'today':
+      return startOfToday;
+    case 'week':
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    case 'month':
+      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    case 'quarter':
+      return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    case 'year':
+      return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    default:
+      return null;
+  }
+}
+
+export function filterKyBillsByDateRange(bills: KYBill[], dateRange: string | undefined): KYBill[] {
+  const min = minDateForRange(dateRange || '');
+  if (!min) return bills;
+  return bills.filter((b) => {
+    const raw = b.last_action_date || b.introduced_date;
+    if (!raw) return false;
+    return new Date(raw).getTime() >= min.getTime();
+  });
+}
+
+function filterKyBillsByCommitteeSlug(bills: KYBill[], committeeSlug: string | undefined): KYBill[] {
+  const hint = committeeSlug ? COMMITTEE_SLUG_HINTS[committeeSlug] : undefined;
+  if (!hint) return bills;
+  const h = hint.toLowerCase();
+  return bills.filter(
+    (b) =>
+      (b.last_action || '').toLowerCase().includes(h) || (b.title || '').toLowerCase().includes(h),
+  );
+}
+
+/** When DB `chamber` is null, infer from bill number so filters still work. */
+export function filterKyBillsByChamberClient(
+  bills: KYBill[],
+  chamber: 'house' | 'senate' | undefined,
+): KYBill[] {
+  if (!chamber) return bills;
+  return bills.filter((b) => effectiveBillChamber(b) === chamber);
+}
 
 /** Merge row lists in order; first occurrence of each `id` wins; cap at `limit`. */
 function mergeUniqueById<T extends { id: string }>(
@@ -29,17 +110,28 @@ export async function fetchKyBillsMatchingSearch(
   supabase: SupabaseClient,
   q: string,
   limit = 20,
+  filters: KyBillSearchFilters = {},
 ): Promise<KYBill[]> {
   const safe = q.trim();
   if (!safe) return [];
 
+  const mergeCap = Math.min(
+    120,
+    Math.max(
+      limit,
+      filters.committee || filters.dateRange ? limit * 4 : limit,
+      filters.chamber ? limit * 3 : limit,
+    ),
+  );
+
   const likePattern = `%${safe}%`;
+  const base = () => kyBillsSearchSelect(supabase, filters);
   const [titleRes, numberRes, descRes, summaryRes, topicRes] = await Promise.all([
-    supabase.from('ky_bills').select('*').ilike('title', likePattern).limit(limit),
-    supabase.from('ky_bills').select('*').ilike('bill_number', likePattern).limit(limit),
-    supabase.from('ky_bills').select('*').ilike('description', likePattern).limit(limit),
-    supabase.from('ky_bills').select('*').ilike('ai_summary', likePattern).limit(limit),
-    supabase.from('ky_bills').select('*').contains('topics', [safe]).limit(limit),
+    base().ilike('title', likePattern).order('session', { ascending: false }).limit(mergeCap),
+    base().ilike('bill_number', likePattern).order('session', { ascending: false }).limit(mergeCap),
+    base().ilike('description', likePattern).order('session', { ascending: false }).limit(mergeCap),
+    base().ilike('ai_summary', likePattern).order('session', { ascending: false }).limit(mergeCap),
+    base().contains('topics', [safe]).order('session', { ascending: false }).limit(mergeCap),
   ]);
 
   for (const res of [titleRes, numberRes, descRes, summaryRes]) {
@@ -48,14 +140,22 @@ export async function fetchKyBillsMatchingSearch(
 
   const topicRows = !topicRes.error ? (topicRes.data as KYBill[] | null) : null;
 
-  return mergeUniqueById<KYBill>(
-    limit,
+  let merged = mergeUniqueById<KYBill>(
+    mergeCap,
     titleRes.data as KYBill[] | null,
     numberRes.data as KYBill[] | null,
     descRes.data as KYBill[] | null,
     summaryRes.data as KYBill[] | null,
     topicRows,
   );
+
+  merged = filterKyBillsByDateRange(merged, filters.dateRange);
+  merged = filterKyBillsByCommitteeSlug(merged, filters.committee);
+  if (filters.chamber === 'house' || filters.chamber === 'senate') {
+    merged = filterKyBillsByChamberClient(merged, filters.chamber);
+  }
+
+  return merged.slice(0, limit);
 }
 
 /** Ordinances: parallel ilike on title, number, description (comma-safe). */

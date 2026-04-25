@@ -5,6 +5,7 @@
  * Usage:
  *   npm run bulk-seed:ky -- --state=KY
  *   npm run bulk-seed:ky -- --state=KY --dryRun
+ *   npm run bulk-seed:ky -- --state=KY --limit=5   # process 5 sessions, re-run to continue
  *
  * Compares dataset_hash against ky_legiscan_datasets and only downloads sessions
  * whose hash changed. Zip decoding lives here (not in ky-legiscan-client): the
@@ -24,6 +25,8 @@ const args = process.argv.slice(2);
 const stateFlag = args.find((a) => a.startsWith('--state='))?.split('=')[1];
 const state = (stateFlag || 'KY').toUpperCase();
 const dryRun = args.includes('--dryRun') || args.includes('--dry-run');
+const limitFlag = args.find((a) => a.startsWith('--limit='))?.split('=')[1];
+const sessionLimit = limitFlag ? parseInt(limitFlag, 10) : undefined;
 
 const ALLOWED_STATES = new Set(['KY']);
 if (!ALLOWED_STATES.has(state)) {
@@ -182,7 +185,7 @@ function buildBillRow(bill: any, sessionName: string, sessionId: number): Record
   const sponsors = Array.isArray(bill?.sponsors) && bill.sponsors.length ? bill.sponsors : null;
   const row: Record<string, unknown> = {
     legiscan_id: bill?.bill_id,
-    bill_number: bill?.number,
+    bill_number: bill?.bill_number || bill?.number, // dataset ZIP uses bill_number; getMasterList uses number
     title: bill?.title || '',
     description: bill?.description || null,
     session: sessionName,
@@ -411,14 +414,17 @@ async function main() {
     if (stored.get(entry.session_id) === entry.dataset_hash) unchanged.push(entry);
     else changed.push(entry);
   }
-  console.log(`[bulk-seed] ${unchanged.length} sessions unchanged (skipped), ${changed.length} to download`);
+  const toProcess = sessionLimit ? changed.slice(0, sessionLimit) : changed;
+  const deferred = sessionLimit ? changed.slice(sessionLimit) : [];
+  console.log(`[bulk-seed] ${unchanged.length} unchanged (skipped), ${toProcess.length} to download${deferred.length ? `, ${deferred.length} deferred (re-run to continue)` : ''}`);
   for (const s of unchanged) console.log(`  ⏭️  ${s.session_id} ${s.session_name} (hash unchanged)`);
+  for (const s of deferred) console.log(`  ⏸️  ${s.session_id} ${s.session_name} (deferred)`);
 
   let totalBills = 0;
   let totalPeople = 0;
   let totalVotes = 0;
   const failures: { session_id: number; error: string }[] = [];
-  for (const entry of changed) {
+  for (const entry of toProcess) {
     console.log('');
     console.log(`[bulk-seed] → session ${entry.session_id} ${entry.session_name} (${entry.year_start}-${entry.year_end}) hash=${entry.dataset_hash.slice(0, 8)}…`);
     if (dryRun) {
@@ -440,7 +446,8 @@ async function main() {
   console.log('');
   console.log('═══════════════ Bulk Seed Results ═══════════════');
   console.log(`  sessions skipped (unchanged): ${unchanged.length}`);
-  console.log(`  sessions processed:           ${changed.length - failures.length}`);
+  console.log(`  sessions deferred:            ${deferred.length}`);
+  console.log(`  sessions processed:           ${toProcess.length - failures.length}`);
   console.log(`  sessions failed:              ${failures.length}`);
   if (!dryRun) {
     console.log(`  bills upserted:               ${totalBills}`);

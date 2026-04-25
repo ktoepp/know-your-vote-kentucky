@@ -30,8 +30,7 @@ export interface BillsListTableProps {
 }
 
 function billHref(bill: KYBill): string {
-  const slug = bill.bill_number?.replace(/\s+/g, '') || bill.id;
-  return `/bills/${slug}`;
+  return `/bills/${bill.id}`;
 }
 
 function formatShortDate(iso: string | null | undefined): string {

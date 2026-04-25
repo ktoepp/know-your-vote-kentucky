@@ -3,6 +3,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import ClientThemeProvider from './components/ClientThemeProvider';
 import Navigation from "./components/Navigation";
+import SiteFooter from "./components/SiteFooter";
 import { TooltipProvider } from '@/lib/TooltipContext';
 import { UserProvider } from "./lib/UserContext";
 import ContrastTester from '../components/dev/ContrastTester';
@@ -78,15 +79,16 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen" suppressHydrationWarning>
+      <body className="flex min-h-screen flex-col" suppressHydrationWarning>
         <a href="#main-content" className="skip-link">Skip to main content</a>
         <UserProvider>
           <ClientThemeProvider>
             <TooltipProvider>
               <Navigation />
-              <main id="main-content" className="pt-0">
+              <main id="main-content" className="pt-0 flex min-h-0 flex-1 flex-col">
                 {children}
               </main>
+              <SiteFooter />
               <ContrastTester />
             </TooltipProvider>
           </ClientThemeProvider>

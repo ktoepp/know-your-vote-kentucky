@@ -114,15 +114,39 @@ export function partyBadgeBackgroundColor(party: string | null | undefined): str
   return '#555';
 }
 
-/** HD-26 / SD-12 / legacy "House Dist." → "House District …" */
+/**
+ * HD-26 / SD-12 / "House Dist." → "House District …"
+ * `House Dist` must NOT match the prefix of "District" (else you get "House District rict 63").
+ */
 export function formatSponsorDistrictLine(district: string | null | undefined): string {
   if (district == null || String(district).trim() === '') return '';
   let s = String(district).trim();
   s = s.replace(/^HD-?\s*/i, 'House District ');
   s = s.replace(/^SD-?\s*/i, 'Senate District ');
-  s = s.replace(/\bHouse\s+Dist\.?\s*/gi, 'House District ');
-  s = s.replace(/\bSenate\s+Dist\.?\s*/gi, 'Senate District ');
+  s = s.replace(/\bHouse\s+Dist(?!rict)\.?\s*/gi, 'House District ');
+  s = s.replace(/\bSenate\s+Dist(?!rict)\.?\s*/gi, 'Senate District ');
+  s = s.replace(/\bHouse District\s+rict\s+/gi, 'House District ');
+  s = s.replace(/\bSenate District\s+rict\s+/gi, 'Senate District ');
   return s.trim();
+}
+
+/** e.g. OCD id segments `sldl:063` / `sldu:9` from Open States or census strings. */
+function tryFormatDistrictFromOcdFragment(
+  raw: string,
+  chamber: 'house' | 'senate' | null,
+): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const sl = t.match(/sldl[:\s/]+0*(\d{1,3})/i);
+  const su = t.match(/sldu[:\s/]+0*(\d{1,3})/i);
+  if (sl && su) {
+    if (chamber === 'senate') return `Senate District ${parseInt(su[1]!, 10)}`;
+    if (chamber === 'house') return `House District ${parseInt(sl[1]!, 10)}`;
+    return `House District ${parseInt(sl[1]!, 10)}`;
+  }
+  if (sl) return `House District ${parseInt(sl[1]!, 10)}`;
+  if (su) return `Senate District ${parseInt(su[1]!, 10)}`;
+  return null;
 }
 
 /**
@@ -134,6 +158,10 @@ export function formatKyLegislatorDistrict(leg: {
 }): string {
   const raw = (leg.district || '').trim();
   if (!raw) return '';
+  if (/sld[lu][:\s/]|[/]sld[lu][:\s/]|ocd-division/i.test(raw)) {
+    const ocd = tryFormatDistrictFromOcdFragment(raw, leg.chamber);
+    if (ocd) return ocd;
+  }
   let s = formatSponsorDistrictLine(raw);
   if (s.includes('House District') || s.includes('Senate District')) return s;
   if (/^\d+$/.test(raw)) {

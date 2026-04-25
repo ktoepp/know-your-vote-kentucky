@@ -34,6 +34,7 @@ import {
   kyLegislatureProfileUrl,
   kyMemberTitleShort,
   memberSlug,
+  normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
 import { ICON_REM } from '@/lib/ui-tokens';
 
@@ -115,8 +116,9 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
           }}
         >
           <Avatar
-            src={leg.photo_url || undefined}
+            src={normalizeLegislatorPhotoUrl(leg.photo_url) || undefined}
             alt=""
+            imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{
               width: avatarSize,
               height: avatarSize,

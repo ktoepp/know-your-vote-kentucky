@@ -28,6 +28,7 @@ import {
   openStatesCurrentRole,
   openStatesLegislatorNames,
 } from './ky-openstates-client';
+import { normalizeLegislatorPhotoUrl } from './ky-member-utils';
 import type { KYSource } from '../types/kentucky';
 import type {
   KyLegiScanClient,
@@ -864,7 +865,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         chamber,
         role_title: cr?.title?.trim() || null,
         district,
-        photo_url: leg.image || null,
+        photo_url: normalizeLegislatorPhotoUrl(leg.image) || null,
         email: leg.email || null,
         lrc_profile_url: lrcProfileUrl,
         website: otherWebsiteUrl,

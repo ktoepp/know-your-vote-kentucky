@@ -5,7 +5,13 @@ import { Avatar, Box, Button, Card, Chip, Divider, Stack, Typography } from '@mu
 import type { KYLegislator } from '@/types/kentucky';
 import { formatKyLegislatorDistrict, formatRepresentativePartyChipLabel, partyBadgeBackgroundColor } from '@/lib/bill-display';
 import { CHIP } from '@/lib/ui-tokens';
-import { isKentuckyGovernor, kyLegislatorAvatarInitials, kyMemberTitleShort, memberProfilePath } from '@/lib/ky-member-utils';
+import {
+  isKentuckyGovernor,
+  kyLegislatorAvatarInitials,
+  kyMemberTitleShort,
+  memberProfilePath,
+  normalizeLegislatorPhotoUrl,
+} from '@/lib/ky-member-utils';
 import { MemberName } from '@/components/civic/MemberName';
 
 /** Role line for map tooltip: district is already shown above, so omit repeating it. */
@@ -73,8 +79,9 @@ function DistrictMapTooltipSectionView({ section }: { section: DistrictMapToolti
       {leg && (
         <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mb: 1.25 }}>
           <Avatar
-            src={leg.photo_url || undefined}
+            src={normalizeLegislatorPhotoUrl(leg.photo_url) || undefined}
             alt=""
+            imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{ width: 48, height: 48, flexShrink: 0, fontWeight: 700, fontSize: '1rem' }}
           >
             {kyLegislatorAvatarInitials(leg)}

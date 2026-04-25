@@ -14,26 +14,28 @@ export async function GET(
 
   // Normalise id: "HB1" and "hb1" and "HB 1" all resolve to the same bill
   const normalised = id.toUpperCase().replace(/\s+/g, '');
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-  // 1. Look up in Supabase — try bill_number first, then UUID
+  // 1. Look up: UUID path is exact row (used by list cards). Bill-number path = newest session when duplicated.
   let billData: any = null;
-  const { data: byNumber } = await supabase
-    .from('ky_bills')
-    .select('*')
-    .ilike('bill_number', normalised)
-    .limit(1)
-    .single();
-
-  if (byNumber) {
-    billData = byNumber;
+  if (isUuid) {
+    const { data } = await supabase.from('ky_bills').select('*').eq('id', id).maybeSingle();
+    billData = data ?? null;
   } else {
-    const { data: byId } = await supabase
+    const { data: byNumber } = await supabase
       .from('ky_bills')
       .select('*')
-      .eq('id', id)
+      .ilike('bill_number', normalised)
+      .order('session', { ascending: false })
+      .order('last_action_date', { ascending: false, nullsFirst: false })
       .limit(1)
-      .single();
-    billData = byId ?? null;
+      .maybeSingle();
+    if (byNumber) {
+      billData = byNumber;
+    } else {
+      const { data: byId } = await supabase.from('ky_bills').select('*').eq('id', id).maybeSingle();
+      billData = byId ?? null;
+    }
   }
 
   if (!billData) {
@@ -51,6 +53,32 @@ export async function GET(
     }
   }
 
+  // Vote rows on getBill sometimes omit or zero out nay/yea; merge official counts from getRollCall.
+  let votesOut: any[] = legiscanDetail?.votes ?? [];
+  if (votesOut.length > 0 && billData.legiscan_id) {
+    try {
+      const client = getKyLegiScanClient();
+      votesOut = await Promise.all(
+        votesOut.map(async (v: { roll_call_id?: number; [k: string]: unknown }) => {
+          const rid = v?.roll_call_id;
+          if (rid == null) return v;
+          const full = await client.fetchRollCall(Number(rid));
+          if (!full) return v;
+          return {
+            ...v,
+            yea: full.yea,
+            nay: full.nay,
+            nv: full.nv,
+            absent: full.absent,
+            passed: full.passed,
+          };
+        }),
+      );
+    } catch (err: any) {
+      console.error('[BillDetail] Vote enrichment failed:', err?.message);
+    }
+  }
+
   // 3. Merge: Supabase is ground truth for status/topics; LegiScan enriches with
   //    history, subjects, texts, and sponsor detail (including ballotpedia slugs).
   return NextResponse.json({
@@ -61,7 +89,7 @@ export async function GET(
           history: legiscanDetail.history ?? [],
           texts: legiscanDetail.texts ?? [],
           sponsors: legiscanDetail.sponsors ?? [],
-          votes: legiscanDetail.votes ?? [],
+          votes: votesOut,
           committee: legiscanDetail.committee ?? null,
         }
       : null,
