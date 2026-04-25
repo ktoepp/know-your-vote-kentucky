@@ -25,6 +25,7 @@ import { supabase } from '../lib/supabaseClient';
 import type { KYLegislator } from '../../types/kentucky';
 import { withTimeout } from '@/lib/async-utils';
 import { isKentuckyGovernor, memberProfilePath } from '@/lib/ky-member-utils';
+import { formatPartyLabel } from '@/lib/bill-display';
 import { MemberCard } from '@/components/members/MemberCard';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 
@@ -95,7 +96,7 @@ export default function MembersPage() {
       if (chamberFilter === 'house' || chamberFilter === 'senate') {
         query = query.eq('chamber', chamberFilter);
       }
-      if (partyFilter !== 'all') query = query.eq('party', partyFilter);
+      // Party is not filtered in SQL: DB values are often D/R/I (LegiScan) while the UI uses full names.
       const { data, error: fetchError } = await withTimeout(
         query,
         30_000,
@@ -114,10 +115,15 @@ export default function MembersPage() {
     fetchLegislators();
   }, [chamberFilter, partyFilter]);
 
+  const legislatorsByParty = useMemo(() => {
+    if (partyFilter === 'all') return legislators;
+    return legislators.filter((leg) => formatPartyLabel(leg.party) === partyFilter);
+  }, [legislators, partyFilter]);
+
   const legislatorsScoped = useMemo(() => {
-    if (chamberFilter !== 'governor') return legislators;
-    return legislators.filter(isKentuckyGovernor);
-  }, [legislators, chamberFilter]);
+    if (chamberFilter !== 'governor') return legislatorsByParty;
+    return legislatorsByParty.filter(isKentuckyGovernor);
+  }, [legislatorsByParty, chamberFilter]);
 
   const filtered = legislatorsScoped
     .filter((leg) => {

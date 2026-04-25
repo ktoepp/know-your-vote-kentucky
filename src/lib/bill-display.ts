@@ -39,6 +39,20 @@ export function isSignedByGovernorBillStatus(status: string | null | undefined):
 }
 
 /**
+ * Home “recently passed” curation: clearly advanced / enacted (signed, chaptered, enrolled, veto override).
+ */
+export function isRecentlyPassedBillStatus(status: string | null | undefined): boolean {
+  if (status == null) return false;
+  if (isSignedByGovernorBillStatus(status)) return true;
+  const s = String(status).trim().toLowerCase();
+  if (s === '') return false;
+  if (s.includes('chaptered')) return true;
+  if (s === 'veto override') return true;
+  if (s.includes('enrolled')) return true;
+  return false;
+}
+
+/**
  * Label for status chips: use full "Signed by Governor" when the DB has only "Signed".
  */
 export function billStatusChipLabel(status: string | null | undefined): string {

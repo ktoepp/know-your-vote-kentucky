@@ -9,6 +9,7 @@ import {
   CircularProgress,
   Alert,
   Grid,
+  Stack,
 } from '@mui/material';
 import {
   Gavel,
@@ -26,10 +27,13 @@ import { EmptyState } from '@/components/civic/EmptyState';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
+import { HomeCuratedBillList } from '@/components/home/HomeCuratedBillList';
+import { selectRecentlyPassedBills, selectRecentActionBills } from '@/lib/home-bill-curated';
 import { ICON_REM, TYPE } from '@/lib/ui-tokens';
 
 const HOME_SECTION_PAGE_SIZE = 6;
 const HOME_SECTION_FETCH = 24;
+const HOME_CURATED_LIMIT = 6;
 
 /**
  * Session dates sourced from OpenStates (verified against legislature.ky.gov).
@@ -104,6 +108,8 @@ export default function HomePage() {
   const [senateBills, setSenateBills] = useState<KYBill[]>([]);
   const [showChamberSections, setShowChamberSections] = useState(false);
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
+  const [passedSidebarBills, setPassedSidebarBills] = useState<KYBill[]>([]);
+  const [recentActionBills, setRecentActionBills] = useState<KYBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,7 +122,7 @@ export default function HomePage() {
           setLoading(false);
           return;
         }
-        const [billsRes, senateCountRes, legRes] = await withTimeout(
+        const [billsRes, senateCountRes, legRes, passedRes, actionRes] = await withTimeout(
           Promise.all([
             supabase.from('ky_bills').select('*').order('session', { ascending: false }).order('last_action_date', { ascending: false }).limit(HOME_SECTION_FETCH),
             supabase
@@ -127,6 +133,20 @@ export default function HomePage() {
               .from('ky_legislators')
               .select('id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url')
               .eq('active', true),
+            supabase
+              .from('ky_bills')
+              .select('*')
+              .or('status.ilike.%signed%,status.ilike.%chaptered%,status.ilike.%enrolled%,status.ilike.%veto%override%')
+              .order('session', { ascending: false })
+              .order('last_action_date', { ascending: false, nullsFirst: false })
+              .limit(16),
+            supabase
+              .from('ky_bills')
+              .select('*')
+              .not('last_action_date', 'is', null)
+              .order('session', { ascending: false })
+              .order('last_action_date', { ascending: false, nullsFirst: false })
+              .limit(24),
           ]),
           30_000,
           'Could not reach database (timed out). Check your connection and Supabase status.',
@@ -134,7 +154,13 @@ export default function HomePage() {
         if (billsRes.error) console.warn('[Home] ky_bills:', billsRes.error.message);
         if (senateCountRes.error) console.warn('[Home] ky_bills (senate count):', senateCountRes.error.message);
         if (legRes.error) console.warn('[Home] ky_legislators:', legRes.error.message);
-        if (billsRes.data) setBills(billsRes.data);
+        if (passedRes.error) console.warn('[Home] ky_bills (curated passed):', passedRes.error.message);
+        if (actionRes.error) console.warn('[Home] ky_bills (curated action):', actionRes.error.message);
+        const billsData = billsRes.data ?? [];
+        setBills(billsData);
+        const passed = selectRecentlyPassedBills(passedRes.data, billsData, HOME_CURATED_LIMIT);
+        setPassedSidebarBills(passed);
+        setRecentActionBills(selectRecentActionBills(actionRes.data, passed, HOME_CURATED_LIMIT));
         if (legRes.data) setLegislators(legRes.data);
 
         const senateCount = senateCountRes.count ?? 0;
@@ -276,105 +302,134 @@ export default function HomePage() {
         )}
 
         {!loading && (
-          <>
-            {/* Latest KY Bills */}
-            <SectionHeader
-              title="Latest KY Bills"
-              icon={<Gavel />}
-              href="/bills"
-              caption={showChamberSections ? 'Recent activity across the House and Senate.' : undefined}
-            />
-            {bills.length === 0 ? (
-              <Grid container spacing={3} sx={{ mb: 6 }}>
-                <Grid item xs={12}><EmptyState message="No bills yet. Data will appear once synced." /></Grid>
-              </Grid>
-            ) : (
-              <Box sx={{ mb: 6 }}>
-                <PaginatedSection
-                  items={bills}
-                  pageSize={HOME_SECTION_PAGE_SIZE}
-                  resetKey={`${bills.length}-${bills[0]?.id ?? ''}`}
-                  variant="responsive"
-                >
-                  {(pageBills) => (
-                    <Grid container spacing={3}>
-                      {pageBills.map((bill) => (
-                        <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                          <KYBillCard bill={bill} legislators={legislators} />
-                        </Grid>
-                      ))}
+          <Grid container spacing={3} sx={{ alignItems: 'flex-start' }}>
+            <Grid item xs={12} lg={8} sx={{ order: { xs: 0, lg: 0 } }}>
+              {/* Latest KY Bills */}
+              <SectionHeader
+                title="Latest KY Bills"
+                icon={<Gavel />}
+                href="/bills"
+                caption={showChamberSections ? 'Recent activity across the House and Senate.' : undefined}
+              />
+              {bills.length === 0 ? (
+                <Grid container spacing={3} sx={{ mb: 6 }}>
+                  <Grid item xs={12}><EmptyState message="No bills yet. Data will appear once synced." /></Grid>
+                </Grid>
+              ) : (
+                <Box sx={{ mb: 6 }}>
+                  <PaginatedSection
+                    items={bills}
+                    pageSize={HOME_SECTION_PAGE_SIZE}
+                    resetKey={`${bills.length}-${bills[0]?.id ?? ''}`}
+                    variant="responsive"
+                  >
+                    {(pageBills) => (
+                      <Grid container spacing={3}>
+                        {pageBills.map((bill) => (
+                          <Grid item xs={12} sm={6} md={4} key={bill.id}>
+                            <KYBillCard bill={bill} legislators={legislators} />
+                          </Grid>
+                        ))}
+                      </Grid>
+                    )}
+                  </PaginatedSection>
+                </Box>
+              )}
+
+              {showChamberSections && (
+                <>
+                  <SectionHeader
+                    title="Latest House Bills"
+                    icon={<Gavel />}
+                    href="/bills/house"
+                    caption="House chamber bills and resolutions — see all House activity."
+                  />
+                  {houseBills.length === 0 ? (
+                    <Grid container spacing={3} sx={{ mb: 6 }}>
+                      <Grid item xs={12}><EmptyState message="No House bills yet. Data will appear once synced." /></Grid>
                     </Grid>
+                  ) : (
+                    <Box sx={{ mb: 6 }}>
+                      <PaginatedSection
+                        items={houseBills}
+                        pageSize={HOME_SECTION_PAGE_SIZE}
+                        resetKey={`h-${houseBills.length}-${houseBills[0]?.id ?? ''}`}
+                        variant="responsive"
+                      >
+                        {(pageBills) => (
+                          <Grid container spacing={3}>
+                            {pageBills.map((bill) => (
+                              <Grid item xs={12} sm={6} md={4} key={bill.id}>
+                                <KYBillCard bill={bill} legislators={legislators} />
+                              </Grid>
+                            ))}
+                          </Grid>
+                        )}
+                      </PaginatedSection>
+                    </Box>
                   )}
-                </PaginatedSection>
-              </Box>
-            )}
 
-            {showChamberSections && (
-              <>
-                <SectionHeader
-                  title="Latest House Bills"
-                  icon={<Gavel />}
-                  href="/bills/house"
-                  caption="House chamber bills and resolutions — see all House activity."
+                  <SectionHeader
+                    title="Latest Senate Bills"
+                    icon={<Gavel />}
+                    href="/bills/senate"
+                    caption="Senate chamber bills and resolutions — see all Senate activity."
+                  />
+                  {senateBills.length === 0 ? (
+                    <Grid container spacing={3} sx={{ mb: 6 }}>
+                      <Grid item xs={12}><EmptyState message="No Senate bills yet. Run a bills sync after updating the app." /></Grid>
+                    </Grid>
+                  ) : (
+                    <Box sx={{ mb: 6 }}>
+                      <PaginatedSection
+                        items={senateBills}
+                        pageSize={HOME_SECTION_PAGE_SIZE}
+                        resetKey={`s-${senateBills.length}-${senateBills[0]?.id ?? ''}`}
+                        variant="responsive"
+                      >
+                        {(pageBills) => (
+                          <Grid container spacing={3}>
+                            {pageBills.map((bill) => (
+                              <Grid item xs={12} sm={6} md={4} key={bill.id}>
+                                <KYBillCard bill={bill} legislators={legislators} />
+                              </Grid>
+                            ))}
+                          </Grid>
+                        )}
+                      </PaginatedSection>
+                    </Box>
+                  )}
+                </>
+              )}
+            </Grid>
+            <Grid item xs={12} lg={4} sx={{ order: { xs: -1, lg: 0 } }}>
+              <Stack
+                spacing={2}
+                sx={{
+                  position: { lg: 'sticky' },
+                  top: { lg: 24 },
+                  mb: { xs: 1, lg: 0 },
+                }}
+              >
+                <HomeCuratedBillList
+                  kind="passed"
+                  title="Recently passed"
+                  caption="Signed, chaptered, enrolled, or similar final stages."
+                  bills={passedSidebarBills}
+                  line="status"
+                  emptyMessage="No bills match this view yet. Try again after a sync."
                 />
-                {houseBills.length === 0 ? (
-                  <Grid container spacing={3} sx={{ mb: 6 }}>
-                    <Grid item xs={12}><EmptyState message="No House bills yet. Data will appear once synced." /></Grid>
-                  </Grid>
-                ) : (
-                  <Box sx={{ mb: 6 }}>
-                    <PaginatedSection
-                      items={houseBills}
-                      pageSize={HOME_SECTION_PAGE_SIZE}
-                      resetKey={`h-${houseBills.length}-${houseBills[0]?.id ?? ''}`}
-                      variant="responsive"
-                    >
-                      {(pageBills) => (
-                        <Grid container spacing={3}>
-                          {pageBills.map((bill) => (
-                            <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                              <KYBillCard bill={bill} legislators={legislators} />
-                            </Grid>
-                          ))}
-                        </Grid>
-                      )}
-                    </PaginatedSection>
-                  </Box>
-                )}
-
-                <SectionHeader
-                  title="Latest Senate Bills"
-                  icon={<Gavel />}
-                  href="/bills/senate"
-                  caption="Senate chamber bills and resolutions — see all Senate activity."
+                <HomeCuratedBillList
+                  kind="action"
+                  title="Recent action"
+                  caption="The latest recorded movement, by last action date."
+                  bills={recentActionBills}
+                  line="lastAction"
+                  emptyMessage="No bills with a recent last action date yet."
                 />
-                {senateBills.length === 0 ? (
-                  <Grid container spacing={3} sx={{ mb: 6 }}>
-                    <Grid item xs={12}><EmptyState message="No Senate bills yet. Run a bills sync after updating the app." /></Grid>
-                  </Grid>
-                ) : (
-                  <Box sx={{ mb: 6 }}>
-                    <PaginatedSection
-                      items={senateBills}
-                      pageSize={HOME_SECTION_PAGE_SIZE}
-                      resetKey={`s-${senateBills.length}-${senateBills[0]?.id ?? ''}`}
-                      variant="responsive"
-                    >
-                      {(pageBills) => (
-                        <Grid container spacing={3}>
-                          {pageBills.map((bill) => (
-                            <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                              <KYBillCard bill={bill} legislators={legislators} />
-                            </Grid>
-                          ))}
-                        </Grid>
-                      )}
-                    </PaginatedSection>
-                  </Box>
-                )}
-              </>
-            )}
-          </>
+              </Stack>
+            </Grid>
+          </Grid>
         )}
       </Container>
     </Box>
