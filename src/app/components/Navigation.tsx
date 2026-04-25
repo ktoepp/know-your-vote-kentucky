@@ -444,12 +444,12 @@ export default function Navigation() {
 
   const isActive = (path: string) => isNavPathActive(path, pathname);
 
-  /** High-contrast labels on the blue mobile drawer (ListItemText defaults to text.primary otherwise). */
+  /** Nav item colors for the light mobile drawer. */
   const mobileNav = {
-    color: alpha(theme.palette.primary.contrastText, 0.92),
-    colorActive: theme.palette.primary.contrastText,
-    hover: alpha(theme.palette.primary.contrastText, 0.12),
-    activeBg: alpha(theme.palette.primary.contrastText, 0.18),
+    color: theme.palette.text.secondary,
+    colorActive: theme.palette.primary.main,
+    hover: theme.palette.action.hover,
+    activeBg: alpha(theme.palette.primary.main, 0.08),
   };
 
   useEffect(() => {
@@ -683,12 +683,10 @@ export default function Navigation() {
         <Box
           ref={mobileMenuRef}
           sx={{
-            background: theme.palette.mode === 'dark'
-              ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`
-              : `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
-            backdropFilter: 'blur(10px)',
-            borderTop: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+            bgcolor: 'background.paper',
+            borderTop: `1px solid ${theme.palette.divider}`,
             py: 2,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
           }}
         >
           <Container maxWidth="xl">
@@ -707,7 +705,7 @@ export default function Navigation() {
                           color: isActive(item.href) ? mobileNav.colorActive : mobileNav.color,
                           backgroundColor: isActive(item.href) ? mobileNav.activeBg : 'transparent',
                           borderLeft: isActive(item.href)
-                            ? `4px solid ${theme.palette.primary.contrastText}`
+                            ? `4px solid ${theme.palette.primary.main}`
                             : '4px solid transparent',
                           '&:hover': {
                             backgroundColor: mobileNav.hover,
@@ -746,7 +744,7 @@ export default function Navigation() {
                               width: 8,
                               height: 8,
                               borderRadius: '50%',
-                              backgroundColor: theme.palette.primary.contrastText,
+                              backgroundColor: theme.palette.primary.main,
                               ml: 'auto',
                             }}
                           />
@@ -766,7 +764,7 @@ export default function Navigation() {
                             backgroundColor: pathname === sub.href ? mobileNav.activeBg : 'transparent',
                             borderLeft:
                               pathname === sub.href
-                                ? `4px solid ${theme.palette.primary.contrastText}`
+                                ? `4px solid ${theme.palette.primary.main}`
                                 : '4px solid transparent',
                             '&:hover': {
                               backgroundColor: mobileNav.hover,
@@ -789,7 +787,7 @@ export default function Navigation() {
                                 width: 8,
                                 height: 8,
                                 borderRadius: '50%',
-                                backgroundColor: theme.palette.primary.contrastText,
+                                backgroundColor: theme.palette.primary.main,
                                 ml: 'auto',
                               }}
                             />
@@ -810,7 +808,7 @@ export default function Navigation() {
                         color: isActive(item.href) ? mobileNav.colorActive : mobileNav.color,
                         backgroundColor: isActive(item.href) ? mobileNav.activeBg : 'transparent',
                         borderLeft: isActive(item.href)
-                          ? `4px solid ${theme.palette.primary.contrastText}`
+                          ? `4px solid ${theme.palette.primary.main}`
                           : '4px solid transparent',
                         '&:hover': {
                           backgroundColor: mobileNav.hover,
@@ -849,7 +847,7 @@ export default function Navigation() {
                             width: 8,
                             height: 8,
                             borderRadius: '50%',
-                            backgroundColor: theme.palette.primary.contrastText,
+                            backgroundColor: theme.palette.primary.main,
                             ml: 'auto',
                           }}
                         />

@@ -18,6 +18,7 @@ import {
 import { Email, OpenInNew, Phone, Public } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import type { KYLegislator } from '@/types/kentucky';
+import { useTooltips } from '@/lib/TooltipContext';
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { KENTUCKY_GOVERNOR_OFFICE_URL } from '@/components/civic/GovernorBeshearChip';
 import { MemberName } from '@/components/civic/MemberName';
@@ -73,6 +74,7 @@ export interface MemberCardProps {
 export function MemberCard({ leg, featured = false, showDistrictInSubtitle = true, profileHref }: MemberCardProps) {
   const theme = useTheme();
   const router = useRouter();
+  const { tooltipsEnabled } = useTooltips();
   const anchorId = memberSlug(leg.name || leg.id);
   const governor = isKentuckyGovernor(leg);
   const avatarSize = featured || governor ? 88 : 72;
@@ -263,7 +265,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
           </Button>
         )}
         <Tooltip
-          title="Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record."
+          title={tooltipsEnabled ? "Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record." : ""}
           placement="top"
           arrow
           enterDelay={400}

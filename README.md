@@ -4,6 +4,51 @@ A civic transparency platform for Kentucky citizens. Track state bills, local or
 
 **Deferred — executive orders:** Not part of the MVP while governor.ky.gov listings are unreliable for automated sync (404s, client-only rendering). Revisit when there is a stable index URL, an official feed/API, or a maintainable headless fetch path. The scraper (`src/lib/ky-executive-orders.ts`), DB table, `syncExecutiveOrders()`, and `generateEOSummary()` remain in the codebase for a future re-enable; they are omitted from the product surface, search, intelligence API, automated sync map, and Vercel cron until then.
 
+## For AI Agents
+
+**Start here if you're an AI picking up this project.**
+
+- **Current tasks and roadmap:** [`TASKS.md`](./TASKS.md) — always check this first
+- **This is a Kentucky state legislature app**, not a federal Congress app. All terminology, chamber sizes, and process descriptions must refer to the Kentucky General Assembly (100 House members, 38 Senators, Governor not President, 3/5 veto override threshold)
+- **Primary language:** TypeScript / Next.js 15 App Router. No pages router.
+- **Styling:** MUI (Material UI) is the primary component library. Tailwind is present but used minimally for the custom tooltip layer.
+- **Database:** Supabase (PostgreSQL). Schema in `supabase/migrations/`. Data comes from LegiScan API via `src/lib/ky-legiscan-client.ts`.
+
+### Key files for common tasks
+
+| Task | Files |
+|---|---|
+| Tooltip content / definitions | `src/lib/tooltipContent.ts` |
+| Tooltip on/off toggle | `src/lib/TooltipContext.tsx`, `src/app/components/Navigation.tsx` |
+| Tooltip components | `src/components/ui/Tooltip.tsx`, `src/components/ui/LegislativeStageTooltip.tsx` |
+| Bill status → tooltip key mapping | `src/lib/bill-display.ts` → `billStatusToTooltipKey()`, `billPrefixToTooltipKey()` |
+| Bill card (list/browse) | `src/components/bills/KYBillCard.tsx` |
+| Bill detail page | `src/app/bills/[id]/page.tsx` |
+| District map | `src/components/members/DistrictMapExplorer.tsx` |
+| Map member popup | `src/components/members/DistrictMapMemberTooltip.tsx` |
+| Member card (list + map sidebar) | `src/components/members/MemberCard.tsx` |
+| Member profile page | `src/app/members/[slug]/page.tsx` |
+| Bill stage definitions | `src/lib/billStages.ts` |
+| Data sync pipeline | `src/lib/ky-sync-pipeline.ts` |
+| App layout / providers | `src/app/layout.tsx` |
+
+### What's hidden / not in nav
+
+- **Events page** (`/events`) — built but hidden from nav. Has known technical debt (some federal terminology in inline term detection). Do not surface until cleaned up.
+- **Explore, table, activity, live-content, dashboard, link-dashboard** — legacy/experimental. Reachable by URL but `noindex`. Do not add to primary navigation.
+- **Admin** (`/admin/sync-status`) — requires `ADMIN_TOKEN` header. Operator-only.
+
+### Tooltip system architecture
+
+The tooltip layer has two parts:
+
+1. **Custom `Tooltip` component** (`src/components/ui/Tooltip.tsx`) — respects the global `tooltipsEnabled` toggle from `TooltipContext`. Use this for educational jargon tooltips on text/inline elements.
+2. **MUI `Tooltip`** — used throughout for UI affordances (card hovers, button hints). Does **not** automatically respect `tooltipsEnabled` — must be gated manually if needed.
+
+Content lives in `src/lib/tooltipContent.ts` (`governmentTooltips` record). Add new terms there; use `getTooltipContent(key)` to retrieve.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites

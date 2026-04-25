@@ -424,7 +424,6 @@ export default function HomePage() {
                   title="Most viewed"
                   caption="Based on how often people open a bill’s detail page. New bills show 0 until someone views them."
                   bills={mostViewedBills}
-                  line="viewCount"
                   emptyMessage="No bills to show yet."
                 />
               </Stack>
