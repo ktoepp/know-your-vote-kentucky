@@ -54,6 +54,8 @@ export interface KYBill {
   bill_text_url: string | null;
   topics: string[] | null;
   sponsors: Record<string, unknown> | null;
+  /** Detail page view count; absent in older API responses until column exists. */
+  view_count?: number | null;
   created_at: string;
   updated_at: string;
   source: string | null;

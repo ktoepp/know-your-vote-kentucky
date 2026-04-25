@@ -8,19 +8,19 @@ import { governmentTooltips } from '@/lib/tooltipContent';
 
 // Example component showing practical tooltip usage
 export const TooltipExamples = () => {
-  // Sample bill data
+  // Sample Kentucky bill data
   const sampleBills = [
     {
-      number: 'H.R. 1234',
-      title: 'A bill to improve renewable energy infrastructure and create jobs in the clean energy sector',
-      sponsor: 'Rep. Jane Smith (D-CA)',
+      number: 'HB 1',
+      title: 'An Act relating to the establishment of a state education savings program',
+      sponsor: 'Rep. John Smith (R-Louisville)',
       chamber: 'house' as const,
       status: 'reported'
     },
     {
-      number: 'S. 5678',
-      title: 'A bill to expand healthcare coverage and reduce prescription drug costs',
-      sponsor: 'Sen. John Doe (D-NY)',
+      number: 'SB 42',
+      title: 'An Act relating to transportation infrastructure funding for rural counties',
+      sponsor: 'Sen. Jane Doe (D-Lexington)',
       chamber: 'senate' as const,
       status: 'passed'
     }
@@ -76,9 +76,9 @@ export const TooltipExamples = () => {
               <span className="text-blue-600 dark:text-blue-400 font-medium">
                 introduced
               </span>
-            </LegislativeStageTooltip> by a member of Congress.
+            </LegislativeStageTooltip> by a member of the Kentucky General Assembly.
           </p>
-          
+
           <p>
             It&apos;s then <LegislativeStageTooltip stage="referred">
               <span className="text-blue-600 dark:text-blue-400 font-medium">
@@ -90,23 +90,19 @@ export const TooltipExamples = () => {
               </span>
             </Tooltip> for review.
           </p>
-          
+
           <p>
             The committee holds <LegislativeStageTooltip stage="hearing">
               <span className="text-blue-600 dark:text-blue-400 font-medium">
                 hearings
               </span>
-            </LegislativeStageTooltip> and conducts a <LegislativeStageTooltip stage="markup">
-              <span className="text-blue-600 dark:text-blue-400 font-medium">
-                markup session
-              </span>
-            </LegislativeStageTooltip>.
+            </LegislativeStageTooltip> and may amend the bill before voting to advance it.
           </p>
-          
+
           <p>
             If approved, the bill is <LegislativeStageTooltip stage="reported">
               <span className="text-blue-600 dark:text-blue-400 font-medium">
-                reported
+                reported favorably
               </span>
             </LegislativeStageTooltip> to the full chamber for a <LegislativeStageTooltip stage="floorVote">
               <span className="text-blue-600 dark:text-blue-400 font-medium">

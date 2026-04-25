@@ -360,6 +360,30 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
     load();
   }, [id]);
 
+  useEffect(() => {
+    if (!supabase || !bill?.id) return;
+    const bid = bill.id;
+    const key = `kyvk_bill_view_${bid}`;
+    try {
+      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(key)) return;
+      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, '1');
+    } catch {
+      /* private mode, etc. */
+    }
+    supabase
+      .rpc('ky_increment_bill_view', { p_bill_id: bid })
+      .then(({ error: rpcError }) => {
+        if (rpcError) {
+          try {
+            if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(key);
+          } catch {
+            /* ignore */
+          }
+          console.warn('[BillDetail] view count:', rpcError.message);
+        }
+      });
+  }, [bill?.id]);
+
   if (loading) {
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

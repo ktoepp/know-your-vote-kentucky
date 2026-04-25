@@ -23,19 +23,31 @@ export function selectRecentlyPassedBills(
     .slice(0, limit);
 }
 
+function byViewCountThenAction(a: KYBill, b: KYBill): number {
+  const va = a.view_count ?? 0;
+  const vb = b.view_count ?? 0;
+  if (vb !== va) return vb - va;
+  return byLastActionDateDesc(a, b);
+}
+
 /**
- * Most recent by last action; de-duplicates ids already shown as “recently passed,” unless that leaves too few rows.
+ * Top by view_count (null/undefined treated as 0), then last action date. Optionally avoids IDs already in “recently passed.”
  */
-export function selectRecentActionBills(
-  fromActionQuery: KYBill[] | null | undefined,
+export function selectMostViewedBills(
+  fromViewQuery: KYBill[] | null | undefined,
+  fallbackBills: KYBill[] | null | undefined,
   recentlyPassed: KYBill[],
   limit: number,
 ): KYBill[] {
-  const raw = (fromActionQuery ?? []).slice().sort(byLastActionDateDesc);
+  const source =
+    fromViewQuery && fromViewQuery.length > 0
+      ? fromViewQuery
+      : (fallbackBills ?? []);
+  if (source.length === 0) return [];
   const passedIds = new Set(recentlyPassed.map(b => b.id));
-  const deduped = raw.filter(b => !passedIds.has(b.id));
-  const take = (rows: KYBill[]) => rows.slice(0, limit);
-  const primary = take(deduped);
-  if (primary.length >= Math.min(3, limit) || !raw.length) return primary;
-  return take(raw);
+  const sorted = source.slice().sort(byViewCountThenAction);
+  const deduped = sorted.filter(b => !passedIds.has(b.id));
+  if (deduped.length >= limit) return deduped.slice(0, limit);
+  if (deduped.length >= Math.min(3, limit)) return deduped.slice(0, limit);
+  return sorted.slice(0, limit);
 }

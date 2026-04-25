@@ -28,7 +28,7 @@ import { KYBillCard } from '@/components/bills/KYBillCard';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { HomeCuratedBillList } from '@/components/home/HomeCuratedBillList';
-import { selectRecentlyPassedBills, selectRecentActionBills } from '@/lib/home-bill-curated';
+import { selectRecentlyPassedBills, selectMostViewedBills } from '@/lib/home-bill-curated';
 import { ICON_REM, TYPE } from '@/lib/ui-tokens';
 
 const HOME_SECTION_PAGE_SIZE = 6;
@@ -109,7 +109,7 @@ export default function HomePage() {
   const [showChamberSections, setShowChamberSections] = useState(false);
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
   const [passedSidebarBills, setPassedSidebarBills] = useState<KYBill[]>([]);
-  const [recentActionBills, setRecentActionBills] = useState<KYBill[]>([]);
+  const [mostViewedBills, setMostViewedBills] = useState<KYBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -122,7 +122,7 @@ export default function HomePage() {
           setLoading(false);
           return;
         }
-        const [billsRes, senateCountRes, legRes, passedRes, actionRes] = await withTimeout(
+        const [billsRes, senateCountRes, legRes, passedRes, mostViewedRes] = await withTimeout(
           Promise.all([
             supabase.from('ky_bills').select('*').order('session', { ascending: false }).order('last_action_date', { ascending: false }).limit(HOME_SECTION_FETCH),
             supabase
@@ -143,7 +143,7 @@ export default function HomePage() {
             supabase
               .from('ky_bills')
               .select('*')
-              .not('last_action_date', 'is', null)
+              .order('view_count', { ascending: false, nullsFirst: false })
               .order('session', { ascending: false })
               .order('last_action_date', { ascending: false, nullsFirst: false })
               .limit(24),
@@ -155,12 +155,12 @@ export default function HomePage() {
         if (senateCountRes.error) console.warn('[Home] ky_bills (senate count):', senateCountRes.error.message);
         if (legRes.error) console.warn('[Home] ky_legislators:', legRes.error.message);
         if (passedRes.error) console.warn('[Home] ky_bills (curated passed):', passedRes.error.message);
-        if (actionRes.error) console.warn('[Home] ky_bills (curated action):', actionRes.error.message);
+        if (mostViewedRes.error) console.warn('[Home] ky_bills (most viewed):', mostViewedRes.error.message);
         const billsData = billsRes.data ?? [];
         setBills(billsData);
         const passed = selectRecentlyPassedBills(passedRes.data, billsData, HOME_CURATED_LIMIT);
         setPassedSidebarBills(passed);
-        setRecentActionBills(selectRecentActionBills(actionRes.data, passed, HOME_CURATED_LIMIT));
+        setMostViewedBills(selectMostViewedBills(mostViewedRes.data, billsData, passed, HOME_CURATED_LIMIT));
         if (legRes.data) setLegislators(legRes.data);
 
         const senateCount = senateCountRes.count ?? 0;
@@ -420,12 +420,12 @@ export default function HomePage() {
                   emptyMessage="No bills match this view yet. Try again after a sync."
                 />
                 <HomeCuratedBillList
-                  kind="action"
-                  title="Recent action"
-                  caption="The latest recorded movement, by last action date."
-                  bills={recentActionBills}
-                  line="lastAction"
-                  emptyMessage="No bills with a recent last action date yet."
+                  kind="views"
+                  title="Most viewed"
+                  caption="Based on how often people open a bill’s detail page. New bills show 0 until someone views them."
+                  bills={mostViewedBills}
+                  line="viewCount"
+                  emptyMessage="No bills to show yet."
                 />
               </Stack>
             </Grid>
