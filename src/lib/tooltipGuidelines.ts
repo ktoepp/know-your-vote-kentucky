@@ -6,13 +6,13 @@ import { governmentTooltips } from './tooltipContent';
 export const tooltipGuidelines = {
   // Terms that should ALWAYS have tooltips
   required: [
-    "Government-specific terminology (committee, markup, cloture)",
-    "Legislative process steps (introduced, reported, enrolled)", 
+    "Kentucky General Assembly terminology (committee, markup, LRC, General Assembly)",
+    "Legislative process steps (introduced, engrossed, enrolled, adjourned sine die)",
     "Voting types (roll call, voice vote, amendment)",
-    "Chamber-specific rules (filibuster, reconciliation)",
-    "Congressional roles (sponsor, cosponsor, whip)",
-    "Document types (conference report, committee report)",
-    "Procedural terms (quorum, unanimous consent, suspension)"
+    "KY-specific procedures (committee substitute, posted for passage, recommitted)",
+    "Legislative roles (sponsor, cosponsor, whip)",
+    "Document types (conference report, fiscal note, emergency clause)",
+    "Procedural terms (quorum, unanimous consent, discharge petition)"
   ],
   
   // Terms that can optionally have tooltips
@@ -40,17 +40,17 @@ export const tooltipExamples = {
     {
       term: "committee",
       context: "In a bill card showing committee assignment",
-      tooltip: "A smaller group of Congress members who specialize in specific topics..."
+      tooltip: "A smaller group of legislators who specialize in a specific policy area..."
     },
     {
-      term: "markup",
-      context: "In a timeline showing bill progress",
-      tooltip: "A meeting where committee members go through a bill line by line..."
+      term: "engrossed",
+      context: "In a bill status chip",
+      tooltip: "The bill passed one chamber and has been printed in its final form..."
     },
     {
-      term: "cloture",
-      context: "In a Senate vote explanation",
-      tooltip: "A Senate procedure to end debate on a bill and force a vote..."
+      term: "adjourned sine die",
+      context: "In a session status banner",
+      tooltip: "The legislative session has officially ended; any unpassed bills are dead until next session..."
     }
   ],
   
@@ -101,28 +101,28 @@ export const implementationPatterns = {
     </Tooltip>
   `,
   
-  // Contextual tooltip with current events
+  // Contextual tooltip with current session context
   contextual: `
-    <ContextualTooltip 
-      term="filibuster" 
-      context="Currently being used to block voting rights legislation"
+    <ContextualTooltip
+      term="committee_substitute"
+      context="The Education Committee replaced the original bill text before reporting it"
     >
-      Filibuster
+      Committee Substitute
     </ContextualTooltip>
   `,
-  
+
   // Complex tooltip with expandable details
   complex: `
     <ComplexTooltip
-      title="Budget Reconciliation"
-      summary="A special Senate process for budget bills that only needs 51 votes."
+      title="Veto Override"
+      summary="The General Assembly can override a Governor veto with 3/5 of elected members."
       details={[
-        "Can only be used for bills that affect government spending",
-        "Limited to once per year for each budget category",
-        "Bypasses the filibuster"
+        "Requires 61 of 100 House members (elected, not just present)",
+        "Requires 23 of 38 Senate members",
+        "Both chambers must vote to override"
       ]}
     >
-      Reconciliation
+      Veto Override
     </ComplexTooltip>
   `
 };
@@ -173,7 +173,7 @@ export const getAppropriateTooltip = (term: string, context?: string) => {
   }
   
   // Check if this term needs complex explanation
-  const complexTerms = ['reconciliation', 'filibuster', 'cloture'];
+  const complexTerms = ['veto_override', 'emergency_clause', 'adjourned_sine_die'];
   if (complexTerms.includes(term)) {
     return {
       type: 'complex',

@@ -10,11 +10,14 @@ import { CivicCard } from '@/components/ui/CivicCard';
 import { ChamberChip, MetaChip } from '@/components/ui/Chip';
 import {
   billStatusChipLabel,
+  billStatusToTooltipKey,
+  billPrefixToTooltipKey,
   effectiveBillChamber,
   formatBillLabelText,
   getKyBillNextAction,
   isSignedByGovernorBillStatus,
 } from '@/lib/bill-display';
+import { governmentTooltips } from '@/lib/tooltipContent';
 import { getSponsorGroupsFromBill } from '@/lib/ky-bill-sponsors';
 
 export interface KYBillCardProps {
@@ -25,6 +28,10 @@ export interface KYBillCardProps {
 /** Bill grid card — matches home page layout (face + hover tooltip). */
 export function KYBillCard({ bill, legislators }: KYBillCardProps) {
   const chamber = effectiveBillChamber(bill);
+  const statusTooltipKey = billStatusToTooltipKey(bill.status);
+  const statusTooltipContent = statusTooltipKey ? governmentTooltips[statusTooltipKey] : null;
+  const billTypeTooltipKey = billPrefixToTooltipKey(bill.bill_number);
+  const billTypeTooltipContent = billTypeTooltipKey ? governmentTooltips[billTypeTooltipKey] : null;
   const sponsorGroups = getSponsorGroupsFromBill(bill.sponsors, legislators, {
     maxPrimary: 4,
     maxCosponsor: 8,
@@ -41,6 +48,42 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
 
   const tooltipTitle = (
     <Box component="span" sx={{ display: 'block', maxWidth: 380, p: 0.5 }}>
+      {billTypeTooltipContent && (
+        <Box
+          component="span"
+          sx={{ display: 'block', mb: 1.5, p: 1, borderRadius: 1, bgcolor: 'action.hover' }}
+        >
+          <Typography
+            component="span"
+            variant="caption"
+            display="block"
+            sx={{ opacity: 0.75, mb: 0.25, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+          >
+            {billTypeTooltipContent.title}
+          </Typography>
+          <Typography component="span" variant="body2" display="block" sx={{ fontWeight: 400 }}>
+            {billTypeTooltipContent.content}
+          </Typography>
+        </Box>
+      )}
+      {statusTooltipContent && (
+        <Box
+          component="span"
+          sx={{ display: 'block', mb: nextAction || sponsorGroups.cosponsor.length > 0 || (bill.topics?.length ?? 0) > 0 ? 1.5 : 0, p: 1, borderRadius: 1, bgcolor: 'action.hover' }}
+        >
+          <Typography
+            component="span"
+            variant="caption"
+            display="block"
+            sx={{ opacity: 0.75, mb: 0.25, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+          >
+            {statusTooltipContent.title}
+          </Typography>
+          <Typography component="span" variant="body2" display="block" sx={{ fontWeight: 400 }}>
+            {statusTooltipContent.content}
+          </Typography>
+        </Box>
+      )}
       {nextAction && (
         <Box
           component="span"
@@ -96,7 +139,11 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
   );
 
   const hasTooltipContent =
-    Boolean(nextAction) || sponsorGroups.cosponsor.length > 0 || Boolean(bill.topics && bill.topics.length > 0);
+    Boolean(statusTooltipContent) ||
+    Boolean(billTypeTooltipContent) ||
+    Boolean(nextAction) ||
+    sponsorGroups.cosponsor.length > 0 ||
+    Boolean(bill.topics && bill.topics.length > 0);
 
   /** Use row id so list cards match detail when the same bill number exists in multiple sessions. */
   const detailHref = `/bills/${bill.id}`;

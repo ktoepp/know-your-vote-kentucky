@@ -295,6 +295,49 @@ export function getKyBillNextAction(bill: {
   };
 }
 
+/**
+ * Maps a LegiScan/KY GA bill status string to a key in `governmentTooltips`.
+ * Returns null when no tooltip match exists (callers should skip showing a tooltip).
+ */
+export function billStatusToTooltipKey(status: string | null | undefined): string | null {
+  if (!status) return null;
+  const s = status.trim().toLowerCase();
+  if (s.includes('signed by governor') || s === 'signed') return 'signed_by_governor';
+  if (s.includes('veto override') || s.includes('veto overridden')) return 'veto_override';
+  if (s.includes('vetoed')) return 'vetoed';
+  if (s.includes('enrolled')) return 'enrolled';
+  if (s.includes('engrossed')) return 'engrossed';
+  if (s.includes('committee substitute')) return 'committee_substitute';
+  if (s.includes('reported favorably') || s.includes('reported')) return 'reported';
+  if (s.includes('posted for passage')) return 'posted_for_passage';
+  if (s.includes('passed')) return 'passed';
+  if (s.includes('tabled')) return 'tabled';
+  if (s.includes('recommitted')) return 'recommitted';
+  if (s.includes('failed') || s.includes('died')) return 'failed';
+  if (s.includes('adjourned sine die')) return 'adjourned_sine_die';
+  if (s.includes('in committee') || s.includes('referred')) return 'in_committee';
+  if (s.includes('prefiled')) return 'prefiled';
+  if (s.includes('introduced')) return 'introduced';
+  return null;
+}
+
+/**
+ * Maps a KY bill number prefix (HB, SB, HJR, etc.) to a key in `governmentTooltips`.
+ * Returns null when the prefix is unrecognized.
+ */
+export function billPrefixToTooltipKey(billNumber: string | null | undefined): string | null {
+  const n = (billNumber || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (n.startsWith('HJR')) return 'hjr';
+  if (n.startsWith('SJR')) return 'sjr';
+  if (n.startsWith('HCR')) return 'hcr';
+  if (n.startsWith('SCR')) return 'scr';
+  if (n.startsWith('HR')) return 'hr';
+  if (n.startsWith('SR')) return 'sr';
+  if (n.startsWith('HB')) return 'hb';
+  if (n.startsWith('SB')) return 'sb';
+  return null;
+}
+
 export type KyBillSortKey =
   | 'bill_number'
   | 'title'

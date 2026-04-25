@@ -31,12 +31,12 @@ export const BILL_STAGES: BillStage[] = [
   { key: 'conference_committee', label: 'Conference Committee', group: 'Bicameral Process', description: 'Joint committee resolving differences.' },
   { key: 'conference_report', label: 'Conference Report', group: 'Bicameral Process', description: 'Committee reached compromise.' },
   { key: 'final_congressional_approval', label: 'Final Congressional Approval', group: 'Bicameral Process', description: 'Both chambers approved identical version.' },
-  // 5. Presidential Action
-  { key: 'sent_president', label: 'Sent to President', group: 'Presidential Action', description: 'Awaiting presidential action.' },
-  { key: 'signed_law', label: 'Signed into Law', group: 'Presidential Action', description: 'President signed the bill.' },
-  { key: 'presidential_veto', label: 'Presidential Veto', group: 'Presidential Action', description: 'President rejected the bill.' },
-  { key: 'veto_override', label: 'Veto Override Attempt', group: 'Presidential Action', description: 'Congress attempting 2/3 override.' },
-  { key: 'pocket_veto', label: 'Pocket Veto', group: 'Presidential Action', description: 'President ignored bill while Congress adjourned.' },
+  // 5. Governor's Action
+  { key: 'sent_president', label: 'Sent to Governor', group: "Governor's Action", description: "Awaiting the Governor's action." },
+  { key: 'signed_law', label: 'Signed into Law', group: "Governor's Action", description: 'Governor signed the bill.' },
+  { key: 'presidential_veto', label: 'Vetoed by Governor', group: "Governor's Action", description: 'Governor rejected the bill; legislature may attempt override.' },
+  { key: 'veto_override', label: 'Veto Override Attempt', group: "Governor's Action", description: 'General Assembly attempting 3/5 override in each chamber.' },
+  { key: 'pocket_veto', label: 'Became Law Without Signature', group: "Governor's Action", description: 'Governor did not sign or veto within the required window; bill became law.' },
   // 6. Critical Status Indicators
   { key: 'urgent', label: 'Urgent/Fast-Track', group: 'Critical Status', description: 'Leadership prioritizing quick passage.' },
   { key: 'bipartisan', label: 'Bipartisan Support', group: 'Critical Status', description: 'Strong support from both parties.' },

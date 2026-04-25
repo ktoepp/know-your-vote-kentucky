@@ -116,73 +116,73 @@ export const TooltipExamples = () => {
       {/* Voting Example */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold mb-3">Voting Example</h3>
-        
+
         <div className="space-y-2">
           <p>
-            The Senate uses a <Tooltip content={governmentTooltips.rollCall.content}>
+            The Kentucky General Assembly uses a <Tooltip content={governmentTooltips.rollCall.content}>
               <span className="text-blue-600 dark:text-blue-400 font-medium">
                 roll call vote
               </span>
-            </Tooltip> to record each member&apos;s position.
+            </Tooltip> to record each member&apos;s individual position.
           </p>
-          
+
           <p>
-            If there&apos;s a <Tooltip content={governmentTooltips.filibuster.content}>
+            If the Governor rejects a bill, it has been <Tooltip content={governmentTooltips.vetoed.content}>
               <span className="text-blue-600 dark:text-blue-400 font-medium">
-                filibuster
+                vetoed
               </span>
-            </Tooltip>, the Senate may need a <Tooltip content={governmentTooltips.cloture.content}>
+            </Tooltip>. The legislature can attempt a <Tooltip content={governmentTooltips.veto_override.content}>
               <span className="text-blue-600 dark:text-blue-400 font-medium">
-                cloture vote
+                veto override
               </span>
-            </Tooltip> to end debate.
+            </Tooltip>, which requires 3/5 of elected members in each chamber.
           </p>
-          
+
           <p>
-            For budget bills, they might use <Tooltip content={governmentTooltips.reconciliation.content}>
+            Bills that include an <Tooltip content={governmentTooltips.emergency_clause.content}>
               <span className="text-blue-600 dark:text-blue-400 font-medium">
-                reconciliation
+                emergency clause
               </span>
-            </Tooltip> to bypass the filibuster.
+            </Tooltip> take effect immediately upon the Governor&apos;s signature.
           </p>
         </div>
       </div>
 
       {/* Bill Number Examples */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold mb-3">Bill Number Examples</h3>
-        
+        <h3 className="text-lg font-semibold mb-3">Kentucky Bill Number Examples</h3>
+
         <div className="space-y-2">
           <p>
-            <BillNumberTooltip billNumber="H.R. 1234">
+            <BillNumberTooltip billNumber="HB 1">
               <span className="font-mono text-blue-600 dark:text-blue-400">
-                H.R. 1234
+                HB 1
               </span>
-            </BillNumberTooltip> - House bill
+            </BillNumberTooltip> — House Bill: proposed law originating in the House
           </p>
-          
+
           <p>
-            <BillNumberTooltip billNumber="S. 5678">
+            <BillNumberTooltip billNumber="SB 42">
               <span className="font-mono text-blue-600 dark:text-blue-400">
-                S. 5678
+                SB 42
               </span>
-            </BillNumberTooltip> - Senate bill
+            </BillNumberTooltip> — Senate Bill: proposed law originating in the Senate
           </p>
-          
+
           <p>
-            <BillNumberTooltip billNumber="H.J.Res. 42">
+            <BillNumberTooltip billNumber="HJR 5">
               <span className="font-mono text-blue-600 dark:text-blue-400">
-                H.J.Res. 42
+                HJR 5
               </span>
-            </BillNumberTooltip> - House joint resolution
+            </BillNumberTooltip> — House Joint Resolution: requires both chambers to approve
           </p>
-          
+
           <p>
-            <BillNumberTooltip billNumber="S.Con.Res. 15">
+            <BillNumberTooltip billNumber="HCR 12">
               <span className="font-mono text-blue-600 dark:text-blue-400">
-                S.Con.Res. 15
+                HCR 12
               </span>
-            </BillNumberTooltip> - Senate concurrent resolution
+            </BillNumberTooltip> — House Concurrent Resolution: does not become law
           </p>
         </div>
       </div>

@@ -12,6 +12,7 @@ import {
   Chip,
   Divider,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { Email, OpenInNew, Phone, Public } from '@mui/icons-material';
@@ -261,26 +262,33 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
             Website
           </Button>
         )}
-        <Button
-          component="a"
-          size="small"
-          variant="text"
-          color="inherit"
-          href={ballotpediaMemberSearchUrl(leg.name)}
-          target="_blank"
-          rel="noopener noreferrer"
-          endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}
-          sx={{
-            color: 'text.secondary',
-            fontWeight: 500,
-            textTransform: 'none',
-            fontSize: '0.8125rem',
-            minHeight: 32,
-            '&:hover': { bgcolor: 'action.hover' },
-          }}
+        <Tooltip
+          title="Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record."
+          placement="top"
+          arrow
+          enterDelay={400}
         >
-          Ballotpedia
-        </Button>
+          <Button
+            component="a"
+            size="small"
+            variant="text"
+            color="inherit"
+            href={ballotpediaMemberSearchUrl(leg.name)}
+            target="_blank"
+            rel="noopener noreferrer"
+            endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}
+            sx={{
+              color: 'text.secondary',
+              fontWeight: 500,
+              textTransform: 'none',
+              fontSize: '0.8125rem',
+              minHeight: 32,
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            Ballotpedia
+          </Button>
+        </Tooltip>
         {governor && (
           <Button
             component="a"

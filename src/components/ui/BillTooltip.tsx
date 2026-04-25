@@ -51,7 +51,7 @@ export const BillTooltip = ({
           )}
           {showChamber && (
             <div className="text-xs text-gray-300">
-              <span className="font-medium">Chamber:</span> {chamber === 'house' ? 'House of Representatives' : 'U.S. Senate'}
+              <span className="font-medium">Chamber:</span> {chamber === 'house' ? 'Kentucky House of Representatives' : 'Kentucky Senate'}
             </div>
           )}
         </div>
@@ -86,14 +86,14 @@ export const BillNumberTooltip = ({
   className = ''
 }: BillNumberTooltipProps) => {
   const normalizedNumber = billNumber
-    .replace(/^(hr|h\.r\.|house resolution|h\.r\.)/i, 'H.R.')
-    .replace(/^(s|s\.|senate bill|s\.)/i, 'S.')
-    .replace(/^(hjres|h\.j\.res\.|house joint resolution|h\.j\.res\.)/i, 'H.J.Res.')
-    .replace(/^(sjres|s\.j\.res\.|senate joint resolution|s\.j\.res\.)/i, 'S.J.Res.')
-    .replace(/^(hconres|h\.con\.res\.|house concurrent resolution|h\.con\.res\.)/i, 'H.Con.Res.')
-    .replace(/^(sconres|s\.con\.res\.|senate concurrent resolution|s\.con\.res\.)/i, 'S.Con.Res.')
-    .replace(/^(hres|h\.res\.|house resolution|h\.res\.)/i, 'H.Res.')
-    .replace(/^(sres|s\.res\.|senate resolution|s\.res\.)/i, 'S.Res.');
+    .replace(/^(hb|house bill)\s*/i, 'HB ')
+    .replace(/^(sb|senate bill)\s*/i, 'SB ')
+    .replace(/^(hjr|house joint resolution)\s*/i, 'HJR ')
+    .replace(/^(sjr|senate joint resolution)\s*/i, 'SJR ')
+    .replace(/^(hcr|house concurrent resolution)\s*/i, 'HCR ')
+    .replace(/^(scr|senate concurrent resolution)\s*/i, 'SCR ')
+    .replace(/^(hr|house resolution)\s*/i, 'HR ')
+    .replace(/^(sr|senate resolution)\s*/i, 'SR ');
   
   const content = (
     <div className="bill-number-tooltip">
