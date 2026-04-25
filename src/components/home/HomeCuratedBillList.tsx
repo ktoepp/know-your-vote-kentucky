@@ -20,7 +20,7 @@ export type HomeCuratedBillListProps = {
   title: string;
   caption?: string;
   bills: KYBill[];
-  line: 'status' | 'viewCount';
+  line?: 'status' | 'viewCount';
   emptyMessage: string;
   kind: 'passed' | 'views';
 };
@@ -97,7 +97,9 @@ export function HomeCuratedBillList({ title, caption, bills, line, emptyMessage,
               const secondary =
                 line === 'status'
                   ? formatBillLabelText(billStatusChipLabel(bill.status) || bill.status || '') || '—'
-                  : viewLine;
+                  : line === 'viewCount'
+                  ? viewLine
+                  : null;
               const rowLabel = `${bill.bill_number}: ${bill.title}. See more about this bill.`;
               return (
                 <Box
@@ -140,10 +142,12 @@ export function HomeCuratedBillList({ title, caption, bills, line, emptyMessage,
                   >
                     {bill.title}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.35, mb: 0.75 }}>
-                    {when ? <>{when} · </> : null}
-                    {secondary}
-                  </Typography>
+                  {(when || secondary) && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.35, mb: 0.75 }}>
+                      {when ? <>{when}{secondary ? ' · ' : ''}</> : null}
+                      {secondary}
+                    </Typography>
+                  )}
                   <Typography
                     className="home-curated-see-more"
                     component="span"
