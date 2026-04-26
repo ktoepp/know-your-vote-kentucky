@@ -73,11 +73,11 @@ function SessionBanner() {
       ? alpha(theme.palette.info.main, 0.06)
       : alpha(theme.palette.grey[500], 0.08);
 
-  const statusTitle = isInSession
+  const statusTitle: string | null = isInSession
     ? 'General Assembly in session'
     : beforeSession
       ? 'Upcoming regular session'
-      : 'Regular session (scheduled dates) ended';
+      : null;
 
   return (
     <Box
@@ -121,16 +121,23 @@ function SessionBanner() {
               }}
             />
             <Box component="div" sx={{ minWidth: 0 }}>
+              {statusTitle !== null && (
+                <Typography
+                  variant="body2"
+                  fontWeight={600}
+                  color={isInSession ? 'success.main' : 'text.primary'}
+                  component="span"
+                  sx={{ display: 'block' }}
+                >
+                  {statusTitle}
+                </Typography>
+              )}
               <Typography
                 variant="body2"
-                fontWeight={600}
-                color={isInSession ? 'success.main' : 'text.primary'}
+                color="text.secondary"
                 component="span"
-                sx={{ display: 'block' }}
+                sx={{ display: 'block', mt: statusTitle !== null ? 0.25 : 0 }}
               >
-                {statusTitle}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" component="span" sx={{ display: 'block', mt: 0.25 }}>
                 {session.name} · {fmtDate(session.start)} – {fmtDate(session.end)}
               </Typography>
               {afterScheduledSession && !isInSession && (
@@ -314,12 +321,18 @@ export default function HomePage() {
             Know Your Vote Kentucky
           </Typography>
           <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2, maxWidth: 640, fontWeight: 400, lineHeight: 1.5 }}>
-            House and Senate bills, your legislators, and district maps in one place—plain-language context and
-            up-to-date status from public data sources.
+            Browse state bills and follow their progress through the legislative process. Find your legislator on the
+            district map.
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Button component={Link} href="/bills" variant="contained" color="secondary" endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
-              Browse all bills
+            <Button
+              component={Link}
+              href="/bills"
+              variant="contained"
+              color="secondary"
+              endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}
+            >
+              Browse bills
             </Button>
             <Button
               component={Link}
@@ -337,12 +350,6 @@ export default function HomePage() {
               }}
             >
               Search bills
-            </Button>
-            <Button component={Link} href="/bills/house" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
-              House bills
-            </Button>
-            <Button component={Link} href="/bills/senate" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
-              Senate bills
             </Button>
             <Button
               component={Link}
@@ -519,7 +526,7 @@ export default function HomePage() {
                 <HomeCuratedBillList
                   kind="views"
                   title="Most viewed"
-                  caption="Based on how often people open a bill’s detail page. New bills show 0 until someone views them."
+                  caption="Based on how often people open a bill’s detail page."
                   bills={mostViewedBills}
                   emptyMessage="No bills to show yet."
                 />

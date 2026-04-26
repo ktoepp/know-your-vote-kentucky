@@ -172,9 +172,6 @@ function SearchPageContent() {
         <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
           Search Kentucky Government
         </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-          Search state bills (House and Senate).
-        </Typography>
         <DataFreshnessNote variant="page" />
 
         {/* Search Bar */}

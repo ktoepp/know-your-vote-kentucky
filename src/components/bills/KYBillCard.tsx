@@ -1,10 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Box, Chip, Tooltip, Typography } from '@mui/material';
+import { Box, Chip, Tooltip, Typography, Avatar } from '@mui/material';
 import { Check } from '@mui/icons-material';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
+import { memberSlug, normalizeLegislatorPhotoUrl } from '@/lib/ky-member-utils';
 import { SponsorAvatarChip } from '@/components/civic/SponsorAvatarChip';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { ChamberChip, MetaChip } from '@/components/ui/Chip';
@@ -20,6 +22,12 @@ import {
 import { governmentTooltips } from '@/lib/tooltipContent';
 import { getSponsorGroupsFromBill } from '@/lib/ky-bill-sponsors';
 
+function sponsorInitials(name: string) {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
 export interface KYBillCardProps {
   bill: KYBill;
   legislators: KYLegislatorRoster[];
@@ -27,6 +35,7 @@ export interface KYBillCardProps {
 
 /** Bill grid card — matches home page layout (face + hover tooltip). */
 export function KYBillCard({ bill, legislators }: KYBillCardProps) {
+  const router = useRouter();
   const chamber = effectiveBillChamber(bill);
   const statusTooltipKey = billStatusToTooltipKey(bill.status);
   const statusTooltipContent = statusTooltipKey ? governmentTooltips[statusTooltipKey] : null;
@@ -203,38 +212,68 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
     (primarySponsorLine || bill.last_action_date || bill.last_action) ? (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
         {primarySponsorLine && (
-          <Box>
-            <Typography
-              variant="caption"
-              display="block"
-              color="text.secondary"
-              sx={{
-                mb: 0.5,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                fontWeight: 600,
-                fontSize: '0.7rem',
-              }}
-            >
-              {sponsorGroups.primary.length > 1 ? 'Primary sponsors' : 'Primary sponsor'}
-            </Typography>
-            <Typography
-              variant="body2"
-              display="block"
-              color="text.primary"
-              sx={{
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                lineHeight: 1.35,
-                opacity: 0.9,
-              }}
-            >
-              {primarySponsorLine}
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25 }}>
+            <Box sx={{ display: 'flex', flexShrink: 0, flexWrap: 'wrap', alignItems: 'center', gap: 0.75 }}>
+              {sponsorGroups.primary.map((s, i) => {
+                const compact = sponsorGroups.primary.length > 1;
+                return (
+                  <Avatar
+                    key={`${s.name}-${i}`}
+                    src={normalizeLegislatorPhotoUrl(s.photoUrl) || undefined}
+                    imgProps={{ referrerPolicy: 'no-referrer' }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      router.push(`/members/${memberSlug(s.name)}`);
+                    }}
+                    title={s.name}
+                    sx={{
+                      width: compact ? 32 : 40,
+                      height: compact ? 32 : 40,
+                      fontSize: compact ? '0.7rem' : '0.8rem',
+                      cursor: 'pointer',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                    }}
+                  >
+                    {sponsorInitials(s.name)}
+                  </Avatar>
+                );
+              })}
+            </Box>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography
+                variant="caption"
+                display="block"
+                color="text.secondary"
+                sx={{
+                  mb: 0.5,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  fontWeight: 600,
+                  fontSize: '0.7rem',
+                }}
+              >
+                {sponsorGroups.primary.length > 1 ? 'Primary sponsors' : 'Primary sponsor'}
+              </Typography>
+              <Typography
+                variant="body2"
+                display="block"
+                color="text.primary"
+                sx={{
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  lineHeight: 1.35,
+                  opacity: 0.9,
+                }}
+              >
+                {primarySponsorLine}
+              </Typography>
+            </Box>
           </Box>
         )}
         {(bill.last_action_date || bill.last_action) && (
