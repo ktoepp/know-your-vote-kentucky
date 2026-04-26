@@ -42,8 +42,9 @@ import {
   Help as HelpIcon,
   AccountCircle,
   KeyboardArrowDown,
-  Map as MapIcon,
+  EventNote,
 } from '@mui/icons-material';
+import { KentuckyStateIcon } from '@/components/icons/KentuckyStateIcon';
 import { useThemeUtils } from '@/components/ui/ThemeUtils';
 import { useTooltips } from '@/lib/TooltipContext';
 import { useUser } from "../lib/UserContext";
@@ -80,7 +81,13 @@ const navLinks: NavLinkConfig[] = [
   {
     href: '/members/map',
     label: 'District map',
-    icon: <MapIcon />,
+    icon: <KentuckyStateIcon />,
+    priority: 'primary',
+  },
+  {
+    href: '/events',
+    label: 'Meetings',
+    icon: <EventNote />,
     priority: 'primary',
   },
 ];

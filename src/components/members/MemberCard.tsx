@@ -34,6 +34,7 @@ import {
   kyLegislatorAvatarInitials,
   kyLegislatorCampaignWebsite,
   kyLegislatureProfileUrl,
+  kyLegislaturePublicUrl,
   kyMemberTitleShort,
   memberSlug,
   normalizeLegislatorPhotoUrl,
@@ -79,7 +80,10 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
   const governor = isKentuckyGovernor(leg);
   const avatarSize = featured || governor ? 88 : 72;
   const telHref = leg.phone ? `tel:${leg.phone.replace(/[^\d+]/g, '')}` : undefined;
-  const lrcUrl = kyLegislatureProfileUrl(leg);
+  const lrcProfileOnly = kyLegislatureProfileUrl(leg);
+  const lrcPublicUrl = kyLegislaturePublicUrl(leg);
+  const showKyLegislatureButton =
+    (leg.chamber === 'house' || leg.chamber === 'senate' || Boolean(lrcProfileOnly)) && Boolean(lrcPublicUrl);
   const campaignUrl = kyLegislatorCampaignWebsite(leg);
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -191,6 +195,53 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
               </Box>
             </Box>
           )}
+          {!leg.email && lrcPublicUrl && (
+            <Box
+              sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', minWidth: 0 }}
+              aria-label="Capitol contact"
+            >
+              <Email sx={{ fontSize: ICON_REM.nav, color: 'text.disabled', flexShrink: 0, mt: 0.2 }} aria-hidden />
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.45 }}>
+                {lrcProfileOnly ? (
+                  <>
+                    Capitol email and phone:{' '}
+                    <Typography
+                      component="a"
+                      href={lrcProfileOnly}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      color="primary"
+                      fontWeight={600}
+                      sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                    >
+                      official legislature profile
+                    </Typography>
+                    .
+                  </>
+                ) : (
+                  <>
+                    Capitol email and phone: use the{' '}
+                    <Typography
+                      component="a"
+                      href={lrcPublicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      color="primary"
+                      fontWeight={600}
+                      sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                    >
+                      {leg.chamber === 'senate'
+                        ? 'LRC Senate directory'
+                        : leg.chamber === 'house'
+                          ? 'LRC House directory'
+                          : 'Kentucky LRC directory'}
+                    </Typography>
+                    .
+                  </>
+                )}
+              </Typography>
+            </Box>
+          )}
           {leg.phone && (
             <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start' }} aria-label="Phone">
               <Phone sx={{ fontSize: ICON_REM.nav, color: 'text.secondary', flexShrink: 0, mt: 0.2 }} aria-hidden />
@@ -220,13 +271,13 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
           borderColor: 'divider',
         }}
       >
-        {lrcUrl && (
+        {showKyLegislatureButton && lrcPublicUrl && (
           <Button
             component="a"
             size="small"
             variant="text"
             color="inherit"
-            href={lrcUrl}
+            href={lrcPublicUrl}
             target="_blank"
             rel="noopener noreferrer"
             endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}

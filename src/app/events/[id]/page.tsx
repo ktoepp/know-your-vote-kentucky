@@ -60,7 +60,6 @@ import Topic from '@mui/icons-material/Topic';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import BackNavigation from '@/app/components/BackNavigation';
 import NavigationLoader from '@/app/components/NavigationLoader';
-import InteractiveTermTooltip from '@/app/components/InteractiveTermTooltip';
 import { trackEventNavigation, trackUserFlow } from '@/lib/analytics';
 
 import Timeline, { TimelineStage } from '../../components/Timeline';
@@ -154,7 +153,7 @@ function TabPanel(props: TabPanelProps) {
 // Utility function to format bill number with prefix
 const formatBillNumber = (bill: Bill) => {
   if (!bill.number) return 'Unknown Bill';
-  const prefix = bill.chamber === 'senate' ? 'S.' : 'H.R.';
+  const prefix = bill.chamber === 'senate' ? 'SB' : 'HB';
   return `${prefix} ${bill.number}`;
 };
 
@@ -357,39 +356,17 @@ export default function EventDetailPage() {
     });
   };
 
-  // Enhanced tag component with navigation
-  const InteractiveTag = ({ tag, type = 'tag' }: { tag: string; type?: 'tag' | 'topic' | 'speaker' | 'bill' }) => {
-    const isPoliticalTerm = [
-      'filibuster', 'cloture', 'omnibus', 'reconciliation', 'earmark', 
-      'deficit', 'debt ceiling', 'entitlement', 'discretionary spending'
-    ].includes(tag.toLowerCase());
-
-    if (isPoliticalTerm) {
-      return (
-        <InteractiveTermTooltip term={tag.toLowerCase()}>
-          <Chip 
-            label={tag} 
-            size="small" 
-            variant="outlined" 
-            color="primary"
-            onClick={() => navigateToSearch(tag, type)}
-            sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'primary.50' } }}
-          />
-        </InteractiveTermTooltip>
-      );
-    }
-
-    return (
-      <Chip 
-        label={tag} 
-        size="small" 
-        variant="outlined" 
-        color="default"
-        onClick={() => navigateToSearch(tag, type)}
-        sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'grey.50' } }}
-      />
-    );
-  };
+  // Tag component with navigation
+  const InteractiveTag = ({ tag, type = 'tag' }: { tag: string; type?: 'tag' | 'topic' | 'speaker' | 'bill' }) => (
+    <Chip
+      label={tag}
+      size="small"
+      variant="outlined"
+      color="default"
+      onClick={() => navigateToSearch(tag, type)}
+      sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'grey.50' } }}
+    />
+  );
 
   // Enhanced speaker component with navigation
   const InteractiveSpeaker = ({ speaker }: { speaker: any }) => (
@@ -634,22 +611,8 @@ export default function EventDetailPage() {
                 <Typography fontWeight={700}>Detailed Summary & Context</Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <Typography variant="body1" component="div" sx={{ whiteSpace: 'pre-line' }}>
-                  {event.detailedSummary.split(/(filibuster|cloture|omnibus|reconciliation|earmark|deficit|debt ceiling|entitlement|discretionary spending)/gi).map((part, idx) => {
-                    const term = part.toLowerCase();
-                    if ([
-                      'filibuster', 'cloture', 'omnibus', 'reconciliation', 'earmark', 'deficit', 'debt ceiling', 'entitlement', 'discretionary spending',
-                    ].includes(term)) {
-                      return (
-                        <InteractiveTermTooltip key={idx} term={term}>
-                          <span className="relative inline-block cursor-help text-primary-700 font-semibold underline decoration-dotted underline-offset-2">
-                            {part}
-                          </span>
-                        </InteractiveTermTooltip>
-                      );
-                    }
-                    return <span key={idx}>{part}</span>;
-                  })}
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+                  {event.detailedSummary}
                 </Typography>
               </AccordionDetails>
             </Accordion>

@@ -11,28 +11,35 @@ import {
   Alert,
   Paper,
   Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   IconButton,
   ToggleButtonGroup,
   ToggleButton,
   Tooltip,
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
-import { Search, Refresh, Gavel } from '@mui/icons-material';
+import { Cancel, Search, Refresh, Gavel } from '@mui/icons-material';
 import { LayoutGrid, List } from 'lucide-react';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { BillsListTable } from '@/components/bills/BillsListTable';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
-import { compareKyBills, effectiveBillChamber, type KyBillSortKey } from '@/lib/bill-display';
+import { billMatchesBrowseStatusFilter, compareKyBills, effectiveBillChamber, type KyBillSortKey } from '@/lib/bill-display';
+import { billMatchesCommitteeFilter } from '@/lib/ky-committee-utils';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
+import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
+import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
 
-const BROWSE_PAGE_SIZE = 12;
-const LIST_PAGE_SIZE = 25;
+/**
+ * One query loads up to this many rows; client filters/sorts, then `PaginatedSection` paginates 25/50/100.
+ * A full KY session is on the order of ~500–600 bills — well under Supabase’s 1000 per-request cap.
+ */
+const BROWSE_QUERY_ROW_LIMIT = 1000;
 
 function defaultSortDirForKey(key: KyBillSortKey): 'asc' | 'desc' {
   return key === 'last_action_date' || key === 'introduced_date' ? 'desc' : 'asc';
@@ -40,11 +47,10 @@ function defaultSortDirForKey(key: KyBillSortKey): 'asc' | 'desc' {
 
 export type BillsBrowseChamberMode = 'all' | 'house' | 'senate';
 
-/** Shared Supabase query for browse + refresh (house/senate include prefix fallback when `chamber` is null). */
-function applyKyBillsFilters(
+/** Shared Supabase query for browse + refresh (house/senate include prefix fallback when `chamber` is null). Status is never filtered in SQL; use `billMatchesBrowseStatusFilter` in the client. */
+function applyKyBillsQuery(
   chamberMode: BillsBrowseChamberMode,
   chamberFilter: 'all' | 'house' | 'senate',
-  statusFilter: string,
 ) {
   if (!supabase) return null;
   let query = supabase.from('ky_bills').select('*').order('session', { ascending: false }).order('last_action_date', { ascending: false });
@@ -54,10 +60,7 @@ function applyKyBillsFilters(
   } else if (effectiveChamber === 'senate') {
     query = query.or('chamber.eq.senate,bill_number.ilike.S%');
   }
-  if (statusFilter !== 'all') {
-    query = query.eq('status', statusFilter);
-  }
-  return query.limit(100);
+  return query.limit(BROWSE_QUERY_ROW_LIMIT);
 }
 
 export interface BillsBrowseProps {
@@ -75,10 +78,13 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
     chamberMode === 'all' ? 'all' : chamberMode,
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [committeeFilter, setCommitteeFilter] = useState('');
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
+  const { committees: committeeOptions } = useKyBillCommittees();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [sortBy, setSortBy] = useState<KyBillSortKey>('last_action_date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const { pageSize, setPageSize } = usePersistedPageSize('bills', 25);
 
   useEffect(() => {
     if (!supabase) return;
@@ -101,7 +107,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
       setLoading(true);
       setError(null);
       try {
-        const query = applyKyBillsFilters(chamberMode, chamberFilter, statusFilter);
+        const query = applyKyBillsQuery(chamberMode, chamberFilter);
         if (!query) {
           if (!cancelled) setLoading(false);
           return;
@@ -123,11 +129,17 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
     return () => {
       cancelled = true;
     };
-  }, [chamberMode, chamberFilter, statusFilter]);
+  }, [chamberMode, chamberFilter]);
 
   const filteredBills = bills.filter((bill) => {
     if (chamberMode === 'all' && chamberFilter !== 'all') {
       if (effectiveBillChamber(bill) !== chamberFilter) return false;
+    }
+    if (!billMatchesBrowseStatusFilter(bill, statusFilter)) {
+      return false;
+    }
+    if (!billMatchesCommitteeFilter(bill, committeeFilter)) {
+      return false;
     }
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -138,7 +150,8 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
       bill.ai_summary?.toLowerCase().includes(q) ||
       bill.session?.toLowerCase().includes(q) ||
       bill.last_action?.toLowerCase().includes(q) ||
-      bill.status?.toLowerCase().includes(q)
+      bill.status?.toLowerCase().includes(q) ||
+      (bill.committee_name || '').toLowerCase().includes(q)
     );
   });
 
@@ -163,10 +176,14 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
     [sortBy],
   );
 
-  const pageSize = viewMode === 'list' ? LIST_PAGE_SIZE : BROWSE_PAGE_SIZE;
-  const browsePagerResetKey = `${searchQuery}|${chamberFilter}|${statusFilter}|${viewMode}|${sortBy}|${sortDir}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
+  const browsePagerResetKey = `${searchQuery}|${chamberFilter}|${statusFilter}|${committeeFilter}|${viewMode}|${sortBy}|${sortDir}|${pageSize}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
 
   const showChamberSelect = chamberMode === 'all';
+
+  const committeeFilterLabel = useMemo(() => {
+    if (!committeeFilter) return '';
+    return committeeOptions.find((c) => c.slug === committeeFilter)?.label ?? committeeFilter.replace(/-/g, ' ');
+  }, [committeeFilter, committeeOptions]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -186,8 +203,8 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
           </Alert>
         )}
 
-        <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
+        <Paper elevation={1} sx={{ p: 2, mb: 1.5, borderRadius: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: { md: 'flex-start' } }}>
             <TextField
               fullWidth
               placeholder="Search by bill number, title, session, status, or summary..."
@@ -201,82 +218,177 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
                 ),
               }}
               size="small"
+              sx={{ mt: { md: 2.75 } }}
             />
-            {showChamberSelect && (
-              <FormControl size="small" sx={{ minWidth: 140 }}>
-                <InputLabel>Chamber</InputLabel>
-                <Select
-                  value={chamberFilter}
-                  onChange={(e) => setChamberFilter(e.target.value as 'all' | 'house' | 'senate')}
-                  label="Chamber"
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, flexShrink: 0 }}>
+              {showChamberSelect && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Chamber
+                  </Typography>
+                  <ToggleButtonGroup
+                    value={chamberFilter}
+                    exclusive
+                    size="small"
+                    onChange={(_, v) => { if (v !== null) setChamberFilter(v); }}
+                    aria-label="Filter by chamber"
+                  >
+                    <ToggleButton value="all">All</ToggleButton>
+                    <ToggleButton value="house">House</ToggleButton>
+                    <ToggleButton value="senate">Senate</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+              )}
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Status
+                </Typography>
+                <ToggleButtonGroup
+                  value={statusFilter}
+                  exclusive
+                  size="small"
+                  onChange={(_, v) => { if (v !== null) setStatusFilter(v); }}
+                  aria-label="Filter by status"
+                  sx={{ flexWrap: 'wrap' }}
                 >
-                  <MenuItem value="all">All Chambers</MenuItem>
-                  <MenuItem value="house">House</MenuItem>
-                  <MenuItem value="senate">Senate</MenuItem>
-                </Select>
-              </FormControl>
-            )}
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>Status</InputLabel>
-              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} label="Status">
-                <MenuItem value="all">All Statuses</MenuItem>
-                <MenuItem value="introduced">Introduced</MenuItem>
-                <MenuItem value="in_committee">In Committee</MenuItem>
-                <MenuItem value="passed_one_chamber">Passed One Chamber</MenuItem>
-                <MenuItem value="passed">Passed</MenuItem>
-                <MenuItem value="signed">Signed</MenuItem>
-                <MenuItem value="vetoed">Vetoed</MenuItem>
-              </Select>
-            </FormControl>
-            <Tooltip title="Grid or list">
-              <ToggleButtonGroup
-                size="small"
-                exclusive
-                value={viewMode}
-                onChange={(_, v) => v && setViewMode(v)}
-                aria-label="View mode"
-                sx={{ flexShrink: 0 }}
-              >
-                <ToggleButton value="grid" aria-label="Grid view">
-                  <LayoutGrid size={18} strokeWidth={2} />
-                </ToggleButton>
-                <ToggleButton value="list" aria-label="List view">
-                  <List size={18} strokeWidth={2} />
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Tooltip>
-            <IconButton
-              onClick={() => {
-                void (async () => {
-                  setLoading(true);
-                  setError(null);
-                  try {
-                    const query = applyKyBillsFilters(chamberMode, chamberFilter, statusFilter);
-                    if (!query) {
-                      setLoading(false);
-                      return;
-                    }
-                    const { data, error: fetchError } = await withTimeout(
-                      query,
-                      30_000,
-                      'Loading bills timed out. Check Supabase or your network.',
-                    );
-                    if (fetchError) throw fetchError;
-                    setBills(data || []);
-                  } catch (err: any) {
-                    setError(err.message || 'Failed to load bills');
-                  } finally {
-                    setLoading(false);
-                  }
-                })();
-              }}
-              disabled={loading}
-              aria-label="Refresh bills"
-            >
-              <Refresh />
-            </IconButton>
+                  <ToggleButton value="all">All</ToggleButton>
+                  <ToggleButton value="introduced">Intro</ToggleButton>
+                  <ToggleButton value="in_committee">Cmte</ToggleButton>
+                  <ToggleButton value="passed_one_chamber">1 Chamber</ToggleButton>
+                  <ToggleButton value="passed">Passed</ToggleButton>
+                  <ToggleButton value="signed">Signed</ToggleButton>
+                  <ToggleButton value="vetoed">Vetoed</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Committee
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel id="browse-committee-label">Committee</InputLabel>
+                  <Select
+                    labelId="browse-committee-label"
+                    label="Committee"
+                    value={committeeFilter}
+                    onChange={(e) => setCommitteeFilter(e.target.value)}
+                  >
+                    <MenuItem value="">All committees</MenuItem>
+                    {committeeOptions.map((c) => (
+                      <MenuItem key={c.slug} value={c.slug}>
+                        {c.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end', pb: 0.25 }}>
+                <Tooltip title="Grid or list">
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={viewMode}
+                    onChange={(_, v) => v && setViewMode(v)}
+                    aria-label="View mode"
+                    sx={{ flexShrink: 0 }}
+                  >
+                    <ToggleButton value="grid" aria-label="Grid view">
+                      <LayoutGrid size={18} strokeWidth={2} />
+                    </ToggleButton>
+                    <ToggleButton value="list" aria-label="List view">
+                      <List size={18} strokeWidth={2} />
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Tooltip>
+                <IconButton
+                  onClick={() => {
+                    void (async () => {
+                      setLoading(true);
+                      setError(null);
+                      try {
+                        const query = applyKyBillsQuery(chamberMode, chamberFilter);
+                        if (!query) {
+                          setLoading(false);
+                          return;
+                        }
+                        const { data, error: fetchError } = await withTimeout(
+                          query,
+                          30_000,
+                          'Loading bills timed out. Check Supabase or your network.',
+                        );
+                        if (fetchError) throw fetchError;
+                        setBills(data || []);
+                      } catch (err: any) {
+                        setError(err.message || 'Failed to load bills');
+                      } finally {
+                        setLoading(false);
+                      }
+                    })();
+                  }}
+                  disabled={loading}
+                  aria-label="Refresh bills"
+                >
+                  <Refresh />
+                </IconButton>
+              </Box>
+            </Box>
           </Box>
         </Paper>
+
+        {/* Active filter chips */}
+        {(chamberFilter !== 'all' || statusFilter !== 'all' || committeeFilter || searchQuery) && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
+              Active filters:
+            </Typography>
+            {showChamberSelect && chamberFilter !== 'all' && (
+              <Chip
+                label={chamberFilter === 'house' ? 'House' : 'Senate'}
+                size="small"
+                onDelete={() => setChamberFilter('all')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {statusFilter !== 'all' && (
+              <Chip
+                label={{ introduced: 'Introduced', in_committee: 'In committee', passed_one_chamber: 'Passed one chamber', passed: 'Passed', signed: 'Signed', vetoed: 'Vetoed' }[statusFilter] ?? statusFilter}
+                size="small"
+                onDelete={() => setStatusFilter('all')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {committeeFilter && (
+              <Chip
+                label={committeeFilterLabel}
+                size="small"
+                onDelete={() => setCommitteeFilter('')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {searchQuery && (
+              <Chip
+                label={`"${searchQuery}"`}
+                size="small"
+                onDelete={() => setSearchQuery('')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            <Chip
+              label="Clear all"
+              size="small"
+              onClick={() => { setChamberFilter('all'); setStatusFilter('all'); setCommitteeFilter(''); setSearchQuery(''); }}
+              variant="outlined"
+              sx={{ ml: 0.5 }}
+            />
+          </Box>
+        )}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Gavel sx={{ fontSize: '1.2rem', color: 'primary.main' }} />
@@ -308,6 +420,8 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
           <PaginatedSection
             items={sortedBills}
             pageSize={pageSize}
+            pageSizeOptions={[...PAGE_SIZE_CHOICES]}
+            onPageSizeChange={(n) => setPageSize(toPageSizeChoice(n))}
             resetKey={browsePagerResetKey}
             variant="pagination"
           >

@@ -24,6 +24,7 @@ import {
   splitLegistarMatterTitleAndDescription,
 } from './legistar-matter';
 import {
+  extractOpenStatesContactDetails,
   extractOpenStatesLegislatorWebLinks,
   openStatesCurrentRole,
   openStatesLegislatorNames,
@@ -73,6 +74,34 @@ function mapLegiScanStatus(statusCode: number, lastAction: string): string {
   if (action.includes('committee') || action.includes('referred to')) return 'In Committee';
   if (action.includes('introduced') || action.includes('filed')) return 'Introduced';
   return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';
+}
+
+/** LegiScan getBill `committee` (object or occasional array) → `ky_bills` committee columns. */
+function committeeFieldsFromLegiScanDetail(detail: LegiScanBillDetail | null): {
+  committee_legiscan_id: number | null;
+  committee_name: string | null;
+} {
+  if (!detail) {
+    return { committee_legiscan_id: null, committee_name: null };
+  }
+  const raw = detail.committee as
+    | { committee_id?: number; name?: string }
+    | { committee_id?: number; name?: string }[]
+    | null
+    | undefined;
+  let c: { committee_id?: number; name?: string } | null = null;
+  if (Array.isArray(raw)) {
+    c = raw[0] ?? null;
+  } else if (raw && typeof raw === 'object') {
+    c = raw;
+  }
+  if (!c?.name?.trim()) {
+    return { committee_legiscan_id: null, committee_name: null };
+  }
+  return {
+    committee_legiscan_id: c.committee_id != null ? Number(c.committee_id) : null,
+    committee_name: c.name.trim(),
+  };
 }
 
 /** Derive chamber from bill number prefix (HB/HR = house, SB/SR = senate). */
@@ -334,9 +363,10 @@ async function buildBillRowsForSession(
     let sponsors: unknown = null;
     let introducedDate: string | null = null;
     let detailFetched = false;
+    let detail: LegiScanBillDetail | null = null;
     if (!skipSponsors) {
       try {
-        const detail = await client.fetchBillDetail(bill.bill_id);
+        detail = await client.fetchBillDetail(bill.bill_id);
         if (detail) {
           detailFetched = true;
           if (detail.sponsors?.length) {
@@ -372,6 +402,7 @@ async function buildBillRowsForSession(
     // otherwise omit the key to preserve any value populated by a prior enrich run.
     if (detailFetched) {
       row.introduced_date = introducedDate;
+      Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
     }
     rows.push(row);
     if (!skipSponsors && (i + 1) % 25 === 0) {
@@ -412,9 +443,10 @@ async function buildBillRowsQuotaSession(
     let sponsors: unknown = null;
     let introducedDate: string | null = null;
     let detailFetched = false;
+    let detail: LegiScanBillDetail | null = null;
     if (enrichIds.has(bill.bill_id)) {
       try {
-        const detail = await client.fetchBillDetail(bill.bill_id);
+        detail = await client.fetchBillDetail(bill.bill_id);
         if (detail) {
           detailFetched = true;
           if (detail.sponsors?.length) sponsors = detail.sponsors;
@@ -456,6 +488,7 @@ async function buildBillRowsQuotaSession(
     // otherwise omit the key to preserve any value populated by a prior enrich run.
     if (detailFetched) {
       row.introduced_date = introducedDate;
+      Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
     }
     rows.push(row);
   }
@@ -580,9 +613,10 @@ async function syncKyBillsByHash(
       let sponsors: unknown = null;
       let introducedDate: string | null = null;
       let detailFetched = false;
+      let detail: LegiScanBillDetail | null = null;
       if (!skipSponsors) {
         try {
-          const detail = await client.fetchBillDetail(raw.bill_id);
+          detail = await client.fetchBillDetail(raw.bill_id);
           if (detail) {
             detailFetched = true;
             if (detail.sponsors?.length) sponsors = detail.sponsors;
@@ -610,7 +644,10 @@ async function syncKyBillsByHash(
         updated_from_legiscan_at: new Date().toISOString(),
       };
       if (!skipSponsors) row.sponsors = sponsors;
-      if (detailFetched) row.introduced_date = introducedDate;
+      if (detailFetched) {
+        row.introduced_date = introducedDate;
+        Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
+      }
       rows.push(row);
       if (!skipSponsors && (i + 1) % 25 === 0) {
         log(source, `Hash-gated enrich ${i + 1}/${changedOrNew.length}`);
@@ -856,6 +893,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       const district = cr?.district != null && cr.district !== '' ? String(cr.district) : null;
       const { lrcProfileUrl, otherWebsiteUrl } = extractOpenStatesLegislatorWebLinks(leg);
       const { first_name, last_name } = openStatesLegislatorNames(leg);
+      const { email, phone } = extractOpenStatesContactDetails(leg);
       return {
         openstates_id: leg.id,
         name: leg.name,
@@ -866,7 +904,8 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         role_title: cr?.title?.trim() || null,
         district,
         photo_url: normalizeLegislatorPhotoUrl(leg.image) || null,
-        email: leg.email || null,
+        email,
+        phone,
         lrc_profile_url: lrcProfileUrl,
         website: otherWebsiteUrl,
         active: true,

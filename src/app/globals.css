@@ -466,10 +466,20 @@ nav.nav-container input[type="search"]::placeholder {
   }
 }
 
-/* Tooltip styles */
+/* Tooltip styles — trigger wrapper; popover is portaled to body (see Tooltip.tsx) */
 .tooltip-container {
   position: relative;
-  display: inline-block;
+  display: inline;
+}
+
+/* Portaled floating layer (class used by src/components/ui/Tooltip.tsx) */
+.ky-tooltip-surface {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: opacity 0.2s, visibility 0.2s;
+  box-sizing: border-box;
 }
 
 .tooltip-content {
@@ -482,7 +492,10 @@ nav.nav-container input[type="search"]::placeholder {
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 0.875rem;
-  white-space: nowrap;
+  max-width: min(28rem, calc(100vw - 1rem));
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s, visibility 0.3s;

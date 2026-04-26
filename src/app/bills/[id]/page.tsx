@@ -54,7 +54,15 @@ import {
   memberProfilePath,
   normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
+import {
+  ballotpediaKyVoteSearchUrl,
+  legiscanRollCallPublicUrl,
+  normalizeBallotpediaHref,
+} from '@/lib/external-legislative-links';
 import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-tokens';
+import { useTooltips } from '@/lib/TooltipContext';
+import { BillHistoryActionText } from '@/components/bills/BillHistoryActionText';
+import { LegislativeStageTooltip } from '@/components/ui/LegislativeStageTooltip';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                */
@@ -151,7 +159,9 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
   const theme = useTheme();
   const photo = normalizeLegislatorPhotoUrl(rosterPhoto || sponsor.bio?.social?.image);
   const memberHref = memberProfilePath({ name: sponsor.name, id: sponsor.name });
-  const ballotpediaUrl = sponsor.bio?.social?.ballotpedia || (sponsor.ballotpedia ? `https://ballotpedia.org/${sponsor.ballotpedia}` : null);
+  const rawBallotpedia = sponsor.bio?.social?.ballotpedia ?? sponsor.ballotpedia;
+  const ballotpediaUrl =
+    rawBallotpedia != null && String(rawBallotpedia).trim() !== '' ? normalizeBallotpediaHref(String(rawBallotpedia)) : null;
   const kyProfileUrl = sponsor.bio?.social?.biography;
   const isPrimary = sponsor.sponsor_type_id === 1;
 
@@ -162,7 +172,7 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
           <MuiAvatar
             src={photo || undefined}
             imgProps={{ referrerPolicy: 'no-referrer' }}
-            sx={{ width: 52, height: 52, flexShrink: 0 }}
+            sx={{ width: 78, height: 78, flexShrink: 0 }}
           >
             {sponsor.first_name?.[0]}{sponsor.last_name?.[0]}
           </MuiAvatar>
@@ -253,6 +263,7 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
 
 function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
   const theme = useTheme();
+  const { tooltipsEnabled } = useTooltips();
   const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
 
   return (
@@ -290,9 +301,20 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
                   {item.chamber === 'H' ? 'House' : item.chamber === 'S' ? 'Senate' : item.chamber}
                 </Box>
               </Typography>
-              <Typography variant="body2" color={isImportant ? 'text.primary' : 'text.secondary'} fontWeight={isImportant ? 500 : 400}>
-                {formatBillLabelText(item.action)}
-                {!isImportant && (
+              <Typography component="div" variant="body2" color={isImportant ? 'text.primary' : 'text.secondary'} fontWeight={isImportant ? 500 : 400}>
+                <BillHistoryActionText text={item.action} />
+                {!isImportant && tooltipsEnabled && (
+                  <LegislativeStageTooltip stage="clerical" showIcon={false} position="top">
+                    <Box
+                      component="span"
+                      sx={{ color: 'text.disabled', fontWeight: 400, cursor: 'help', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
+                    >
+                      {' '}
+                      (clerical)
+                    </Box>
+                  </LegislativeStageTooltip>
+                )}
+                {!isImportant && !tooltipsEnabled && (
                   <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>
                     {' '}
                     (clerical)
@@ -560,8 +582,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
 
             {bill.last_action && (
               <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
-                <Typography variant="body1" fontWeight={500} sx={{ fontSize: '1.02rem' }}>
-                  {formatBillLabelText(bill.last_action)}
+                <Typography component="div" variant="body1" fontWeight={500} sx={{ fontSize: '1.02rem' }}>
+                  <BillHistoryActionText text={bill.last_action} component="div" />
                 </Typography>
               </Box>
             )}
@@ -654,10 +676,20 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
           </MuiGrid>
 
           {/* Right column */}
-          <MuiGrid item xs={12} md={4}>
+          <MuiGrid
+            item
+            xs={12}
+            md={4}
+            sx={{
+              '& > .MuiCard:nth-of-type(2) .MuiCardContent': {
+                py: 1,
+                px: 2,
+              },
+            }}
+          >
             {/* Sponsors */}
             {primarySponsors.length > 0 && (
-              <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+              <MuiCard elevation={0} sx={{ mb: 3, borderRadius: 3, boxShadow: 'none', border: 'none' }}>
                 <MuiCardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                     <Person color="primary" sx={{ fontSize: ICON_REM.section }} />
@@ -693,6 +725,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     {coSponsors.map((s) => {
                       const coHref = memberProfilePath({ name: s.name, id: s.name });
+                      const coBp = normalizeBallotpediaHref(s.bio?.social?.ballotpedia ?? s.ballotpedia);
                       const coPhoto = normalizeLegislatorPhotoUrl(
                         matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
                           matchLegislatorBySponsorName(legislators, s.name)?.photo_url ??
@@ -703,7 +736,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                         <MuiAvatar
                           src={coPhoto || undefined}
                           imgProps={{ referrerPolicy: 'no-referrer' }}
-                          sx={{ width: 36, height: 36, flexShrink: 0 }}
+                          sx={{ width: 54, height: 54, flexShrink: 0 }}
                         >
                           {s.first_name?.[0]}{s.last_name?.[0]}
                         </MuiAvatar>
@@ -734,10 +767,10 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                               sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(s.party), color: '#fff' }}
                             />
                             <MuiChip label="Co sponsor" size="small" color="primary" sx={CHIP.compact} />
-                            {s.bio?.social?.ballotpedia && (
+                            {coBp && (
                               <MuiButton
                                 size="small"
-                                href={s.bio.social.ballotpedia}
+                                href={coBp}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
@@ -764,28 +797,80 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                     <HowToVote color="primary" sx={{ fontSize: ICON_REM.section }} />
                     <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>Votes</Typography>
                   </Box>
-                  {detail.votes.map((v: any, i: number) => (
-                    <Box key={i} sx={{ mb: i < detail.votes.length - 1 ? 1.5 : 0, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.background.default, 0.5), border: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="caption" color="text.secondary" display="block">{fmtDate(v.date)}</Typography>
-                      <Typography variant="body2" fontWeight={500} gutterBottom>{v.desc}</Typography>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        {(['yea', 'nay'] as const).map((key) => {
-                          const tip = voteCountTooltips[key];
-                          const chip = <MuiChip key={key} label={key === 'yea' ? `Yea: ${v.yea}` : `Nay: ${v.nay}`} size="small" color={key === 'yea' ? 'success' : 'error'} />;
-                          return tip ? (
-                            <MuiTooltip key={key} title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{tip.title}</Typography><Typography variant="body2">{tip.content}</Typography></Box>} arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 300, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}>{chip}</MuiTooltip>
-                          ) : chip;
-                        })}
-                        {v.nv > 0 && (() => {
-                          const tip = voteCountTooltips['nv'];
-                          const chip = <MuiChip label={`NV: ${v.nv}`} size="small" variant="outlined" />;
-                          return tip ? (
-                            <MuiTooltip title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{tip.title}</Typography><Typography variant="body2">{tip.content}</Typography></Box>} arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 300, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}>{chip}</MuiTooltip>
-                          ) : chip;
-                        })()}
+                  {detail.votes.map((v: any, i: number) => {
+                    const rollId = v.roll_call_id as number | undefined;
+                    const legiscanVoteUrl =
+                      rollId != null && Number.isFinite(Number(rollId))
+                        ? legiscanRollCallPublicUrl(bill.bill_number, Number(rollId))
+                        : null;
+                    const ballotpediaVoteUrl = ballotpediaKyVoteSearchUrl(
+                      bill.bill_number,
+                      String(v.desc ?? ''),
+                      String(v.date ?? ''),
+                    );
+                    const rowKey = rollId != null ? `rc-${rollId}` : `vote-${i}`;
+                    return (
+                      <Box
+                        key={rowKey}
+                        sx={{
+                          mb: i < detail.votes.length - 1 ? 1.5 : 0,
+                          p: 1.5,
+                          borderRadius: 2,
+                          bgcolor: alpha(theme.palette.background.default, 0.5),
+                          border: `1px solid ${theme.palette.divider}`,
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {fmtDate(v.date)}
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500} gutterBottom>
+                          {v.desc}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1.25 }}>
+                          {(['yea', 'nay'] as const).map((key) => {
+                            const tip = voteCountTooltips[key];
+                            const chip = <MuiChip key={key} label={key === 'yea' ? `Yea: ${v.yea}` : `Nay: ${v.nay}`} size="small" color={key === 'yea' ? 'success' : 'error'} />;
+                            return tip ? (
+                              <MuiTooltip key={key} title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{tip.title}</Typography><Typography variant="body2">{tip.content}</Typography></Box>} arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 300, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}>{chip}</MuiTooltip>
+                            ) : chip;
+                          })}
+                          {v.nv > 0 && (() => {
+                            const tip = voteCountTooltips['nv'];
+                            const chip = <MuiChip label={`NV: ${v.nv}`} size="small" variant="outlined" />;
+                            return tip ? (
+                              <MuiTooltip title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{tip.title}</Typography><Typography variant="body2">{tip.content}</Typography></Box>} arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 300, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}>{chip}</MuiTooltip>
+                            ) : chip;
+                          })()}
+                        </Box>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                          {legiscanVoteUrl && (
+                            <MuiButton
+                              component="a"
+                              size="small"
+                              variant="outlined"
+                              href={legiscanVoteUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                            >
+                              LegiScan roll call
+                            </MuiButton>
+                          )}
+                          <MuiButton
+                            component="a"
+                            size="small"
+                            variant={legiscanVoteUrl ? 'text' : 'outlined'}
+                            href={ballotpediaVoteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                          >
+                            Ballotpedia
+                          </MuiButton>
+                        </Box>
                       </Box>
-                    </Box>
-                  ))}
+                    );
+                  })}
                 </MuiCardContent>
               </MuiCard>
             )}

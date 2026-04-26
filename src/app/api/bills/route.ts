@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
 import { parseLimit, parseEnum, ValidationError } from '@/lib/api-validation';
+import { billMatchesBrowseStatusFilter, BROWSE_STATUS_BUCKETS } from '@/lib/bill-display';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,14 +20,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const needBucketFilter = status && BROWSE_STATUS_BUCKETS.has(status);
+    const fetchLimit = needBucketFilter ? Math.min(1000, Math.max(limit, 200)) : limit;
+
     let query = supabase
       .from('ky_bills')
       .select('*')
       .order('last_action_date', { ascending: false })
-      .limit(limit);
+      .limit(fetchLimit);
 
     if (chamber) query = query.eq('chamber', chamber);
-    if (status) query = query.eq('status', status);
 
     const { data, error } = await query;
 
@@ -35,11 +38,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    let rows = data || [];
+    if (status) {
+      rows = rows.filter((b) => billMatchesBrowseStatusFilter(b, status));
+    }
+    if (rows.length > limit) {
+      rows = rows.slice(0, limit);
+    }
+
     return NextResponse.json({
       updated: new Date().toISOString(),
-      bills: data || [],
+      bills: rows,
       source: 'supabase',
-      count: (data || []).length,
+      count: rows.length,
     });
   } catch (error) {
     if (error instanceof ValidationError) {

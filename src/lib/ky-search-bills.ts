@@ -1,24 +1,40 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { KYBill, KYOrdinance, KYSchoolBoardItem } from '@/types/kentucky';
-import { effectiveBillChamber } from '@/lib/bill-display';
+import { billMatchesBrowseStatusFilter, effectiveBillChamber } from '@/lib/bill-display';
+import { billMatchesCommitteeFilter } from '@/lib/ky-committee-utils';
 
 /** Optional filters (URL: chamber, dateRange, status, committee). */
 export type KyBillSearchFilters = {
   chamber?: 'house' | 'senate';
   dateRange?: string;
-  /** Exact `ky_bills.status` match; omit or `all` for any. */
+  /**
+   * Status bucket: `introduced` | `in_committee` | `passed_one_chamber` | `passed` | `signed` | `vetoed` | `all`.
+   * Matched in memory (DB stores LegiScan labels, not these keys). Unknown values fall back to `status` equality.
+   */
   status?: string;
-  /** SearchBar committee slug — matched loosely on title / last_action. */
+  /**
+   * Committee filter slug (from {@link committeeSlugFromName}); matches `ky_bills.committee_name`
+   * when synced, with legacy keyword fallback on title/last_action.
+   */
   committee?: string;
 };
 
-const COMMITTEE_SLUG_HINTS: Record<string, string> = {
-  appropriations: 'appropriation',
-  budget: 'budget',
-  finance: 'finance',
-  'foreign-relations': 'foreign',
-  judiciary: 'judiciary',
-};
+/**
+ * Query params (same as `/search` URL): `chamber`, `dateRange`, `status`, `committee`.
+ * `status` values are UI buckets, resolved by {@link billMatchesBrowseStatusFilter}.
+ */
+export function buildKyBillSearchFiltersFromUrlSearch(
+  sp: Readonly<URLSearchParams> | { get(name: string): string | null },
+): KyBillSearchFilters {
+  const ch = sp.get('chamber');
+  const st = sp.get('status');
+  return {
+    chamber: ch === 'house' || ch === 'senate' ? ch : undefined,
+    dateRange: sp.get('dateRange') || undefined,
+    status: st && st !== 'all' ? st : undefined,
+    committee: sp.get('committee') || undefined,
+  };
+}
 
 function kyBillsSearchSelect(supabase: SupabaseClient, filters: KyBillSearchFilters) {
   let q = supabase.from('ky_bills').select('*');
@@ -26,9 +42,6 @@ function kyBillsSearchSelect(supabase: SupabaseClient, filters: KyBillSearchFilt
     q = q.or('chamber.eq.house,bill_number.ilike.H%');
   } else if (filters.chamber === 'senate') {
     q = q.or('chamber.eq.senate,bill_number.ilike.S%');
-  }
-  if (filters.status && filters.status !== 'all') {
-    q = q.eq('status', filters.status);
   }
   return q;
 }
@@ -61,16 +74,6 @@ export function filterKyBillsByDateRange(bills: KYBill[], dateRange: string | un
     if (!raw) return false;
     return new Date(raw).getTime() >= min.getTime();
   });
-}
-
-function filterKyBillsByCommitteeSlug(bills: KYBill[], committeeSlug: string | undefined): KYBill[] {
-  const hint = committeeSlug ? COMMITTEE_SLUG_HINTS[committeeSlug] : undefined;
-  if (!hint) return bills;
-  const h = hint.toLowerCase();
-  return bills.filter(
-    (b) =>
-      (b.last_action || '').toLowerCase().includes(h) || (b.title || '').toLowerCase().includes(h),
-  );
 }
 
 /** When DB `chamber` is null, infer from bill number so filters still work. */
@@ -115,12 +118,14 @@ export async function fetchKyBillsMatchingSearch(
   const safe = q.trim();
   if (!safe) return [];
 
+  /** Was 120 and capped merge results too low; KY session-scale search needs room for 25/50/100 per page. */
   const mergeCap = Math.min(
-    120,
+    1000,
     Math.max(
       limit,
       filters.committee || filters.dateRange ? limit * 4 : limit,
       filters.chamber ? limit * 3 : limit,
+      filters.committee || (filters.status && filters.status !== 'all') ? limit * 6 : limit,
     ),
   );
 
@@ -150,9 +155,14 @@ export async function fetchKyBillsMatchingSearch(
   );
 
   merged = filterKyBillsByDateRange(merged, filters.dateRange);
-  merged = filterKyBillsByCommitteeSlug(merged, filters.committee);
+  if (filters.committee) {
+    merged = merged.filter((b) => billMatchesCommitteeFilter(b, filters.committee));
+  }
   if (filters.chamber === 'house' || filters.chamber === 'senate') {
     merged = filterKyBillsByChamberClient(merged, filters.chamber);
+  }
+  if (filters.status && filters.status !== 'all') {
+    merged = merged.filter((b) => billMatchesBrowseStatusFilter(b, filters.status));
   }
 
   return merged.slice(0, limit);

@@ -1,4 +1,5 @@
 import type { KYLegislator, KYLegislatorRoster } from '@/types/kentucky';
+import { parseKyDistrictNumber } from '@/lib/ky-district-geo';
 import { formatBillLabelText, formatPartyLetterAbbrev } from '@/lib/bill-display';
 
 /** Two-letter initials for `Avatar` when photo is missing (uses first/last or parses `name`). */
@@ -125,13 +126,7 @@ export function findLegislatorByProfileSlug(
   return null;
 }
 
-/**
- * Ballotpedia search for this person (we don't store slugs). "Kentucky" narrows results.
- */
-export function ballotpediaMemberSearchUrl(displayName: string): string {
-  const q = encodeURIComponent(`${displayName.trim()} Kentucky`);
-  return `https://ballotpedia.org/Special:Search?search=${q}`;
-}
+export { ballotpediaMemberSearchUrl } from './external-legislative-links';
 
 /** Kentucky LRC / legislature.ky.gov profile URL when stored or legacy `website` points there. */
 export function kyLegislatureProfileUrl(leg: {
@@ -156,6 +151,68 @@ export function kyLegislatorCampaignWebsite(leg: {
   return w;
 }
 
+/** Official LRC listings when a direct profile URL is unknown (still better than a missing footer link). */
+export const KY_LEGISLATURE_HOUSE_ROSTER_URL = 'https://apps.legislature.ky.gov/Legislators/hmembers_alpha.html';
+export const KY_LEGISLATURE_SENATE_ROSTER_URL = 'https://apps.legislature.ky.gov/Legislators/smembers_alpha.html';
+
+/**
+ * Direct legislature.ky.gov profile when stored, else chamber roster on apps.legislature.ky.gov
+ * so every House/Senate card can offer a consistent "KY Legislature" target.
+ */
+export function kyLegislaturePublicUrl(leg: {
+  chamber?: 'house' | 'senate' | null;
+  lrc_profile_url?: string | null;
+  website?: string | null;
+}): string | null {
+  const direct = kyLegislatureProfileUrl(leg);
+  if (direct) return direct;
+  if (leg.chamber === 'house') return KY_LEGISLATURE_HOUSE_ROSTER_URL;
+  if (leg.chamber === 'senate') return KY_LEGISLATURE_SENATE_ROSTER_URL;
+  return 'https://legislature.ky.gov/Legislators';
+}
+
+/**
+ * Deduplicate `ky_legislators` rows that refer to the same person (e.g. LegiScan-seeded row
+ * plus Open States–synced row: separate unique keys on `legiscan_id` vs `openstates_id`).
+ * Prefers the row with Open States id and richer contact / photo / LRC data.
+ */
+export function dedupeKyLegislators(legislators: KYLegislator[]): KYLegislator[] {
+  function keyFor(leg: KYLegislator): string {
+    const nameK = normalizeSponsorNameForMatch(
+      leg.name || [leg.first_name, leg.last_name].filter(Boolean).join(' '),
+    );
+    const d = parseKyDistrictNumber(leg.district) || (leg.district || '').trim().toLowerCase();
+    const ch = leg.chamber ?? 'none';
+    return `${ch}\0${d}\0${nameK}`;
+  }
+  function score(leg: KYLegislator): number {
+    let s = 0;
+    if (leg.openstates_id) s += 200;
+    if (leg.legiscan_id) s += 100;
+    if (leg.lrc_profile_url) s += 40;
+    if (leg.email) s += 25;
+    if (leg.phone) s += 25;
+    if (leg.photo_url) s += 25;
+    if (leg.first_name && leg.last_name) s += 5;
+    return s;
+  }
+  const byKey = new Map<string, KYLegislator>();
+  for (const leg of legislators) {
+    const k = keyFor(leg);
+    const prev = byKey.get(k);
+    if (!prev) {
+      byKey.set(k, leg);
+      continue;
+    }
+    if (score(leg) > score(prev)) {
+      byKey.set(k, leg);
+    } else if (score(leg) === score(prev) && leg.openstates_id && !prev.openstates_id) {
+      byKey.set(k, leg);
+    }
+  }
+  return Array.from(byKey.values());
+}
+
 /**
  * True only for the elected Kentucky governor (used for the Governor tag and section).
  * Update name matching when the officeholder changes.
@@ -177,6 +234,17 @@ export function isKentuckyGovernor(leg: {
   return firstMatches;
 }
 
+/** Unify "Rep" / "Sen" API strings with full titles used when `role_title` is absent. */
+function normalizeChamberTitleForDisplay(
+  leg: { chamber?: 'house' | 'senate' | null; role_title?: string | null },
+  formatted: string,
+): string {
+  const t = formatted.trim();
+  if (leg.chamber === 'house' && /^(rep|rep\.)$/i.test(t)) return 'Representative';
+  if (leg.chamber === 'senate' && /^(sen|sen\.)$/i.test(t)) return 'Senator';
+  return formatted;
+}
+
 /** Short public title for member cards — prefers Open States `role_title` when present. */
 export function kyMemberTitleShort(leg: {
   chamber?: 'house' | 'senate' | null;
@@ -187,7 +255,9 @@ export function kyMemberTitleShort(leg: {
 }): string {
   if (isKentuckyGovernor(leg)) return 'Governor';
   const rt = (leg.role_title || '').trim();
-  if (rt) return formatBillLabelText(rt);
+  if (rt) {
+    return normalizeChamberTitleForDisplay(leg, formatBillLabelText(rt));
+  }
   if (leg.chamber === 'house') return 'Representative';
   if (leg.chamber === 'senate') return 'Senator';
   return 'Statewide official';

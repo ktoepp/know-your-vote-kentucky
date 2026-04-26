@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { useTooltips } from '@/lib/TooltipContext';
 import { useThemeUtils } from './ThemeUtils';
+
+const TOOLTIP_MAX_WIDTH = 'min(28rem, calc(100vw - 1rem))';
 
 interface TooltipProps {
   content: string | React.ReactNode;
@@ -11,35 +14,61 @@ interface TooltipProps {
   className?: string;
   maxWidth?: string;
   delay?: number;
-  forceShow?: boolean; // Override global setting if needed
+  forceShow?: boolean;
 }
 
-export const Tooltip = ({ 
-  content, 
-  children, 
+export const Tooltip = ({
+  content,
+  children,
   position = 'top',
   className = '',
-  maxWidth = 'max-w-md',
   delay = 300,
-  forceShow = false
+  forceShow = false,
 }: TooltipProps) => {
   const { tooltipsEnabled } = useTooltips();
   const [isVisible, setIsVisible] = useState(false);
-  const [actualPosition, setActualPosition] = useState(position);
-  const [showTimeout, setShowTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [placeReady, setPlaceReady] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const [showTimeout, setShowTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
   const { getSurfaceBackground, getAdaptiveBorder } = useThemeUtils();
+  const descId = useId().replace(/:/g, '');
 
-  // Don't show tooltips if they're globally disabled (unless forced)
   const shouldShowTooltips = forceShow || tooltipsEnabled;
+  const preferTop = position === 'top' || position === 'left' || position === 'right';
+
+  const recompute = useCallback(() => {
+    const t = triggerRef.current;
+    const p = tooltipRef.current;
+    if (!t || !p) return;
+    const tr = t.getBoundingClientRect();
+    const pr = p.getBoundingClientRect();
+    const margin = 8;
+    let top: number;
+    if (preferTop) {
+      top = tr.top - pr.height - margin;
+      if (top < 8 && tr.bottom + pr.height + margin <= window.innerHeight - 8) {
+        top = tr.bottom + margin;
+      } else {
+        top = Math.max(8, Math.min(top, window.innerHeight - pr.height - 8));
+      }
+    } else {
+      top = tr.bottom + margin;
+      if (top + pr.height > window.innerHeight - 8) {
+        top = Math.max(8, tr.top - pr.height - margin);
+      }
+    }
+    let left = tr.left + tr.width / 2 - pr.width / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - pr.width - 8));
+    setCoords({ top, left });
+    setPlaceReady(true);
+  }, [preferTop]);
 
   const showTooltip = () => {
     if (!shouldShowTooltips) return;
-    
-    if (showTimeout) {
-      clearTimeout(showTimeout);
-    }
+    if (showTimeout) clearTimeout(showTimeout);
+    setPlaceReady(false);
     const timeout = setTimeout(() => setIsVisible(true), delay);
     setShowTimeout(timeout);
   };
@@ -50,102 +79,91 @@ export const Tooltip = ({
       setShowTimeout(null);
     }
     setIsVisible(false);
+    setPlaceReady(false);
   };
 
-  // Auto-adjust position if tooltip would go off-screen
-  useEffect(() => {
-    if (isVisible && tooltipRef.current && triggerRef.current) {
-      const tooltip = tooltipRef.current;
-      const trigger = triggerRef.current;
-      const rect = trigger.getBoundingClientRect();
-      const tooltipRect = tooltip.getBoundingClientRect();
-      
-      let newPosition = position;
-      
-      if (position === 'top' && rect.top - tooltipRect.height < 10) {
-        newPosition = 'bottom';
-      } else if (position === 'bottom' && rect.bottom + tooltipRect.height > window.innerHeight - 10) {
-        newPosition = 'top';
-      } else if (position === 'left' && rect.left - tooltipRect.width < 10) {
-        newPosition = 'right';
-      } else if (position === 'right' && rect.right + tooltipRect.width > window.innerWidth - 10) {
-        newPosition = 'left';
+  useLayoutEffect(() => {
+    if (!isVisible || !shouldShowTooltips) return;
+    let cancelled = false;
+    const nudge = (n: number) => {
+      if (cancelled) return;
+      recompute();
+      if (n < 6) {
+        requestAnimationFrame(() => nudge(n + 1));
       }
-      
-      setActualPosition(newPosition);
-    }
-  }, [isVisible, position]);
+    };
+    nudge(0);
+    const onMove = () => recompute();
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+  }, [isVisible, shouldShowTooltips, recompute, content]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (showTimeout) {
-        clearTimeout(showTimeout);
-      }
+      if (showTimeout) clearTimeout(showTimeout);
     };
   }, [showTimeout]);
 
-  return (
-    <div className="tooltip-container">
+  const floating =
+    typeof document !== 'undefined' &&
+    isVisible &&
+    shouldShowTooltips &&
+    createPortal(
       <div
+        ref={tooltipRef}
+        id={descId}
+        className={`ky-tooltip-surface show animate-fade-in ${className}`.trim()}
+        style={{
+          position: 'fixed',
+          top: coords.top,
+          left: coords.left,
+          zIndex: 2000,
+          maxWidth: TOOLTIP_MAX_WIDTH,
+          visibility: placeReady ? 'visible' : 'hidden',
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          overflowWrap: 'break-word',
+          backgroundColor: getSurfaceBackground(),
+          border: `1px solid ${getAdaptiveBorder('#e2e8f0', '#333333')}`,
+          color: 'inherit',
+          pointerEvents: 'none',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+        }}
+        role="tooltip"
+        aria-hidden="false"
+      >
+        {content}
+      </div>,
+      document.body,
+    );
+
+  return (
+    <span
+      className="tooltip-container"
+      style={{ display: 'inline', position: 'relative', verticalAlign: 'baseline' }}
+    >
+      <span
         ref={triggerRef}
         onMouseEnter={showTooltip}
         onMouseLeave={hideTooltip}
         onFocus={showTooltip}
         onBlur={hideTooltip}
         className="tooltip-trigger focusable"
+        style={{ display: 'inline' }}
         tabIndex={0}
         role="button"
-        aria-describedby={isVisible ? "tooltip-content" : undefined}
+        aria-describedby={isVisible ? descId : undefined}
       >
         {children}
-      </div>
-      
-      {isVisible && shouldShowTooltips && (
-        <div
-          ref={tooltipRef}
-          id="tooltip-content"
-          className={`
-            tooltip-content ${maxWidth} ${className}
-            ${actualPosition === 'top' ? 'bottom-full mb-2' : ''}
-            ${actualPosition === 'bottom' ? 'top-full mt-2' : ''}
-            ${actualPosition === 'left' ? 'right-full mr-2' : ''}
-            ${actualPosition === 'right' ? 'left-full ml-2' : ''}
-            show animate-fade-in
-          `}
-          style={{
-            left: actualPosition === 'top' || actualPosition === 'bottom' ? '50%' : undefined,
-            top: actualPosition === 'left' || actualPosition === 'right' ? '50%' : undefined,
-            transform: (actualPosition === 'top' || actualPosition === 'bottom' ? 'translateX(-50%)' : '') + 
-                      (actualPosition === 'left' || actualPosition === 'right' ? 'translateY(-50%)' : ''),
-            backgroundColor: getSurfaceBackground(),
-            border: `1px solid ${getAdaptiveBorder('#e2e8f0', '#333333')}`,
-            color: 'inherit',
-            zIndex: 1300
-          }}
-          role="tooltip"
-          aria-hidden="false"
-        >
-          {content}
-          
-          {/* Arrow */}
-          <div
-            className={`
-              absolute w-2 h-2 transform rotate-45
-              ${actualPosition === 'top' ? 'top-full -mt-1 left-1/2 -translate-x-1/2 border-t border-l' : ''}
-              ${actualPosition === 'bottom' ? 'bottom-full -mb-1 left-1/2 -translate-x-1/2 border-b border-r' : ''}
-              ${actualPosition === 'left' ? 'left-full -ml-1 top-1/2 -translate-y-1/2 border-l border-b' : ''}
-              ${actualPosition === 'right' ? 'right-full -mr-1 top-1/2 -translate-y-1/2 border-r border-t' : ''}
-            `}
-            style={{
-              backgroundColor: getSurfaceBackground(),
-              borderColor: getAdaptiveBorder('#e2e8f0', '#333333')
-            }}
-          />
-        </div>
-      )}
-    </div>
+      </span>
+      {floating}
+    </span>
   );
 };
 
-export default Tooltip; 
+export default Tooltip;
