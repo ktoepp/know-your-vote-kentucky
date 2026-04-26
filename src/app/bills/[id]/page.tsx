@@ -56,7 +56,6 @@ import {
   normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
 import {
-  ballotpediaKyVoteSearchUrl,
   legiscanRollCallPublicUrl,
   normalizeBallotpediaHref,
 } from '@/lib/external-legislative-links';
@@ -845,11 +844,6 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                       rollId != null && Number.isFinite(Number(rollId))
                         ? legiscanRollCallPublicUrl(bill.bill_number, Number(rollId))
                         : null;
-                    const ballotpediaVoteUrl = ballotpediaKyVoteSearchUrl(
-                      bill.bill_number,
-                      String(v.desc ?? ''),
-                      String(v.date ?? ''),
-                    );
                     const rowKey = rollId != null ? `rc-${rollId}` : `vote-${i}`;
                     return (
                       <Box
@@ -884,8 +878,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                             ) : chip;
                           })()}
                         </Box>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                          {legiscanVoteUrl && (
+                        {legiscanVoteUrl && (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                             <MuiButton
                               component="a"
                               size="small"
@@ -897,19 +891,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                             >
                               LegiScan roll call
                             </MuiButton>
-                          )}
-                          <MuiButton
-                            component="a"
-                            size="small"
-                            variant={legiscanVoteUrl ? 'text' : 'outlined'}
-                            href={ballotpediaVoteUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                          >
-                            Ballotpedia
-                          </MuiButton>
-                        </Box>
+                          </Box>
+                        )}
                       </Box>
                     );
                   })}
