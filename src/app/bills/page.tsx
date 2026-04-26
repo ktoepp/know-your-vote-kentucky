@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BillsBrowse } from '@/components/bills/BillsBrowse';
 
-export default function BillsPage() {
+function BillsPageInner() {
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic') ?? undefined;
 
@@ -15,5 +15,13 @@ export default function BillsPage() {
       chamberMode="all"
       initialTopic={topic}
     />
+  );
+}
+
+export default function BillsPage() {
+  return (
+    <Suspense fallback={null}>
+      <BillsPageInner />
+    </Suspense>
   );
 }
