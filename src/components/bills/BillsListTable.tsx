@@ -24,6 +24,7 @@ import {
   isSignedByGovernorBillStatus,
 } from '@/lib/bill-display';
 import { governmentTooltips } from '@/lib/tooltipContent';
+import { getSessionTooltip } from '@/lib/ky-sessions';
 
 export interface BillsListTableProps {
   bills: KYBill[];
@@ -104,7 +105,19 @@ export function BillsListTable({ bills, sortBy, sortDir, onRequestSort }: BillsL
                 </Typography>
               </TableCell>
               <TableCell>{chamberLabel(bill)}</TableCell>
-              <TableCell>{bill.session || ''}</TableCell>
+              <TableCell>{bill.session ? (() => {
+                const tip = getSessionTooltip(bill.session);
+                return tip ? (
+                  <Tooltip
+                    title={<>{tip.content.split('\n\n').map((p, i) => <span key={i} style={{ display: 'block', marginBottom: i === 0 ? 4 : 0 }}>{p}</span>)}</>}
+                    arrow
+                    enterDelay={300}
+                    componentsProps={{ tooltip: { sx: { maxWidth: 340 } } }}
+                  >
+                    <span style={{ cursor: 'help', borderBottom: '1px dotted currentColor' }}>{bill.session}</span>
+                  </Tooltip>
+                ) : bill.session;
+              })() : ''}</TableCell>
               <TableCell>
                 {bill.status ? (() => {
                   const label = formatBillLabelText(

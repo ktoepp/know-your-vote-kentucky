@@ -46,6 +46,7 @@ import {
   partyBadgeBackgroundColor,
 } from '@/lib/bill-display';
 import { governmentTooltips, voteCountTooltips } from '@/lib/tooltipContent';
+import { getSessionTooltip } from '@/lib/ky-sessions';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYLegislatorRoster } from '@/types/kentucky';
 import {
@@ -515,14 +516,32 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                   >{chip}</MuiTooltip>
                 ) : chip;
               })()}
-              {bill.session && (
-                <MuiChip
-                  label={formatBillLabelText(bill.session)}
-                  size="medium"
-                  variant="outlined"
-                  sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
-                />
-              )}
+              {bill.session && (() => {
+                const sessionTip = getSessionTooltip(bill.session);
+                const chip = (
+                  <MuiChip
+                    label={formatBillLabelText(bill.session)}
+                    size="medium"
+                    variant="outlined"
+                    sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
+                  />
+                );
+                return sessionTip ? (
+                  <MuiTooltip
+                    title={
+                      <Box sx={{ p: 0.25 }}>
+                        <Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{sessionTip.title}</Typography>
+                        {sessionTip.content.split('\n\n').map((para, i) => (
+                          <Typography key={i} variant="body2" display="block" sx={{ mb: i === 0 ? 0.75 : 0 }}>{para}</Typography>
+                        ))}
+                      </Box>
+                    }
+                    arrow
+                    enterDelay={300}
+                    componentsProps={{ tooltip: { sx: { maxWidth: 380, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}
+                  >{chip}</MuiTooltip>
+                ) : chip;
+              })()}
             </Box>
 
             <Typography variant="h5" fontWeight={700} color="primary.main" gutterBottom>
