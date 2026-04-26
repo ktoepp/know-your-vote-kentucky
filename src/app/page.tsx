@@ -30,33 +30,15 @@ import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { HomeCuratedBillList } from '@/components/home/HomeCuratedBillList';
 import { selectRecentlyPassedBills, selectMostViewedBills } from '@/lib/home-bill-curated';
 import { ICON_REM, TYPE } from '@/lib/ui-tokens';
+import { getActiveSessionInfo } from '@/lib/ky-sessions';
 
 const HOME_SECTION_PAGE_SIZE = 6;
 const HOME_SECTION_FETCH = 24;
 const HOME_CURATED_LIMIT = 6;
 
-/**
- * Session dates sourced from OpenStates (verified against legislature.ky.gov).
- * Update `KY_SESSIONS` when a new session begins.
- */
-const KY_SESSIONS = [
-  { name: '2026 Regular Session', start: '2026-01-06', end: '2026-04-15', type: 'regular' },
-  { name: '2025 Regular Session', start: '2025-01-07', end: '2025-04-15', type: 'regular' },
-];
-
 function SessionBanner() {
   const theme = useTheme();
-  const today = new Date();
-
-  const active = KY_SESSIONS.find(s => {
-    const start = new Date(s.start);
-    const end = new Date(s.end);
-    return today >= start && today <= end;
-  });
-
-  const mostRecent = KY_SESSIONS[0];
-  const session = active || mostRecent;
-  const isInSession = !!active;
+  const { session, isActive: isInSession } = getActiveSessionInfo();
 
   const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 

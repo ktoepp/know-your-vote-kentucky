@@ -437,10 +437,30 @@ export const hasTooltipContent = (key: string): boolean => {
 // Vote explanation tooltips - Concise and clear
 export const voteExplanations: Record<string, string> = {
   yes: "Voted in favor of the bill or amendment",
-  no: "Voted against the bill or amendment", 
+  no: "Voted against the bill or amendment",
   abstain: "Chose not to vote, often due to conflict of interest",
   not_voting: "Was absent or chose not to participate in this vote",
   present: "Was present but chose not to vote either way"
+};
+
+/** Tooltip content for roll-call vote-count chips (Yea / Nay / NV). */
+export const voteCountTooltips: Record<string, TooltipContent> = {
+  yea: {
+    title: "Yea (Yes) Votes",
+    content: "The number of legislators who voted in favor of the bill or amendment. A bill generally needs a simple majority of members present to pass."
+  },
+  nay: {
+    title: "Nay (No) Votes",
+    content: "The number of legislators who voted against the bill or amendment."
+  },
+  nv: {
+    title: "Not Voting (NV)",
+    content: "Legislators who were present but did not cast a vote, or who were absent. Not-voting members do not count toward the total needed to pass."
+  },
+  absent: {
+    title: "Absent",
+    content: "Legislators who were not present during the vote. Absent members do not affect the outcome."
+  },
 };
 
 // Bill status explanations for Kentucky General Assembly — concise one-liners
