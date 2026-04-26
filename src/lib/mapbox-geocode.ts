@@ -20,6 +20,7 @@ export async function mapboxGeocodeAddress(
   u.searchParams.set('country', 'us');
   u.searchParams.set('bbox', bbox.join(','));
   u.searchParams.set('proximity', '-84.87,37.35');
+  u.searchParams.set('types', 'address');
   const r = await fetch(u.toString());
   if (!r.ok) return null;
   const data = (await r.json()) as {
