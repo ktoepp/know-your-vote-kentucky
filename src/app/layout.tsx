@@ -6,8 +6,6 @@ import Navigation from "./components/Navigation";
 import SiteFooter from "./components/SiteFooter";
 import { TooltipProvider } from '@/lib/TooltipContext';
 import { UserProvider } from "./lib/UserContext";
-import ContrastTester from '../components/dev/ContrastTester';
-
 export const metadata: Metadata = {
   title: 'Know Your Vote Kentucky',
   description: 'Track Kentucky legislation, representatives, and civic engagement',
@@ -89,7 +87,6 @@ export default function RootLayout({
                 {children}
               </main>
               <SiteFooter />
-              <ContrastTester />
             </TooltipProvider>
           </ClientThemeProvider>
         </UserProvider>

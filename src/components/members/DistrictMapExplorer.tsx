@@ -5,6 +5,9 @@ import MapGL, { Layer, Marker, NavigationControl, Popup, Source, type MapRef } f
 import mapboxgl, { type MapMouseEvent } from 'mapbox-gl';
 import bbox from '@turf/bbox';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -16,6 +19,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
+import { ExpandMore } from '@mui/icons-material';
 import { MapPin } from 'lucide-react';
 import type { Feature, FeatureCollection } from 'geojson';
 import type { KYLegislator } from '@/types/kentucky';
@@ -27,7 +31,7 @@ import {
   parseKyDistrictNumber,
 } from '@/lib/ky-district-geo';
 import { MemberCard } from '@/components/members/MemberCard';
-import { memberProfilePath } from '@/lib/ky-member-utils';
+import { dedupeKyLegislators, memberProfilePath } from '@/lib/ky-member-utils';
 import {
   DistrictMapMemberTooltip,
   type DistrictMapTooltipModel,
@@ -44,6 +48,7 @@ import {
   SENATE_OUTLINE,
 } from '@/components/members/district-map-tokens';
 import { KY_DISTRICT_MAPBOX_STYLE } from '@/lib/ky-district-mapbox-style';
+import { mapboxGeocodeAddress } from '@/lib/mapbox-geocode';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -127,10 +132,13 @@ export default function DistrictMapExplorer() {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoLoading, setGeoLoading] = useState(true);
 
-  /** Off, or exactly one chamber layer. */
-  const [districtMode, setDistrictMode] = useState<'off' | 'house' | 'senate'>('house');
-  const showHouseLayer = districtMode === 'house';
-  const showSenateLayer = districtMode === 'senate';
+  /**
+   * Exactly one chamber’s district fill is shown at a time (House or Senate), so the map
+   * always has one active boundary layer.
+   */
+  const [visibleChamber, setVisibleChamber] = useState<'house' | 'senate'>('house');
+  const showHouseLayer = visibleChamber === 'house';
+  const showSenateLayer = visibleChamber === 'senate';
 
   const [selectedHouseName, setSelectedHouseName] = useState<string | null>(null);
   const [selectedSenateName, setSelectedSenateName] = useState<string | null>(null);
@@ -141,6 +149,10 @@ export default function DistrictMapExplorer() {
   const [zipLoading, setZipLoading] = useState(false);
   /** Last ZIP used for search (centroid geocode); cleared when picking a point on the map instead. */
   const [zipResolvedLabel, setZipResolvedLabel] = useState<string | null>(null);
+  const [addressInput, setAddressInput] = useState('');
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [addressResolvedLabel, setAddressResolvedLabel] = useState<string | null>(null);
 
   const [hoverPopup, setHoverPopup] = useState<{
     lng: number;
@@ -163,7 +175,7 @@ export default function DistrictMapExplorer() {
           'Loading legislators timed out.',
         );
         if (error) throw error;
-        if (!cancelled) setLegislators(data || []);
+        if (!cancelled) setLegislators(dedupeKyLegislators(data || []));
       } catch (e) {
         if (!cancelled) setLegError(e instanceof Error ? e.message : 'Failed to load legislators');
       } finally {
@@ -282,6 +294,8 @@ export default function DistrictMapExplorer() {
       const { lngLat } = e;
       if (!lngLat) return;
       setZipResolvedLabel(null);
+      setAddressResolvedLabel(null);
+      setAddressError(null);
       resolvePoint(lngLat.lng, lngLat.lat);
       setMarker({ lng: lngLat.lng, lat: lngLat.lat });
     },
@@ -297,6 +311,8 @@ export default function DistrictMapExplorer() {
       return;
     }
     setZipLoading(true);
+    setAddressResolvedLabel(null);
+    setAddressError(null);
     try {
       const res = await fetch(`/api/geo/zip?zip=${encodeURIComponent(z)}`);
       const data = (await res.json()) as { error?: string; lat?: number; lng?: number };
@@ -309,6 +325,7 @@ export default function DistrictMapExplorer() {
         return;
       }
       setZipResolvedLabel(z);
+      setAddressInput('');
       setMarker({ lng: data.lng, lat: data.lat });
       resolvePoint(data.lng, data.lat);
       const map = mapRef.current?.getMap();
@@ -321,6 +338,40 @@ export default function DistrictMapExplorer() {
       setZipLoading(false);
     }
   }, [zipInput, resolvePoint]);
+
+  const onAddressSearch = useCallback(async () => {
+    const q = addressInput.trim();
+    setAddressError(null);
+    if (q.length < 8) {
+      setAddressError('Enter a fuller street address (for example, number, street, city, and state).');
+      return;
+    }
+    if (!MAPBOX_TOKEN) {
+      setAddressError('Add a Mapbox access token in .env.local to use address search.');
+      return;
+    }
+    setAddressLoading(true);
+    setZipError(null);
+    setZipResolvedLabel(null);
+    try {
+      const g = await mapboxGeocodeAddress(q, MAPBOX_TOKEN);
+      if (!g) {
+        setAddressError('No location found. Try including city and state (e.g. … Frankfort, KY 40601).');
+        return;
+      }
+      setAddressResolvedLabel(g.placeName);
+      setMarker({ lng: g.lng, lat: g.lat });
+      resolvePoint(g.lng, g.lat);
+      const map = mapRef.current?.getMap();
+      if (map) {
+        map.easeTo({ center: [g.lng, g.lat], zoom: 11, duration: 900 });
+      }
+    } catch {
+      setAddressError('Address search failed. Try again or use ZIP search.');
+    } finally {
+      setAddressLoading(false);
+    }
+  }, [addressInput, resolvePoint]);
 
   const clearHoverFeatureState = useCallback(() => {
     const map = mapRef.current?.getMap();
@@ -345,7 +396,7 @@ export default function DistrictMapExplorer() {
 
   useEffect(() => {
     clearHoverFeatureState();
-  }, [districtMode, clearHoverFeatureState]);
+  }, [visibleChamber, clearHoverFeatureState]);
 
   const onMouseMove = useCallback(
     (e: MapMouseEvent) => {
@@ -471,26 +522,56 @@ export default function DistrictMapExplorer() {
               Fit Kentucky
             </Button>
           </Stack>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} useFlexGap alignItems={{ sm: 'flex-start' }}>
+            <TextField
+              size="small"
+              fullWidth
+              label="Street address"
+              placeholder="e.g. 100 Capitol Ave, Frankfort, KY 40601"
+              value={addressInput}
+              onChange={(e) => {
+                setAddressInput(e.target.value);
+                setAddressError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void onAddressSearch();
+              }}
+              disabled={addressLoading || !mapReady}
+              helperText="Mapbox geocoding, biased to Kentucky. Often more precise at district lines than ZIP alone."
+            />
+            <Button
+              variant="outlined"
+              onClick={() => void onAddressSearch()}
+              disabled={addressLoading || !mapReady || !MAPBOX_TOKEN}
+              sx={{ flexShrink: 0, minWidth: 140, mt: { sm: 0.5 } }}
+            >
+              {addressLoading ? <CircularProgress size={20} color="inherit" /> : 'Find address'}
+            </Button>
+          </Stack>
           {zipError && (
             <Alert severity="warning" onClose={() => setZipError(null)}>
               {zipError}
             </Alert>
           )}
+          {addressError && (
+            <Alert severity="warning" onClose={() => setAddressError(null)}>
+              {addressError}
+            </Alert>
+          )}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }} flexWrap="wrap" useFlexGap>
             <Typography variant="body2" color="text.secondary" component="span">
-              District layers
+              District layer
             </Typography>
             <ToggleButtonGroup
               exclusive
-              value={districtMode}
-              onChange={(_, v: 'off' | 'house' | 'senate' | null) => {
-                if (v != null) setDistrictMode(v);
+              value={visibleChamber}
+              onChange={(_e, v: 'house' | 'senate' | null) => {
+                if (v != null) setVisibleChamber(v);
               }}
               size="small"
               disabled={!mapReady}
-              aria-label="District layer visibility"
+              aria-label="Which district boundaries to show on the map"
             >
-              <ToggleButton value="off">Off</ToggleButton>
               <ToggleButton value="house">House</ToggleButton>
               <ToggleButton value="senate">Senate</ToggleButton>
             </ToggleButtonGroup>
@@ -736,7 +817,7 @@ export default function DistrictMapExplorer() {
                   closeOnClick={false}
                   anchor="bottom"
                   offset={[0, -6]}
-                  maxWidth="320px"
+                  maxWidth="360px"
                 >
                   <DistrictMapMemberTooltip model={hoverPopup.model} />
                 </Popup>
@@ -762,6 +843,38 @@ export default function DistrictMapExplorer() {
         </Paper>
 
         <Stack spacing={2}>
+          <Paper
+            elevation={1}
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              borderLeft: 4,
+              borderColor: 'primary.main',
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              Every Kentucky address has <strong>two</strong> state legislators: a House member (one of 100 smaller
+              districts) and a senator (one of 38 larger districts). The numbers are not the same — you always have
+              both a rep and a senator.
+            </Typography>
+          </Paper>
+
+          <Accordion elevation={0} sx={{ border: 1, borderColor: 'divider', borderRadius: 2, '&:before': { display: 'none' } }}>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography variant="subtitle2" fontWeight={700}>
+                How to contact your legislators
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" component="ul" sx={{ m: 0, pl: 2.5 }}>
+                <li>Call or email the capitol number or address listed in the LRC directory or on your member’s profile page.</li>
+                <li>Committee hearing calendars are on the LRC site—anyone can attend or watch a livestream when offered.</li>
+                <li>Written committee testimony and bill comments follow each committee’s published rules; check the docket for deadlines.</li>
+                <li>For formal letters, mention your address so offices know you are a constituent of that district.</li>
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
+
           <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle2" fontWeight={700} gutterBottom>
               Selected districts
@@ -770,6 +883,12 @@ export default function DistrictMapExplorer() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                 ZIP {zipResolvedLabel}: districts are from the point geocoded for that postal area (same logic as map
                 click).
+              </Typography>
+            )}
+            {addressResolvedLabel && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                <strong>Address</strong> {addressResolvedLabel}: districts are from the geocoded point (Mapbox, biased
+                to Kentucky).
               </Typography>
             )}
             {!selectedHouseName && !selectedSenateName && (

@@ -34,28 +34,6 @@ const stageIcons: Record<string, string> = {
   timeline_signed: '✍️'
 };
 
-// Stage colors for visual hierarchy
-const stageColors: Record<string, string> = {
-  introduced: 'text-blue-300',
-  referred: 'text-blue-300',
-  reported: 'text-green-300',
-  passed: 'text-green-300',
-  enrolled: 'text-yellow-300',
-  enacted: 'text-green-400',
-  vetoed: 'text-red-300',
-  failed: 'text-red-300',
-  markup: 'text-purple-300',
-  hearing: 'text-blue-300',
-  floorVote: 'text-orange-300',
-  cloture: 'text-yellow-300',
-  timeline_introduced: 'text-blue-300',
-  timeline_committee: 'text-blue-300',
-  timeline_markup: 'text-purple-300',
-  timeline_vote: 'text-orange-300',
-  timeline_passed: 'text-green-300',
-  timeline_signed: 'text-green-400'
-};
-
 export const LegislativeStageTooltip = ({ 
   stage,
   children,
@@ -66,25 +44,26 @@ export const LegislativeStageTooltip = ({
 }: LegislativeStageTooltipProps) => {
   const tooltipContent = getTooltipContent(stage);
   const icon = stageIcons[stage] || '📋';
-  const color = stageColors[stage] || 'text-gray-300';
-  
+
   if (!tooltipContent) {
     return <>{children}</>;
   }
   
   const content = (
-    <div className="legislative-stage-tooltip">
+    <div className="legislative-stage-tooltip text-left text-slate-900 dark:text-slate-50 max-w-full">
       <div className="stage-header mb-2 flex items-center gap-2">
         {showIcon && (
-          <span className="text-lg">{icon}</span>
+          <span className="text-lg" aria-hidden>
+            {icon}
+          </span>
         )}
-        <strong className="text-white font-semibold text-sm">
+        <strong className="font-semibold text-sm text-inherit">
           {tooltipContent.title}
         </strong>
       </div>
       
       <div className="stage-content mb-2">
-        <p className={`text-sm leading-relaxed ${color}`}>
+        <p className={`text-sm leading-relaxed text-slate-700 dark:text-slate-300`}>
           {tooltipContent.content}
         </p>
       </div>
@@ -129,23 +108,22 @@ export const BillStatusTooltip = ({
 }: BillStatusTooltipProps) => {
   const tooltipContent = getTooltipContent(status);
   const icon = stageIcons[status] || '📋';
-  const color = stageColors[status] || 'text-gray-300';
-  
+
   if (!tooltipContent) {
     return <>{children}</>;
   }
   
   const content = (
-    <div className="bill-status-tooltip">
+    <div className="bill-status-tooltip text-left text-slate-900 dark:text-slate-50 max-w-full">
       <div className="status-header mb-2 flex items-center gap-2">
-        <span className="text-lg">{icon}</span>
-        <strong className="text-white font-semibold text-sm">
+        <span className="text-lg" aria-hidden>{icon}</span>
+        <strong className="font-semibold text-sm text-inherit">
           {tooltipContent.title}
         </strong>
       </div>
       
       <div className="status-content mb-2">
-        <p className={`text-sm leading-relaxed ${color}`}>
+        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
           {tooltipContent.content}
         </p>
       </div>

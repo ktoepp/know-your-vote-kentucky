@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { KYLegislator } from '@/types/kentucky';
-import { findLegislatorByProfileSlug } from '@/lib/ky-member-utils';
+import { dedupeKyLegislators, findLegislatorByProfileSlug } from '@/lib/ky-member-utils';
 
 function createAnonClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -17,5 +17,6 @@ export async function getLegislatorByProfileSlug(slug: string): Promise<KYLegisl
   // Include inactive so bookmarked or sponsor-linked profiles still resolve (see findLegislatorByProfileSlug fallbacks).
   const { data, error } = await supabase.from('ky_legislators').select('*');
   if (error || !data?.length) return null;
-  return findLegislatorByProfileSlug(data as KYLegislator[], decoded);
+  const roster = dedupeKyLegislators(data as KYLegislator[]);
+  return findLegislatorByProfileSlug(roster, decoded);
 }

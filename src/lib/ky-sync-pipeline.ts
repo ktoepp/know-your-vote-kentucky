@@ -24,6 +24,7 @@ import {
   splitLegistarMatterTitleAndDescription,
 } from './legistar-matter';
 import {
+  extractOpenStatesContactDetails,
   extractOpenStatesLegislatorWebLinks,
   openStatesCurrentRole,
   openStatesLegislatorNames,
@@ -856,6 +857,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       const district = cr?.district != null && cr.district !== '' ? String(cr.district) : null;
       const { lrcProfileUrl, otherWebsiteUrl } = extractOpenStatesLegislatorWebLinks(leg);
       const { first_name, last_name } = openStatesLegislatorNames(leg);
+      const { email, phone } = extractOpenStatesContactDetails(leg);
       return {
         openstates_id: leg.id,
         name: leg.name,
@@ -866,7 +868,8 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         role_title: cr?.title?.trim() || null,
         district,
         photo_url: normalizeLegislatorPhotoUrl(leg.image) || null,
-        email: leg.email || null,
+        email,
+        phone,
         lrc_profile_url: lrcProfileUrl,
         website: otherWebsiteUrl,
         active: true,

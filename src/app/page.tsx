@@ -10,6 +10,10 @@ import {
   Alert,
   Grid,
   Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Gavel,
@@ -27,73 +31,131 @@ import { EmptyState } from '@/components/civic/EmptyState';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
+import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { HomeCuratedBillList } from '@/components/home/HomeCuratedBillList';
 import { selectRecentlyPassedBills, selectMostViewedBills } from '@/lib/home-bill-curated';
+import { KY_SESSIONS, getActiveSession } from '@/lib/ky-sessions';
 import { ICON_REM, TYPE } from '@/lib/ui-tokens';
 
-const HOME_SECTION_PAGE_SIZE = 6;
-const HOME_SECTION_FETCH = 24;
+/** Each home bill query loads enough rows for 25/50/100 per page in every section. */
+const HOME_SECTION_FETCH = 100;
 const HOME_CURATED_LIMIT = 6;
 
-/**
- * Session dates sourced from OpenStates (verified against legislature.ky.gov).
- * Update `KY_SESSIONS` when a new session begins.
- */
-const KY_SESSIONS = [
-  { name: '2026 Regular Session', start: '2026-01-06', end: '2026-04-15', type: 'regular' },
-  { name: '2025 Regular Session', start: '2025-01-07', end: '2025-04-15', type: 'regular' },
-];
+/** LRC meetings & committee schedule (authoritative for day-to-day floor and committee). */
+const KY_LRC_SCHEDULE_URL = 'https://legislature.ky.gov/Committee/Schedule';
 
 function SessionBanner() {
   const theme = useTheme();
   const today = new Date();
+  today.setHours(12, 0, 0, 0);
 
-  const active = KY_SESSIONS.find(s => {
-    const start = new Date(s.start);
-    const end = new Date(s.end);
-    return today >= start && today <= end;
-  });
+  const active = getActiveSession();
+  const session = active ?? KY_SESSIONS[0]!;
+  const isInSession = Boolean(active);
 
-  const mostRecent = KY_SESSIONS[0];
-  const session = active || mostRecent;
-  const isInSession = !!active;
+  const sessionStart = new Date(session.start);
+  const sessionEnd = new Date(session.end);
+  sessionEnd.setHours(23, 59, 59, 999);
+  const beforeSession = today < sessionStart;
+  const afterScheduledSession = today > sessionEnd;
 
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  const statusColor = isInSession
+    ? theme.palette.success.main
+    : beforeSession
+      ? theme.palette.info.main
+      : theme.palette.grey[500];
+  const rowBg = isInSession
+    ? alpha(theme.palette.success.main, 0.08)
+    : beforeSession
+      ? alpha(theme.palette.info.main, 0.06)
+      : alpha(theme.palette.grey[500], 0.08);
+
+  const statusTitle = isInSession
+    ? 'General Assembly in session'
+    : beforeSession
+      ? 'Upcoming regular session'
+      : 'Regular session (scheduled dates) ended';
 
   return (
-    <Box sx={{
-      borderBottom: `1px solid ${theme.palette.divider}`,
-      bgcolor: isInSession ? alpha(theme.palette.success.main, 0.08) : alpha(theme.palette.grey[500], 0.08),
-      py: 1,
-    }}>
+    <Box
+      sx={{
+        borderBottom: `1px solid ${theme.palette.divider}`,
+        bgcolor: rowBg,
+        py: 1.25,
+      }}
+    >
       <Container maxWidth="lg">
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-          <Box sx={{
-            width: 8, height: 8, borderRadius: '50%',
-            bgcolor: isInSession ? theme.palette.success.main : theme.palette.grey[500],
-            flexShrink: 0,
-            ...(isInSession && { animation: 'pulse 2s infinite', '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } } }),
-          }} />
-          <Typography variant="body2" fontWeight={600} color={isInSession ? 'success.main' : 'text.secondary'}>
-            {isInSession ? 'Legislature In Session' : 'Legislature Adjourned'}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {session.name} &bull; {fmtDate(session.start)} – {fmtDate(session.end)}
-          </Typography>
-          {!isInSession && (
-            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-              Next session typically begins January
-            </Typography>
-          )}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 1.5,
+            flexWrap: 'wrap',
+            flexDirection: { xs: 'column', sm: 'row' },
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              flexWrap: 'wrap',
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: statusColor,
+                flexShrink: 0,
+                ...(isInSession && {
+                  animation: 'pulse 2s infinite',
+                  '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
+                }),
+              }}
+            />
+            <Box component="div" sx={{ minWidth: 0 }}>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                color={isInSession ? 'success.main' : 'text.primary'}
+                component="span"
+                sx={{ display: 'block' }}
+              >
+                {statusTitle}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" component="span" sx={{ display: 'block', mt: 0.25 }}>
+                {session.name} · {fmtDate(session.start)} – {fmtDate(session.end)}
+              </Typography>
+              {afterScheduledSession && !isInSession && (
+                <Typography variant="caption" color="text.secondary" component="span" sx={{ display: 'block', mt: 0.5 }}>
+                  Chambers or committees can still post limited activity after the last scheduled day—check the LRC
+                  for meetings and published calendars.
+                </Typography>
+              )}
+              {beforeSession && !isInSession && (
+                <Typography variant="caption" color="text.secondary" component="span" sx={{ display: 'block', mt: 0.5 }}>
+                  Session convenes {fmtDate(session.start)}. Next in-person work after sine die is usually the next
+                  January regular session unless a special session is called.
+                </Typography>
+              )}
+            </Box>
+          </Box>
           <Button
             component={Link}
-            href="https://legislature.ky.gov"
+            href={KY_LRC_SCHEDULE_URL}
             target="_blank"
             rel="noopener noreferrer"
             size="medium"
-            sx={{ ml: 'auto', fontSize: '0.95rem', py: 0.75, px: 1.5 }}
+            sx={{ ml: { sm: 'auto' }, fontSize: '0.95rem', py: 0.75, px: 1.5, flexShrink: 0 }}
           >
-            Official Calendar
+            LRC schedule
           </Button>
         </Box>
       </Container>
@@ -112,6 +174,7 @@ export default function HomePage() {
   const [mostViewedBills, setMostViewedBills] = useState<KYBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { pageSize: homePageSize, setPageSize: setHomePageSize } = usePersistedPageSize('home', 25);
 
   useEffect(() => {
     async function fetchData() {
@@ -250,19 +313,13 @@ export default function HomePage() {
           <Typography variant={TYPE.heroTitle.variant} component="h1" fontWeight={TYPE.heroTitle.fontWeight} gutterBottom>
             Know Your Vote Kentucky
           </Typography>
-          <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2, maxWidth: 600, fontWeight: 400 }}>
-            Track Kentucky legislation and your representatives.
-            Stay informed about the issues that affect your community.
+          <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2, maxWidth: 640, fontWeight: 400, lineHeight: 1.5 }}>
+            House and Senate bills, your legislators, and district maps in one place—plain-language context and
+            up-to-date status from public data sources.
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <Button component={Link} href="/bills" variant="contained" color="secondary" endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
-              Browse Bills
-            </Button>
-            <Button component={Link} href="/bills/house" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
-              House Bills
-            </Button>
-            <Button component={Link} href="/bills/senate" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
-              Senate Bills
+              Browse all bills
             </Button>
             <Button
               component={Link}
@@ -280,6 +337,29 @@ export default function HomePage() {
               }}
             >
               Search bills
+            </Button>
+            <Button component={Link} href="/bills/house" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
+              House bills
+            </Button>
+            <Button component={Link} href="/bills/senate" variant="contained" color="inherit" sx={{ color: 'primary.main', bgcolor: 'background.paper' }} endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}>
+              Senate bills
+            </Button>
+            <Button
+              component={Link}
+              href="/members/map"
+              variant="outlined"
+              color="inherit"
+              sx={{
+                color: 'common.white',
+                borderColor: 'rgba(255, 255, 255, 0.55)',
+                '&:hover': {
+                  color: 'common.white',
+                  borderColor: 'common.white',
+                  bgcolor: 'rgba(255, 255, 255, 0.12)',
+                },
+              }}
+            >
+              District map
             </Button>
           </Box>
           <DataFreshnessNote variant="hero" />
@@ -304,6 +384,23 @@ export default function HomePage() {
         {!loading && (
           <Grid container spacing={3} sx={{ alignItems: 'flex-start' }}>
             <Grid item xs={12} lg={8} sx={{ order: { xs: 0, lg: 0 } }}>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                <FormControl size="small" sx={{ minWidth: 150 }} variant="outlined">
+                  <InputLabel id="home-bills-per-page">Bills per page</InputLabel>
+                  <Select
+                    labelId="home-bills-per-page"
+                    label="Bills per page"
+                    value={homePageSize}
+                    onChange={(e) => setHomePageSize(toPageSizeChoice(parseInt(String(e.target.value), 10)))}
+                  >
+                    {PAGE_SIZE_CHOICES.map((n) => (
+                      <MenuItem key={n} value={n}>
+                        {n}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
               {/* Latest KY Bills */}
               <SectionHeader
                 title="Latest KY Bills"
@@ -319,8 +416,8 @@ export default function HomePage() {
                 <Box sx={{ mb: 6 }}>
                   <PaginatedSection
                     items={bills}
-                    pageSize={HOME_SECTION_PAGE_SIZE}
-                    resetKey={`${bills.length}-${bills[0]?.id ?? ''}`}
+                    pageSize={homePageSize}
+                    resetKey={`${bills.length}-${bills[0]?.id ?? ''}-${homePageSize}`}
                     variant="responsive"
                   >
                     {(pageBills) => (
@@ -352,8 +449,8 @@ export default function HomePage() {
                     <Box sx={{ mb: 6 }}>
                       <PaginatedSection
                         items={houseBills}
-                        pageSize={HOME_SECTION_PAGE_SIZE}
-                        resetKey={`h-${houseBills.length}-${houseBills[0]?.id ?? ''}`}
+                        pageSize={homePageSize}
+                        resetKey={`h-${houseBills.length}-${houseBills[0]?.id ?? ''}-${homePageSize}`}
                         variant="responsive"
                       >
                         {(pageBills) => (
@@ -383,8 +480,8 @@ export default function HomePage() {
                     <Box sx={{ mb: 6 }}>
                       <PaginatedSection
                         items={senateBills}
-                        pageSize={HOME_SECTION_PAGE_SIZE}
-                        resetKey={`s-${senateBills.length}-${senateBills[0]?.id ?? ''}`}
+                        pageSize={homePageSize}
+                        resetKey={`s-${senateBills.length}-${senateBills[0]?.id ?? ''}-${homePageSize}`}
                         variant="responsive"
                       >
                         {(pageBills) => (

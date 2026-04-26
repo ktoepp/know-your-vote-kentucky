@@ -1,7 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Box, IconButton, Pagination, Typography, useMediaQuery } from '@mui/material';
+import React, { useId, useState, useEffect, useMemo } from 'react';
+import {
+  Box,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Pagination,
+  Select,
+  type SelectChangeEvent,
+  Typography,
+  useMediaQuery,
+} from '@mui/material';
 import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 
@@ -12,6 +23,11 @@ export interface PaginatedSectionProps<T> {
   pageSize: number;
   /** When this string changes, the current page resets to 1 (e.g. bill ids or filter fingerprint). */
   resetKey?: string;
+  /**
+   * Optional 25/50/100 (or other) control; pair with `onPageSizeChange` for persisted prefs from the parent.
+   */
+  pageSizeOptions?: readonly number[];
+  onPageSizeChange?: (n: number) => void;
   /**
    * pagination — numbered pages only.
    * gallery — prev/next + dot indicators (compact “carousel” control).
@@ -25,11 +41,14 @@ export function PaginatedSection<T>({
   items,
   pageSize,
   resetKey = '',
+  pageSizeOptions,
+  onPageSizeChange,
   variant = 'pagination',
   children,
 }: PaginatedSectionProps<T>) {
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
+  const pageSizeLabelId = useId();
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
 
@@ -47,6 +66,12 @@ export function PaginatedSection<T>({
   }, [items, page, pageSize]);
 
   const showPager = items.length > pageSize;
+  const showPageSizeSelect =
+    Boolean(pageSizeOptions?.length) && typeof onPageSizeChange === 'function';
+
+  const handlePageSizeSelect = (e: SelectChangeEvent<number | string>) => {
+    onPageSizeChange?.(parseInt(String(e.target.value), 10));
+  };
 
   /** Dot stepper is only practical for a small page count; otherwise use numbered pages. */
   const maxDotPages = 12;
@@ -57,6 +82,32 @@ export function PaginatedSection<T>({
 
   return (
     <Box>
+      {showPageSizeSelect && items.length > 0 && (
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            mb: 1.5,
+          }}
+        >
+          <FormControl size="small" sx={{ minWidth: 130 }} variant="outlined">
+            <InputLabel id={pageSizeLabelId}>Per page</InputLabel>
+            <Select
+              labelId={pageSizeLabelId}
+              label="Per page"
+              value={pageSize}
+              onChange={handlePageSizeSelect}
+            >
+              {(pageSizeOptions ?? []).map((n) => (
+                <MenuItem key={n} value={n}>
+                  {n}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+      )}
       {children(pageItems)}
       {showPager && (
         <Box

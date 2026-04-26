@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getLegislatorByProfileSlug } from '@/lib/member-profile';
+import { getCivicDataSessionName } from '@/lib/ky-sessions';
+import { fetchSponsoredBillsForLegislator, fetchMemberVoteRecord } from '@/lib/member-profile-data';
 import { MemberProfileView } from '@/components/members/MemberProfileView';
 import { kyMemberTitleShort } from '@/lib/ky-member-utils';
 import { formatKyLegislatorDistrict } from '@/lib/bill-display';
@@ -30,5 +32,12 @@ export default async function MemberProfilePage({ params }: PageProps) {
   const { slug } = await params;
   const leg = await getLegislatorByProfileSlug(slug);
   if (!leg) notFound();
-  return <MemberProfileView leg={leg} />;
+  const sessionName = getCivicDataSessionName();
+  const [sponsoredBills, voteRecord] = await Promise.all([
+    fetchSponsoredBillsForLegislator(leg, { sessionName, limit: 30 }),
+    fetchMemberVoteRecord(leg, { sessionName, maxRows: 200, recentLimit: 8 }),
+  ]);
+  return (
+    <MemberProfileView leg={leg} sessionName={sessionName} sponsoredBills={sponsoredBills} voteRecord={voteRecord} />
+  );
 }

@@ -167,6 +167,13 @@ export const governmentTooltips: Record<string, TooltipContent> = {
     content: "The bill has been set aside indefinitely. This effectively ends the bill's progress for this session without a direct up-or-down vote."
   },
 
+  /** Minor / routine docket line — LegiScan flags these with importance 0. */
+  clerical: {
+    title: "Routine procedural line",
+    content:
+      "A scheduling or docket action with no direct effect on the bill's policy or stage — for example a read-and-referred, notice, or file stamp. The substantive steps are the ones that move the bill (committee, floor votes, etc.)."
+  },
+
   recommitted: {
     title: "Recommitted",
     content: "The bill was sent back to committee after already reaching the floor. This usually happens to allow further amendments or to slow the bill's progress."

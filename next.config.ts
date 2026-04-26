@@ -22,12 +22,21 @@ const nextConfig: NextConfig = {
   },
   /** Map libs ship modern ESM; transpiling avoids occasional webpack chunk/module id mismatches in the App Router. */
   transpilePackages: ['mapbox-gl', 'react-map-gl'],
-  webpack: (config, { isServer }) => {
+  webpack: (config, { dev }) => {
     // Fix MUI imports for Next.js 15 compatibility
     config.resolve.alias = {
       ...config.resolve.alias,
       '@mui/material/esm': '@mui/material',
     };
+
+    /**
+     * In development, use in-memory webpack cache instead of on-disk pack files.
+     * Avoids intermittent ENOENT rename errors under `.next/cache/webpack/...` on macOS
+     * (parallel writes / antivirus) and reduces stale chunk name mismatches after crash/restart.
+     */
+    if (dev) {
+      config.cache = { type: "memory" as const };
+    }
 
     return config;
   },

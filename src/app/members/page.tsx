@@ -10,21 +10,19 @@ import {
   CircularProgress,
   Alert,
   Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Paper,
   IconButton,
   TextField,
   InputAdornment,
   Link as MuiLink,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
-import { AccountBalance, Groups, House, Refresh, Search } from '@mui/icons-material';
+import { AccountBalance, Cancel, Groups, House, Refresh, Search } from '@mui/icons-material';
 import { supabase } from '../lib/supabaseClient';
 import type { KYLegislator } from '../../types/kentucky';
 import { withTimeout } from '@/lib/async-utils';
-import { isKentuckyGovernor, memberProfilePath } from '@/lib/ky-member-utils';
+import { dedupeKyLegislators, isKentuckyGovernor, memberProfilePath } from '@/lib/ky-member-utils';
 import { formatPartyLabel } from '@/lib/bill-display';
 import { MemberCard } from '@/components/members/MemberCard';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
@@ -77,7 +75,8 @@ function ChamberSection({
 }
 
 export default function MembersPage() {
-  const [legislators, setLegislators] = useState<KYLegislator[]>([]);
+  const [roster, setRoster] = useState<KYLegislator[]>([]);
+  const legislators = useMemo(() => dedupeKyLegislators(roster), [roster]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +91,11 @@ export default function MembersPage() {
         setLoading(false);
         return;
       }
-      let query = supabase.from('ky_legislators').select('*').eq('active', true).order('last_name', { ascending: true });
+      let query = supabase
+        .from('ky_legislators')
+        .select('*')
+        .eq('active', true)
+        .order('last_name', { ascending: true });
       if (chamberFilter === 'house' || chamberFilter === 'senate') {
         query = query.eq('chamber', chamberFilter);
       }
@@ -103,7 +106,7 @@ export default function MembersPage() {
         'Loading legislators timed out. Check Supabase or your network.',
       );
       if (fetchError) throw fetchError;
-      setLegislators(data || []);
+      setRoster(data || []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load legislators');
     } finally {
@@ -166,8 +169,8 @@ export default function MembersPage() {
         </Typography>
         <DataFreshnessNote variant="page" source="legislators" />
 
-        <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
+        <Paper elevation={1} sx={{ p: 2, mb: 1.5, borderRadius: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: { md: 'center' } }}>
             <TextField
               fullWidth
               placeholder="Search by name or district..."
@@ -176,33 +179,95 @@ export default function MembersPage() {
               InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }}
               size="small"
             />
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel>Chamber</InputLabel>
-              <Select
-                value={chamberFilter}
-                onChange={(e) => setChamberFilter(e.target.value as 'all' | 'governor' | 'house' | 'senate')}
-                label="Chamber"
-              >
-                <MenuItem value="all">All (grouped)</MenuItem>
-                <MenuItem value="governor">Governor</MenuItem>
-                <MenuItem value="house">House</MenuItem>
-                <MenuItem value="senate">Senate</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>Party</InputLabel>
-              <Select value={partyFilter} onChange={(e) => setPartyFilter(e.target.value)} label="Party">
-                <MenuItem value="all">All Parties</MenuItem>
-                <MenuItem value="Republican">Republican</MenuItem>
-                <MenuItem value="Democrat">Democrat</MenuItem>
-                <MenuItem value="Independent">Independent</MenuItem>
-              </Select>
-            </FormControl>
-            <IconButton onClick={fetchLegislators} disabled={loading}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, flexShrink: 0 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Chamber
+                </Typography>
+                <ToggleButtonGroup
+                  value={chamberFilter}
+                  exclusive
+                  size="small"
+                  onChange={(_, v) => { if (v !== null) setChamberFilter(v); }}
+                  aria-label="Filter by chamber"
+                >
+                  <ToggleButton value="all">All</ToggleButton>
+                  <ToggleButton value="house">House</ToggleButton>
+                  <ToggleButton value="senate">Senate</ToggleButton>
+                  <ToggleButton value="governor">Gov.</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Party
+                </Typography>
+                <ToggleButtonGroup
+                  value={partyFilter}
+                  exclusive
+                  size="small"
+                  onChange={(_, v) => { if (v !== null) setPartyFilter(v); }}
+                  aria-label="Filter by party"
+                >
+                  <ToggleButton value="all">All</ToggleButton>
+                  <ToggleButton value="Republican">R</ToggleButton>
+                  <ToggleButton value="Democrat">D</ToggleButton>
+                  <ToggleButton value="Independent">I</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+            </Box>
+            <IconButton onClick={fetchLegislators} disabled={loading} sx={{ alignSelf: { xs: 'flex-start', md: 'center' }, mt: { xs: 0, md: 2 } }}>
               <Refresh />
             </IconButton>
           </Box>
         </Paper>
+
+        {/* Active filter chips */}
+        {(chamberFilter !== 'all' || partyFilter !== 'all' || searchQuery) && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
+              Active filters:
+            </Typography>
+            {chamberFilter !== 'all' && (
+              <Chip
+                label={chamberFilter === 'governor' ? 'Governor' : chamberFilter === 'house' ? 'House' : 'Senate'}
+                size="small"
+                onDelete={() => setChamberFilter('all')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {partyFilter !== 'all' && (
+              <Chip
+                label={partyFilter}
+                size="small"
+                onDelete={() => setPartyFilter('all')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {searchQuery && (
+              <Chip
+                label={`"${searchQuery}"`}
+                size="small"
+                onDelete={() => setSearchQuery('')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {(chamberFilter !== 'all' || partyFilter !== 'all' || searchQuery) && (
+              <Chip
+                label="Clear all"
+                size="small"
+                onClick={() => { setChamberFilter('all'); setPartyFilter('all'); setSearchQuery(''); }}
+                variant="outlined"
+                sx={{ ml: 0.5 }}
+              />
+            )}
+          </Box>
+        )}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Groups sx={{ fontSize: '1.2rem', color: 'primary.main' }} />
@@ -218,7 +283,7 @@ export default function MembersPage() {
           </Alert>
         )}
 
-        {loading && legislators.length === 0 ? (
+        {loading && roster.length === 0 ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />
           </Box>

@@ -18,8 +18,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
-import { Search, Gavel, ArrowForward } from '@mui/icons-material';
+import { Cancel, Search, Gavel, ArrowForward } from '@mui/icons-material';
 import { supabase } from '../lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '../../types/kentucky';
 import Link from 'next/link';
@@ -28,9 +30,10 @@ import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { withTimeout } from '@/lib/async-utils';
 import { fetchKyBillsMatchingSearch, type KyBillSearchFilters } from '@/lib/ky-search-bills';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
+import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 
-const SEARCH_SECTION_PAGE_SIZE = 6;
-const SEARCH_FETCH_LIMIT = 40;
+/** Enough merged hits for several pages at 25/50/100; search runs multiple parallel `ilike` legs. */
+const SEARCH_FETCH_LIMIT = 500;
 
 function normalizeChamberParam(raw: string | null): KyBillSearchFilters['chamber'] {
   if (raw === 'house' || raw === 'senate') return raw;
@@ -61,6 +64,7 @@ function SearchPageContent() {
   const [nonBillType, setNonBillType] = useState<string | null>(null);
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
   const filterKey = searchParams.toString();
+  const { pageSize: searchPageSize, setPageSize: setSearchPageSize } = usePersistedPageSize('search', 25);
 
   useEffect(() => {
     if (!supabase) return;
@@ -188,27 +192,24 @@ function SearchPageContent() {
               endAdornment: <Button type="submit" variant="contained" disabled={loading}>Search</Button>,
             }}
           />
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 2,
-              mt: 2,
-            }}
-          >
-            <FormControl size="small" fullWidth>
-              <InputLabel>Chamber</InputLabel>
-              <Select
-                label="Chamber"
-                value={chamberSelect}
-                onChange={(e) => setFilterParam('chamber', e.target.value as string)}
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Chamber
+              </Typography>
+              <ToggleButtonGroup
+                value={chamberSelect || 'all'}
+                exclusive
+                size="small"
+                onChange={(_, v) => { if (v !== null) setFilterParam('chamber', v === 'all' ? '' : v); }}
+                aria-label="Filter by chamber"
               >
-                <MenuItem value="">All chambers</MenuItem>
-                <MenuItem value="house">House</MenuItem>
-                <MenuItem value="senate">Senate</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
+                <ToggleButton value="all">All</ToggleButton>
+                <ToggleButton value="house">House</ToggleButton>
+                <ToggleButton value="senate">Senate</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
               <InputLabel>Status</InputLabel>
               <Select
                 label="Status"
@@ -224,7 +225,7 @@ function SearchPageContent() {
                 <MenuItem value="vetoed">Vetoed</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" fullWidth>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
               <InputLabel>Activity</InputLabel>
               <Select
                 label="Activity"
@@ -239,10 +240,10 @@ function SearchPageContent() {
                 <MenuItem value="year">This year</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Committee hint</InputLabel>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Committee</InputLabel>
               <Select
-                label="Committee hint"
+                label="Committee"
                 value={committeeSelect}
                 onChange={(e) => setFilterParam('committee', e.target.value as string)}
               >
@@ -254,6 +255,28 @@ function SearchPageContent() {
               </Select>
             </FormControl>
           </Box>
+
+          {/* Active filter chips */}
+          {(chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect) && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1.5, alignItems: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
+                Active filters:
+              </Typography>
+              {chamberSelect && (
+                <Chip label={chamberSelect === 'house' ? 'House' : 'Senate'} size="small" onDelete={() => setFilterParam('chamber', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
+              )}
+              {statusSelect && statusSelect !== 'all' && (
+                <Chip label={{ introduced: 'Introduced', in_committee: 'In committee', passed_one_chamber: 'Passed one chamber', passed: 'Passed', signed: 'Signed', vetoed: 'Vetoed' }[statusSelect] ?? statusSelect} size="small" onDelete={() => setFilterParam('status', 'all')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
+              )}
+              {dateRangeSelect && (
+                <Chip label={{ today: 'Today', week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' }[dateRangeSelect] ?? dateRangeSelect} size="small" onDelete={() => setFilterParam('dateRange', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
+              )}
+              {committeeSelect && (
+                <Chip label={committeeSelect.charAt(0).toUpperCase() + committeeSelect.slice(1)} size="small" onDelete={() => setFilterParam('committee', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
+              )}
+              <Chip label="Clear all" size="small" onClick={() => { setFilterParam('chamber', ''); setFilterParam('status', 'all'); setFilterParam('dateRange', ''); setFilterParam('committee', ''); }} variant="outlined" sx={{ ml: 0.5 }} />
+            </Box>
+          )}
           {!searched && (
             <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
               <Chip
@@ -332,8 +355,10 @@ function SearchPageContent() {
                 </Box>
                 <PaginatedSection
                   items={bills}
-                  pageSize={SEARCH_SECTION_PAGE_SIZE}
-                  resetKey={`bill-${query}-${bills.length}-${bills[0]?.id ?? ''}`}
+                  pageSize={searchPageSize}
+                  pageSizeOptions={[...PAGE_SIZE_CHOICES]}
+                  onPageSizeChange={(n) => setSearchPageSize(toPageSizeChoice(n))}
+                  resetKey={`bill-${query}-${bills.length}-${bills[0]?.id ?? ''}-${searchPageSize}`}
                   variant="responsive"
                 >
                   {(pageBills) => (

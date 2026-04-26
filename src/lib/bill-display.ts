@@ -179,8 +179,9 @@ export function formatKyLegislatorDistrict(leg: {
   let s = formatSponsorDistrictLine(raw);
   if (s.includes('House District') || s.includes('Senate District')) return s;
   if (/^\d+$/.test(raw)) {
-    if (leg.chamber === 'house') return `House District ${raw}`;
-    if (leg.chamber === 'senate') return `Senate District ${raw}`;
+    const n = String(parseInt(raw, 10));
+    if (leg.chamber === 'house') return `House District ${n}`;
+    if (leg.chamber === 'senate') return `Senate District ${n}`;
   }
   return s || raw;
 }
