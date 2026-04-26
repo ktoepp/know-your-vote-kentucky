@@ -2,15 +2,33 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/app/lib/supabaseClient';
-import { committeeSlugFromName } from '@/lib/ky-committee-utils';
+import { committeeSlugFromName, KY_STATIC_COMMITTEES } from '@/lib/ky-committee-utils';
 
-export type KyCommitteeOption = { slug: string; label: string };
+export type KyCommitteeOption = { slug: string; label: string; chamber?: 'house' | 'senate' | 'joint' };
+
+/** Build the base option list from the static KY GA committee registry. */
+function staticOptions(): KyCommitteeOption[] {
+  const seen = new Set<string>();
+  const out: KyCommitteeOption[] = [];
+  for (const c of KY_STATIC_COMMITTEES) {
+    const slug = committeeSlugFromName(c.name);
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    out.push({ slug, label: c.name, chamber: c.chamber });
+  }
+  return out;
+}
 
 /**
- * Distinct `ky_bills.committee_name` values via `ky_distinct_bill_committees` RPC (after migration 013 + sync).
+ * Committee options for the bill search/browse filter dropdown.
+ *
+ * Starts from the static KY GA standing-committee list so the dropdown is
+ * always populated. Merges in any distinct `committee_name` values from the
+ * DB (via `ky_distinct_bill_committees` RPC) so real LegiScan names also
+ * appear once the sync has run.
  */
 export function useKyBillCommittees(): { committees: KyCommitteeOption[]; loading: boolean } {
-  const [committees, setCommittees] = useState<KyCommitteeOption[]>([]);
+  const [committees, setCommittees] = useState<KyCommitteeOption[]>(staticOptions);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,31 +40,37 @@ export function useKyBillCommittees(): { committees: KyCommitteeOption[]; loadin
     void (async () => {
       const { data, error } = await supabase.rpc('ky_distinct_bill_committees');
       if (cancelled) return;
-      if (error) {
-        setCommittees([]);
-        setLoading(false);
-        return;
-      }
-      const raw = data as unknown;
-      let names: string[] = [];
-      if (Array.isArray(raw)) {
-        if (raw.length && typeof raw[0] === 'string') {
-          names = raw as string[];
+
+      const base = staticOptions();
+      const seen = new Set<string>(base.map((o) => o.slug));
+
+      if (!error && Array.isArray(data)) {
+        const dbNames: string[] = data
+          .map((r) => (typeof r === 'string' ? r : null))
+          .filter((n): n is string => Boolean(n?.trim()));
+
+        for (const name of dbNames) {
+          const label = name.trim();
+          const slug = committeeSlugFromName(label);
+          if (seen.has(slug)) continue;
+          seen.add(slug);
+          base.push({ slug, label });
         }
       }
-      const seen = new Set<string>();
-      const out: KyCommitteeOption[] = [];
-      for (const n of names) {
-        const label = String(n || '').trim();
-        if (!label) continue;
-        const slug = committeeSlugFromName(label);
-        if (seen.has(slug)) continue;
-        seen.add(slug);
-        out.push({ slug, label });
+
+      // Sort: House first, then Senate, then Joint, then any DB extras (alphabetical within each group)
+      const chamberOrder = { house: 0, senate: 1, joint: 2 };
+      base.sort((a, b) => {
+        const ca = chamberOrder[a.chamber ?? 'joint'] ?? 3;
+        const cb = chamberOrder[b.chamber ?? 'joint'] ?? 3;
+        if (ca !== cb) return ca - cb;
+        return a.label.localeCompare(b.label);
+      });
+
+      if (!cancelled) {
+        setCommittees(base);
+        setLoading(false);
       }
-      out.sort((a, b) => a.label.localeCompare(b.label));
-      setCommittees(out);
-      setLoading(false);
     })();
     return () => {
       cancelled = true;

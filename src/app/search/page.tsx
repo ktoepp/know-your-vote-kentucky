@@ -22,6 +22,7 @@ import {
   ToggleButton,
 } from '@mui/material';
 import { Cancel, Search, Gavel, ArrowForward } from '@mui/icons-material';
+import ListSubheader from '@mui/material/ListSubheader';
 import { supabase } from '../lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '../../types/kentucky';
 import Link from 'next/link';
@@ -237,19 +238,29 @@ function SearchPageContent() {
                 <MenuItem value="year">This year</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" sx={{ minWidth: 200 }}>
+            <FormControl size="small" sx={{ minWidth: 220 }}>
               <InputLabel>Committee</InputLabel>
               <Select
                 label="Committee"
                 value={committeeSelect}
                 onChange={(e) => setFilterParam('committee', e.target.value as string)}
+                MenuProps={{ PaperProps: { sx: { maxHeight: 420 } } }}
               >
-                <MenuItem value="">Any committee</MenuItem>
-                {committeeOptions.map((c) => (
-                  <MenuItem key={c.slug} value={c.slug}>
-                    {c.label}
-                  </MenuItem>
-                ))}
+                <MenuItem value="">All committees</MenuItem>
+                {(() => {
+                  const items: React.ReactNode[] = [];
+                  let lastChamber: string | undefined;
+                  const chamberLabel: Record<string, string> = { house: 'House', senate: 'Senate', joint: 'Joint / Interim' };
+                  for (const c of committeeOptions) {
+                    const ch = c.chamber ?? 'joint';
+                    if (ch !== lastChamber) {
+                      items.push(<ListSubheader key={`hdr-${ch}`} disableSticky>{chamberLabel[ch] ?? ch}</ListSubheader>);
+                      lastChamber = ch;
+                    }
+                    items.push(<MenuItem key={c.slug} value={c.slug} sx={{ pl: 3 }}>{c.label}</MenuItem>);
+                  }
+                  return items;
+                })()}
               </Select>
             </FormControl>
           </Box>

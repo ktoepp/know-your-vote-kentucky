@@ -7,10 +7,11 @@ export const KY_SESSIONS = [
   { name: '2025 Regular Session', start: '2025-01-07', end: '2025-04-15', type: 'regular' as const },
 ];
 
-export type KYSession = typeof KY_SESSIONS[number];
+export type KYSessionType = 'regular' | 'special';
+export type KYSession = (typeof KY_SESSIONS[number]) | { name: string; start: string; end: string; type: KYSessionType };
 
 /** Returns the currently active session, or null if today is outside all session windows. */
-export function getActiveSession(asOf: Date = new Date()): KYSession | null {
+export function getActiveSession(asOf: Date = new Date()): typeof KY_SESSIONS[number] | null {
   const today = new Date(asOf);
   today.setHours(12, 0, 0, 0);
   return KY_SESSIONS.find((s) => {
@@ -26,7 +27,7 @@ export function getCivicDataSessionName(asOf: Date = new Date()): string {
   return (getActiveSession(asOf) ?? KY_SESSIONS[0]!).name;
 }
 
-const SESSION_TYPE_DESCRIPTIONS: Record<KYSession['type'], string> = {
+const SESSION_TYPE_DESCRIPTIONS: Record<KYSessionType, string> = {
   regular:
     'A regular session convenes each January under the Kentucky Constitution. ' +
     'The General Assembly meets for up to 60 legislative days: 30 days in even-numbered years (budget years) ' +
