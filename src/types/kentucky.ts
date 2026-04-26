@@ -51,6 +51,9 @@ export interface KYBill {
   introduced_date: string | null;
   last_action_date: string | null;
   last_action: string | null;
+  /** LegiScan getBill primary committee when synced (migration 013). */
+  committee_legiscan_id?: number | null;
+  committee_name?: string | null;
   bill_text_url: string | null;
   topics: string[] | null;
   sponsors: Record<string, unknown> | null;

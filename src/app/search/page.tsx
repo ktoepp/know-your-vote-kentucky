@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, Suspense, useEffect, useCallback } from 'react';
+import React, { useState, Suspense, useEffect, useCallback, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
@@ -28,27 +28,17 @@ import Link from 'next/link';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { withTimeout } from '@/lib/async-utils';
-import { fetchKyBillsMatchingSearch, type KyBillSearchFilters } from '@/lib/ky-search-bills';
+import {
+  buildKyBillSearchFiltersFromUrlSearch,
+  fetchKyBillsMatchingSearch,
+  type KyBillSearchFilters,
+} from '@/lib/ky-search-bills';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
+import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
 
 /** Enough merged hits for several pages at 25/50/100; search runs multiple parallel `ilike` legs. */
 const SEARCH_FETCH_LIMIT = 500;
-
-function normalizeChamberParam(raw: string | null): KyBillSearchFilters['chamber'] {
-  if (raw === 'house' || raw === 'senate') return raw;
-  return undefined;
-}
-
-function buildSearchFilters(searchParams: URLSearchParams): KyBillSearchFilters {
-  const st = searchParams.get('status');
-  return {
-    chamber: normalizeChamberParam(searchParams.get('chamber')),
-    dateRange: searchParams.get('dateRange') || undefined,
-    status: st && st !== 'all' ? st : undefined,
-    committee: searchParams.get('committee') || undefined,
-  };
-}
 
 function SearchPageContent() {
   const router = useRouter();
@@ -65,6 +55,7 @@ function SearchPageContent() {
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
   const filterKey = searchParams.toString();
   const { pageSize: searchPageSize, setPageSize: setSearchPageSize } = usePersistedPageSize('search', 25);
+  const { committees: committeeOptions } = useKyBillCommittees();
 
   useEffect(() => {
     if (!supabase) return;
@@ -128,7 +119,7 @@ function SearchPageContent() {
     }
 
     setNonBillType(null);
-    const filters = buildSearchFilters(searchParams);
+    const filters = buildKyBillSearchFiltersFromUrlSearch(searchParams);
     void performSearch(q, filters);
   }, [qFromUrl, contentType, filterKey, performSearch]);
 
@@ -157,6 +148,12 @@ function SearchPageContent() {
   const dateRangeSelect = searchParams.get('dateRange') || '';
   const statusSelect = searchParams.get('status') || 'all';
   const committeeSelect = searchParams.get('committee') || '';
+
+  const committeeChipLabel = useMemo(() => {
+    if (!committeeSelect) return '';
+    const found = committeeOptions.find((c) => c.slug === committeeSelect);
+    return found?.label ?? committeeSelect.replace(/-/g, ' ');
+  }, [committeeSelect, committeeOptions]);
 
   const setFilterParam = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -240,18 +237,19 @@ function SearchPageContent() {
                 <MenuItem value="year">This year</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" sx={{ minWidth: 160 }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
               <InputLabel>Committee</InputLabel>
               <Select
                 label="Committee"
                 value={committeeSelect}
                 onChange={(e) => setFilterParam('committee', e.target.value as string)}
               >
-                <MenuItem value="">Any</MenuItem>
-                <MenuItem value="appropriations">Appropriations</MenuItem>
-                <MenuItem value="budget">Budget</MenuItem>
-                <MenuItem value="finance">Finance</MenuItem>
-                <MenuItem value="judiciary">Judiciary</MenuItem>
+                <MenuItem value="">Any committee</MenuItem>
+                {committeeOptions.map((c) => (
+                  <MenuItem key={c.slug} value={c.slug}>
+                    {c.label}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>
@@ -272,7 +270,7 @@ function SearchPageContent() {
                 <Chip label={{ today: 'Today', week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' }[dateRangeSelect] ?? dateRangeSelect} size="small" onDelete={() => setFilterParam('dateRange', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
               )}
               {committeeSelect && (
-                <Chip label={committeeSelect.charAt(0).toUpperCase() + committeeSelect.slice(1)} size="small" onDelete={() => setFilterParam('committee', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
+                <Chip label={committeeChipLabel} size="small" onDelete={() => setFilterParam('committee', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
               )}
               <Chip label="Clear all" size="small" onClick={() => { setFilterParam('chamber', ''); setFilterParam('status', 'all'); setFilterParam('dateRange', ''); setFilterParam('committee', ''); }} variant="outlined" sx={{ ml: 0.5 }} />
             </Box>

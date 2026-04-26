@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
-import { fetchKyBillsMatchingSearch } from '@/lib/ky-search-bills';
+import { buildKyBillSearchFiltersFromUrlSearch, fetchKyBillsMatchingSearch } from '@/lib/ky-search-bills';
 import { parseLimit, ValidationError } from '@/lib/api-validation';
 
 export async function GET(request: NextRequest) {
@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
     }
 
     const q = query.trim();
-    const bills = await fetchKyBillsMatchingSearch(supabase, q, limit);
+    const filters = buildKyBillSearchFiltersFromUrlSearch(searchParams);
+    const bills = await fetchKyBillsMatchingSearch(supabase, q, limit, filters);
 
     const results = bills.map((b) => ({
       id: b.id,

@@ -52,6 +52,89 @@ export function isRecentlyPassedBillStatus(status: string | null | undefined): b
   return false;
 }
 
+/** UI browse toggles in `BillsBrowse` (values match `status` param on search, not raw `ky_bills.status` strings). */
+export type KyBillBrowseStatusFilterKey =
+  | 'all'
+  | 'introduced'
+  | 'in_committee'
+  | 'passed_one_chamber'
+  | 'passed'
+  | 'signed'
+  | 'vetoed';
+
+/**
+ * Coarse stage for `ky_bills` rows from `mapLegiScanStatus` (see `ky-sync-pipeline.ts`).
+ * Used for client-side status filters: DB has "Engrossed", "Passed Chamber", "In Committee", not `passed_one_chamber`.
+ */
+export type KyBillBrowseBucket = Exclude<KyBillBrowseStatusFilterKey, 'all'> | 'other';
+
+export const BROWSE_STATUS_BUCKETS: ReadonlySet<string> = new Set([
+  'introduced',
+  'in_committee',
+  'passed_one_chamber',
+  'passed',
+  'signed',
+  'vetoed',
+]);
+
+/**
+ * One bucket per bill (first match wins, most advanced stage first) so every row maps to at most one filter.
+ */
+export function classifyKyBillBrowseBucket(bill: KYBill): KyBillBrowseBucket {
+  const st = (bill.status || '').trim().toLowerCase();
+  const act = (bill.last_action || '').trim().toLowerCase();
+
+  if (isSignedByGovernorBillStatus(bill.status) || st.includes('chaptered')) {
+    return 'signed';
+  }
+  if (st.includes('vetoed') && !st.includes('override')) {
+    return 'vetoed';
+  }
+
+  if (st === 'enrolled' || (st === 'passed' && !st.includes('chamber')) || act.includes('delivered to the governor')) {
+    return 'passed';
+  }
+
+  if (st.includes('engrossed') && !st.includes('enrolled')) {
+    return 'passed_one_chamber';
+  }
+  if (st.includes('passed chamber')) {
+    return 'passed_one_chamber';
+  }
+  if (act.includes('engrossed') && !st.includes('enrolled')) {
+    return 'passed_one_chamber';
+  }
+
+  if (st === 'failed in committee') {
+    return 'other';
+  }
+  if (st === 'in committee' || st === 'referred' || st === 'reported' || (st.includes('committee') && !st.includes('substitute'))) {
+    return 'in_committee';
+  }
+  if (st.includes('committee substitute')) {
+    return 'in_committee';
+  }
+
+  if (st === 'introduced' || st === 'draft' || st.includes('prefiled')) {
+    return 'introduced';
+  }
+  if (st.includes('failed') || st.includes('died') || st.includes('veto override')) {
+    return 'other';
+  }
+  return 'other';
+}
+
+/** Browse/search: filter key is a bucket; unknown strings fall back to case-insensitive `status` equality. */
+export function billMatchesBrowseStatusFilter(bill: KYBill, filter: string | null | undefined): boolean {
+  if (filter == null || filter === '' || filter === 'all') return true;
+  const f = filter.trim();
+  if (f === 'all') return true;
+  if (!BROWSE_STATUS_BUCKETS.has(f)) {
+    return (bill.status || '').trim().toLowerCase() === f.toLowerCase();
+  }
+  return classifyKyBillBrowseBucket(bill) === f;
+}
+
 /**
  * Label for status chips: use full "Signed by Governor" when the DB has only "Signed".
  */

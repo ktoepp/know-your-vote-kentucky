@@ -16,6 +16,10 @@ import {
   ToggleButton,
   Tooltip,
   Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { Cancel, Search, Refresh, Gavel } from '@mui/icons-material';
 import { LayoutGrid, List } from 'lucide-react';
@@ -24,10 +28,12 @@ import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { BillsListTable } from '@/components/bills/BillsListTable';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
-import { compareKyBills, effectiveBillChamber, type KyBillSortKey } from '@/lib/bill-display';
+import { billMatchesBrowseStatusFilter, compareKyBills, effectiveBillChamber, type KyBillSortKey } from '@/lib/bill-display';
+import { billMatchesCommitteeFilter } from '@/lib/ky-committee-utils';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
+import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
 
 /**
  * One query loads up to this many rows; client filters/sorts, then `PaginatedSection` paginates 25/50/100.
@@ -41,11 +47,10 @@ function defaultSortDirForKey(key: KyBillSortKey): 'asc' | 'desc' {
 
 export type BillsBrowseChamberMode = 'all' | 'house' | 'senate';
 
-/** Shared Supabase query for browse + refresh (house/senate include prefix fallback when `chamber` is null). */
-function applyKyBillsFilters(
+/** Shared Supabase query for browse + refresh (house/senate include prefix fallback when `chamber` is null). Status is never filtered in SQL; use `billMatchesBrowseStatusFilter` in the client. */
+function applyKyBillsQuery(
   chamberMode: BillsBrowseChamberMode,
   chamberFilter: 'all' | 'house' | 'senate',
-  statusFilter: string,
 ) {
   if (!supabase) return null;
   let query = supabase.from('ky_bills').select('*').order('session', { ascending: false }).order('last_action_date', { ascending: false });
@@ -54,9 +59,6 @@ function applyKyBillsFilters(
     query = query.or('chamber.eq.house,bill_number.ilike.H%');
   } else if (effectiveChamber === 'senate') {
     query = query.or('chamber.eq.senate,bill_number.ilike.S%');
-  }
-  if (statusFilter !== 'all') {
-    query = query.eq('status', statusFilter);
   }
   return query.limit(BROWSE_QUERY_ROW_LIMIT);
 }
@@ -76,7 +78,9 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
     chamberMode === 'all' ? 'all' : chamberMode,
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [committeeFilter, setCommitteeFilter] = useState('');
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
+  const { committees: committeeOptions } = useKyBillCommittees();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [sortBy, setSortBy] = useState<KyBillSortKey>('last_action_date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -103,7 +107,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
       setLoading(true);
       setError(null);
       try {
-        const query = applyKyBillsFilters(chamberMode, chamberFilter, statusFilter);
+        const query = applyKyBillsQuery(chamberMode, chamberFilter);
         if (!query) {
           if (!cancelled) setLoading(false);
           return;
@@ -125,11 +129,17 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
     return () => {
       cancelled = true;
     };
-  }, [chamberMode, chamberFilter, statusFilter]);
+  }, [chamberMode, chamberFilter]);
 
   const filteredBills = bills.filter((bill) => {
     if (chamberMode === 'all' && chamberFilter !== 'all') {
       if (effectiveBillChamber(bill) !== chamberFilter) return false;
+    }
+    if (!billMatchesBrowseStatusFilter(bill, statusFilter)) {
+      return false;
+    }
+    if (!billMatchesCommitteeFilter(bill, committeeFilter)) {
+      return false;
     }
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -140,7 +150,8 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
       bill.ai_summary?.toLowerCase().includes(q) ||
       bill.session?.toLowerCase().includes(q) ||
       bill.last_action?.toLowerCase().includes(q) ||
-      bill.status?.toLowerCase().includes(q)
+      bill.status?.toLowerCase().includes(q) ||
+      (bill.committee_name || '').toLowerCase().includes(q)
     );
   });
 
@@ -165,9 +176,14 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
     [sortBy],
   );
 
-  const browsePagerResetKey = `${searchQuery}|${chamberFilter}|${statusFilter}|${viewMode}|${sortBy}|${sortDir}|${pageSize}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
+  const browsePagerResetKey = `${searchQuery}|${chamberFilter}|${statusFilter}|${committeeFilter}|${viewMode}|${sortBy}|${sortDir}|${pageSize}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
 
   const showChamberSelect = chamberMode === 'all';
+
+  const committeeFilterLabel = useMemo(() => {
+    if (!committeeFilter) return '';
+    return committeeOptions.find((c) => c.slug === committeeFilter)?.label ?? committeeFilter.replace(/-/g, ' ');
+  }, [committeeFilter, committeeOptions]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -244,6 +260,27 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
                   <ToggleButton value="vetoed">Vetoed</ToggleButton>
                 </ToggleButtonGroup>
               </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Committee
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel id="browse-committee-label">Committee</InputLabel>
+                  <Select
+                    labelId="browse-committee-label"
+                    label="Committee"
+                    value={committeeFilter}
+                    onChange={(e) => setCommitteeFilter(e.target.value)}
+                  >
+                    <MenuItem value="">All committees</MenuItem>
+                    {committeeOptions.map((c) => (
+                      <MenuItem key={c.slug} value={c.slug}>
+                        {c.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
               <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end', pb: 0.25 }}>
                 <Tooltip title="Grid or list">
                   <ToggleButtonGroup
@@ -268,7 +305,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
                       setLoading(true);
                       setError(null);
                       try {
-                        const query = applyKyBillsFilters(chamberMode, chamberFilter, statusFilter);
+                        const query = applyKyBillsQuery(chamberMode, chamberFilter);
                         if (!query) {
                           setLoading(false);
                           return;
@@ -298,7 +335,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
         </Paper>
 
         {/* Active filter chips */}
-        {(chamberFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+        {(chamberFilter !== 'all' || statusFilter !== 'all' || committeeFilter || searchQuery) && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
               Active filters:
@@ -323,6 +360,16 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
                 variant="outlined"
               />
             )}
+            {committeeFilter && (
+              <Chip
+                label={committeeFilterLabel}
+                size="small"
+                onDelete={() => setCommitteeFilter('')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
             {searchQuery && (
               <Chip
                 label={`"${searchQuery}"`}
@@ -336,7 +383,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
             <Chip
               label="Clear all"
               size="small"
-              onClick={() => { setChamberFilter('all'); setStatusFilter('all'); setSearchQuery(''); }}
+              onClick={() => { setChamberFilter('all'); setStatusFilter('all'); setCommitteeFilter(''); setSearchQuery(''); }}
               variant="outlined"
               sx={{ ml: 0.5 }}
             />
