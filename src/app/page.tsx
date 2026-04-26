@@ -4,16 +4,13 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
+  Chip,
   Container,
   Typography,
   CircularProgress,
   Alert,
   Grid,
   Stack,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
 } from '@mui/material';
 import {
   Gavel,
@@ -31,14 +28,14 @@ import { EmptyState } from '@/components/civic/EmptyState';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
-import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { HomeCuratedBillList } from '@/components/home/HomeCuratedBillList';
 import { selectRecentlyPassedBills, selectMostViewedBills } from '@/lib/home-bill-curated';
 import { KY_SESSIONS, getActiveSession } from '@/lib/ky-sessions';
+import { KY_TOPICS } from '@/lib/ky-topic-classifier';
 import { ICON_REM, TYPE } from '@/lib/ui-tokens';
 
-/** Each home bill query loads enough rows for 24/48/96 per page in every section. */
-const HOME_SECTION_FETCH = 100;
+const HOME_SECTION_DISPLAY = 6;
+const HOME_SECTION_FETCH = 60;
 const HOME_CURATED_LIMIT = 6;
 
 /** LRC meetings & committee schedule (authoritative for day-to-day floor and committee). */
@@ -181,7 +178,7 @@ export default function HomePage() {
   const [mostViewedBills, setMostViewedBills] = useState<KYBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { pageSize: homePageSize, setPageSize: setHomePageSize } = usePersistedPageSize('home', 24);
+  const [topicCounts, setTopicCounts] = useState<{ topic: string; count: number }[]>([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -192,7 +189,7 @@ export default function HomePage() {
           setLoading(false);
           return;
         }
-        const [billsRes, senateCountRes, legRes, passedRes, mostViewedRes] = await withTimeout(
+        const [billsRes, senateCountRes, legRes, passedRes, mostViewedRes, topicsRes] = await withTimeout(
           Promise.all([
             supabase.from('ky_bills').select('*').order('session', { ascending: false }).order('last_action_date', { ascending: false }).limit(HOME_SECTION_FETCH),
             supabase
@@ -217,6 +214,8 @@ export default function HomePage() {
               .order('session', { ascending: false })
               .order('last_action_date', { ascending: false, nullsFirst: false })
               .limit(24),
+            // Identical ordering/limit to BillsBrowse so topic counts match click-through results
+            supabase.from('ky_bills').select('topics').order('session', { ascending: false }).order('last_action_date', { ascending: false }).limit(1000),
           ]),
           30_000,
           'Could not reach database (timed out). Check your connection and Supabase status.',
@@ -226,12 +225,27 @@ export default function HomePage() {
         if (legRes.error) console.warn('[Home] ky_legislators:', legRes.error.message);
         if (passedRes.error) console.warn('[Home] ky_bills (curated passed):', passedRes.error.message);
         if (mostViewedRes.error) console.warn('[Home] ky_bills (most viewed):', mostViewedRes.error.message);
+        if (topicsRes.error) console.warn('[Home] ky_bills (topics):', topicsRes.error.message);
         const billsData = billsRes.data ?? [];
         setBills(billsData);
         const passed = selectRecentlyPassedBills(passedRes.data, billsData, HOME_CURATED_LIMIT);
         setPassedSidebarBills(passed);
         setMostViewedBills(selectMostViewedBills(mostViewedRes.data, billsData, passed, HOME_CURATED_LIMIT));
         if (legRes.data) setLegislators(legRes.data);
+        if (topicsRes.data) {
+          const counts = new Map<string, number>();
+          for (const row of topicsRes.data) {
+            for (const topic of row.topics ?? []) {
+              counts.set(topic, (counts.get(topic) ?? 0) + 1);
+            }
+          }
+          setTopicCounts(
+            Array.from(counts.entries())
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 6)
+              .map(([topic, count]) => ({ topic, count })),
+          );
+        }
 
         const senateCount = senateCountRes.count ?? 0;
         const bicameral = senateCount > 0;
@@ -389,26 +403,78 @@ export default function HomePage() {
           </Box>
         )}
 
+        {/* Browse by topic — static chip strip */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" fontWeight={700} gutterBottom>
+            Browse by topic
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {KY_TOPICS.map((topic) => (
+              <Chip
+                key={topic}
+                label={topic}
+                component="a"
+                href={`/bills?topic=${encodeURIComponent(topic)}`}
+                clickable
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 500 }}
+              />
+            ))}
+          </Box>
+        </Box>
+
+        {/* Trending topics — accurate counts from full bill set */}
+        {topicCounts.length > 0 && (
+          <Box sx={{ mb: 5 }}>
+            <Typography variant="h6" fontWeight={700} gutterBottom>
+              Trending topics
+            </Typography>
+            <Grid container spacing={2}>
+              {topicCounts.map(({ topic, count }) => (
+                <Grid item xs={6} sm={4} md={2} key={topic}>
+                  <Box
+                    component="a"
+                    href={`/bills?topic=${encodeURIComponent(topic)}`}
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      p: 2,
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      bgcolor: 'background.paper',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        boxShadow: 2,
+                      },
+                    }}
+                  >
+                    <Typography variant="h5" fontWeight={700} color="primary.main" lineHeight={1}>
+                      {count}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
+                      bills
+                    </Typography>
+                    <Typography variant="body2" fontWeight={600} sx={{ mt: 0.75, lineHeight: 1.2 }}>
+                      {topic}
+                    </Typography>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+
         {!loading && (
           <Grid container spacing={3} sx={{ alignItems: 'flex-start' }}>
             <Grid item xs={12} lg={8} sx={{ order: { xs: 0, lg: 0 } }}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-                <FormControl size="small" sx={{ minWidth: 150 }} variant="outlined">
-                  <InputLabel id="home-bills-per-page">Bills per page</InputLabel>
-                  <Select
-                    labelId="home-bills-per-page"
-                    label="Bills per page"
-                    value={homePageSize}
-                    onChange={(e) => setHomePageSize(toPageSizeChoice(parseInt(String(e.target.value), 10)))}
-                  >
-                    {PAGE_SIZE_CHOICES.map((n) => (
-                      <MenuItem key={n} value={n}>
-                        {n}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
               {/* Latest KY Bills */}
               <SectionHeader
                 title="Latest KY Bills"
@@ -424,8 +490,8 @@ export default function HomePage() {
                 <Box sx={{ mb: 6 }}>
                   <PaginatedSection
                     items={bills}
-                    pageSize={homePageSize}
-                    resetKey={`${bills.length}-${bills[0]?.id ?? ''}-${homePageSize}`}
+                    pageSize={HOME_SECTION_DISPLAY}
+                    resetKey={`${bills.length}-${bills[0]?.id ?? ''}`}
                     variant="responsive"
                   >
                     {(pageBills) => (
@@ -457,8 +523,8 @@ export default function HomePage() {
                     <Box sx={{ mb: 6 }}>
                       <PaginatedSection
                         items={houseBills}
-                        pageSize={homePageSize}
-                        resetKey={`h-${houseBills.length}-${houseBills[0]?.id ?? ''}-${homePageSize}`}
+                        pageSize={HOME_SECTION_DISPLAY}
+                        resetKey={`h-${houseBills.length}-${houseBills[0]?.id ?? ''}`}
                         variant="responsive"
                       >
                         {(pageBills) => (
@@ -488,8 +554,8 @@ export default function HomePage() {
                     <Box sx={{ mb: 6 }}>
                       <PaginatedSection
                         items={senateBills}
-                        pageSize={homePageSize}
-                        resetKey={`s-${senateBills.length}-${senateBills[0]?.id ?? ''}-${homePageSize}`}
+                        pageSize={HOME_SECTION_DISPLAY}
+                        resetKey={`s-${senateBills.length}-${senateBills[0]?.id ?? ''}`}
                         variant="responsive"
                       >
                         {(pageBills) => (

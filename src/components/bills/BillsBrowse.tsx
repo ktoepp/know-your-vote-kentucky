@@ -67,9 +67,11 @@ export interface BillsBrowseProps {
   title: string;
   subtitle: string;
   chamberMode: BillsBrowseChamberMode;
+  /** Pre-select a topic filter on mount (e.g. from ?topic= URL param). */
+  initialTopic?: string;
 }
 
-export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) {
+export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: BillsBrowseProps) {
   const [bills, setBills] = useState<KYBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +80,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
     chamberMode === 'all' ? 'all' : chamberMode,
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [topicFilter, setTopicFilter] = useState<string>(initialTopic ?? '');
   const [committeeFilter, setCommitteeFilter] = useState('');
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
   const { committees: committeeOptions } = useKyBillCommittees();
@@ -141,6 +144,9 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
     if (!billMatchesCommitteeFilter(bill, committeeFilter)) {
       return false;
     }
+    if (topicFilter && !bill.topics?.includes(topicFilter)) {
+      return false;
+    }
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -176,7 +182,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
     [sortBy],
   );
 
-  const browsePagerResetKey = `${searchQuery}|${chamberFilter}|${statusFilter}|${committeeFilter}|${viewMode}|${sortBy}|${sortDir}|${pageSize}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
+  const browsePagerResetKey = `${searchQuery}|${chamberFilter}|${statusFilter}|${committeeFilter}|${topicFilter}|${viewMode}|${sortBy}|${sortDir}|${pageSize}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
 
   const showChamberSelect = chamberMode === 'all';
 
@@ -335,7 +341,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
         </Paper>
 
         {/* Active filter chips */}
-        {(chamberFilter !== 'all' || statusFilter !== 'all' || committeeFilter || searchQuery) && (
+        {(chamberFilter !== 'all' || statusFilter !== 'all' || committeeFilter || topicFilter || searchQuery) && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
               Active filters:
@@ -370,6 +376,16 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
                 variant="outlined"
               />
             )}
+            {topicFilter && (
+              <Chip
+                label={topicFilter}
+                size="small"
+                onDelete={() => setTopicFilter('')}
+                deleteIcon={<Cancel />}
+                color="secondary"
+                variant="outlined"
+              />
+            )}
             {searchQuery && (
               <Chip
                 label={`"${searchQuery}"`}
@@ -383,7 +399,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
             <Chip
               label="Clear all"
               size="small"
-              onClick={() => { setChamberFilter('all'); setStatusFilter('all'); setCommitteeFilter(''); setSearchQuery(''); }}
+              onClick={() => { setChamberFilter('all'); setStatusFilter('all'); setCommitteeFilter(''); setTopicFilter(''); setSearchQuery(''); }}
               variant="outlined"
               sx={{ ml: 0.5 }}
             />
