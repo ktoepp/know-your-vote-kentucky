@@ -128,16 +128,42 @@ export function findLegislatorByProfileSlug(
 
 export { ballotpediaMemberSearchUrl } from './external-legislative-links';
 
-/** Kentucky LRC / legislature.ky.gov profile URL when stored or legacy `website` points there. */
+/**
+ * Public LRC profile is keyed by **district** (current officeholder), not by person.
+ * - House: `DistrictNumber` = 1..100
+ * - Senate: `DistrictNumber` = 101..138 (100 + senate district 1..38)
+ * @see https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx
+ */
+export function inferKyLrcProfileUrlFromDistrict(leg: {
+  chamber?: 'house' | 'senate' | null;
+  district?: string | null;
+}): string | null {
+  if (leg.chamber !== 'house' && leg.chamber !== 'senate') return null;
+  const nStr = parseKyDistrictNumber(leg.district);
+  if (!nStr) return null;
+  const d = parseInt(nStr, 10);
+  if (!Number.isFinite(d) || d < 1) return null;
+  const base = 'https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx';
+  if (leg.chamber === 'house') {
+    if (d > 100) return null;
+    return `${base}?DistrictNumber=${d}`;
+  }
+  if (d > 38) return null;
+  return `${base}?DistrictNumber=${100 + d}`;
+}
+
+/** Kentucky LRC / legislature.ky.gov profile URL when stored, legacy `website`, or inferable from chamber + district. */
 export function kyLegislatureProfileUrl(leg: {
   lrc_profile_url?: string | null;
   website?: string | null;
+  chamber?: 'house' | 'senate' | null;
+  district?: string | null;
 }): string | null {
   const lrc = (leg.lrc_profile_url || '').trim();
   if (lrc) return lrc;
   const w = (leg.website || '').trim();
   if (w.toLowerCase().includes('legislature.ky.gov')) return w;
-  return null;
+  return inferKyLrcProfileUrlFromDistrict(leg);
 }
 
 /** Non-legislature website (e.g. campaign) when `website` is not the LRC profile. */

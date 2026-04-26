@@ -37,7 +37,7 @@ import { selectRecentlyPassedBills, selectMostViewedBills } from '@/lib/home-bil
 import { KY_SESSIONS, getActiveSession } from '@/lib/ky-sessions';
 import { ICON_REM, TYPE } from '@/lib/ui-tokens';
 
-/** Each home bill query loads enough rows for 25/50/100 per page in every section. */
+/** Each home bill query loads enough rows for 24/48/96 per page in every section. */
 const HOME_SECTION_FETCH = 100;
 const HOME_CURATED_LIMIT = 6;
 
@@ -181,7 +181,7 @@ export default function HomePage() {
   const [mostViewedBills, setMostViewedBills] = useState<KYBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { pageSize: homePageSize, setPageSize: setHomePageSize } = usePersistedPageSize('home', 25);
+  const { pageSize: homePageSize, setPageSize: setHomePageSize } = usePersistedPageSize('home', 24);
 
   useEffect(() => {
     async function fetchData() {
@@ -321,8 +321,9 @@ export default function HomePage() {
             Know Your Vote Kentucky
           </Typography>
           <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2, maxWidth: 640, fontWeight: 400, lineHeight: 1.5 }}>
-            Browse state bills and follow their progress through the legislative process. Find your legislator on the
-            district map.
+            Browse state bills and follow their progress through the legislative process.
+            <br />
+            Find your legislator on the district map.
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <Button

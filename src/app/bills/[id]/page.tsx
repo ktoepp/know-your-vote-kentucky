@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Container as MuiContainer,
   Typography,
@@ -15,6 +15,8 @@ import {
   Avatar as MuiAvatar,
   Grid as MuiGrid,
   Tooltip as MuiTooltip,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -264,9 +266,34 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
 function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
-  const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
+  const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest');
+
+  const sorted = useMemo(() => {
+    const copy = [...history].sort((a, b) => a.date.localeCompare(b.date));
+    if (sortOrder === 'newest') copy.reverse();
+    return copy;
+  }, [history, sortOrder]);
 
   return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <ToggleButtonGroup
+          size="small"
+          value={sortOrder}
+          exclusive
+          onChange={(_, v: 'oldest' | 'newest' | null) => {
+            if (v != null) setSortOrder(v);
+          }}
+          aria-label="Sort legislative history by date"
+        >
+          <ToggleButton value="oldest" sx={{ textTransform: 'none', px: 1.5 }}>
+            Oldest first
+          </ToggleButton>
+          <ToggleButton value="newest" sx={{ textTransform: 'none', px: 1.5 }}>
+            Newest first
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
     <Box sx={{ pl: 0 }}>
       {sorted.map((item, i) => {
         const isLast = i === sorted.length - 1;
@@ -283,7 +310,10 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
             ? theme.palette.grey[500]
             : theme.palette.grey[600];
         return (
-          <Box key={i} sx={{ display: 'flex', gap: 2, mb: isLast ? 0 : 2 }}>
+          <Box
+            key={`${item.date}-${i}-${item.chamber}-${(item.action || '').slice(0, 48)}`}
+            sx={{ display: 'flex', gap: 2, mb: isLast ? 0 : 2 }}
+          >
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
               <Box sx={{
                 width: 10, height: 10, borderRadius: '50%', mt: 0.6,
@@ -325,6 +355,7 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
           </Box>
         );
       })}
+    </Box>
     </Box>
   );
 }

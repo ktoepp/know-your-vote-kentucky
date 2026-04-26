@@ -36,7 +36,7 @@ import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
 
 /**
- * One query loads up to this many rows; client filters/sorts, then `PaginatedSection` paginates 25/50/100.
+ * One query loads up to this many rows; client filters/sorts, then `PaginatedSection` paginates 24/48/96.
  * A full KY session is on the order of ~500–600 bills — well under Supabase’s 1000 per-request cap.
  */
 const BROWSE_QUERY_ROW_LIMIT = 1000;
@@ -84,7 +84,7 @@ export function BillsBrowse({ title, subtitle, chamberMode }: BillsBrowseProps) 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [sortBy, setSortBy] = useState<KyBillSortKey>('last_action_date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const { pageSize, setPageSize } = usePersistedPageSize('bills', 25);
+  const { pageSize, setPageSize } = usePersistedPageSize('bills', 24);
 
   useEffect(() => {
     if (!supabase) return;

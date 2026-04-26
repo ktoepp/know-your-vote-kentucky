@@ -118,7 +118,7 @@ export async function fetchKyBillsMatchingSearch(
   const safe = q.trim();
   if (!safe) return [];
 
-  /** Was 120 and capped merge results too low; KY session-scale search needs room for 25/50/100 per page. */
+  /** Was 120 and capped merge results too low; KY session-scale search needs room for 24/48/96 per page. */
   const mergeCap = Math.min(
     1000,
     Math.max(

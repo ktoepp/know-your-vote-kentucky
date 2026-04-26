@@ -23,7 +23,7 @@ const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
  */
 export default function DataFreshnessNote({ variant = 'page', source }: DataFreshnessNoteProps) {
   const theme = useTheme();
-  const [line, setLine] = useState<string | null>(null);
+  const [lastUpdatedWhen, setLastUpdatedWhen] = useState<string | null>(null);
   const [staleHours, setStaleHours] = useState<number | null>(null);
 
   useEffect(() => {
@@ -45,9 +45,7 @@ export default function DataFreshnessNote({ variant = 'page', source }: DataFres
 
       if (cancelled) return;
       setStaleHours(ageMs > STALE_THRESHOLD_MS ? Math.round(ageMs / (60 * 60 * 1000)) : null);
-      setLine(
-        `Last updated ${when}. This site compiles and presents information with AI assistance—please verify important details with official sources.`,
-      );
+      setLastUpdatedWhen(when);
     })();
 
     return () => {
@@ -55,7 +53,7 @@ export default function DataFreshnessNote({ variant = 'page', source }: DataFres
     };
   }, [source]);
 
-  if (!line) return null;
+  if (!lastUpdatedWhen) return null;
 
   const textColor = variant === 'hero' ? alpha(theme.palette.common.white, 0.88) : 'text.secondary';
   const iconColor = variant === 'hero' ? alpha(theme.palette.common.white, 0.7) : alpha(theme.palette.warning.main, 0.75);
@@ -79,7 +77,9 @@ export default function DataFreshnessNote({ variant = 'page', source }: DataFres
         />
       )}
       <Typography variant="caption" component="p" sx={{ lineHeight: 1.5, color: textColor }}>
-        {line}
+        Last updated {lastUpdatedWhen}.
+        <br />
+        This site compiles and presents information with AI assistance—please verify important details with official sources.
       </Typography>
     </Box>
   );

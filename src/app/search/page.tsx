@@ -38,7 +38,7 @@ import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
 
-/** Enough merged hits for several pages at 25/50/100; search runs multiple parallel `ilike` legs. */
+/** Enough merged hits for several pages at 24/48/96; search runs multiple parallel `ilike` legs. */
 const SEARCH_FETCH_LIMIT = 500;
 
 function SearchPageContent() {
@@ -55,7 +55,7 @@ function SearchPageContent() {
   const [nonBillType, setNonBillType] = useState<string | null>(null);
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
   const filterKey = searchParams.toString();
-  const { pageSize: searchPageSize, setPageSize: setSearchPageSize } = usePersistedPageSize('search', 25);
+  const { pageSize: searchPageSize, setPageSize: setSearchPageSize } = usePersistedPageSize('search', 24);
   const { committees: committeeOptions } = useKyBillCommittees();
 
   useEffect(() => {
