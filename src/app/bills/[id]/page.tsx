@@ -46,6 +46,7 @@ import {
   partyBadgeBackgroundColor,
 } from '@/lib/bill-display';
 import { governmentTooltips, voteCountTooltips } from '@/lib/tooltipContent';
+import { getSessionTooltip } from '@/lib/ky-sessions';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYLegislatorRoster } from '@/types/kentucky';
 import {
@@ -55,7 +56,6 @@ import {
   normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
 import {
-  ballotpediaKyVoteSearchUrl,
   legiscanRollCallPublicUrl,
   normalizeBallotpediaHref,
 } from '@/lib/external-legislative-links';
@@ -441,6 +441,29 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
   const primarySponsors = sponsors.filter(s => s.sponsor_type_id === 1);
   const coSponsors = sponsors.filter(s => s.sponsor_type_id !== 1);
 
+  /**
+   * Use the most recent important (importance === 1) history action to derive the
+   * authoritative status. LegiScan's status *code* (stored in bill.status) can lag
+   * behind the history entries, producing contradictions like "Signed by Governor"
+   * when the history says "Vetoed". The history array comes fresh from the API so
+   * it wins when it disagrees.
+   */
+  const effectiveStatus = (() => {
+    if (!history.length) return bill.status;
+    const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date) || b.importance - a.importance);
+    const topImportant = sorted.find(h => h.importance === 1);
+    if (!topImportant) return bill.status;
+    const a = topImportant.action.toLowerCase();
+    if (a.includes('vetoed') || a.startsWith('veto')) return 'Vetoed';
+    if (a.includes('signed by governor') || a.includes('enacted') || a.includes('signed into law')) return 'Signed by Governor';
+    if (a.includes('became law without')) return 'Enacted';
+    if (a.includes('failed') || a.includes('died')) return 'Failed';
+    if (a.includes('enrolled')) return 'Enrolled';
+    if (a.includes('engrossed')) return 'Engrossed';
+    if (a.includes('passed') && (a.includes('house') || a.includes('senate') || a.includes('chamber'))) return 'Passed';
+    return bill.status;
+  })();
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <MuiContainer maxWidth="lg" sx={{ py: 3 }}>
@@ -478,13 +501,13 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                   >{chip}</MuiTooltip>
                 ) : chip;
               })()}
-              {bill.status && (() => {
-                const statusKey = billStatusToTooltipKey(bill.status);
+              {effectiveStatus && (() => {
+                const statusKey = billStatusToTooltipKey(effectiveStatus);
                 const statusTip = statusKey ? governmentTooltips[statusKey] : null;
-                const chip = isSignedByGovernorBillStatus(bill.status) ? (
+                const chip = isSignedByGovernorBillStatus(effectiveStatus) ? (
                   <MuiChip
                     icon={<Check sx={{ fontSize: '1.125rem !important' }} />}
-                    label={billStatusChipLabel(bill.status)}
+                    label={billStatusChipLabel(effectiveStatus)}
                     size="medium"
                     color="success"
                     variant="outlined"
@@ -499,9 +522,9 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                   />
                 ) : (
                   <MuiChip
-                    label={formatBillLabelText(bill.status)}
+                    label={formatBillLabelText(effectiveStatus)}
                     size="medium"
-                    color={statusColor(bill.status)}
+                    color={statusColor(effectiveStatus)}
                     sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
                   />
                 );
@@ -515,14 +538,32 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                   >{chip}</MuiTooltip>
                 ) : chip;
               })()}
-              {bill.session && (
-                <MuiChip
-                  label={formatBillLabelText(bill.session)}
-                  size="medium"
-                  variant="outlined"
-                  sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
-                />
-              )}
+              {bill.session && (() => {
+                const sessionTip = getSessionTooltip(bill.session);
+                const chip = (
+                  <MuiChip
+                    label={formatBillLabelText(bill.session)}
+                    size="medium"
+                    variant="outlined"
+                    sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
+                  />
+                );
+                return sessionTip ? (
+                  <MuiTooltip
+                    title={
+                      <Box sx={{ p: 0.25 }}>
+                        <Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{sessionTip.title}</Typography>
+                        {sessionTip.content.split('\n\n').map((para, i) => (
+                          <Typography key={i} variant="body2" display="block" sx={{ mb: i === 0 ? 0.75 : 0 }}>{para}</Typography>
+                        ))}
+                      </Box>
+                    }
+                    arrow
+                    enterDelay={300}
+                    componentsProps={{ tooltip: { sx: { maxWidth: 380, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}
+                  >{chip}</MuiTooltip>
+                ) : chip;
+              })()}
             </Box>
 
             <Typography variant="h5" fontWeight={700} color="primary.main" gutterBottom>
@@ -803,11 +844,6 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                       rollId != null && Number.isFinite(Number(rollId))
                         ? legiscanRollCallPublicUrl(bill.bill_number, Number(rollId))
                         : null;
-                    const ballotpediaVoteUrl = ballotpediaKyVoteSearchUrl(
-                      bill.bill_number,
-                      String(v.desc ?? ''),
-                      String(v.date ?? ''),
-                    );
                     const rowKey = rollId != null ? `rc-${rollId}` : `vote-${i}`;
                     return (
                       <Box
@@ -842,8 +878,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                             ) : chip;
                           })()}
                         </Box>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                          {legiscanVoteUrl && (
+                        {legiscanVoteUrl && (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                             <MuiButton
                               component="a"
                               size="small"
@@ -855,19 +891,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                             >
                               LegiScan roll call
                             </MuiButton>
-                          )}
-                          <MuiButton
-                            component="a"
-                            size="small"
-                            variant={legiscanVoteUrl ? 'text' : 'outlined'}
-                            href={ballotpediaVoteUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                          >
-                            Ballotpedia
-                          </MuiButton>
-                        </Box>
+                          </Box>
+                        )}
                       </Box>
                     );
                   })}

@@ -84,12 +84,6 @@ const navLinks: NavLinkConfig[] = [
     icon: <KentuckyStateIcon />,
     priority: 'primary',
   },
-  {
-    href: '/events',
-    label: 'Meetings',
-    icon: <EventNote />,
-    priority: 'primary',
-  },
 ];
 
 function isNavPathActive(path: string, pathname: string): boolean {

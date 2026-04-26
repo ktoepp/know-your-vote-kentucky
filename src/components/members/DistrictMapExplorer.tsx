@@ -537,7 +537,7 @@ export default function DistrictMapExplorer() {
                 if (e.key === 'Enter') void onAddressSearch();
               }}
               disabled={addressLoading || !mapReady}
-              helperText="Mapbox geocoding, biased to Kentucky. Often more precise at district lines than ZIP alone."
+              helperText="Street-level geocoding — more precise than ZIP for district boundaries."
             />
             <Button
               variant="outlined"
