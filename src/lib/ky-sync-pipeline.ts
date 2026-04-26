@@ -37,6 +37,7 @@ import type {
   LegiScanBillSummary,
   LegiScanMasterListRawBill,
   LegiScanSession,
+  LegiScanPerson,
 } from './ky-legiscan-client';
 
 /**
@@ -943,6 +944,73 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
   }
 }
 
+// --- Legislator bio enrichment (LegiScan getPerson) ---
+/**
+ * For each legislator with a legiscan_id, call getPerson to backfill:
+ *   - ballotpedia slug (direct link)
+ *   - legiscan_image_url (photo fallback when photo_url is null)
+ * Skips legislators where both fields are already populated.
+ * Quota cost: 1 query per legislator processed.
+ */
+export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<SyncResult> {
+  const start = Date.now();
+  const source = 'legislator-bios';
+  log(source, 'Starting legislator bio enrichment from LegiScan');
+  try {
+    const db = getSupabase();
+    const { data: legislators, error: fetchErr } = await db
+      .from('ky_legislators')
+      .select('id, legiscan_id, ballotpedia, photo_url, legiscan_image_url')
+      .not('legiscan_id', 'is', null);
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!legislators?.length) {
+      log(source, 'No legislators with legiscan_id found');
+      return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
+    }
+
+    // Only process rows that are missing at least one enrichable field
+    const toEnrich = legislators.filter(
+      (l) => !l.ballotpedia || !l.legiscan_image_url,
+    );
+    log(source, `${toEnrich.length}/${legislators.length} legislators need enrichment`);
+
+    if (options.dryRun) {
+      log(source, `[DRY RUN] Would enrich ${toEnrich.length} legislators`);
+      return { source, status: 'success', itemsSynced: toEnrich.length, duration: Date.now() - start };
+    }
+
+    const legiscanClient = getKyLegiScanClient();
+    let synced = 0;
+    let failed = 0;
+    for (const leg of toEnrich) {
+      try {
+        const person: LegiScanPerson | null = await legiscanClient.getPerson(leg.legiscan_id!);
+        if (!person) continue;
+        const ballotpediaRaw = person.bio?.social?.ballotpedia ?? person.ballotpedia;
+        const imageRaw = person.bio?.social?.image;
+        const update: Record<string, string | null> = {};
+        if (!leg.ballotpedia && ballotpediaRaw) update.ballotpedia = ballotpediaRaw;
+        if (!leg.legiscan_image_url && imageRaw) update.legiscan_image_url = imageRaw;
+        if (Object.keys(update).length === 0) continue;
+        const { error } = await db.from('ky_legislators').update(update).eq('id', leg.id);
+        if (error) { failed++; logError(source, `Failed updating ${leg.id}: ${error.message}`); }
+        else synced++;
+      } catch (err: any) {
+        failed++;
+        logError(source, `getPerson failed for legiscan_id=${leg.legiscan_id}: ${err.message}`);
+      }
+    }
+
+    log(source, `Enriched ${synced} legislators (${failed} failed)`);
+    await updateSourceStatus(source, failed > 0 && synced === 0 ? 'error' : 'success', synced);
+    return { source, status: failed > 0 && synced === 0 ? 'error' : 'success', itemsSynced: synced, duration: Date.now() - start };
+  } catch (err: any) {
+    logError(source, err.message);
+    await updateSourceStatus(source, 'error', 0, err.message);
+    return { source, status: 'error', itemsSynced: 0, error: err.message, duration: Date.now() - start };
+  }
+}
+
 // --- Votes (LegiScan) ---
 export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult> {
   const start = Date.now();
@@ -1235,6 +1303,7 @@ export async function syncCountyActions(options: SyncOptions = {}): Promise<Sync
 export const SYNC_SOURCES: Record<string, (options: SyncOptions) => Promise<SyncResult>> = {
   bills: syncKyBills,
   legislators: syncKyLegislators,
+  'legislator-bios': syncKyLegislatorBios,
   votes: syncKyVotes,
   ordinances: async (opts) => {
     const lou = await syncLouisvilleOrdinances(opts);

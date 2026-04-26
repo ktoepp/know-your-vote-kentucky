@@ -30,6 +30,25 @@ export interface LegiScanMasterListRawBill { bill_id: number; number: string; ch
 export interface LegiScanDatasetListEntry { state_id: number; session_id: number; session_name: string; session_title?: string; year_start: number; year_end: number; special: number; prior?: number; dataset_hash: string; dataset_date: string; dataset_size: number; access_key: string; }
 export interface LegiScanDataset { state: string; session_id: number; session_name?: string; dataset_hash: string; dataset_date: string; dataset_size: number; mime: string; zip: string; }
 
+export interface LegiScanPersonSocial {
+  ballotpedia?: string;
+  image?: string;
+  email?: string;
+  capitol_phone?: string;
+  biography?: string;
+}
+export interface LegiScanPerson {
+  people_id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  party: string;
+  role: string;
+  district: string;
+  bio?: { social?: LegiScanPersonSocial };
+  ballotpedia?: string;
+}
+
 const LEGISCAN_QUERY_COUNTER_KEY = 'legiscan_query_counter';
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -196,6 +215,11 @@ export class KyLegiScanClient {
 
   async search(query: string): Promise<LegiScanSearchResult[]> {
     return this.searchBills(query);
+  }
+
+  async getPerson(peopleId: number): Promise<LegiScanPerson | null> {
+    const d = await this.request<any>({ op: 'getPerson', id: String(peopleId) });
+    return d?.person || null;
   }
 }
 

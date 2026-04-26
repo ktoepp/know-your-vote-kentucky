@@ -126,7 +126,7 @@ export function findLegislatorByProfileSlug(
   return null;
 }
 
-export { ballotpediaMemberSearchUrl } from './external-legislative-links';
+export { normalizeBallotpediaHref, legiscanPersonUrl } from './external-legislative-links';
 
 /**
  * Public LRC profile is keyed by **district** (current officeholder), not by person.

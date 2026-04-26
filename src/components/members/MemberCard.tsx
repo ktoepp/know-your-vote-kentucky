@@ -29,14 +29,15 @@ import {
 } from '@/lib/bill-display';
 import { CHIP } from '@/lib/ui-tokens';
 import {
-  ballotpediaMemberSearchUrl,
   isKentuckyGovernor,
   kyLegislatorAvatarInitials,
   kyLegislatorCampaignWebsite,
   kyLegislatureProfileUrl,
   kyLegislaturePublicUrl,
   kyMemberTitleShort,
+  legiscanPersonUrl,
   memberSlug,
+  normalizeBallotpediaHref,
   normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
 import { ICON_REM } from '@/lib/ui-tokens';
@@ -123,7 +124,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
           }}
         >
           <Avatar
-            src={normalizeLegislatorPhotoUrl(leg.photo_url) || undefined}
+            src={normalizeLegislatorPhotoUrl(leg.photo_url) || normalizeLegislatorPhotoUrl(leg.legiscan_image_url) || undefined}
             alt=""
             imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{
@@ -315,18 +316,42 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
             Website
           </Button>
         )}
-        <Tooltip
-          title={tooltipsEnabled ? "Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record." : ""}
-          placement="top"
-          arrow
-          enterDelay={400}
-        >
+        {normalizeBallotpediaHref(leg.ballotpedia) && (
+          <Tooltip
+            title={tooltipsEnabled ? "Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record." : ""}
+            placement="top"
+            arrow
+            enterDelay={400}
+          >
+            <Button
+              component="a"
+              size="small"
+              variant="text"
+              color="inherit"
+              href={normalizeBallotpediaHref(leg.ballotpedia)!}
+              target="_blank"
+              rel="noopener noreferrer"
+              endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}
+              sx={{
+                color: 'text.secondary',
+                fontWeight: 500,
+                textTransform: 'none',
+                fontSize: '0.8125rem',
+                minHeight: 32,
+                '&:hover': { bgcolor: 'action.hover' },
+              }}
+            >
+              Ballotpedia
+            </Button>
+          </Tooltip>
+        )}
+        {leg.legiscan_id != null && (
           <Button
             component="a"
             size="small"
             variant="text"
             color="inherit"
-            href={ballotpediaMemberSearchUrl(leg.name)}
+            href={legiscanPersonUrl(leg.legiscan_id)}
             target="_blank"
             rel="noopener noreferrer"
             endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}
@@ -339,9 +364,9 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
               '&:hover': { bgcolor: 'action.hover' },
             }}
           >
-            Ballotpedia
+            LegiScan
           </Button>
-        </Tooltip>
+        )}
         {governor && (
           <Button
             component="a"

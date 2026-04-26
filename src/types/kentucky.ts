@@ -26,6 +26,10 @@ export interface KYLegislator {
   website: string | null;
   /** legislature.ky.gov profile (from Open States links). */
   lrc_profile_url: string | null;
+  /** Ballotpedia wiki slug or full URL, populated by LegiScan getPerson enrichment. */
+  ballotpedia: string | null;
+  /** LegiScan bio photo URL, used as fallback when photo_url is null. */
+  legiscan_image_url: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -34,7 +38,7 @@ export interface KYLegislator {
 /** Subset returned by lightweight `select(...)` for roster matching (photos, names). */
 export type KYLegislatorRoster = Pick<
   KYLegislator,
-  'id' | 'legiscan_id' | 'name' | 'first_name' | 'last_name' | 'party' | 'chamber' | 'district' | 'photo_url'
+  'id' | 'legiscan_id' | 'name' | 'first_name' | 'last_name' | 'party' | 'chamber' | 'district' | 'photo_url' | 'ballotpedia' | 'legiscan_image_url'
 >;
 
 export interface KYBill {

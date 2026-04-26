@@ -201,7 +201,7 @@ export default function HomePage() {
               .or('chamber.eq.senate,bill_number.ilike.S%'),
             supabase
               .from('ky_legislators')
-              .select('id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url')
+              .select('id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url,ballotpedia,legiscan_image_url')
               .eq('active', true),
             supabase
               .from('ky_bills')

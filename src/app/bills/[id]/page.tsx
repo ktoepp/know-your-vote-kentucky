@@ -379,7 +379,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
     let cancelled = false;
     supabase
       .from('ky_legislators')
-      .select('id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url')
+      .select('id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url,ballotpedia,legiscan_image_url')
       .eq('active', true)
       .then(({ data }) => {
         if (!cancelled) setLegislators(data || []);

@@ -26,26 +26,11 @@ export function legiscanRollCallPublicUrl(
 }
 
 /**
- * Ballotpedia has no reliable per–roll-call deep link. Search narrows to this bill and vote context.
+ * Direct LegiScan person page.
+ * @see https://legiscan.com/people/id/123
  */
-export function ballotpediaKyVoteSearchUrl(
-  billNumber: string | null | undefined,
-  voteDesc: string,
-  voteDate: string,
-): string {
-  const bill = String(billNumber ?? '').trim();
-  const desc = (voteDesc || '').replace(/\s+/g, ' ').trim().slice(0, 100);
-  const q = [bill, 'Kentucky', 'roll call', voteDate, desc].filter(Boolean).join(' ');
-  return `https://ballotpedia.org/Special:Search?search=${encodeURIComponent(q)}`;
-}
-
-/**
- * Broader bill search (member cards, when no direct Ballotpedia slug exists for a person).
- * Keeps the same entry point the app already used; "Kentucky" improves relevance.
- */
-export function ballotpediaMemberSearchUrl(displayName: string): string {
-  const q = encodeURIComponent(`${displayName.trim()} Kentucky`);
-  return `https://ballotpedia.org/Special:Search?search=${q}`;
+export function legiscanPersonUrl(legiscanId: number): string {
+  return `https://legiscan.com/people/id/${legiscanId}`;
 }
 
 /**
