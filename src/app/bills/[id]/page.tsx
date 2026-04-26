@@ -14,6 +14,7 @@ import {
   CircularProgress,
   Avatar as MuiAvatar,
   Grid as MuiGrid,
+  Tooltip as MuiTooltip,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -36,6 +37,7 @@ import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { MemberName } from '@/components/civic/MemberName';
 import {
   billStatusChipLabel,
+  billStatusToTooltipKey,
   formatBillLabelText,
   formatLegislativeRoleLabel,
   formatRepresentativePartyChipLabel,
@@ -43,6 +45,7 @@ import {
   isSignedByGovernorBillStatus,
   partyBadgeBackgroundColor,
 } from '@/lib/bill-display';
+import { governmentTooltips, voteCountTooltips } from '@/lib/tooltipContent';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYLegislatorRoster } from '@/types/kentucky';
 import {
@@ -454,16 +457,31 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
         <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
           <MuiCardContent sx={{ p: { xs: 2, md: 3 } }}>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-              {bill.chamber && (
-                <MuiChip
-                  label={bill.chamber === 'house' ? 'House' : 'Senate'}
-                  color={bill.chamber === 'senate' ? 'secondary' : 'primary'}
-                  size="medium"
-                  sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
-                />
-              )}
-              {bill.status &&
-                (isSignedByGovernorBillStatus(bill.status) ? (
+              {bill.chamber && (() => {
+                const chamberKey = bill.chamber === 'house' ? 'house' : 'senate';
+                const chamberTip = governmentTooltips[chamberKey];
+                const chip = (
+                  <MuiChip
+                    label={bill.chamber === 'house' ? 'House' : 'Senate'}
+                    color={bill.chamber === 'senate' ? 'secondary' : 'primary'}
+                    size="medium"
+                    sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
+                  />
+                );
+                return chamberTip ? (
+                  <MuiTooltip
+                    key="chamber"
+                    title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{chamberTip.title}</Typography><Typography variant="body2">{chamberTip.content}</Typography></Box>}
+                    arrow
+                    enterDelay={300}
+                    componentsProps={{ tooltip: { sx: { maxWidth: 340, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}
+                  >{chip}</MuiTooltip>
+                ) : chip;
+              })()}
+              {bill.status && (() => {
+                const statusKey = billStatusToTooltipKey(bill.status);
+                const statusTip = statusKey ? governmentTooltips[statusKey] : null;
+                const chip = isSignedByGovernorBillStatus(bill.status) ? (
                   <MuiChip
                     icon={<Check sx={{ fontSize: '1.125rem !important' }} />}
                     label={billStatusChipLabel(bill.status)}
@@ -486,7 +504,17 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                     color={statusColor(bill.status)}
                     sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
                   />
-                ))}
+                );
+                return statusTip ? (
+                  <MuiTooltip
+                    key="status"
+                    title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{statusTip.title}</Typography><Typography variant="body2">{statusTip.content}</Typography></Box>}
+                    arrow
+                    enterDelay={300}
+                    componentsProps={{ tooltip: { sx: { maxWidth: 340, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}
+                  >{chip}</MuiTooltip>
+                ) : chip;
+              })()}
               {bill.session && (
                 <MuiChip
                   label={formatBillLabelText(bill.session)}
@@ -799,9 +827,20 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                           {v.desc}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1.25 }}>
-                          <MuiChip label={`Yea: ${v.yea}`} size="small" color="success" />
-                          <MuiChip label={`Nay: ${v.nay}`} size="small" color="error" />
-                          {v.nv > 0 && <MuiChip label={`NV: ${v.nv}`} size="small" variant="outlined" />}
+                          {(['yea', 'nay'] as const).map((key) => {
+                            const tip = voteCountTooltips[key];
+                            const chip = <MuiChip key={key} label={key === 'yea' ? `Yea: ${v.yea}` : `Nay: ${v.nay}`} size="small" color={key === 'yea' ? 'success' : 'error'} />;
+                            return tip ? (
+                              <MuiTooltip key={key} title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{tip.title}</Typography><Typography variant="body2">{tip.content}</Typography></Box>} arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 300, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}>{chip}</MuiTooltip>
+                            ) : chip;
+                          })}
+                          {v.nv > 0 && (() => {
+                            const tip = voteCountTooltips['nv'];
+                            const chip = <MuiChip label={`NV: ${v.nv}`} size="small" variant="outlined" />;
+                            return tip ? (
+                              <MuiTooltip title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{tip.title}</Typography><Typography variant="body2">{tip.content}</Typography></Box>} arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 300, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}>{chip}</MuiTooltip>
+                            ) : chip;
+                          })()}
                         </Box>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                           {legiscanVoteUrl && (

@@ -11,16 +11,19 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import type { KYBill } from '@/types/kentucky';
 import type { KyBillSortKey } from '@/lib/bill-display';
 import {
   billStatusChipLabel,
+  billStatusToTooltipKey,
   effectiveBillChamber,
   formatBillLabelText,
   isSignedByGovernorBillStatus,
 } from '@/lib/bill-display';
+import { governmentTooltips } from '@/lib/tooltipContent';
 
 export interface BillsListTableProps {
   bills: KYBill[];
@@ -103,11 +106,23 @@ export function BillsListTable({ bills, sortBy, sortDir, onRequestSort }: BillsL
               <TableCell>{chamberLabel(bill)}</TableCell>
               <TableCell>{bill.session || ''}</TableCell>
               <TableCell>
-                {bill.status
-                  ? formatBillLabelText(
-                      isSignedByGovernorBillStatus(bill.status) ? billStatusChipLabel(bill.status) : bill.status,
-                    )
-                  : ''}
+                {bill.status ? (() => {
+                  const label = formatBillLabelText(
+                    isSignedByGovernorBillStatus(bill.status!) ? billStatusChipLabel(bill.status) : bill.status!,
+                  );
+                  const key = billStatusToTooltipKey(bill.status);
+                  const tip = key ? governmentTooltips[key] : null;
+                  return tip ? (
+                    <Tooltip
+                      title={<><strong>{tip.title}</strong><br />{tip.content}</>}
+                      arrow
+                      enterDelay={300}
+                      componentsProps={{ tooltip: { sx: { maxWidth: 320 } } }}
+                    >
+                      <span style={{ cursor: 'help', borderBottom: '1px dotted currentColor' }}>{label}</span>
+                    </Tooltip>
+                  ) : label;
+                })() : ''}
               </TableCell>
               <TableCell>{formatShortDate(bill.introduced_date)}</TableCell>
               <TableCell>{formatShortDate(bill.last_action_date)}</TableCell>
