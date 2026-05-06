@@ -21,6 +21,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { syncAll, getSyncStatus, SYNC_SOURCES } from '../../../lib/ky-sync-pipeline';
+import { withVercelSyncCronMonitor } from '../../../lib/sentry-sync-cron';
 
 /** Pro / Enterprise: raise if your plan allows longer functions. */
 export const maxDuration = 300;
@@ -119,19 +120,21 @@ export async function GET(req: NextRequest) {
     useChangeHash,
   } = syncParamsFromUrl(req);
   try {
-    const results = await syncAll({
-      source,
-      dryRun,
-      limit,
-      skipBillSponsorDetails,
-      historicSessions,
-      legiscanSessionId,
-      quotaBackfill,
-      quotaBackfillSessionsPerRun,
-      sponsorDetailBudgetPerSession,
-      quotaBackfillAdvanceCursor,
-      useChangeHash,
-    });
+    const results = await withVercelSyncCronMonitor(source, () =>
+      syncAll({
+        source,
+        dryRun,
+        limit,
+        skipBillSponsorDetails,
+        historicSessions,
+        legiscanSessionId,
+        quotaBackfill,
+        quotaBackfillSessionsPerRun,
+        sponsorDetailBudgetPerSession,
+        quotaBackfillAdvanceCursor,
+        useChangeHash,
+      }),
+    );
     const hasErrors = results.some((r) => r.status === 'error');
     return NextResponse.json(
       { results, dryRun },
@@ -163,19 +166,21 @@ export async function POST(req: NextRequest) {
   } = syncParamsFromUrl(req);
 
   try {
-    const results = await syncAll({
-      source,
-      dryRun,
-      limit,
-      skipBillSponsorDetails,
-      historicSessions,
-      legiscanSessionId,
-      quotaBackfill,
-      quotaBackfillSessionsPerRun,
-      sponsorDetailBudgetPerSession,
-      quotaBackfillAdvanceCursor,
-      useChangeHash,
-    });
+    const results = await withVercelSyncCronMonitor(source, () =>
+      syncAll({
+        source,
+        dryRun,
+        limit,
+        skipBillSponsorDetails,
+        historicSessions,
+        legiscanSessionId,
+        quotaBackfill,
+        quotaBackfillSessionsPerRun,
+        sponsorDetailBudgetPerSession,
+        quotaBackfillAdvanceCursor,
+        useChangeHash,
+      }),
+    );
     const hasErrors = results.some((r) => r.status === 'error');
     return NextResponse.json(
       { results, dryRun },

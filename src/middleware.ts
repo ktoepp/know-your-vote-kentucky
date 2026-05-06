@@ -23,5 +23,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Exclude /monitoring (Sentry tunnel route) to avoid auth interference
   matcher: ['/admin/:path*'],
 };

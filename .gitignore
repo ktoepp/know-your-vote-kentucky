@@ -49,3 +49,6 @@ supabase/.temp/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Sentry build plugin auth token (never commit)
+.env.sentry-build-plugin

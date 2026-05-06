@@ -8,7 +8,7 @@ A civic transparency platform for Kentucky citizens. Track state bills, local or
 
 **Start here if you're an AI picking up this project.**
 
-- **Current tasks and roadmap:** [`TASKS.md`](./TASKS.md) — always check this first
+- **Current tasks and roadmap:** `[TASKS.md](./TASKS.md)` — always check this first
 - **This is a Kentucky state legislature app**, not a federal Congress app. All terminology, chamber sizes, and process descriptions must refer to the Kentucky General Assembly (100 House members, 38 Senators, Governor not President, 3/5 veto override threshold)
 - **Primary language:** TypeScript / Next.js 15 App Router. No pages router.
 - **Styling:** MUI (Material UI) is the primary component library. Tailwind is present but used minimally for the custom tooltip layer.
@@ -16,21 +16,23 @@ A civic transparency platform for Kentucky citizens. Track state bills, local or
 
 ### Key files for common tasks
 
-| Task | Files |
-|---|---|
-| Tooltip content / definitions | `src/lib/tooltipContent.ts` |
-| Tooltip on/off toggle | `src/lib/TooltipContext.tsx`, `src/app/components/Navigation.tsx` |
-| Tooltip components | `src/components/ui/Tooltip.tsx`, `src/components/ui/LegislativeStageTooltip.tsx` |
+
+| Task                              | Files                                                                              |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| Tooltip content / definitions     | `src/lib/tooltipContent.ts`                                                        |
+| Tooltip on/off toggle             | `src/lib/TooltipContext.tsx`, `src/app/components/Navigation.tsx`                  |
+| Tooltip components                | `src/components/ui/Tooltip.tsx`, `src/components/ui/LegislativeStageTooltip.tsx`   |
 | Bill status → tooltip key mapping | `src/lib/bill-display.ts` → `billStatusToTooltipKey()`, `billPrefixToTooltipKey()` |
-| Bill card (list/browse) | `src/components/bills/KYBillCard.tsx` |
-| Bill detail page | `src/app/bills/[id]/page.tsx` |
-| District map | `src/components/members/DistrictMapExplorer.tsx` |
-| Map member popup | `src/components/members/DistrictMapMemberTooltip.tsx` |
-| Member card (list + map sidebar) | `src/components/members/MemberCard.tsx` |
-| Member profile page | `src/app/members/[slug]/page.tsx` |
-| Bill stage definitions | `src/lib/billStages.ts` |
-| Data sync pipeline | `src/lib/ky-sync-pipeline.ts` |
-| App layout / providers | `src/app/layout.tsx` |
+| Bill card (list/browse)           | `src/components/bills/KYBillCard.tsx`                                              |
+| Bill detail page                  | `src/app/bills/[id]/page.tsx`                                                      |
+| District map                      | `src/components/members/DistrictMapExplorer.tsx`                                   |
+| Map member popup                  | `src/components/members/DistrictMapMemberTooltip.tsx`                              |
+| Member card (list + map sidebar)  | `src/components/members/MemberCard.tsx`                                            |
+| Member profile page               | `src/app/members/[slug]/page.tsx`                                                  |
+| Bill stage definitions            | `src/lib/billStages.ts`                                                            |
+| Data sync pipeline                | `src/lib/ky-sync-pipeline.ts`                                                      |
+| App layout / providers            | `src/app/layout.tsx`                                                               |
+
 
 ### What's hidden / not in nav
 
@@ -52,6 +54,7 @@ Content lives in `src/lib/tooltipContent.ts` (`governmentTooltips` record). Add 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - npm
 - Supabase project (for database)
@@ -59,6 +62,7 @@ Content lives in `src/lib/tooltipContent.ts` (`governmentTooltips` record). Add 
 - LegiScan / OpenStates API keys (for KY legislative data)
 
 ### Installation
+
 ```bash
 git clone <repository-url>
 cd know-your-vote-kentucky
@@ -82,7 +86,7 @@ If `next dev` returns 500s or missing webpack chunks, stop every process on port
 
 ## MVP scope (public story)
 
-Primary navigation highlights **bills, ordinances, meetings, members, search, and about**. Legacy or experimental tools (explore, live content, table/activity dashboards, etc.) remain reachable by URL for development but use **`noindex`** metadata so they are not promoted in search results.
+Primary navigation highlights **bills, ordinances, meetings, members, search, and about**. Legacy or experimental tools (explore, live content, table/activity dashboards, etc.) remain reachable by URL for development but use `**noindex`** metadata so they are not promoted in search results.
 
 ## Key Features
 
@@ -96,24 +100,28 @@ Primary navigation highlights **bills, ordinances, meetings, members, search, an
 
 Sync sources and status (as of last verification):
 
-| Source | Status | Notes |
-|--------|--------|-------|
-| bills | Working | LegiScan |
-| legislators | Working | OpenStates |
-| votes | Working | Requires bills synced first |
-| ordinances | Working | Louisville + Lexington via Legistar |
-| school-boards | Working | JCPS + FCPS via KSBA portal |
+
+| Source         | Status  | Notes                                                                                                                                             |
+| -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| bills          | Working | LegiScan                                                                                                                                          |
+| legislators    | Working | OpenStates                                                                                                                                        |
+| votes          | Working | Requires bills synced first                                                                                                                       |
+| ordinances     | Working | Louisville + Lexington via Legistar                                                                                                               |
+| school-boards  | Working | JCPS + FCPS via KSBA portal                                                                                                                       |
 | county-actions | Working | Jefferson & Fayette **Legistar** public calendars (`louisville.legistar.com`, `lexington.legistar.com`); meeting rows sync to `ky_county_actions` |
+
 
 ## API Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/bills` | Kentucky bills with filtering |
-| `GET /api/search` | Full-text search across all content types |
-| `GET /api/intelligence` | Top-scored items with AI analysis |
-| `POST /api/sync` | Trigger data sync (Bearer `SYNC_API_KEY` or `CRON_SECRET`) |
-| `GET /api/sync` | Without `?source=`: sync status. With `?source=bills` etc.: run that source (used by Vercel Cron; same auth) |
+
+| Endpoint                | Description                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `GET /api/bills`        | Kentucky bills with filtering                                                                                |
+| `GET /api/search`       | Full-text search across all content types                                                                    |
+| `GET /api/intelligence` | Top-scored items with AI analysis                                                                            |
+| `POST /api/sync`        | Trigger data sync (Bearer `SYNC_API_KEY` or `CRON_SECRET`)                                                   |
+| `GET /api/sync`         | Without `?source=`: sync status. With `?source=bills` etc.: run that source (used by Vercel Cron; same auth) |
+
 
 ## Operations
 
@@ -131,12 +139,14 @@ Sync sources and status (as of last verification):
 
 All counters land in `ky_sync_state` (JSONB payload, bucketed by date) via the `ky_increment_counter` RPC (migration `009_ky_atomic_counters.sql`):
 
-| Counter key | Bucket | What it tracks |
-|---|---|---|
-| `legiscan_query_counter` | `YYYY-MM` | LegiScan API calls this month (30k/month cap) |
-| `rate_limit_denies` | `YYYY-MM-DD` | `/api/intelligence` 429s per day |
-| `anthropic_cache_hits` | `YYYY-MM-DD` | Anthropic response cache hits |
-| `anthropic_cache_misses` | `YYYY-MM-DD` | Anthropic response cache misses |
+
+| Counter key              | Bucket       | What it tracks                                |
+| ------------------------ | ------------ | --------------------------------------------- |
+| `legiscan_query_counter` | `YYYY-MM`    | LegiScan API calls this month (30k/month cap) |
+| `rate_limit_denies`      | `YYYY-MM-DD` | `/api/intelligence` 429s per day              |
+| `anthropic_cache_hits`   | `YYYY-MM-DD` | Anthropic response cache hits                 |
+| `anthropic_cache_misses` | `YYYY-MM-DD` | Anthropic response cache misses               |
+
 
 These counters feed the `/admin/sync-status` dashboard (see 3a.2).
 
@@ -147,6 +157,7 @@ Operator dashboard: `/admin/sync-status` (requires `ADMIN_TOKEN` header)
 Set `CRON_SECRET` in Vercel (16+ random characters). Vercel Cron invokes `/api/sync?source=…` with `Authorization: Bearer <CRON_SECRET>`. The sync route also accepts `SYNC_API_KEY` for manual runs. Configure at least one of `CRON_SECRET` or `SYNC_API_KEY`.
 
 Configured for Vercel with automatic cron jobs for data sync (see `vercel.json` for exact schedules):
+
 - Bills, legislators, votes, ordinances, school boards, county actions
 
 Executive-order sync is not scheduled (deferred); see the note at the top of this file.
@@ -155,7 +166,7 @@ Executive-order sync is not scheduled (deferred); see the note at the top of thi
 
 See `env-template.txt` for the full list of required and optional environment variables.
 
-To show **data freshness** on the home, search, bills, and ordinances pages, the anonymous Supabase client must be allowed to **`SELECT` on `ky_sources`** (or the note is omitted silently). Civic tables used for browsing typically already allow read; add a read policy for `ky_sources` if needed.
+To show **data freshness** on the home, search, bills, and ordinances pages, the anonymous Supabase client must be allowed to `**SELECT` on `ky_sources`** (or the note is omitted silently). Civic tables used for browsing typically already allow read; add a read policy for `ky_sources` if needed.
 
 ## License
 

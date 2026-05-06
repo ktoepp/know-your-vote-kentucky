@@ -1,5 +1,8 @@
 'use client';
 
+import * as Sentry from "@sentry/nextjs";
+import { useEffect } from "react";
+
 /**
  * Root error UI when the root layout fails. Must include html/body.
  * @see https://nextjs.org/docs/app/api-reference/file-conventions/global-error
@@ -11,6 +14,9 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
   return (
     <html lang="en">
       <body style={{ margin: 0, fontFamily: 'system-ui,sans-serif', padding: 24 }}>

@@ -77,5 +77,38 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # (safe for local dev; always set this in production).
 # ADMIN_TOKEN=your_admin_token_here
 
+# =============================================================================
+# OPTIONAL — Sentry example page (/sentry-example-page)
+# =============================================================================
+# In production this route returns 404 unless enabled (avoids public error spam).
+# SENTRY_ENABLE_EXAMPLE_PAGE=true
+
+# =============================================================================
+# OPTIONAL — Sentry (error monitoring)
+# =============================================================================
+# Create a project at https://sentry.io and grab the DSN from Project → Settings → SDK Setup.
+# NEXT_PUBLIC_SENTRY_DSN is read by the browser bundle; SENTRY_DSN by the server.
+# NEXT_PUBLIC_SENTRY_DSN=https://xxx@oXXX.ingest.sentry.io/YYY
+# SENTRY_DSN=https://xxx@oXXX.ingest.sentry.io/YYY
+#
+# For source map uploads during production builds, create .env.sentry-build-plugin
+# (already in .gitignore) with:
+#   SENTRY_AUTH_TOKEN=sntrys_eyJ...   (project:releases + org:read scopes)
+#   SENTRY_ORG=your-sentry-org-slug
+#   SENTRY_PROJECT=know-your-vote-kentucky
+#
+# Or set these directly in Vercel → Project → Environment Variables (Build step only).
+
+# =============================================================================
+# OPTIONAL — Slack notifications
+# =============================================================================
+# Incoming Webhook URLs from https://api.slack.com/apps → Incoming Webhooks.
+# SLACK_WEBHOOK_URL is the default/fallback used for all notifications.
+# SLACK_WEBHOOK_ALERTS overrides for high-priority errors and critical alerts.
+# SLACK_WEBHOOK_SYNC overrides for data sync events (bills, legislators, votes).
+# SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../xxx
+# SLACK_WEBHOOK_ALERTS=https://hooks.slack.com/services/T.../B.../xxx
+# SLACK_WEBHOOK_SYNC=https://hooks.slack.com/services/T.../B.../xxx
+
 # Note: Replace all "your_*_here" placeholders with actual values.
 # Keep this file secure and never commit it to version control.
