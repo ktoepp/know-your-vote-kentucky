@@ -1,5 +1,7 @@
 // Kentucky civic data types — mirrors Supabase schema
 
+import type { LegiscanBillSubject } from '@/lib/ky-legiscan-subjects';
+
 export interface KYTopic {
   id: string;
   name: string;
@@ -61,6 +63,10 @@ export interface KYBill {
   bill_text_url: string | null;
   topics: string[] | null;
   sponsors: Record<string, unknown> | null;
+  /** LegiScan getBill subjects; mirrors official subject_id / subject_name. */
+  legiscan_subjects?: LegiscanBillSubject[] | null;
+  /** Sync-only search helper (newline-separated lowercase subject names). */
+  legiscan_subjects_search?: string | null;
   /** Detail page view count; absent in older API responses until column exists. */
   view_count?: number | null;
   created_at: string;

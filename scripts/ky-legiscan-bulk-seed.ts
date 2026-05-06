@@ -19,6 +19,7 @@ import AdmZip from 'adm-zip';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { getKyLegiScanClient } from '../src/lib/ky-data-sources';
 import { classifyTopics } from '../src/lib/ky-topic-classifier';
+import { legiscanSubjectColumnsFromRawPayload } from '../src/lib/ky-legiscan-subjects';
 import type { LegiScanDatasetListEntry } from '../src/lib/ky-legiscan-client';
 
 const args = process.argv.slice(2);
@@ -183,6 +184,7 @@ function buildBillRow(bill: any, sessionName: string, sessionId: number): Record
   const billTextUrl = bill?.state_link || bill?.url || texts[0]?.state_link || texts[0]?.url || null;
   const topics = classifyTopics(bill?.title || '', bill?.description || '');
   const sponsors = Array.isArray(bill?.sponsors) && bill.sponsors.length ? bill.sponsors : null;
+  const { legiscan_subjects, legiscan_subjects_search } = legiscanSubjectColumnsFromRawPayload(bill?.subjects);
   const row: Record<string, unknown> = {
     legiscan_id: bill?.bill_id,
     bill_number: bill?.bill_number || bill?.number, // dataset ZIP uses bill_number; getMasterList uses number
@@ -196,6 +198,8 @@ function buildBillRow(bill: any, sessionName: string, sessionId: number): Record
     bill_text_url: billTextUrl,
     topics: topics.length > 0 ? topics : null,
     sponsors,
+    legiscan_subjects,
+    legiscan_subjects_search,
     introduced_date: deriveIntroducedDate(bill),
     source: 'legiscan',
     change_hash: bill?.change_hash || null,

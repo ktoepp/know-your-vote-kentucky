@@ -15,6 +15,28 @@ export function effectiveBillChamber(bill: {
   return null;
 }
 
+/** Collapse spaces and punctuation so "HB 23", "H.B.23", and "HB23" compare equal for search. */
+export function normalizeKyBillDesignation(input: string | null | undefined): string {
+  return String(input ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s\-.]+/g, '');
+}
+
+/**
+ * True when the bill designation's numeric suffix equals `digits` ("23" matches HB23/SB23;
+ * avoids treating "23" as a substring of HB123).
+ */
+export function kyBillNumericPartEquals(
+  billNumber: string | null | undefined,
+  digits: string,
+): boolean {
+  if (!digits || !/^\d+$/.test(digits)) return false;
+  const bn = normalizeKyBillDesignation(billNumber || '');
+  const m = bn.match(/^([A-Z]+)(\d+)$/);
+  return m !== null && m[2] === digits;
+}
+
 /**
  * Title-case LegiScan/GAE-style bill strings for display (status, last action, history).
  * APIs often return mixed fragments like "recommitted to Appropriations & Revenue (H)".

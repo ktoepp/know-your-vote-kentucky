@@ -24,7 +24,7 @@ export interface PaginatedSectionProps<T> {
   /** When this string changes, the current page resets to 1 (e.g. bill ids or filter fingerprint). */
   resetKey?: string;
   /**
-   * Optional 24/48/96 (or other) control; pair with `onPageSizeChange` for persisted prefs from the parent.
+   * Optional page-size control (e.g. 25/50/100); pair with `onPageSizeChange` for persisted prefs from the parent.
    */
   pageSizeOptions?: readonly number[];
   onPageSizeChange?: (n: number) => void;

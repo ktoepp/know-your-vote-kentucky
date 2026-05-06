@@ -28,7 +28,14 @@ import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { BillsListTable } from '@/components/bills/BillsListTable';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
-import { billMatchesBrowseStatusFilter, compareKyBills, effectiveBillChamber, type KyBillSortKey } from '@/lib/bill-display';
+import {
+  billMatchesBrowseStatusFilter,
+  compareKyBills,
+  effectiveBillChamber,
+  kyBillNumericPartEquals,
+  normalizeKyBillDesignation,
+  type KyBillSortKey,
+} from '@/lib/bill-display';
 import { billMatchesCommitteeFilter } from '@/lib/ky-committee-utils';
 import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
@@ -36,7 +43,7 @@ import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
 
 /**
- * One query loads up to this many rows; client filters/sorts, then `PaginatedSection` paginates 24/48/96.
+ * One query loads up to this many rows; client filters/sorts, then `PaginatedSection` paginates 25/50/100.
  * A full KY session is on the order of ~500–600 bills — well under Supabase’s 1000 per-request cap.
  */
 const BROWSE_QUERY_ROW_LIMIT = 1000;
@@ -87,7 +94,7 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [sortBy, setSortBy] = useState<KyBillSortKey>('last_action_date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const { pageSize, setPageSize } = usePersistedPageSize('bills', 24);
+  const { pageSize, setPageSize } = usePersistedPageSize('bills', 25);
 
   useEffect(() => {
     if (!supabase) return;
@@ -148,9 +155,16 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
       return false;
     }
     if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
+    const rawSq = searchQuery.trim();
+    const q = rawSq.toLowerCase();
+    const normQ = normalizeKyBillDesignation(rawSq);
+    const digitsOnly = normQ.length > 0 && /^\d+$/.test(normQ);
+    const billNumMatch = digitsOnly
+      ? kyBillNumericPartEquals(bill.bill_number, normQ)
+      : normQ.length >= 2 &&
+        normalizeKyBillDesignation(bill.bill_number || '').includes(normQ);
     return (
-      bill.bill_number?.toLowerCase().includes(q) ||
+      billNumMatch ||
       bill.title?.toLowerCase().includes(q) ||
       bill.description?.toLowerCase().includes(q) ||
       bill.ai_summary?.toLowerCase().includes(q) ||

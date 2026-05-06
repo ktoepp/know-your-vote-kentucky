@@ -31,14 +31,16 @@ import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { withTimeout } from '@/lib/async-utils';
 import {
   buildKyBillSearchFiltersFromUrlSearch,
+  canonicalizeKyBillSearchInput,
   fetchKyBillsMatchingSearch,
+  isDigitsOnlyBillSearchQuery,
   type KyBillSearchFilters,
 } from '@/lib/ky-search-bills';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
 
-/** Enough merged hits for several pages at 24/48/96; search runs multiple parallel `ilike` legs. */
+/** Enough merged hits for several pages at 25/50/100; search runs multiple parallel `ilike` legs. */
 const SEARCH_FETCH_LIMIT = 500;
 
 function SearchPageContent() {
@@ -46,6 +48,11 @@ function SearchPageContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const qFromUrl = searchParams.get('q') || searchParams.get('query') || '';
+  const canonicalUrlQ = useMemo(
+    () => canonicalizeKyBillSearchInput(qFromUrl.trim()),
+    [qFromUrl],
+  );
+
   const contentType = searchParams.get('type') || 'all';
   const [query, setQuery] = useState(qFromUrl);
   const [bills, setBills] = useState<KYBill[] | null>(null);
@@ -55,7 +62,7 @@ function SearchPageContent() {
   const [nonBillType, setNonBillType] = useState<string | null>(null);
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
   const filterKey = searchParams.toString();
-  const { pageSize: searchPageSize, setPageSize: setSearchPageSize } = usePersistedPageSize('search', 24);
+  const { pageSize: searchPageSize, setPageSize: setSearchPageSize } = usePersistedPageSize('search', 25);
   const { committees: committeeOptions } = useKyBillCommittees();
 
   useEffect(() => {
@@ -100,7 +107,19 @@ function SearchPageContent() {
   }, []);
 
   useEffect(() => {
-    const q = qFromUrl.trim();
+    const raw = qFromUrl.trim();
+    if (!raw) return;
+    if (contentType !== 'all' && contentType !== 'bill') return;
+    const c = canonicalizeKyBillSearchInput(raw);
+    if (c !== raw) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('q', c);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  }, [qFromUrl, contentType, pathname, router, searchParams]);
+
+  useEffect(() => {
+    const q = canonicalUrlQ.trim();
     if (!q) {
       setLoading(false);
       setSearched(false);
@@ -108,6 +127,7 @@ function SearchPageContent() {
       setNonBillType(null);
       return;
     }
+
     setQuery(q);
 
     if (contentType !== 'all' && contentType !== 'bill') {
@@ -122,11 +142,11 @@ function SearchPageContent() {
     setNonBillType(null);
     const filters = buildKyBillSearchFiltersFromUrlSearch(searchParams);
     void performSearch(q, filters);
-  }, [qFromUrl, contentType, filterKey, performSearch]);
+  }, [canonicalUrlQ, contentType, filterKey, performSearch, searchParams]);
 
   const pushSearchUrl = (nextQuery: string, overrides?: Partial<Record<string, string>>) => {
     const params = new URLSearchParams(searchParams.toString());
-    const qTrim = nextQuery.trim();
+    const qTrim = canonicalizeKyBillSearchInput(nextQuery.trim());
     if (!qTrim) return;
     params.set('q', qTrim);
     const keys = ['chamber', 'dateRange', 'status', 'committee', 'type'] as const;
@@ -156,11 +176,16 @@ function SearchPageContent() {
     return found?.label ?? committeeSelect.replace(/-/g, ' ');
   }, [committeeSelect, committeeOptions]);
 
+  const hasActiveBillFilters = Boolean(
+    chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect,
+  );
+
   const setFilterParam = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (!value || value === 'all') params.delete(key);
     else params.set(key, value);
-    const q = (params.get('q') || query).trim();
+    const qRaw = (params.get('q') || query).trim();
+    const q = qRaw ? canonicalizeKyBillSearchInput(qRaw) : '';
     if (q) params.set('q', q);
     router.replace(`${pathname}?${params.toString()}`);
   };
@@ -179,7 +204,7 @@ function SearchPageContent() {
         <Paper elevation={1} sx={{ p: 2, mb: 4, borderRadius: 2 }} component="form" onSubmit={handleSubmit}>
           <TextField
             fullWidth
-            placeholder="Search for bills by number, title, or keyword..."
+            placeholder="Example: HB 23, SB 6, Medicaid, budgets…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             InputProps={{
@@ -187,6 +212,11 @@ function SearchPageContent() {
               endAdornment: <Button type="submit" variant="contained" disabled={loading}>Search</Button>,
             }}
           />
+          <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1, mx: 0.5 }}>
+            Bill numbers work with or without spaces and common punctuation ({`HB23`}, {`HB 23`}, {`HB-23`}). Typing{' '}
+            <Box component="span" sx={{ fontWeight: 600 }}>only a number</Box> finds every designation with that
+            numeral (House, Senate, and resolutions together).
+          </Typography>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -302,6 +332,14 @@ function SearchPageContent() {
                 sx={{ cursor: 'pointer' }}
               />
               <Chip
+                label='Try: "23" (bill number)'
+                onClick={() => {
+                  setQuery('23');
+                  pushSearchUrl('23');
+                }}
+                sx={{ cursor: 'pointer' }}
+              />
+              <Chip
                 label='Try: "HB 1"'
                 onClick={() => {
                   setQuery('HB 1');
@@ -348,8 +386,43 @@ function SearchPageContent() {
             {totalResults === 0 && (
               <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
                 <Search sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-                <Typography variant="h6" color="text.secondary">No results found</Typography>
-                <Typography variant="body2" color="text.secondary">Try different search terms.</Typography>
+                <Typography variant="h6" color="text.secondary">
+                  No results found
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 560, mx: 'auto' }}>
+                  Bill numbers accept spaces and punctuation (for example HB 23, HB23, HB-23). You can filter by chamber,
+                  status, time, or committee above{hasActiveBillFilters ? '; those selections may narrow results sharply' : ''}.
+                </Typography>
+                {isDigitsOnlyBillSearchQuery(query) && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, maxWidth: 560, mx: 'auto' }}>
+                    Searching with only a numeral lists every designation that uses that bill number across types (for
+                    example House and Senate measures with the same number).
+                  </Typography>
+                )}
+                {hasActiveBillFilters && (
+                  <Box sx={{ mt: 2 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => {
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.delete('chamber');
+                        params.delete('status');
+                        params.delete('dateRange');
+                        params.delete('committee');
+                        const qc = canonicalUrlQ.trim();
+                        if (!qc) {
+                          router.replace(`${pathname}?${params.toString()}`);
+                          return;
+                        }
+                        params.set('q', qc);
+                        router.replace(`${pathname}?${params.toString()}`);
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  </Box>
+                )}
               </Paper>
             )}
 

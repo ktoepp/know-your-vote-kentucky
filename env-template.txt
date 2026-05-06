@@ -78,12 +78,6 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # ADMIN_TOKEN=your_admin_token_here
 
 # =============================================================================
-# OPTIONAL — Sentry example page (/sentry-example-page)
-# =============================================================================
-# In production this route returns 404 unless enabled (avoids public error spam).
-# SENTRY_ENABLE_EXAMPLE_PAGE=true
-
-# =============================================================================
 # OPTIONAL — Sentry (error monitoring)
 # =============================================================================
 # Create a project at https://sentry.io and grab the DSN from Project → Settings → SDK Setup.

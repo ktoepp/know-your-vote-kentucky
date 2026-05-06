@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
-import { buildKyBillSearchFiltersFromUrlSearch, fetchKyBillsMatchingSearch } from '@/lib/ky-search-bills';
+import { buildKyBillSearchFiltersFromUrlSearch, canonicalizeKyBillSearchInput, fetchKyBillsMatchingSearch } from '@/lib/ky-search-bills';
 import { parseLimit, ValidationError } from '@/lib/api-validation';
 
 export async function GET(request: NextRequest) {
@@ -13,16 +13,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ results: [], query: '', count: 0 });
     }
 
+    const qRaw = query.trim();
+    const q = canonicalizeKyBillSearchInput(qRaw);
+
     if (!supabase) {
       return NextResponse.json({
         results: [],
-        query,
+        query: q,
         count: 0,
         message: 'Supabase is not configured',
       });
     }
 
-    const q = query.trim();
     const filters = buildKyBillSearchFiltersFromUrlSearch(searchParams);
     const bills = await fetchKyBillsMatchingSearch(supabase, q, limit, filters);
 
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       results,
-      query,
+      query: q,
       count: results.length,
     });
   } catch (error) {

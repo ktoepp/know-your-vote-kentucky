@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { canonicalizeKyBillSearchInput } from '@/lib/ky-search-bills';
 
 interface SearchSuggestion {
   id: string;
@@ -26,10 +27,10 @@ interface TrendingTopic {
   category: string;
 }
 
-export default function SearchBar({ 
-  placeholder = "Search videos, speakers, topics, bills...",
+export default function SearchBar({
+  placeholder = 'Bills (e.g. HB 23), topics, legislators…',
   showFilters = true,
-  className = ""
+  className = '',
 }: {
   placeholder?: string;
   showFilters?: boolean;
@@ -135,10 +136,13 @@ export default function SearchBar({
 
   const handleSearch = (searchQuery?: string) => {
     const finalQuery = searchQuery || query;
-    if (!finalQuery.trim()) return;
+    const trimmed = finalQuery.trim();
+    if (!trimmed) return;
+
+    const qForNavigation = canonicalizeKyBillSearchInput(trimmed);
 
     // Save to search history
-    const newHistory = [finalQuery, ...searchHistory.filter(h => h !== finalQuery)].slice(0, 10);
+    const newHistory = [qForNavigation, ...searchHistory.filter((h) => h !== qForNavigation)].slice(0, 10);
     setSearchHistory(newHistory);
     if (typeof window !== 'undefined') {
       localStorage.setItem('searchHistory', JSON.stringify(newHistory));
@@ -146,7 +150,7 @@ export default function SearchBar({
 
     // Build search URL with filters
     const params = new URLSearchParams();
-    params.set('q', finalQuery);
+    params.set('q', qForNavigation);
     if (filters.dateRange) params.set('dateRange', filters.dateRange);
     if (filters.chamber) params.set('chamber', filters.chamber);
     if (filters.committee) params.set('committee', filters.committee);

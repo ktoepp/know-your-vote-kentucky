@@ -49,6 +49,7 @@ import { useThemeUtils } from '@/components/ui/ThemeUtils';
 import { useTooltips } from '@/lib/TooltipContext';
 import { useUser } from "../lib/UserContext";
 import { ICON_REM, TYPE } from '@/lib/ui-tokens';
+import { canonicalizeKyBillSearchInput } from '@/lib/ky-search-bills';
 
 type NavSubLink = { href: string; label: string };
 
@@ -287,7 +288,7 @@ function GlobalSearchBar({ tone = 'default' }: { tone?: 'default' | 'onPrimary' 
       router.push('/search');
       return;
     }
-    router.push(`/search?q=${encodeURIComponent(q)}`);
+    router.push(`/search?q=${encodeURIComponent(canonicalizeKyBillSearchInput(q))}`);
   };
 
   const inputColor = onPrimary
@@ -331,7 +332,10 @@ function GlobalSearchBar({ tone = 'default' }: { tone?: 'default' | 'onPrimary' 
         variant="outlined"
         size="small"
         fullWidth
-        inputProps={{ 'aria-label': 'Search' }}
+        inputProps={{
+          'aria-label': 'Search',
+          title: 'Search bills by designation (HB 23) or keywords',
+        }}
         sx={{
           '& .MuiOutlinedInput-root': {
             backgroundColor: onPrimary

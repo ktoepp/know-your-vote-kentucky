@@ -79,19 +79,34 @@ export async function GET(
     }
   }
 
+  const fallbackSubjects = Array.isArray(billData?.legiscan_subjects) ? billData.legiscan_subjects : [];
+
   // 3. Merge: Supabase is ground truth for status/topics; LegiScan enriches with
   //    history, subjects, texts, and sponsor detail (including ballotpedia slugs).
+  //    When getBill fails or omits subjects, use synced `legiscan_subjects` so chips match search.
   return NextResponse.json({
     bill: billData,
     detail: legiscanDetail
       ? {
-          subjects: legiscanDetail.subjects ?? [],
+          subjects:
+            Array.isArray(legiscanDetail.subjects) && legiscanDetail.subjects.length > 0
+              ? legiscanDetail.subjects
+              : fallbackSubjects,
           history: legiscanDetail.history ?? [],
           texts: legiscanDetail.texts ?? [],
           sponsors: legiscanDetail.sponsors ?? [],
           votes: votesOut,
           committee: legiscanDetail.committee ?? null,
         }
-      : null,
+      : fallbackSubjects.length > 0
+        ? {
+            subjects: fallbackSubjects,
+            history: [],
+            texts: [],
+            sponsors: [],
+            votes: [],
+            committee: null,
+          }
+        : null,
   });
 }

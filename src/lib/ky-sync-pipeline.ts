@@ -14,6 +14,7 @@ import {
 } from './ky-data-sources';
 import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 import { classifyTopics } from './ky-topic-classifier';
+import { legiscanSubjectColumnsFromDetail } from './ky-legiscan-subjects';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
 import {
   buildOrdinanceSponsorsJson,
@@ -349,6 +350,30 @@ async function fetchExistingSponsorsByLegiscanIds(
   return map;
 }
 
+async function fetchExistingLegiscanSubjectsByLegiscanIds(
+  db: ReturnType<typeof getSupabase>,
+  legiscanIds: number[],
+): Promise<Map<number, { legiscan_subjects: unknown; legiscan_subjects_search: string | null }>> {
+  const map = new Map<number, { legiscan_subjects: unknown; legiscan_subjects_search: string | null }>();
+  const CHUNK = 300;
+  for (let i = 0; i < legiscanIds.length; i += CHUNK) {
+    const chunk = legiscanIds.slice(i, i + CHUNK);
+    const { data } = await db
+      .from('ky_bills')
+      .select('legiscan_id, legiscan_subjects, legiscan_subjects_search')
+      .in('legiscan_id', chunk);
+    for (const row of data || []) {
+      if (row.legiscan_id != null) {
+        map.set(Number(row.legiscan_id), {
+          legiscan_subjects: row.legiscan_subjects,
+          legiscan_subjects_search: (row.legiscan_subjects_search as string | null) ?? null,
+        });
+      }
+    }
+  }
+  return map;
+}
+
 // --- Bills (LegiScan) ---
 async function buildBillRowsForSession(
   source: string,
@@ -404,6 +429,7 @@ async function buildBillRowsForSession(
     if (detailFetched) {
       row.introduced_date = introducedDate;
       Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
+      Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
     }
     rows.push(row);
     if (!skipSponsors && (i + 1) % 25 === 0) {
@@ -419,7 +445,15 @@ async function buildBillRowsQuotaSession(
   client: KyLegiScanClient,
   session: LegiScanSession,
   bills: LegiScanBillSummary[],
-  opts: { skipSponsors: boolean; sponsorBudget: number; existingSponsors: Map<number, unknown> },
+  opts: {
+    skipSponsors: boolean;
+    sponsorBudget: number;
+    existingSponsors: Map<number, unknown>;
+    existingLegiscanSubjects: Map<
+      number,
+      { legiscan_subjects: unknown; legiscan_subjects_search: string | null }
+    >;
+  },
 ): Promise<Record<string, unknown>[]> {
   const sortedByDate = [...bills].sort((a, b) => {
     const ta = a.last_action_date ? new Date(a.last_action_date).getTime() : 0;
@@ -490,6 +524,13 @@ async function buildBillRowsQuotaSession(
     if (detailFetched) {
       row.introduced_date = introducedDate;
       Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
+      Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
+    } else {
+      const prev = opts.existingLegiscanSubjects.get(bill.bill_id);
+      if (prev !== undefined) {
+        row.legiscan_subjects = prev.legiscan_subjects;
+        row.legiscan_subjects_search = prev.legiscan_subjects_search;
+      }
     }
     rows.push(row);
   }
@@ -607,6 +648,11 @@ async function syncKyBillsByHash(
 
     if (options.dryRun || !changedOrNew.length || !db) continue;
 
+    const existingSubjectsForBatch = await fetchExistingLegiscanSubjectsByLegiscanIds(
+      db,
+      changedOrNew.map((b) => b.bill_id),
+    );
+
     const rows: Record<string, unknown>[] = [];
     for (let i = 0; i < changedOrNew.length; i++) {
       const raw = changedOrNew[i];
@@ -648,6 +694,13 @@ async function syncKyBillsByHash(
       if (detailFetched) {
         row.introduced_date = introducedDate;
         Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
+        Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
+      } else {
+        const prev = existingSubjectsForBatch.get(raw.bill_id);
+        if (prev !== undefined) {
+          row.legiscan_subjects = prev.legiscan_subjects;
+          row.legiscan_subjects_search = prev.legiscan_subjects_search;
+        }
       }
       rows.push(row);
       if (!skipSponsors && (i + 1) % 25 === 0) {
@@ -836,10 +889,15 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
           db,
           bills.map((b) => b.bill_id),
         );
+        const existingLegiscanSubjects = await fetchExistingLegiscanSubjectsByLegiscanIds(
+          db,
+          bills.map((b) => b.bill_id),
+        );
         const rows = await buildBillRowsQuotaSession(source, client, session, bills, {
           skipSponsors,
           sponsorBudget,
           existingSponsors: existing,
+          existingLegiscanSubjects,
         });
         const synced = await upsertKyBillRows(source, db, rows);
         totalSynced += synced;

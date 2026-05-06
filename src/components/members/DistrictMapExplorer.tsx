@@ -852,10 +852,14 @@ export default function DistrictMapExplorer() {
               borderColor: 'primary.main',
             }}
           >
+            <Typography variant="subtitle1" component="div" fontWeight={700} sx={{ mb: 1 }}>
+              Two legislators, two districts
+            </Typography>
             <Typography variant="body2" color="text.secondary">
-              Every Kentucky address has <strong>two</strong> state legislators: a House member (one of 100 smaller
-              districts) and a senator (one of 38 larger districts). The numbers are not the same — you always have
-              both a rep and a senator.
+              Every Kentucky address has <strong>two</strong> state legislators: a House member (one of{' '}
+              <strong>100</strong> smaller districts) and a senator (one of <strong>38</strong> larger districts). District
+              numbers are not interchangeable — you always have both a House representative and a state senator for this
+              address.
             </Typography>
           </Paper>
 

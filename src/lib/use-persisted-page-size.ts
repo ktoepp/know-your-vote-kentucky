@@ -1,19 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 
 /**
- * Multiples of 3 so 3-column bill grids (xs=12, sm=6, md=4) fill every row on each page.
- * Shown in bill browse, search, and home (localStorage `kyv:pageSize:*`).
+ * Default pagination options for bill browse and search (localStorage `kyv:pageSize:*`).
  */
-export const PAGE_SIZE_CHOICES = [24, 48, 96] as const;
+export const PAGE_SIZE_CHOICES = [25, 50, 100] as const;
 export type PageSizeChoice = (typeof PAGE_SIZE_CHOICES)[number];
 
 const STORAGE_PREFIX = 'kyv:pageSize:';
 
-/** Old 25/50/100 values migrate to 24/48/96. */
-const LEGACY_PAGE_SIZES: Record<number, PageSizeChoice> = {
-  25: 24,
-  50: 48,
-  100: 96,
+/** Earlier 24/48/96 grid-aligned sizes migrate to 25/50/100 on read. */
+const LEGACY_GRID_PAGE_SIZES: Record<number, PageSizeChoice> = {
+  24: 25,
+  48: 50,
+  96: 100,
 };
 
 function isPageSize(n: number): n is PageSizeChoice {
@@ -21,10 +20,10 @@ function isPageSize(n: number): n is PageSizeChoice {
 }
 
 /** Safe when wiring MUI `Select` `onChange` to `setPageSize`. */
-export function toPageSizeChoice(n: number, fallback: PageSizeChoice = 24): PageSizeChoice {
+export function toPageSizeChoice(n: number, fallback: PageSizeChoice = 25): PageSizeChoice {
   if (isPageSize(n)) return n;
-  if (Object.prototype.hasOwnProperty.call(LEGACY_PAGE_SIZES, n)) {
-    return LEGACY_PAGE_SIZES[n]!;
+  if (Object.prototype.hasOwnProperty.call(LEGACY_GRID_PAGE_SIZES, n)) {
+    return LEGACY_GRID_PAGE_SIZES[n]!;
   }
   return fallback;
 }
@@ -44,11 +43,11 @@ function readSize(storageKey: string, fallback: PageSizeChoice): PageSizeChoice 
 }
 
 /**
- * Read/write 24/48/96 in localStorage. Safe for SSR: first paint uses `fallback`, then syncs from storage.
+ * Read/write page size choice in localStorage. Safe for SSR: first paint uses `fallback`, then syncs from storage.
  */
 export function usePersistedPageSize(
   storageKey: string,
-  fallback: PageSizeChoice = 24,
+  fallback: PageSizeChoice = 25,
 ): { pageSize: PageSizeChoice; setPageSize: (n: PageSizeChoice) => void } {
   const [pageSize, setPageSizeState] = useState<PageSizeChoice>(fallback);
 

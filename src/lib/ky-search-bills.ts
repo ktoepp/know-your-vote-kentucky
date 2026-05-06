@@ -1,7 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { KYBill, KYOrdinance, KYSchoolBoardItem } from '@/types/kentucky';
-import { billMatchesBrowseStatusFilter, effectiveBillChamber } from '@/lib/bill-display';
+import {
+  billMatchesBrowseStatusFilter,
+  effectiveBillChamber,
+  kyBillNumericPartEquals,
+  normalizeKyBillDesignation,
+} from '@/lib/bill-display';
 import { billMatchesCommitteeFilter } from '@/lib/ky-committee-utils';
+
+/**
+ * Set after PostgREST reports `legiscan_subjects_search` missing (migration 015 not applied or schema stale).
+ * Avoids issuing the same doomed filter on every search in this Node/browser process until restart.
+ */
+let omitLegiscanSubjectSearchFilter = false;
 
 /** Optional filters (URL: chamber, dateRange, status, committee). */
 export type KyBillSearchFilters = {
@@ -34,6 +45,25 @@ export function buildKyBillSearchFiltersFromUrlSearch(
     status: st && st !== 'all' ? st : undefined,
     committee: sp.get('committee') || undefined,
   };
+}
+
+/**
+ * Turn bill-style queries into a stable, shareable form (e.g. "hb 23" → "HB23", " SB-5 " → "SB5").
+ * Keyword and phrase searches are left as trimmed user text.
+ */
+export function canonicalizeKyBillSearchInput(raw: string): string {
+  const safe = raw.trim();
+  if (!safe) return safe;
+  const compact = normalizeKyBillDesignation(safe).replace(/%/g, '').replace(/\\/g, '').replace(/_/g, '');
+  if (!compact) return safe;
+  if (/^\d+$/.test(compact)) return compact;
+  if (/^[A-Z]+\d+$/.test(compact)) return compact;
+  return safe;
+}
+
+/** True when the trimmed query is only digits (matches HB n, SB n, etc. in search). */
+export function isDigitsOnlyBillSearchQuery(raw: string): boolean {
+  return /^\d+$/.test(canonicalizeKyBillSearchInput(raw));
 }
 
 function kyBillsSearchSelect(supabase: SupabaseClient, filters: KyBillSearchFilters) {
@@ -85,9 +115,8 @@ export function filterKyBillsByChamberClient(
   return bills.filter((b) => effectiveBillChamber(b) === chamber);
 }
 
-/** Merge row lists in order; first occurrence of each `id` wins; cap at `limit`. */
-function mergeUniqueById<T extends { id: string }>(
-  limit: number,
+/** Merge row lists in order; first occurrence of each `id` wins (earlier chunks rank higher); no cap here. */
+function mergeUniqueByIdAllChunks<T extends { id: string }>(
   ...chunks: (readonly T[] | null | undefined)[]
 ): T[] {
   const seen = new Set<string>();
@@ -97,17 +126,96 @@ function mergeUniqueById<T extends { id: string }>(
       if (!seen.has(row.id)) {
         seen.add(row.id);
         out.push(row);
-        if (out.length >= limit) return out;
       }
     }
   }
   return out;
 }
 
+/** Typical Kentucky prefixes for resolving a numeric-only query against `bill_number` (exact ilike rows). */
+const KY_BILL_NUMBER_PREFIXES: readonly string[] = [
+  'HB',
+  'SB',
+  'HR',
+  'SR',
+  'HJR',
+  'SJR',
+  'HCR',
+  'SCR',
+];
+
+function sanitizeIlikeFragment(s: string): string {
+  return s.replace(/%/g, '').replace(/\\/g, '').replace(/_/g, '');
+}
+
+/** PostgREST 400 when `legiscan_subjects_search` is missing from DB or not yet in schema cache. */
+function isMissingLegiscanSubjectsSearchColumn(err: { message?: string; details?: string; code?: string } | null | undefined): boolean {
+  const blob = `${err?.message ?? ''} ${err?.details ?? ''}`.toLowerCase();
+  if (!blob.includes('legiscan_subjects_search')) return false;
+  return (
+    blob.includes('does not exist') ||
+    blob.includes('schema cache') ||
+    blob.includes('undefined column') ||
+    err?.code === 'PGRST204'
+  );
+}
+
+function relevanceScoreForKyBillSearch(
+  bill: KYBill,
+  safe: string,
+  compactDesignation: string,
+  numericOnlyQuery: boolean,
+): number {
+  const bnCompact = normalizeKyBillDesignation(bill.bill_number);
+  let score = 0;
+
+  if (numericOnlyQuery) {
+    if (kyBillNumericPartEquals(bill.bill_number, compactDesignation)) score += 6000;
+  } else {
+    if (bnCompact === compactDesignation) score += 6500;
+    else if (
+      bnCompact.includes(compactDesignation) ||
+      bnCompact.endsWith(compactDesignation)
+    ) {
+      const extraDigits = bnCompact.length - compactDesignation.length;
+      score += Math.max(0, 3800 - extraDigits * 50);
+    }
+  }
+
+  const qLow = safe.toLowerCase().trim();
+  if (bill.title?.toLowerCase().includes(qLow)) score += 800;
+  if (bill.description?.toLowerCase().includes(qLow)) score += 450;
+  if (bill.ai_summary?.toLowerCase().includes(qLow)) score += 350;
+  if (bill.topics?.some((t) => t.toLowerCase() === qLow)) score += 500;
+
+  score += scoreLegiscanSubjectSearch(bill.legiscan_subjects_search, qLow);
+
+  return score;
+}
+
+/** Rank LegiScan subject matches (`legiscan_subjects_search`): full-line phrase match boosts chip clicks. */
+function scoreLegiscanSubjectSearch(blob: string | null | undefined, qLow: string): number {
+  if (!blob || qLow === '') return 0;
+  let best = 0;
+  const lines = blob.split('\n');
+  for (const line of lines) {
+    if (line === qLow) best = Math.max(best, 7600);
+    else if (line.includes(qLow)) best = Math.max(best, 6400);
+    else if (qLow.length >= 4 && qLow.includes(line) && line.length >= 4) best = Math.max(best, 5600);
+  }
+  if (best === 0 && blob.includes(qLow)) best = 4800;
+  return best;
+}
+
+function compareSessionsDescKy(a: KYBill, b: KYBill): number {
+  return String(b.session ?? '').localeCompare(String(a.session ?? ''));
+}
+
 /**
  * Bills matching a keyword: parallel `ilike` on title / number / description / AI summary
  * (avoids PostgREST `.or()` comma-splitting on queries like "Effective Dates, Emergency"),
- * plus exact match on a `topics[]` entry (for subject/topic chips).
+ * LegiScan `legiscan_subjects_search` (`ilike`),
+ * plus exact match on curated `topics[]` (homepage/chip UX).
  */
 export async function fetchKyBillsMatchingSearch(
   supabase: SupabaseClient,
@@ -118,7 +226,7 @@ export async function fetchKyBillsMatchingSearch(
   const safe = q.trim();
   if (!safe) return [];
 
-  /** Was 120 and capped merge results too low; KY session-scale search needs room for 24/48/96 per page. */
+  /** Was 120 and capped merge results too low; KY session-scale search needs room for 25/50/100 per page. */
   const mergeCap = Math.min(
     1000,
     Math.max(
@@ -130,28 +238,98 @@ export async function fetchKyBillsMatchingSearch(
   );
 
   const likePattern = `%${safe}%`;
+  const compactDesignation = sanitizeIlikeFragment(normalizeKyBillDesignation(safe));
+  /** Digits-only: use exact bill_number rows (HB23 …), not `%23%` (would match HB123). */
+  const numericOnlyQuery = /^\d+$/.test(compactDesignation);
+
   const base = () => kyBillsSearchSelect(supabase, filters);
-  const [titleRes, numberRes, descRes, summaryRes, topicRes] = await Promise.all([
+
+  const digitBillOrClause = numericOnlyQuery
+    ? KY_BILL_NUMBER_PREFIXES.map((p) => `bill_number.ilike.${p}${compactDesignation}`).join(',')
+    : '';
+
+  const subjectsFrag = sanitizeIlikeFragment(safe.toLowerCase());
+  const queryLegiscanSubjects = subjectsFrag !== '' && !omitLegiscanSubjectSearchFilter;
+
+  const [
+    digitsOnlyNumberRes,
+    billNumberCompactRes,
+    legiscanSubjectsRes,
+    titleRes,
+    descRes,
+    summaryRes,
+    topicRes,
+  ] = await Promise.all([
+    numericOnlyQuery
+      ? base().or(digitBillOrClause).order('session', { ascending: false }).limit(mergeCap)
+      : Promise.resolve({ data: [] as KYBill[] | null, error: null }),
+    numericOnlyQuery
+      ? Promise.resolve({ data: [] as KYBill[] | null, error: null })
+      : compactDesignation
+        ? base()
+            .ilike('bill_number', `%${compactDesignation}%`)
+            .order('session', { ascending: false })
+            .limit(mergeCap)
+        : Promise.resolve({ data: [] as KYBill[] | null, error: null }),
+    queryLegiscanSubjects
+      ? base()
+          .ilike('legiscan_subjects_search', `%${subjectsFrag}%`)
+          .order('session', { ascending: false })
+          .limit(mergeCap)
+      : Promise.resolve({ data: [] as KYBill[] | null, error: null }),
     base().ilike('title', likePattern).order('session', { ascending: false }).limit(mergeCap),
-    base().ilike('bill_number', likePattern).order('session', { ascending: false }).limit(mergeCap),
     base().ilike('description', likePattern).order('session', { ascending: false }).limit(mergeCap),
     base().ilike('ai_summary', likePattern).order('session', { ascending: false }).limit(mergeCap),
     base().contains('topics', [safe]).order('session', { ascending: false }).limit(mergeCap),
   ]);
 
-  for (const res of [titleRes, numberRes, descRes, summaryRes]) {
+  if (
+    queryLegiscanSubjects &&
+    legiscanSubjectsRes.error &&
+    !isMissingLegiscanSubjectsSearchColumn(legiscanSubjectsRes.error)
+  ) {
+    throw legiscanSubjectsRes.error;
+  }
+
+  if (
+    queryLegiscanSubjects &&
+    legiscanSubjectsRes.error &&
+    isMissingLegiscanSubjectsSearchColumn(legiscanSubjectsRes.error)
+  ) {
+    omitLegiscanSubjectSearchFilter = true;
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[ky-search-bills] legiscan_subjects_search unavailable (run migration 015 or reload PostgREST schema). Skipping LegiScan subject filter on subsequent searches until restart.',
+      );
+    }
+  }
+
+  const legiscanSubjectRows =
+    queryLegiscanSubjects && !legiscanSubjectsRes.error
+      ? (legiscanSubjectsRes.data as KYBill[] | null)
+      : null;
+
+  const staticResChecks = [
+    digitsOnlyNumberRes,
+    billNumberCompactRes,
+    titleRes,
+    descRes,
+    summaryRes,
+  ];
+  for (const res of staticResChecks) {
     if (res.error) throw res.error;
   }
 
   const topicRows = !topicRes.error ? (topicRes.data as KYBill[] | null) : null;
 
-  let merged = mergeUniqueById<KYBill>(
-    mergeCap,
+  /** Bill-number matches must rank ahead of titles so busy keyword sessions do not bury them. */
+  let merged = mergeUniqueByIdAllChunks<KYBill>(
+    numericOnlyQuery ? (digitsOnlyNumberRes.data as KYBill[] | null) : (billNumberCompactRes.data as KYBill[] | null),
+    legiscanSubjectRows,
+    topicRows,
     titleRes.data as KYBill[] | null,
-    numberRes.data as KYBill[] | null,
     descRes.data as KYBill[] | null,
     summaryRes.data as KYBill[] | null,
-    topicRows,
   );
 
   merged = filterKyBillsByDateRange(merged, filters.dateRange);
@@ -165,7 +343,15 @@ export async function fetchKyBillsMatchingSearch(
     merged = merged.filter((b) => billMatchesBrowseStatusFilter(b, filters.status));
   }
 
-  return merged.slice(0, limit);
+  const stable = [...merged];
+  stable.sort((a, b) => {
+    const ra = relevanceScoreForKyBillSearch(a, safe, compactDesignation, numericOnlyQuery);
+    const rb = relevanceScoreForKyBillSearch(b, safe, compactDesignation, numericOnlyQuery);
+    if (rb !== ra) return rb - ra;
+    return compareSessionsDescKy(a, b);
+  });
+
+  return stable.slice(0, limit);
 }
 
 /** Ordinances: parallel ilike on title, number, description (comma-safe). */
@@ -189,12 +375,11 @@ export async function fetchKyOrdinancesMatchingSearch(
     if (res.error) throw res.error;
   }
 
-  return mergeUniqueById<KYOrdinance>(
-    limit,
+  return mergeUniqueByIdAllChunks<KYOrdinance>(
     t.data as KYOrdinance[] | null,
     n.data as KYOrdinance[] | null,
     d.data as KYOrdinance[] | null,
-  );
+  ).slice(0, limit);
 }
 
 /** School board items: parallel ilike on title and description (comma-safe). */
@@ -217,9 +402,8 @@ export async function fetchKySchoolBoardMatchingSearch(
     if (res.error) throw res.error;
   }
 
-  return mergeUniqueById<KYSchoolBoardItem>(
-    limit,
+  return mergeUniqueByIdAllChunks<KYSchoolBoardItem>(
     t.data as KYSchoolBoardItem[] | null,
     d.data as KYSchoolBoardItem[] | null,
-  );
+  ).slice(0, limit);
 }
