@@ -254,7 +254,7 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
               endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
               sx={{ fontSize: '0.9rem', py: 0.75, px: 1.5, color: 'primary.main', borderColor: 'primary.main' }}
             >
-              KY Profile
+              Official profile
             </MuiButton>
           )}
         </Box>
@@ -501,10 +501,10 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
         {/* Back */}
         <MuiButton
           startIcon={<ArrowBack />}
-          onClick={() => router.back()}
+          onClick={() => router.push('/bills')}
           sx={{ mb: 2, fontSize: '1rem', fontWeight: 600 }}
         >
-          Bills
+          Back to bills
         </MuiButton>
 
         {/* Header */}
@@ -792,7 +792,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
                   <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
-                    Co-Sponsors ({coSponsors.length})
+                    Co-sponsors ({coSponsors.length})
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     {coSponsors.map((s) => {
@@ -838,7 +838,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                               size="small"
                               sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(s.party), color: '#fff' }}
                             />
-                            <MuiChip label="Co sponsor" size="small" color="primary" sx={CHIP.compact} />
+                            <MuiChip label="Co-sponsor" size="small" color="primary" sx={CHIP.compact} />
                             {coBp && (
                               <MuiButton
                                 size="small"
@@ -960,7 +960,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                     size="medium"
                     sx={{ color: 'primary.main', borderColor: 'primary.main', fontSize: '1rem', py: 1.25 }}
                   >
-                    KY Legislature
+                    Kentucky Legislature
                   </MuiButton>
                 </Box>
               </MuiCardContent>

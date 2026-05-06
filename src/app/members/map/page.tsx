@@ -20,8 +20,7 @@ export default function MembersDistrictMapPage() {
           Find your legislators
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Explore Kentucky state House and Senate districts on the map, or search by ZIP code to see which districts
-          contain that area and who represents you in our roster.
+          Explore Kentucky state House and Senate districts on the map, or search by ZIP code to find your representatives.
         </Typography>
         <DistrictMapExplorer />
       </Container>

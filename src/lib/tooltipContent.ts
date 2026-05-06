@@ -169,7 +169,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
 
   /** Minor / routine docket line — LegiScan flags these with importance 0. */
   clerical: {
-    title: "Routine procedural line",
+    title: "Routine procedural step",
     content:
       "A scheduling or docket action with no direct effect on the bill's policy or stage — for example a read-and-referred, notice, or file stamp. The substantive steps are the ones that move the bill (committee, floor votes, etc.)."
   },

@@ -35,6 +35,9 @@
 
 - **Spot-check external legislative links** — Sponsors, roll calls, and Ballotpedia search URLs across a sample of bills and member rows (production + edge cases).
 - **Members page: filter by committee** — Surface Education (etc.) committee membership from synced roster data (`ky_legislators` / committees) without requiring the district map.
+- **Search: make search fully functional** — Current search has functional gaps. Goal is reliable full-text bill search that correctly surfaces results for natural-language queries (e.g. "Medicaid", "education funding", "gun rights") as well as bill designations (HB 23, SB 6). Audit `fetchKyBillsMatchingSearch` for coverage and ranking issues.
+- **Search: suggestion chips using LegiScan schema** — Replace the hardcoded `Try: "..."` chips with dynamic suggestions informed by LegiScan subjects/topics. Chips should reflect actual data in the current session and help users discover what's active, not just serve as format examples.
+- **Search: fix nonBillType URL error message** — When `?type=` is set to an unrecognized value, the alert shown to users exposes internal language ("The URL is set to type..."). Replace with a plain-English message that doesn't reference URL parameters or query strings.
 
 ---
 

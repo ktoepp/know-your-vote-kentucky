@@ -550,7 +550,7 @@ export default function Navigation() {
                       display: 'block',
                     }}
                   >
-                    Kentucky Civic Engagement
+                    Kentucky Legislature Tracker
                   </Typography>
                 </Box>
               </Box>

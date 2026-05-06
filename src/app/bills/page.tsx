@@ -11,7 +11,7 @@ function BillsPageInner() {
   return (
     <BillsBrowse
       title="Kentucky Bills"
-      subtitle="Browse bills from the Kentucky General Assembly. Filter by chamber, status, or search by keyword."
+      subtitle="Browse bills from the current and recent sessions of the Kentucky General Assembly."
       chamberMode="all"
       initialTopic={topic}
     />

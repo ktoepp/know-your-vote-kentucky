@@ -157,15 +157,11 @@ export default function MembersPage() {
           Kentucky Legislators
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-          House and Senate members are grouped by chamber. Only the elected governor is tagged <strong>Governor</strong>{' '}
-          and listed under Governor. Other statewide roles (if present in the data) appear under{' '}
-          <strong>Other statewide officials</strong>.
-        </Typography>
-        <Typography variant="body2" sx={{ mb: 1 }}>
+          Browse all current members of the Kentucky General Assembly.{' '}
           <MuiLink component={Link} href="/members/map" fontWeight={600}>
-            District map
+            Use the district map
           </MuiLink>{' '}
-          — explore House and Senate districts and search by ZIP code.
+          to find your representatives by ZIP code.
         </Typography>
         <DataFreshnessNote variant="page" source="legislators" />
 
@@ -295,9 +291,9 @@ export default function MembersPage() {
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {!supabase
-                ? 'Supabase is not configured. Legislators will appear once connected.'
+                ? 'Member data is currently unavailable. Try again shortly.'
                 : chamberFilter === 'governor'
-                  ? 'No governor record matched. The governor is detected by name in code (update when the officeholder changes).'
+                  ? 'Governor data is temporarily unavailable.'
                   : 'Try adjusting your filters.'}
             </Typography>
           </Paper>

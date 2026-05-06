@@ -335,9 +335,7 @@ export default function HomePage() {
             Know Your Vote Kentucky
           </Typography>
           <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2, maxWidth: 640, fontWeight: 400, lineHeight: 1.5 }}>
-            Browse state bills and follow their progress through the legislative process.
-            <br />
-            Find your legislator on the district map.
+            See who represents you in the Kentucky General Assembly and track the bills they're voting on.
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <Button
@@ -381,7 +379,7 @@ export default function HomePage() {
                 },
               }}
             >
-              District map
+              Find your legislators
             </Button>
           </Box>
           <DataFreshnessNote variant="hero" />
@@ -402,6 +400,11 @@ export default function HomePage() {
             <CircularProgress />
           </Box>
         )}
+
+        {/* Site orientation blurb */}
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 680 }}>
+          Know Your Vote Kentucky tracks activity in the Kentucky General Assembly so you can follow the bills and legislators that matter to you.
+        </Typography>
 
         {/* Browse by topic — static chip strip */}
         <Box sx={{ mb: 4 }}>

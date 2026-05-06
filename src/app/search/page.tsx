@@ -196,7 +196,7 @@ function SearchPageContent() {
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-          Search Kentucky Government
+          Search Kentucky bills
         </Typography>
         <DataFreshnessNote variant="page" />
 
@@ -251,9 +251,9 @@ function SearchPageContent() {
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>Activity</InputLabel>
+              <InputLabel>Date range</InputLabel>
               <Select
-                label="Activity"
+                label="Date range"
                 value={dateRangeSelect}
                 onChange={(e) => setFilterParam('dateRange', e.target.value as string)}
               >

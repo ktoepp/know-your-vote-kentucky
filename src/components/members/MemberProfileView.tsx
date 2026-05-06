@@ -70,7 +70,7 @@ export function MemberProfileView({
 
         {!leg.active && (
           <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-            This legislator is not marked active in the current roster. Information may be from a prior term.
+            This member may no longer be serving. Information shown may be from a prior session.
           </Alert>
         )}
 
@@ -78,8 +78,7 @@ export function MemberProfileView({
 
         {!hasLegiscan && (
           <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
-            Sponsorship and individual roll-call votes on bills require a LegiScan roster match for this lawmaker; only the
-            profile above is available.
+            Sponsored bills and voting history aren't available for this member yet.
           </Alert>
         )}
 
@@ -92,14 +91,12 @@ export function MemberProfileView({
               </Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Bills listing this person as a sponsor in <strong>{sessionName}</strong> (per LegiScan data in our
-              system).
+              Bills sponsored by this member in <strong>{sessionName}</strong>.
             </Typography>
 
             {sponsoredBills.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                No sponsored bills in this session in our data yet. The roster may be updating, or sponsor lists may
-                be incomplete for some measures.
+                No sponsored bills found for this session yet.
               </Typography>
             ) : (
               <Card variant="outlined" sx={{ borderRadius: 2, mb: 1 }}>
@@ -151,8 +148,7 @@ export function MemberProfileView({
               </Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Individual &ldquo;Yea&rdquo; and &ldquo;Nay&rdquo; on floor and committee roll calls in{' '}
-              <strong>{sessionName}</strong>, when LegiScan published a full roll.
+              How this member voted on floor and committee roll calls in <strong>{sessionName}</strong>.
             </Typography>
 
             {tally && voteRecord && (
@@ -160,8 +156,7 @@ export function MemberProfileView({
                 <CardContent>
                   {voteRecord.totalRollCalls === 0 ? (
                     <Typography variant="body2" color="text.secondary">
-                      No roll-call votes in this session include this member in our data, or the sync is still
-                      filling in full rolls for some measures.
+                      No recorded votes found for this session yet.
                     </Typography>
                   ) : (
                     <>
