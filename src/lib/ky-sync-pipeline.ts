@@ -30,6 +30,9 @@ import {
   openStatesCurrentRole,
   openStatesLegislatorNames,
 } from './ky-openstates-client';
+import { normalizeBallotpediaForStorage } from './external-legislative-links';
+import { normalizeHttpsUrl } from './legislator-link-normalize';
+import { normalizeKyLegislatorDistrictForDb } from './ky-district-geo';
 import { normalizeLegislatorPhotoUrl } from './ky-member-utils';
 import type { KYSource } from '../types/kentucky';
 import type {
@@ -949,7 +952,8 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       const cr = openStatesCurrentRole(leg);
       const org = cr?.org_classification;
       const chamber = org === 'upper' ? ('senate' as const) : org === 'lower' ? ('house' as const) : null;
-      const district = cr?.district != null && cr.district !== '' ? String(cr.district) : null;
+      const districtRaw = cr?.district != null && cr.district !== '' ? String(cr.district) : null;
+      const district = normalizeKyLegislatorDistrictForDb(chamber, districtRaw);
       const { lrcProfileUrl, otherWebsiteUrl } = extractOpenStatesLegislatorWebLinks(leg);
       const { first_name, last_name } = openStatesLegislatorNames(leg);
       const { email, phone } = extractOpenStatesContactDetails(leg);
@@ -965,8 +969,8 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         photo_url: normalizeLegislatorPhotoUrl(leg.image) || null,
         email,
         phone,
-        lrc_profile_url: lrcProfileUrl,
-        website: otherWebsiteUrl,
+        lrc_profile_url: normalizeHttpsUrl(lrcProfileUrl),
+        website: normalizeHttpsUrl(otherWebsiteUrl),
         active: true,
       };
     });
@@ -1047,8 +1051,14 @@ export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<S
         const ballotpediaRaw = person.bio?.social?.ballotpedia ?? person.ballotpedia;
         const imageRaw = person.bio?.social?.image;
         const update: Record<string, string | null> = {};
-        if (!leg.ballotpedia && ballotpediaRaw) update.ballotpedia = ballotpediaRaw;
-        if (!leg.legiscan_image_url && imageRaw) update.legiscan_image_url = imageRaw;
+        if (!leg.ballotpedia && ballotpediaRaw != null && String(ballotpediaRaw).trim()) {
+          const canon = normalizeBallotpediaForStorage(String(ballotpediaRaw));
+          if (canon) update.ballotpedia = canon;
+        }
+        if (!leg.legiscan_image_url && imageRaw) {
+          const img = normalizeLegislatorPhotoUrl(String(imageRaw));
+          if (img) update.legiscan_image_url = img;
+        }
         if (Object.keys(update).length === 0) continue;
         const { error } = await db.from('ky_legislators').update(update).eq('id', leg.id);
         if (error) { failed++; logError(source, `Failed updating ${leg.id}: ${error.message}`); }

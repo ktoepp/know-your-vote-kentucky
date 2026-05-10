@@ -409,7 +409,14 @@ function UserMenu() {
   if (user) {
     return (
       <>
-        <IconButton onClick={handleMenu} size="small" sx={{ ml: 1 }}>
+        <IconButton
+          onClick={handleMenu}
+          size="small"
+          sx={{ ml: 1 }}
+          aria-label="Open account menu"
+          aria-haspopup="true"
+          aria-expanded={open}
+        >
           <Avatar sx={{ width: 32, height: 32 }}>
             {user.email?.[0]?.toUpperCase() || <AccountCircle />}
           </Avatar>
@@ -497,19 +504,24 @@ export default function Navigation() {
         <Toolbar sx={{ px: { xs: 1, sm: 2 }, py: 1 }}>
           {/* Logo */}
           <Box sx={{ display: 'flex', alignItems: 'center', mr: { lg: 4 } }}>
-            <Link href="/" style={{ textDecoration: 'none' }}>
+            <Link href="/" style={{ textDecoration: 'none' }} aria-label="Know Your Vote Kentucky home">
               <Box sx={{ 
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: 2,
                 p: 1,
                 borderRadius: 2,
-                transition: 'all 0.2s ease',
+                transition: 'background-color 0.2s ease',
+                '@media (prefers-reduced-motion: no-preference)': {
+                  transition: 'all 0.2s ease',
+                },
                 '&:hover': {
                   backgroundColor: theme.palette.mode === 'dark' 
                     ? 'rgba(255,255,255,0.1)' 
                     : 'rgba(0,0,0,0.05)',
-                  transform: 'scale(1.02)',
+                  '@media (prefers-reduced-motion: no-preference)': {
+                    transform: 'scale(1.02)',
+                  },
                 }
               }}>
                 <Avatar sx={{ 
@@ -558,7 +570,11 @@ export default function Navigation() {
           </Box>
           
           {/* Desktop Navigation Links */}
-          <Box sx={{ display: { xs: 'none', lg: 'flex' }, gap: 1, alignItems: 'center' }}>
+          <Box
+            component="nav"
+            aria-label="Primary"
+            sx={{ display: { xs: 'none', lg: 'flex' }, gap: 1, alignItems: 'center' }}
+          >
             {navLinks.map((item) =>
               item.subLinks?.length ? (
                 <BillsNavDropdown
@@ -662,6 +678,9 @@ export default function Navigation() {
             <Box sx={{ display: { xs: 'block', lg: 'none' } }}>
               <IconButton
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-expanded={mobileMenuOpen}
+                aria-controls="site-primary-nav-mobile"
+                aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
                 sx={{
                   color: theme.palette.mode === 'dark' 
                     ? theme.palette.primary.contrastText 
@@ -687,6 +706,9 @@ export default function Navigation() {
       <Collapse in={mobileMenuOpen} timeout={300}>
         <Box
           ref={mobileMenuRef}
+          id="site-primary-nav-mobile"
+          component="nav"
+          aria-label="Primary"
           sx={{
             bgcolor: 'background.paper',
             borderTop: `1px solid ${theme.palette.divider}`,

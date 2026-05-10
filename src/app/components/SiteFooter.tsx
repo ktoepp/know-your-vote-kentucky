@@ -26,6 +26,8 @@ export default function SiteFooter() {
           updates.
         </Typography>
         <Box
+          component="nav"
+          aria-label="Footer"
           sx={{
             display: 'flex',
             flexWrap: 'wrap',
@@ -38,6 +40,10 @@ export default function SiteFooter() {
           <span>© {new Date().getFullYear()} The Eighth Dimension, LLC</span>
           <span aria-hidden>·</span>
           <span>v{APP_VERSION}</span>
+          <span aria-hidden>·</span>
+          <MuiLink component={Link} href="/about" color="inherit" sx={{ textDecoration: 'underline' }}>
+            About
+          </MuiLink>
           <span aria-hidden>·</span>
           <MuiLink component={Link} href="/licenses" color="inherit" sx={{ textDecoration: 'underline' }}>
             Licenses

@@ -11,6 +11,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { syncAll, SYNC_SOURCES } from '../../../../lib/ky-sync-pipeline';
+import {
+  isVercelCronRequest,
+  notifySyncExceptionSlack,
+  notifySyncSlack,
+} from '../../../../lib/slack-webhook';
 
 export const maxDuration = 300;
 
@@ -88,12 +93,25 @@ export async function POST(
       useChangeHash: useChangeHash || undefined,
     });
     const result = results[0];
+    const cron = isVercelCronRequest(req);
+    await notifySyncSlack({
+      results,
+      source,
+      dryRun,
+      isVercelCron: cron,
+    }).catch((e) => console.error('[Slack] sync notify failed:', e));
     return NextResponse.json(
       { result, dryRun },
       { status: result?.status === 'error' ? 500 : 200 },
     );
   } catch (err: any) {
     console.error('[Sync API] per-source syncAll failed:', err);
+    await notifySyncExceptionSlack({
+      error: err,
+      source,
+      dryRun,
+      isVercelCron: isVercelCronRequest(req),
+    }).catch((e) => console.error('[Slack] sync exception notify failed:', e));
     return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
 }

@@ -1,6 +1,13 @@
 import type { KYLegislator, KYLegislatorRoster } from '@/types/kentucky';
 import { parseKyDistrictNumber } from '@/lib/ky-district-geo';
 import { formatBillLabelText, formatPartyLetterAbbrev } from '@/lib/bill-display';
+import {
+  hostnameOf,
+  isKentuckyLegislatureHost,
+  isObsoleteKyLrcHostname,
+  normalizeHttpsUrl,
+} from '@/lib/legislator-link-normalize';
+import { normalizeBallotpediaHref, legiscanPersonUrl } from './external-legislative-links';
 
 /** Two-letter initials for `Avatar` when photo is missing (uses first/last or parses `name`). */
 export function kyLegislatorAvatarInitials(leg: Pick<KYLegislator, 'name' | 'first_name' | 'last_name'>): string {
@@ -126,7 +133,34 @@ export function findLegislatorByProfileSlug(
   return null;
 }
 
-export { normalizeBallotpediaHref, legiscanPersonUrl } from './external-legislative-links';
+export { normalizeBallotpediaHref, legiscanPersonUrl };
+
+/** Ignore broken legacy `*.lrc.ky.gov` profile URLs and prefer current legislature.ky.gov (stored or inferred). */
+function sanitizeStoredKyLegislatureUrl(raw: string | null | undefined): string | null {
+  const t = (raw ?? '').trim();
+  if (!t) return null;
+  const n = normalizeHttpsUrl(t) ?? t;
+  const host = hostnameOf(n);
+  if (!host || isObsoleteKyLrcHostname(host)) return null;
+  if (isKentuckyLegislatureHost(host)) return n;
+  if (host === 'apps.legislature.ky.gov') return n;
+  return null;
+}
+
+/** Seat identity for conflict checks: House/Senate + numeric district from `district` string. */
+function kyDistrictSeatKey(leg: Pick<KYLegislator, 'chamber' | 'district'>): string | null {
+  if (leg.chamber !== 'house' && leg.chamber !== 'senate') return null;
+  const n = parseKyDistrictNumber(leg.district);
+  if (!n) return null;
+  return `${leg.chamber}:${n}`;
+}
+
+/** Another active row claims the same chamber + district (duplicate/stale Open States / LegiScan overlap). */
+function hasConflictingActiveDistrictSeatHolder(leg: Pick<KYLegislator, 'id' | 'active' | 'chamber' | 'district'>, roster: KYLegislator[]): boolean {
+  const key = kyDistrictSeatKey(leg);
+  if (!key) return false;
+  return roster.some((p) => p.id !== leg.id && p.active && kyDistrictSeatKey(p) === key);
+}
 
 /**
  * Public LRC profile is keyed by **district** (current officeholder), not by person.
@@ -152,18 +186,39 @@ export function inferKyLrcProfileUrlFromDistrict(leg: {
   return `${base}?DistrictNumber=${100 + d}`;
 }
 
-/** Kentucky LRC / legislature.ky.gov profile URL when stored, legacy `website`, or inferable from chamber + district. */
-export function kyLegislatureProfileUrl(leg: {
-  lrc_profile_url?: string | null;
-  website?: string | null;
-  chamber?: 'house' | 'senate' | null;
-  district?: string | null;
-}): string | null {
-  const lrc = (leg.lrc_profile_url || '').trim();
-  if (lrc) return lrc;
-  const w = (leg.website || '').trim();
-  if (w.toLowerCase().includes('legislature.ky.gov')) return w;
-  return inferKyLrcProfileUrlFromDistrict(leg);
+/**
+ * Kentucky LRC profile URL: stored legislature.ky.gov / apps links first; otherwise infer from chamber + district.
+ * When `roster` is provided, district inference is skipped if another active legislator claims the same seat — avoids
+ * linking a stale row to the **current** officeholder's profile (only one person holds a district at a time).
+ */
+export function kyLegislatureProfileUrl(
+  leg: {
+    id?: string;
+    active?: boolean;
+    lrc_profile_url?: string | null;
+    website?: string | null;
+    chamber?: 'house' | 'senate' | null;
+    district?: string | null;
+  },
+  roster?: KYLegislator[],
+): string | null {
+  const fromLrc = sanitizeStoredKyLegislatureUrl(leg.lrc_profile_url);
+  if (fromLrc) return fromLrc;
+  const fromWebsite = sanitizeStoredKyLegislatureUrl(leg.website);
+  if (fromWebsite) return fromWebsite;
+
+  const inferred = inferKyLrcProfileUrlFromDistrict(leg);
+  if (!inferred) return null;
+
+  if (
+    roster?.length &&
+    typeof leg.id === 'string' &&
+    hasConflictingActiveDistrictSeatHolder(leg as KYLegislator, roster)
+  ) {
+    return null;
+  }
+
+  return normalizeHttpsUrl(inferred) ?? inferred;
 }
 
 /** Non-legislature website (e.g. campaign) when `website` is not the LRC profile. */
@@ -173,8 +228,12 @@ export function kyLegislatorCampaignWebsite(leg: {
 }): string | null {
   const w = (leg.website || '').trim();
   if (!w) return null;
-  if (w.toLowerCase().includes('legislature.ky.gov')) return null;
-  return w;
+  const n = normalizeHttpsUrl(w) ?? w;
+  const host = hostnameOf(n);
+  if (!host || isObsoleteKyLrcHostname(host)) return null;
+  if (isKentuckyLegislatureHost(host)) return null;
+  if (host === 'apps.legislature.ky.gov') return null;
+  return n;
 }
 
 /** Official LRC listings when a direct profile URL is unknown (still better than a missing footer link). */
@@ -185,12 +244,18 @@ export const KY_LEGISLATURE_SENATE_ROSTER_URL = 'https://apps.legislature.ky.gov
  * Direct legislature.ky.gov profile when stored, else chamber roster on apps.legislature.ky.gov
  * so every House/Senate card can offer a consistent "KY Legislature" target.
  */
-export function kyLegislaturePublicUrl(leg: {
-  chamber?: 'house' | 'senate' | null;
-  lrc_profile_url?: string | null;
-  website?: string | null;
-}): string | null {
-  const direct = kyLegislatureProfileUrl(leg);
+export function kyLegislaturePublicUrl(
+  leg: {
+    id?: string;
+    active?: boolean;
+    chamber?: 'house' | 'senate' | null;
+    lrc_profile_url?: string | null;
+    website?: string | null;
+    district?: string | null;
+  },
+  roster?: KYLegislator[],
+): string | null {
+  const direct = kyLegislatureProfileUrl(leg, roster);
   if (direct) return direct;
   if (leg.chamber === 'house') return KY_LEGISLATURE_HOUSE_ROSTER_URL;
   if (leg.chamber === 'senate') return KY_LEGISLATURE_SENATE_ROSTER_URL;

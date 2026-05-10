@@ -22,6 +22,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncAll, getSyncStatus, SYNC_SOURCES } from '../../../lib/ky-sync-pipeline';
 import { withVercelSyncCronMonitor } from '../../../lib/sentry-sync-cron';
+import {
+  isVercelCronRequest,
+  notifySyncExceptionSlack,
+  notifySyncSlack,
+} from '../../../lib/slack-webhook';
 
 /** Pro / Enterprise: raise if your plan allows longer functions. */
 export const maxDuration = 300;
@@ -136,12 +141,25 @@ export async function GET(req: NextRequest) {
       }),
     );
     const hasErrors = results.some((r) => r.status === 'error');
+    const cron = isVercelCronRequest(req);
+    await notifySyncSlack({
+      results,
+      source,
+      dryRun,
+      isVercelCron: cron,
+    }).catch((e) => console.error('[Slack] sync notify failed:', e));
     return NextResponse.json(
       { results, dryRun },
       { status: hasErrors ? 207 : 200 },
     );
   } catch (err: any) {
     console.error('[Sync API] GET syncAll failed:', err);
+    await notifySyncExceptionSlack({
+      error: err,
+      source,
+      dryRun,
+      isVercelCron: isVercelCronRequest(req),
+    }).catch((e) => console.error('[Slack] sync exception notify failed:', e));
     return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
 }
@@ -182,12 +200,25 @@ export async function POST(req: NextRequest) {
       }),
     );
     const hasErrors = results.some((r) => r.status === 'error');
+    const cron = isVercelCronRequest(req);
+    await notifySyncSlack({
+      results,
+      source,
+      dryRun,
+      isVercelCron: cron,
+    }).catch((e) => console.error('[Slack] sync notify failed:', e));
     return NextResponse.json(
       { results, dryRun },
       { status: hasErrors ? 207 : 200 },
     );
   } catch (err: any) {
     console.error('[Sync API] POST syncAll failed:', err);
+    await notifySyncExceptionSlack({
+      error: err,
+      source,
+      dryRun,
+      isVercelCron: isVercelCronRequest(req),
+    }).catch((e) => console.error('[Slack] sync exception notify failed:', e));
     return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
 }

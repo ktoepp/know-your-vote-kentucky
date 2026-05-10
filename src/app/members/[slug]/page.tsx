@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getLegislatorByProfileSlug } from '@/lib/member-profile';
+import { getLegislatorByProfileSlug, getMemberProfilePageContext } from '@/lib/member-profile';
 import { getCivicDataSessionName } from '@/lib/ky-sessions';
 import { fetchSponsoredBillsForLegislator, fetchMemberVoteRecord } from '@/lib/member-profile-data';
 import { MemberProfileView } from '@/components/members/MemberProfileView';
@@ -30,14 +30,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function MemberProfilePage({ params }: PageProps) {
   const { slug } = await params;
-  const leg = await getLegislatorByProfileSlug(slug);
-  if (!leg) notFound();
+  const ctx = await getMemberProfilePageContext(slug);
+  if (!ctx) notFound();
+  const { leg, roster } = ctx;
   const sessionName = getCivicDataSessionName();
   const [sponsoredBills, voteRecord] = await Promise.all([
     fetchSponsoredBillsForLegislator(leg, { sessionName, limit: 30 }),
     fetchMemberVoteRecord(leg, { sessionName, maxRows: 200, recentLimit: 8 }),
   ]);
   return (
-    <MemberProfileView leg={leg} sessionName={sessionName} sponsoredBills={sponsoredBills} voteRecord={voteRecord} />
+    <MemberProfileView
+      leg={leg}
+      legislatorRoster={roster}
+      sessionName={sessionName}
+      sponsoredBills={sponsoredBills}
+      voteRecord={voteRecord}
+    />
   );
 }

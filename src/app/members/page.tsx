@@ -38,12 +38,15 @@ function ChamberSection({
   caption,
   icon,
   legislators,
+  legislatorRoster,
   cardFeatured = false,
 }: {
   title: string;
   caption?: string;
   icon: React.ReactNode;
   legislators: KYLegislator[];
+  /** Full deduped roster for seat-level URL validation on member cards. */
+  legislatorRoster: KYLegislator[];
   cardFeatured?: boolean;
 }) {
   if (legislators.length === 0) return null;
@@ -66,7 +69,12 @@ function ChamberSection({
       <Grid container spacing={3}>
         {legislators.map((leg) => (
           <Grid item xs={12} sm={cardFeatured ? 12 : 6} md={cardFeatured ? 8 : 4} lg={cardFeatured ? 6 : 4} key={leg.id}>
-            <MemberCard leg={leg} featured={cardFeatured} profileHref={memberProfilePath(leg)} />
+            <MemberCard
+              leg={leg}
+              featured={cardFeatured}
+              profileHref={memberProfilePath(leg)}
+              legislatorRoster={legislatorRoster}
+            />
           </Grid>
         ))}
       </Grid>
@@ -211,7 +219,13 @@ export default function MembersPage() {
                 </ToggleButtonGroup>
               </Box>
             </Box>
-            <IconButton onClick={fetchLegislators} disabled={loading} sx={{ alignSelf: { xs: 'flex-start', md: 'center' }, mt: { xs: 0, md: 2 } }}>
+            <IconButton
+              type="button"
+              aria-label="Refresh legislator list"
+              onClick={fetchLegislators}
+              disabled={loading}
+              sx={{ alignSelf: { xs: 'flex-start', md: 'center' }, mt: { xs: 0, md: 2 } }}
+            >
               <Refresh />
             </IconButton>
           </Box>
@@ -303,29 +317,38 @@ export default function MembersPage() {
               title="Governor"
               icon={<AccountBalance sx={{ fontSize: 28 }} />}
               legislators={governorLegislators}
+              legislatorRoster={legislators}
               cardFeatured
             />
             <ChamberSection
               title="House of Representatives"
               icon={<House sx={{ fontSize: 28 }} />}
               legislators={houseLegislators}
+              legislatorRoster={legislators}
             />
             <ChamberSection
               title="Senate"
               icon={<Groups sx={{ fontSize: 28 }} />}
               legislators={senateLegislators}
+              legislatorRoster={legislators}
             />
             <ChamberSection
               title="Other statewide officials"
               icon={<AccountBalance sx={{ fontSize: 28 }} />}
               legislators={otherStatewideLegislators}
+              legislatorRoster={legislators}
             />
           </Box>
         ) : (
           <Grid container spacing={3}>
             {filtered.map((leg) => (
               <Grid item xs={12} sm={6} md={chamberFilter === 'governor' ? 8 : 4} lg={chamberFilter === 'governor' ? 6 : 4} key={leg.id}>
-                <MemberCard leg={leg} featured={chamberFilter === 'governor'} />
+                <MemberCard
+                  leg={leg}
+                  featured={chamberFilter === 'governor'}
+                  profileHref={memberProfilePath(leg)}
+                  legislatorRoster={legislators}
+                />
               </Grid>
             ))}
           </Grid>

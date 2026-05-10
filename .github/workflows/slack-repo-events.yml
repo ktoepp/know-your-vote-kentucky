@@ -1,0 +1,122 @@
+# Posts pull request lifecycle and direct pushes to `main` to Slack.
+#
+# Setup: GitHub → repo → Settings → Secrets and variables → Actions → New repository secret:
+#   SLACK_WEBHOOK_GITHUB = Incoming Webhook URL (e.g. channel #status-reports or #engineering).
+#
+# Events:
+#   • pull_request: opened, reopened, commits pushed to PR branch, merged, closed without merge
+#   • push to main: direct commits / squash merges (classic "Merge pull request #…" merges are skipped here;
+#     those are covered by the pull_request "merged" notification).
+name: Slack — commits & PRs
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  notify-pull-request:
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post PR event to Slack
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_GITHUB }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+          ACTION: ${{ github.event.action }}
+          MERGED: ${{ github.event.pull_request.merged }}
+          MERGER: ${{ github.event.pull_request.merged_by != null && github.event.pull_request.merged_by.login || '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "Skip: SLACK_WEBHOOK_GITHUB repository secret is not set."
+            exit 0
+          fi
+
+          case "$ACTION" in
+            opened) HEADLINE="PR opened" ;;
+            reopened) HEADLINE="PR reopened" ;;
+            synchronize) HEADLINE="PR updated (new commits)" ;;
+            closed)
+              if [ "$MERGED" = "true" ]; then
+                HEADLINE="PR merged into \`$BASE\`"
+              else
+                HEADLINE="PR closed (not merged)"
+              fi
+              ;;
+            *) HEADLINE="PR $ACTION" ;;
+          esac
+
+          MERGER_LINE=""
+          if [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ] && [ -n "${MERGER:-}" ] && [ "$MERGER" != "null" ]; then
+            MERGER_LINE=$(printf '\nMerged by: `%s`' "$MERGER")
+          fi
+
+          BODY=$(jq -n \
+            --arg headline "$HEADLINE" \
+            --arg repo "$REPO" \
+            --arg actor "$ACTOR" \
+            --arg title "$PR_TITLE" \
+            --arg num "$PR_NUMBER" \
+            --arg url "$PR_URL" \
+            --arg base "$BASE" \
+            --arg head "$HEAD" \
+            --arg merger_line "$MERGER_LINE" \
+            '{text: ("*" + $headline + "* — `" + $repo + "` #" + $num + "\n" + $title + "\nBranch: `" + $head + "` → `" + $base + "`\nAuthor: `" + $actor + "`" + $merger_line + "\n<" + $url + "|Open on GitHub>")}')
+
+          curl -sS -X POST -H 'Content-Type: application/json' -d "$BODY" "$WEBHOOK"
+
+  notify-push-main:
+    if: github.event_name == 'push' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post push summary to Slack
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_GITHUB }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          COMPARE_URL: ${{ github.event.compare }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+          COMMITS_JSON: ${{ toJson(github.event.commits) }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "Skip: SLACK_WEBHOOK_GITHUB repository secret is not set."
+            exit 0
+          fi
+
+          # Skip classic merge commits; the pull_request "merged" notification covers those.
+          if printf '%s' "$HEAD_MSG" | grep -qiE '^Merge pull request #[0-9]+ '; then
+            echo "Skip push notify: merge commit (PR workflow already notified)."
+            exit 0
+          fi
+
+          BODY=$(jq -n \
+            --arg repo "$REPO" \
+            --arg actor "$ACTOR" \
+            --arg ref "$REF_NAME" \
+            --arg compare "$COMPARE_URL" \
+            --arg head "$HEAD_MSG" \
+            --argjson commits "$COMMITS_JSON" \
+            '
+            ($commits | if type == "array" then . else [] end) as $c
+            | (if ($c | length) == 0 then "• (no commit list — see compare link)"
+               else ([$c[] | "• " + (.message | split("\n")[0])] | .[0:12] | join("\n"))
+               end) as $lines
+            | ($head | split("\n")[0]) as $latest
+            | {text: ("*Push to `" + $ref + "`* — `" + $repo + "` by `" + $actor + "`\nLatest: " + $latest + "\n" + $lines + "\n<" + $compare + "|Compare on GitHub>")}
+            ')
+
+          curl -sS -X POST -H 'Content-Type: application/json' -d "$BODY" "$WEBHOOK"

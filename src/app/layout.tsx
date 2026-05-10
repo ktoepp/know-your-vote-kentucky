@@ -83,7 +83,11 @@ export default function RootLayout({
           <ClientThemeProvider>
             <TooltipProvider>
               <Navigation />
-              <main id="main-content" className="pt-0 flex min-h-0 flex-1 flex-col">
+              <main
+                id="main-content"
+                className="pt-0 flex min-h-0 flex-1 flex-col"
+                aria-label="Main content"
+              >
                 {children}
               </main>
               <SiteFooter />

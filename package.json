@@ -66,7 +66,9 @@
     "geo:ky-districts": "NODE_OPTIONS=--dns-result-order=ipv4first tsx scripts/build-ky-district-geojson.ts",
     "geo:ky-mask": "tsx scripts/build-ky-outside-mask.ts",
     "db:apply-sql": "tsx scripts/apply-migration-sql.ts",
-    "verify:votes": "tsx scripts/verify-legiscan-vote-counts.ts"
+    "slack:smoke-test": "tsx scripts/slack-smoke-test.ts",
+    "verify:votes": "tsx scripts/verify-legiscan-vote-counts.ts",
+    "verify:legislator-links": "tsx scripts/verify-legislator-external-links.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

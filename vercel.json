@@ -10,6 +10,9 @@
     },
     "src/app/api/sync/[source]/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/health-check/route.ts": {
+      "maxDuration": 30
     }
   },
   "headers": [
@@ -40,6 +43,7 @@
     { "path": "/api/sync?source=votes&limit=5", "schedule": "15 6 * * *" },
     { "path": "/api/sync?source=ordinances", "schedule": "0 7 * * *" },
     { "path": "/api/sync?source=school-boards", "schedule": "0 10 * * 1" },
-    { "path": "/api/sync?source=county-actions", "schedule": "0 11 * * 1" }
+    { "path": "/api/sync?source=county-actions", "schedule": "0 11 * * 1" },
+    { "path": "/api/cron/health-check", "schedule": "*/15 * * * *" }
   ]
 }

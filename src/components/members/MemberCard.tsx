@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Avatar,
   Box,
@@ -68,45 +68,61 @@ export interface MemberCardProps {
    */
   showDistrictInSubtitle?: boolean;
   /**
-   * When set, clicking the card (outside of links, email, and phone) navigates to the individual profile.
+   * When set, the card surface navigates to the profile (keyboard-accessible stretch link). Nested actions stay clickable.
    */
   profileHref?: string;
+  /**
+   * Deduped roster (same scope as `/members`). When set, district-inferred legislature.ky.gov profile URLs are skipped if
+   * another active legislator claims the same chamber + district — avoids pointing two cards at one seat’s profile.
+   */
+  legislatorRoster?: KYLegislator[];
+  /** Member name heading level for document outline. Use `h1` only on dedicated profile pages. @default 'h3' */
+  profileNameHeading?: 'h1' | 'h2' | 'h3';
 }
 
-export function MemberCard({ leg, featured = false, showDistrictInSubtitle = true, profileHref }: MemberCardProps) {
+export function MemberCard({
+  leg,
+  featured = false,
+  showDistrictInSubtitle = true,
+  profileHref,
+  legislatorRoster,
+  profileNameHeading = 'h3',
+}: MemberCardProps) {
   const theme = useTheme();
-  const router = useRouter();
   const { tooltipsEnabled } = useTooltips();
   const anchorId = memberSlug(leg.name || leg.id);
   const governor = isKentuckyGovernor(leg);
   const avatarSize = featured || governor ? 88 : 72;
   const telHref = leg.phone ? `tel:${leg.phone.replace(/[^\d+]/g, '')}` : undefined;
-  const lrcProfileOnly = kyLegislatureProfileUrl(leg);
-  const lrcPublicUrl = kyLegislaturePublicUrl(leg);
+  const lrcProfileOnly = kyLegislatureProfileUrl(leg, legislatorRoster);
+  const lrcPublicUrl = kyLegislaturePublicUrl(leg, legislatorRoster);
   const showKyLegislatureButton =
     (leg.chamber === 'house' || leg.chamber === 'senate' || Boolean(lrcProfileOnly)) && Boolean(lrcPublicUrl);
   const campaignUrl = kyLegislatorCampaignWebsite(leg);
-
-  const handleCardClick = (e: React.MouseEvent) => {
-    if (!profileHref) return;
-    if ((e.target as HTMLElement).closest('a, button, [role="button"], [data-no-card-nav]')) return;
-    router.push(profileHref);
-  };
+  const ballotpediaHref = normalizeBallotpediaHref(leg.ballotpedia);
+  const pointerPassthrough = Boolean(profileHref);
+  const avatarAlt = leg.name?.trim() ? `Portrait of ${leg.name.trim()}` : '';
 
   return (
     <Card
       id={anchorId}
       elevation={governor ? 3 : 1}
-      onClick={handleCardClick}
       sx={{
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        position: 'relative',
         borderRadius: 3,
         border: governor ? `2px solid ${theme.palette.success.main}` : `1px solid ${theme.palette.divider}`,
         bgcolor: governor ? (theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.08)' : 'rgba(46, 125, 50, 0.04)') : undefined,
         transition: 'all 0.2s ease',
-        cursor: profileHref ? 'pointer' : undefined,
+        ...(profileHref && {
+          cursor: 'pointer',
+          '&:has(.member-card-stretch-link:focus-visible)': {
+            outline: `2px solid ${theme.palette.primary.main}`,
+            outlineOffset: 2,
+          },
+        }),
         '&:hover': {
           boxShadow: governor ? 8 : 4,
           transform: 'translateY(-2px)',
@@ -114,7 +130,31 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
         },
       }}
     >
-      <CardContent sx={{ flexGrow: 1, p: { xs: 2, sm: 2.5 } }}>
+      {profileHref && (
+        <Link
+          href={profileHref}
+          className="member-card-stretch-link"
+          aria-label={`View profile for ${leg.name?.trim() || 'legislator'}`}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 1,
+            borderRadius: theme.spacing(3),
+            textDecoration: 'none',
+          }}
+        >
+          <span className="sr-only">View profile</span>
+        </Link>
+      )}
+      <CardContent
+        sx={{
+          flexGrow: 1,
+          p: { xs: 2, sm: 2.5 },
+          position: 'relative',
+          zIndex: 2,
+          ...(pointerPassthrough ? { pointerEvents: 'none' as const } : {}),
+        }}
+      >
         <Box
           sx={{
             display: 'flex',
@@ -125,7 +165,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
         >
           <Avatar
             src={normalizeLegislatorPhotoUrl(leg.photo_url) || normalizeLegislatorPhotoUrl(leg.legiscan_image_url) || undefined}
-            alt=""
+            alt={avatarAlt}
             imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{
               width: avatarSize,
@@ -140,7 +180,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
           </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography
-              component="h3"
+              component={profileNameHeading}
               variant={governor ? 'h5' : 'h6'}
               fontWeight={800}
               color="text.primary"
@@ -187,7 +227,13 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
         <Stack spacing={1.75}>
           {leg.email && (
             <Box
-              sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', minWidth: 0 }}
+              sx={{
+                display: 'flex',
+                gap: 1.25,
+                alignItems: 'flex-start',
+                minWidth: 0,
+                pointerEvents: pointerPassthrough ? 'auto' : undefined,
+              }}
               aria-label="Email"
             >
               <Email sx={{ fontSize: ICON_REM.nav, color: 'text.secondary', flexShrink: 0, mt: 0.2 }} aria-hidden />
@@ -198,7 +244,13 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
           )}
           {!leg.email && lrcPublicUrl && (
             <Box
-              sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', minWidth: 0 }}
+              sx={{
+                display: 'flex',
+                gap: 1.25,
+                alignItems: 'flex-start',
+                minWidth: 0,
+                pointerEvents: pointerPassthrough ? 'auto' : undefined,
+              }}
               aria-label="Capitol contact"
             >
               <Email sx={{ fontSize: ICON_REM.nav, color: 'text.disabled', flexShrink: 0, mt: 0.2 }} aria-hidden />
@@ -244,7 +296,15 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
             </Box>
           )}
           {leg.phone && (
-            <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start' }} aria-label="Phone">
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 1.25,
+                alignItems: 'flex-start',
+                pointerEvents: pointerPassthrough ? 'auto' : undefined,
+              }}
+              aria-label="Phone"
+            >
               <Phone sx={{ fontSize: ICON_REM.nav, color: 'text.secondary', flexShrink: 0, mt: 0.2 }} aria-hidden />
               <Typography
                 component="a"
@@ -270,6 +330,9 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
           alignItems: 'center',
           borderTop: 1,
           borderColor: 'divider',
+          position: 'relative',
+          zIndex: 3,
+          pointerEvents: pointerPassthrough ? 'auto' : undefined,
         }}
       >
         {showKyLegislatureButton && lrcPublicUrl && (
@@ -316,7 +379,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
             Website
           </Button>
         )}
-        {normalizeBallotpediaHref(leg.ballotpedia) && (
+        {ballotpediaHref && (
           <Tooltip
             title={tooltipsEnabled ? "Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record." : ""}
             placement="top"
@@ -328,7 +391,7 @@ export function MemberCard({ leg, featured = false, showDistrictInSubtitle = tru
               size="small"
               variant="text"
               color="inherit"
-              href={normalizeBallotpediaHref(leg.ballotpedia)!}
+              href={ballotpediaHref}
               target="_blank"
               rel="noopener noreferrer"
               endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}

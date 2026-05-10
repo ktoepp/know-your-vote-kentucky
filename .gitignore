@@ -20,6 +20,9 @@
 # production
 /build
 
+# Illustrator scratch files (often huge / noisy)
+branding/~*.tmp
+
 # misc
 .claude/
 .DS_Store

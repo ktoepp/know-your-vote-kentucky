@@ -8,7 +8,7 @@
 
 ## In Progress
 
-*(none)*
+- **Legislator outbound links** — (1) Run production **`sync:ky:legislators`** so ranked/normalized URLs persist in `ky_legislators`. (2) Run **`npm run verify:legislator-links`** locally or in CI to catch broken outbound URLs; tune timeouts if LRC is slow.
 
 ---
 
@@ -43,10 +43,41 @@
 
 ## Backlog
 
+- **Legislator links — full fidelity** — Add JSON storage (e.g. `ky_legislators.external_links` or `link_manifest` jsonb) for **all** Open States `links` entries including **social** (with `note`), not only LRC + single campaign URL. Backfill via legislator sync + optional one-off migration from current rows. UI: group **Official** vs **Social** (accessibility labels, external icons).
+- **Legislator links — verifier in CI** — Add scheduled or release-gated workflow running **`npm run verify:legislator-links`** with Supabase secrets; fail or upload artifact on 4xx; allowlist known flaky endpoints if necessary.
 - **LRC vs structured APIs (legislator data strategy)** — Kentucky LRC / `legislature.ky.gov` is the **canonical public-facing** source, but it does **not** provide a stable, documented **bulk API** for the full chamber roster the way Open States does. The app **syncs** from Open States into `ky_legislators` and **points users to the LRC** with stored profile URLs and official House/Senate directory fallbacks (`kyLegislaturePublicUrl` in `src/lib/ky-member-utils.ts`). **Revisit** if the state publishes **machine-readable bulk data** (CSV, API) with clear reuse terms.
 - **"Follow this bill" — email alerts** — Subscribe by email on status / vote / signed / veto. Needs accounts or email opt-in, Supabase subscription table, sync diff notifications, transactional email (e.g. Resend).
 - **Address search UX on map** — Street address lookup exists (`mapbox-geocode.ts`). Optional improvements: autocomplete/typeahead, clearer empty states.
 - **"How to contact your rep"** — District map accordion covers basics; expand with capitol workflows, hearings, testimony links to LRC as product needs evolve.
+
+---
+
+## UX design tracker (agent)
+
+Active:
+
+- (none)
+
+Done:
+
+- Home IA (2026-05-09): orientation-first hero primary CTA (district map), merged topic module, bill-area-only loading spinner — see `decisions.md`.
+- Members (2026-05-09): filtered roster `profileHref` bugfix; member profile `h1`/`h2`/`h3` outline, `Link` back control, bill links identifiable by underline; roster card keyboard profile navigation + portrait alt + refresh `aria-label` — see `decisions.md`.
+- Legislator outbound links (2026-05-09): link ranking + normalization in code (`legislator-link-normalize.ts`, sync + read paths); production DB updates pending legislator sync — see `decisions.md`.
+- **Link verifier:** `npm run verify:legislator-links` (`scripts/verify-legislator-external-links.ts`) — HEAD/GET checks for LRC, website, Ballotpedia, LegiScan URLs per active legislator.
+
+Blocked:
+
+- (none)
+
+Notes:
+
+- Designer-assisted UI/UX work follows user-provided Operating Principles (clarity before cleverness; explicit hierarchy; IA before layout; WCAG AA baseline; friction intentional; defaults and states explicit). Modes: Generative vs Critique per request. Conflict resolution: hierarchy accessibility > clarity > safety > consistency > efficiency > aesthetic refinement; state trade-offs and decision questions when ambiguous. Log substantive design decisions to `decisions.md` (append-only).
+
+Open decisions / questions (not resolved — pick when ready):
+
+- **Home hero vs returning bill trackers** — Orientation-first hero makes map the primary CTA. If analytics show heavy repeat bill traffic: consider nothing (scroll habits), segmented messaging, or test alternate hero emphasis. Trade-off: comprehension for new users vs immediacy for power users.
+- **Member profile content order** — Sponsored bills before voting record is the default; validate with research or A/B test later (identity/contact vs legislative activity first).
+- **Home hero contrast** — Outlined white CTAs on photo hero should be verified against WCAG non-text / focus visibility requirements for default state (not only hover). Automated check recommended (e.g. axe on deployed build).
 
 ---
 

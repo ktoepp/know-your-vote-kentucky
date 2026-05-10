@@ -35,7 +35,13 @@ export type DistrictMapTooltipModel = {
   sections: DistrictMapTooltipSection[];
 };
 
-export function DistrictMapMemberTooltip({ model }: { model: DistrictMapTooltipModel }) {
+export function DistrictMapMemberTooltip({
+  model,
+  legislatorRoster,
+}: {
+  model: DistrictMapTooltipModel;
+  legislatorRoster?: KYLegislator[];
+}) {
   return (
     <Card
       elevation={4}
@@ -50,14 +56,20 @@ export function DistrictMapMemberTooltip({ model }: { model: DistrictMapTooltipM
     >
       <Stack divider={<Divider flexItem />} sx={{ p: 0 }}>
         {model.sections.map((sec) => (
-          <DistrictMapTooltipSectionView key={sec.chamberLabel} section={sec} />
+          <DistrictMapTooltipSectionView key={sec.chamberLabel} section={sec} legislatorRoster={legislatorRoster} />
         ))}
       </Stack>
     </Card>
   );
 }
 
-function DistrictMapTooltipSectionView({ section }: { section: DistrictMapTooltipSection }) {
+function DistrictMapTooltipSectionView({
+  section,
+  legislatorRoster,
+}: {
+  section: DistrictMapTooltipSection;
+  legislatorRoster?: KYLegislator[];
+}) {
   const { chamberLabel, districtSummary, leg } = section;
   const href = leg ? memberProfilePath(leg) : undefined;
 
@@ -99,7 +111,7 @@ function DistrictMapTooltipSectionView({ section }: { section: DistrictMapToolti
             {leg.party && (
               <Chip label={formatRepresentativePartyChipLabel(leg.party)} size="small" sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(leg.party), color: '#fff' }} />
             )}
-            {(leg.email || leg.phone || (leg.chamber && kyLegislaturePublicUrl(leg))) && (
+            {(leg.email || leg.phone || (leg.chamber && kyLegislaturePublicUrl(leg, legislatorRoster))) && (
               <Box
                 component="div"
                 sx={{ mt: 1, pointerEvents: 'auto' }}
@@ -128,7 +140,7 @@ function DistrictMapTooltipSectionView({ section }: { section: DistrictMapToolti
                 )}
                 {!leg.email && leg.chamber && (
                   <MuiLink
-                    href={kyLegislaturePublicUrl(leg) || 'https://legislature.ky.gov/Legislators'}
+                    href={kyLegislaturePublicUrl(leg, legislatorRoster) || 'https://legislature.ky.gov/Legislators'}
                     target="_blank"
                     rel="noopener noreferrer"
                     variant="caption"

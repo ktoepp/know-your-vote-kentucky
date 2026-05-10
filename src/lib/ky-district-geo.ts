@@ -14,6 +14,29 @@ export function parseKyDistrictNumber(raw: string | null | undefined): string | 
   return String(parseInt(m[0], 10));
 }
 
+/**
+ * Canonical `ky_legislators.district` string after Open States sync (stable joins / fewer duplicate-looking seats).
+ * House → HD-001…HD-100; Senate → SD-01…SD-38. Leaves unrecognized formats unchanged.
+ */
+export function normalizeKyLegislatorDistrictForDb(
+  chamber: 'house' | 'senate' | null,
+  districtRaw: string | null | undefined,
+): string | null {
+  const raw = (districtRaw ?? '').trim();
+  if (!raw) return null;
+  if (chamber !== 'house' && chamber !== 'senate') return raw;
+  const numStr = parseKyDistrictNumber(raw);
+  if (!numStr) return raw;
+  const n = parseInt(numStr, 10);
+  if (!Number.isFinite(n)) return raw;
+  if (chamber === 'house') {
+    if (n < 1 || n > 100) return raw;
+    return `HD-${String(n).padStart(3, '0')}`;
+  }
+  if (n < 1 || n > 38) return raw;
+  return `SD-${String(n).padStart(2, '0')}`;
+}
+
 export function findDistrictFeatureAtPoint(
   fc: FeatureCollection,
   lng: number,

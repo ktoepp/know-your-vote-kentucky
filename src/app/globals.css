@@ -400,6 +400,11 @@ nav.nav-container input[type="search"]::placeholder {
   top: 6px;
 }
 
+.skip-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* Touch target sizing */
 .touch-target {
   min-height: 44px;

@@ -2,20 +2,19 @@
 
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Chip,
-  Container,
-  Typography,
   CircularProgress,
-  Alert,
+  Container,
   Grid,
+  Link as MuiLink,
   Stack,
+  Typography,
 } from '@mui/material';
-import {
-  Gavel,
-  ArrowForward,
-} from '@mui/icons-material';
+import { Gavel, Category } from '@mui/icons-material';
+import { ExternalLink, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useTheme } from '@mui/material/styles';
@@ -32,7 +31,7 @@ import { HomeCuratedBillList } from '@/components/home/HomeCuratedBillList';
 import { selectRecentlyPassedBills, selectMostViewedBills } from '@/lib/home-bill-curated';
 import { KY_SESSIONS, getActiveSession } from '@/lib/ky-sessions';
 import { KY_TOPICS } from '@/lib/ky-topic-classifier';
-import { ICON_REM, TYPE } from '@/lib/ui-tokens';
+import { TYPE } from '@/lib/ui-tokens';
 
 const HOME_SECTION_DISPLAY = 6;
 const HOME_SECTION_FETCH = 60;
@@ -112,8 +111,13 @@ function SessionBanner() {
                 bgcolor: statusColor,
                 flexShrink: 0,
                 ...(isInSession && {
-                  animation: 'pulse 2s infinite',
-                  '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
+                  '@media (prefers-reduced-motion: no-preference)': {
+                    animation: 'sessionBannerPulse 2s infinite',
+                  },
+                  '@keyframes sessionBannerPulse': {
+                    '0%,100%': { opacity: 1 },
+                    '50%': { opacity: 0.4 },
+                  },
                 }),
               }}
             />
@@ -157,6 +161,8 @@ function SessionBanner() {
             target="_blank"
             rel="noopener noreferrer"
             size="medium"
+            title="Opens the LRC committee schedule on legislature.ky.gov in a new tab"
+            endIcon={<ExternalLink size={18} aria-hidden />}
             sx={{ ml: { sm: 'auto' }, fontSize: '0.95rem', py: 0.75, px: 1.5, flexShrink: 0 }}
           >
             LRC schedule
@@ -334,16 +340,35 @@ export default function HomePage() {
           <Typography variant={TYPE.heroTitle.variant} component="h1" fontWeight={TYPE.heroTitle.fontWeight} gutterBottom>
             Know Your Vote Kentucky
           </Typography>
-          <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2, maxWidth: 640, fontWeight: 400, lineHeight: 1.5 }}>
-            See who represents you in the Kentucky General Assembly and track the bills they're voting on.
+          <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2.5, maxWidth: 640, fontWeight: 400, lineHeight: 1.5 }}>
+            Start by finding who represents you in the Kentucky House and Senate, then follow bills and votes from the General Assembly.
           </Typography>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Stack direction="row" flexWrap="wrap" spacing={2} useFlexGap sx={{ mb: 0.5 }}>
+            <Button
+              component={Link}
+              href="/members/map"
+              variant="contained"
+              color="secondary"
+              size="large"
+              startIcon={<MapPin size={22} strokeWidth={2} aria-hidden />}
+            >
+              Find your legislators
+            </Button>
             <Button
               component={Link}
               href="/bills"
-              variant="contained"
-              color="secondary"
-              endIcon={<ArrowForward sx={{ fontSize: ICON_REM.nav }} />}
+              variant="outlined"
+              color="inherit"
+              size="large"
+              sx={{
+                color: 'common.white',
+                borderColor: 'rgba(255, 255, 255, 0.55)',
+                '&:hover': {
+                  color: 'common.white',
+                  borderColor: 'common.white',
+                  bgcolor: 'rgba(255, 255, 255, 0.12)',
+                },
+              }}
             >
               Browse bills
             </Button>
@@ -352,6 +377,7 @@ export default function HomePage() {
               href="/search"
               variant="outlined"
               color="inherit"
+              size="large"
               sx={{
                 color: 'common.white',
                 borderColor: 'rgba(255, 255, 255, 0.55)',
@@ -364,24 +390,10 @@ export default function HomePage() {
             >
               Search bills
             </Button>
-            <Button
-              component={Link}
-              href="/members/map"
-              variant="outlined"
-              color="inherit"
-              sx={{
-                color: 'common.white',
-                borderColor: 'rgba(255, 255, 255, 0.55)',
-                '&:hover': {
-                  color: 'common.white',
-                  borderColor: 'common.white',
-                  bgcolor: 'rgba(255, 255, 255, 0.12)',
-                },
-              }}
-            >
-              Find your legislators
-            </Button>
-          </Box>
+          </Stack>
+          <Typography variant="caption" component="p" sx={{ opacity: 0.75, mt: 1.5, maxWidth: 560 }}>
+            Prefer to dive into legislation first? Browse or search bills anytime.
+          </Typography>
           <DataFreshnessNote variant="hero" />
         </Container>
       </Box>
@@ -395,21 +407,76 @@ export default function HomePage() {
           </Alert>
         )}
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-            <CircularProgress />
-          </Box>
-        )}
 
-        {/* Site orientation blurb */}
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 680 }}>
-          Know Your Vote Kentucky tracks activity in the Kentucky General Assembly so you can follow the bills and legislators that matter to you.
+        {/* Orientation — static; visible while bill data loads */}
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 720 }}>
+          Know Your Vote Kentucky helps you learn who represents you and what the legislature is doing.{' '}
+          <MuiLink component={Link} href="/members/map" fontWeight={600}>
+            Open the district map
+          </MuiLink>{' '}
+          by address or ZIP, or{' '}
+          <MuiLink component={Link} href="/members" fontWeight={600}>
+            browse all legislators
+          </MuiLink>
+          . Then use topics or bill lists below to go deeper.
         </Typography>
 
-        {/* Browse by topic — static chip strip */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" fontWeight={700} gutterBottom>
-            Browse by topic
+        {/* Single topic module: trending (when loaded) + full topic chips */}
+        <Box sx={{ mb: 5 }}>
+          <SectionHeader
+            title="Explore by topic"
+            icon={<Category />}
+            href="/bills"
+            caption="Trending reflects recent bill activity in our dataset. Chips cover every topic filter."
+          />
+          {topicCounts.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ mb: 1.5 }}>
+                Trending now
+              </Typography>
+              <Grid container spacing={2}>
+                {topicCounts.map(({ topic, count }) => (
+                  <Grid item xs={6} sm={4} md={2} key={topic}>
+                    <Box
+                      component="a"
+                      href={`/bills?topic=${encodeURIComponent(topic)}`}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        p: 2,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'background.paper',
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        transition: 'border-color 0.15s, box-shadow 0.15s',
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          boxShadow: 2,
+                        },
+                      }}
+                    >
+                      <Typography variant="h5" fontWeight={700} color="primary.main" lineHeight={1}>
+                        {count}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
+                        bills
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600} sx={{ mt: 0.75, lineHeight: 1.2 }}>
+                        {topic}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
+          <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ mb: 1.5 }}>
+            All topics
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {KY_TOPICS.map((topic) => (
@@ -427,55 +494,11 @@ export default function HomePage() {
           </Box>
         </Box>
 
-        {/* Trending topics — accurate counts from full bill set */}
-        {topicCounts.length > 0 && (
-          <Box sx={{ mb: 5 }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              Trending topics
-            </Typography>
-            <Grid container spacing={2}>
-              {topicCounts.map(({ topic, count }) => (
-                <Grid item xs={6} sm={4} md={2} key={topic}>
-                  <Box
-                    component="a"
-                    href={`/bills?topic=${encodeURIComponent(topic)}`}
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      p: 2,
-                      borderRadius: 2,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      bgcolor: 'background.paper',
-                      textDecoration: 'none',
-                      color: 'inherit',
-                      transition: 'border-color 0.15s, box-shadow 0.15s',
-                      '&:hover': {
-                        borderColor: 'primary.main',
-                        boxShadow: 2,
-                      },
-                    }}
-                  >
-                    <Typography variant="h5" fontWeight={700} color="primary.main" lineHeight={1}>
-                      {count}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
-                      bills
-                    </Typography>
-                    <Typography variant="body2" fontWeight={600} sx={{ mt: 0.75, lineHeight: 1.2 }}>
-                      {topic}
-                    </Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }} aria-busy="true" aria-label="Loading bill sections">
+            <CircularProgress />
           </Box>
-        )}
-
-        {!loading && (
+        ) : (
           <Grid container spacing={3} sx={{ alignItems: 'flex-start' }}>
             <Grid item xs={12} lg={8} sx={{ order: { xs: 0, lg: 0 } }}>
               {/* Latest KY Bills */}

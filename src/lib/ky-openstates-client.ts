@@ -4,6 +4,7 @@
  * Required env: OPENSTATES_API_KEY
  */
 import axios, { AxiosInstance } from 'axios';
+import { extractOpenStatesLegislatorWebLinksFromRaw } from './legislator-link-normalize';
 
 export interface OpenStatesBill { id: string; identifier: string; title: string; classification: string[]; subject: string[]; updatedAt: string; createdAt: string; session: string; jurisdiction: { name: string }; abstracts: { abstract: string }[]; actions: { description: string; date: string; classification: string[] }[]; sponsors: { name: string; classification: string }[]; }
 
@@ -59,26 +60,13 @@ export interface OpenStatesLegislator {
 
 /**
  * Split legislature.ky.gov profile vs other sites (campaign, etc.) from Open States `links`.
+ * Picks the best LRC profile URL when multiple exist; drops social hosts for the secondary website field.
  */
 export function extractOpenStatesLegislatorWebLinks(leg: OpenStatesLegislator): {
   lrcProfileUrl: string | null;
   otherWebsiteUrl: string | null;
 } {
-  const raw = leg.links;
-  if (!Array.isArray(raw)) return { lrcProfileUrl: null, otherWebsiteUrl: null };
-  let lrcProfileUrl: string | null = null;
-  let otherWebsiteUrl: string | null = null;
-  for (const item of raw) {
-    const url = typeof item?.url === 'string' ? item.url.trim() : '';
-    if (!url || !/^https?:\/\//i.test(url)) continue;
-    const host = url.toLowerCase();
-    if (host.includes('legislature.ky.gov')) {
-      if (!lrcProfileUrl) lrcProfileUrl = url;
-    } else if (!otherWebsiteUrl) {
-      otherWebsiteUrl = url;
-    }
-  }
-  return { lrcProfileUrl, otherWebsiteUrl };
+  return extractOpenStatesLegislatorWebLinksFromRaw(leg.links);
 }
 
 /**
@@ -169,17 +157,18 @@ function mergeLegislatorListById(
   secondary: OpenStatesLegislator[],
 ): OpenStatesLegislator[] {
   const byId = new Map(secondary.map((p) => [p.id, p]));
-  return primary.map((p) => {
-    const s = byId.get(p.id);
-    if (!s) return p;
-    return {
-      ...p,
-      offices: s.offices ?? p.offices,
-      email: p.email || s.email,
-      phone: p.phone || s.phone,
-      contact_details: s.contact_details ?? s.contactDetails ?? p.contact_details,
-    };
-  });
+    return primary.map((p) => {
+      const s = byId.get(p.id);
+      if (!s) return p;
+      return {
+        ...p,
+        offices: s.offices ?? p.offices,
+        email: p.email || s.email,
+        phone: p.phone || s.phone,
+        contact_details: s.contact_details ?? s.contactDetails ?? p.contact_details,
+        links: p.links?.length ? p.links : s.links ?? p.links,
+      };
+    });
 }
 
 export class KyOpenStatesClient {

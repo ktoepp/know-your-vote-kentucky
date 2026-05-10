@@ -9,8 +9,7 @@ function createAnonClient() {
   return createClient(url, key);
 }
 
-/** Server/RSC: resolve a member from the `[slug]` dynamic segment. */
-export async function getLegislatorByProfileSlug(slug: string): Promise<KYLegislator | null> {
+async function loadLegislatorProfileFromSlug(slug: string): Promise<{ leg: KYLegislator; roster: KYLegislator[] } | null> {
   const supabase = createAnonClient();
   if (!supabase) return null;
   const decoded = decodeURIComponent(slug).trim();
@@ -18,5 +17,20 @@ export async function getLegislatorByProfileSlug(slug: string): Promise<KYLegisl
   const { data, error } = await supabase.from('ky_legislators').select('*');
   if (error || !data?.length) return null;
   const roster = dedupeKyLegislators(data as KYLegislator[]);
-  return findLegislatorByProfileSlug(roster, decoded);
+  const leg = findLegislatorByProfileSlug(roster, decoded);
+  if (!leg) return null;
+  return { leg, roster };
+}
+
+/** Server/RSC: resolve a member from the `[slug]` dynamic segment. */
+export async function getLegislatorByProfileSlug(slug: string): Promise<KYLegislator | null> {
+  const ctx = await loadLegislatorProfileFromSlug(slug);
+  return ctx?.leg ?? null;
+}
+
+/** Same fetch as `getLegislatorByProfileSlug`, plus deduped roster for seat-safe legislature URLs on the profile card. */
+export async function getMemberProfilePageContext(
+  slug: string,
+): Promise<{ leg: KYLegislator; roster: KYLegislator[] } | null> {
+  return loadLegislatorProfileFromSlug(slug);
 }

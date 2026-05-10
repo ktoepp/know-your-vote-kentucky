@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Alert,
   Box,
@@ -44,16 +43,17 @@ function rollVoteLabel(bucket: VoteBucket, raw: string | null): string {
 
 export function MemberProfileView({
   leg,
+  legislatorRoster,
   sessionName,
   sponsoredBills = [],
   voteRecord,
 }: {
   leg: KYLegislator;
+  legislatorRoster: KYLegislator[];
   sessionName: string;
   sponsoredBills?: KYBill[];
   voteRecord?: MemberVoteRecord;
 }) {
-  const router = useRouter();
   const hasLegiscan = leg.legiscan_id != null;
   const tally = voteRecord?.tally;
 
@@ -61,8 +61,9 @@ export function MemberProfileView({
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Button
-          startIcon={<ArrowBack sx={{ fontSize: ICON_REM.nav }} />}
-          onClick={() => router.push('/members')}
+          component={Link}
+          href="/members"
+          startIcon={<ArrowBack sx={{ fontSize: ICON_REM.nav }} aria-hidden />}
           sx={{ mb: 2, textTransform: 'none', fontWeight: 600 }}
         >
           All members
@@ -74,19 +75,24 @@ export function MemberProfileView({
           </Alert>
         )}
 
-        <MemberCard leg={leg} featured={false} />
+        <MemberCard leg={leg} featured={false} profileNameHeading="h1" legislatorRoster={legislatorRoster} />
 
         {!hasLegiscan && (
           <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
-            Sponsored bills and voting history aren't available for this member yet.
+            Sponsored bills and voting history are not available for this member yet.
           </Alert>
         )}
 
         {hasLegiscan && (
           <>
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} />
-              <Typography variant={TYPE.sectionTitle.variant} fontWeight={TYPE.sectionTitle.fontWeight} color="text.primary">
+              <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
+              <Typography
+                component="h2"
+                variant={TYPE.sectionTitle.variant}
+                fontWeight={TYPE.sectionTitle.fontWeight}
+                color="text.primary"
+              >
                 Sponsored bills
               </Typography>
             </Box>
@@ -112,7 +118,7 @@ export function MemberProfileView({
                               <Box component="span" sx={{ display: 'block' }}>
                                 <Link
                                   href={`/bills/${b.id}`}
-                                  style={{ textDecoration: 'none', fontWeight: 600 }}
+                                  style={{ textDecoration: 'underline', textUnderlineOffset: 2, fontWeight: 600 }}
                                 >
                                   <Typography component="span" color="primary.main" variant="body1">
                                     {formatBillLabelText(b.bill_number)}
@@ -142,8 +148,13 @@ export function MemberProfileView({
             )}
 
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <HowToVote sx={{ color: 'primary.main', fontSize: ICON_REM.section }} />
-              <Typography variant={TYPE.sectionTitle.variant} fontWeight={TYPE.sectionTitle.fontWeight} color="text.primary">
+              <HowToVote sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
+              <Typography
+                component="h2"
+                variant={TYPE.sectionTitle.variant}
+                fontWeight={TYPE.sectionTitle.fontWeight}
+                color="text.primary"
+              >
                 Voting record
               </Typography>
             </Box>
@@ -182,7 +193,7 @@ export function MemberProfileView({
 
                       {voteRecord.recent.length > 0 && (
                         <>
-                          <Typography variant="subtitle2" color="text.primary" sx={{ mb: 0.5 }}>
+                          <Typography component="h3" variant="subtitle2" color="text.primary" sx={{ mb: 0.5 }}>
                             Recent
                           </Typography>
                           <List disablePadding>
@@ -195,7 +206,7 @@ export function MemberProfileView({
                                       r.bill ? (
                                         <Link
                                           href={`/bills/${r.bill.id}`}
-                                          style={{ textDecoration: 'none' }}
+                                          style={{ textDecoration: 'underline', textUnderlineOffset: 2 }}
                                         >
                                           <Typography component="span" color="primary.main" fontWeight={600} variant="body2">
                                             {formatBillLabelText(r.bill.bill_number)}

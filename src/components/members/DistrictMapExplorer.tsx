@@ -819,7 +819,7 @@ export default function DistrictMapExplorer() {
                   offset={[0, -6]}
                   maxWidth="360px"
                 >
-                  <DistrictMapMemberTooltip model={hoverPopup.model} />
+                  <DistrictMapMemberTooltip model={hoverPopup.model} legislatorRoster={legislators} />
                 </Popup>
               )}
             </MapGL>
@@ -926,6 +926,7 @@ export default function DistrictMapExplorer() {
               leg={selectedHouseLeg}
               showDistrictInSubtitle={false}
               profileHref={memberProfilePath(selectedHouseLeg)}
+              legislatorRoster={legislators}
             />
           )}
           {selectedSenateLeg && (
@@ -933,6 +934,7 @@ export default function DistrictMapExplorer() {
               leg={selectedSenateLeg}
               showDistrictInSubtitle={false}
               profileHref={memberProfilePath(selectedSenateLeg)}
+              legislatorRoster={legislators}
             />
           )}
         </Stack>
