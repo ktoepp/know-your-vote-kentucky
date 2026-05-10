@@ -1,27 +1,32 @@
 #!/usr/bin/env npx tsx
 /**
- * Systematically verify HTTP reachability of legislator outbound URLs in ky_legislators.
+ * Systematically verify reachability of legislator outbound URLs in ky_legislators.
  *
  * Checks (when present): lrc_profile_url, website, Ballotpedia (resolved), LegiScan person page.
- * HEAD first; on 405/501 or HEAD failure, retries with GET (Range: bytes=0-0, then full GET).
+ * Non-LegiScan: HEAD first; on 405/501 or HEAD failure, retries with GET (Range: bytes=0-0, then full GET).
+ *
+ * LegiScan: the public `legiscan.com/people/id/...` HTML is often **403** for scripts (Cloudflare). That shows as
+ * `skip` in human output — the URL was still probed; the site blocked automation, not "missing link."
+ * When **LEGISCAN_API_KEY** is set (same as bill sync), LegiScan rows are validated with **getPerson** instead,
+ * so you get a real OK/fail per `people_id` without relying on public HTML.
  *
  * Usage:
  *   npx tsx scripts/verify-legislator-external-links.ts
  *   npx tsx scripts/verify-legislator-external-links.ts --limit 20
  *   npx tsx scripts/verify-legislator-external-links.ts --json
  *   npx tsx scripts/verify-legislator-external-links.ts --strict-legiscan
- *
- * LegiScan public HTML often returns 403 to scripted requests; by default those probes are reported but do **not**
- * fail the exit code. Use `--strict-legiscan` to treat them like any other failure.
+ *   npx tsx scripts/verify-legislator-external-links.ts --http-legiscan-only   # ignore API; force HTTP probe only
  *
  * Requires: SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) in .env.local
+ * Optional: LEGISCAN_API_KEY — LegiScan API verification for person IDs (recommended).
  *
- * Exit: 0 if every non-exempt probe returns 2xx/3xx; 1 if any other 4xx/5xx or fetch failure.
+ * Exit: 0 if every non-exempt probe returns 2xx/3xx (LegiScan API counts as OK when getPerson succeeds); 1 if any other failure.
  */
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { legiscanPersonUrl, normalizeBallotpediaHref } from '../src/lib/external-legislative-links';
 import { normalizeHttpsUrl } from '../src/lib/legislator-link-normalize';
+import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
 
 const TIMEOUT_MS = 18_000;
 const CONCURRENCY = 6;
@@ -51,11 +56,17 @@ interface ProbeResult {
   error?: string;
 }
 
-function parseArgs(): { limit: number | null; json: boolean; strictLegiscan: boolean } {
+function parseArgs(): {
+  limit: number | null;
+  json: boolean;
+  strictLegiscan: boolean;
+  httpLegiscanOnly: boolean;
+} {
   const args = process.argv.slice(2);
   let limit: number | null = null;
   let json = false;
   let strictLegiscan = false;
+  let httpLegiscanOnly = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--limit' && args[i + 1]) {
       limit = Math.max(1, parseInt(args[i + 1]!, 10));
@@ -64,19 +75,52 @@ function parseArgs(): { limit: number | null; json: boolean; strictLegiscan: boo
       json = true;
     } else if (args[i] === '--strict-legiscan') {
       strictLegiscan = true;
+    } else if (args[i] === '--http-legiscan-only') {
+      httpLegiscanOnly = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       console.log(
-        'Usage: npx tsx scripts/verify-legislator-external-links.ts [--limit N] [--json] [--strict-legiscan]',
+        'Usage: npx tsx scripts/verify-legislator-external-links.ts [--limit N] [--json] [--strict-legiscan] [--http-legiscan-only]',
       );
       process.exit(0);
     }
   }
-  return { limit, json, strictLegiscan };
+  return { limit, json, strictLegiscan, httpLegiscanOnly };
 }
 
 /** LegiScan blocks many automated GETs with 403; URL pattern is often still valid in a browser. */
 function isLegiscanPublic403Exempt(field: FieldKey, status: number, strictLegiscan: boolean): boolean {
   return field === 'legiscan' && status === 403 && !strictLegiscan;
+}
+
+function legiscanPeopleIdFromPublicUrl(url: string): number | null {
+  const m = url.match(/\/people\/id\/(\d+)/i);
+  if (!m) return null;
+  const n = parseInt(m[1]!, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** True when LegiScan API confirms this people_id exists (avoids Cloudflare on public HTML). */
+async function verifyLegiscanPersonViaApi(peopleId: number): Promise<ProbeResult> {
+  try {
+    const client = getKyLegiScanClient();
+    const person = await client.getPerson(peopleId);
+    if (person?.people_id === peopleId) {
+      return { ok: true, status: 200, finalUrl: legiscanPersonUrl(peopleId) };
+    }
+    return {
+      ok: false,
+      status: 404,
+      finalUrl: legiscanPersonUrl(peopleId),
+      error: 'getPerson returned empty or mismatched people_id',
+    };
+  } catch (e: unknown) {
+    return {
+      ok: false,
+      status: 0,
+      finalUrl: legiscanPersonUrl(peopleId),
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
 }
 
 function collectProbes(rows: Row[]): LinkProbe[] {
@@ -165,7 +209,7 @@ async function mapLimit<T, R>(items: T[], concurrency: number, fn: (item: T) => 
 }
 
 async function main() {
-  const { limit, json, strictLegiscan } = parseArgs();
+  const { limit, json, strictLegiscan, httpLegiscanOnly } = parseArgs();
 
   if (!supabaseAdmin) {
     console.error(
@@ -173,6 +217,8 @@ async function main() {
     );
     process.exit(1);
   }
+
+  const useLegiscanApi = Boolean(process.env.LEGISCAN_API_KEY?.trim()) && !httpLegiscanOnly;
 
   let query = supabaseAdmin
     .from('ky_legislators')
@@ -192,7 +238,8 @@ async function main() {
 
   const rows = (data ?? []) as Row[];
   const probes = collectProbes(rows);
-  const uniqueUrls = [...new Set(probes.map((p) => p.url))];
+  const httpProbeList = probes.filter((p) => !(useLegiscanApi && p.field === 'legiscan'));
+  const uniqueUrls = [...new Set(httpProbeList.map((p) => p.url))];
 
   const probeResults = await mapLimit(uniqueUrls, CONCURRENCY, (url) => probeUrl(url));
   const urlCache = new Map<string, ProbeResult>();
@@ -200,12 +247,26 @@ async function main() {
     urlCache.set(uniqueUrls[i]!, probeResults[i]!);
   }
 
-  type RowOut = LinkProbe & ProbeResult & { exemptLegiscan403: boolean };
-  const table: RowOut[] = probes.map((p) => {
+  type RowOut = LinkProbe &
+    ProbeResult & {
+      exemptLegiscan403: boolean;
+      legiscanVia?: 'api' | 'http';
+    };
+  const table: RowOut[] = [];
+  for (const p of probes) {
+    if (p.field === 'legiscan' && useLegiscanApi) {
+      const pid = legiscanPeopleIdFromPublicUrl(p.url);
+      const r =
+        pid != null
+          ? await verifyLegiscanPersonViaApi(pid)
+          : ({ ok: false, status: 0, finalUrl: p.url, error: 'Could not parse people id from URL' } satisfies ProbeResult);
+      table.push({ ...p, ...r, exemptLegiscan403: false, legiscanVia: 'api' });
+      continue;
+    }
     const r = urlCache.get(p.url)!;
     const exemptLegiscan403 = isLegiscanPublic403Exempt(p.field, r.status, strictLegiscan);
-    return { ...p, ...r, exemptLegiscan403 };
-  });
+    table.push({ ...p, ...r, exemptLegiscan403, legiscanVia: p.field === 'legiscan' ? 'http' : undefined });
+  }
 
   let failed = 0;
   let skippedLegiscan403 = 0;
@@ -223,6 +284,7 @@ async function main() {
           failed,
           skippedLegiscan403,
           strictLegiscan,
+          legiscanVerification: useLegiscanApi ? 'legiscan_api_getperson' : 'public_http',
           rows: table.map(({ exemptLegiscan403, ...rest }) => ({
             ...rest,
             ...(exemptLegiscan403 ? { verifierNote: 'legiscan_html_403_exempt' } : {}),
@@ -233,22 +295,31 @@ async function main() {
       ),
     );
   } else {
+    const legApiN = table.filter((t) => t.legiscanVia === 'api').length;
     const skipNote =
       skippedLegiscan403 > 0 && !strictLegiscan
-        ? ` | Skipped (LegiScan 403, use --strict-legiscan to fail): ${skippedLegiscan403}`
+        ? ` | LegiScan HTTP skipped (403 bot block, not missing link): ${skippedLegiscan403}`
         : '';
+    const apiNote =
+      useLegiscanApi && legApiN > 0
+        ? ` | LegiScan checked via API (getPerson): ${legApiN}`
+        : !useLegiscanApi && table.some((t) => t.field === 'legiscan')
+          ? ' | LegiScan: set LEGISCAN_API_KEY to validate people_id via API (public HTML often 403).'
+          : '';
     console.log(
-      `Legislators: ${rows.length} | Link checks: ${table.length} (${uniqueUrls.length} unique URLs) | Failed: ${failed}${skipNote}\n`,
+      `Legislators: ${rows.length} | Link checks: ${table.length} (${uniqueUrls.length} unique HTTP URLs) | Failed: ${failed}${skipNote}${apiNote}\n`,
     );
-    if (strictLegiscan) {
+    if (strictLegiscan && !useLegiscanApi) {
       console.log(
-        'Mode: --strict-legiscan (LegiScan person URLs that return HTTP 403 count as failures; omit this flag for CI-friendly behavior).\n',
+        'Mode: --strict-legiscan (LegiScan person URLs that return HTTP 403 count as failures). ' +
+          'Set LEGISCAN_API_KEY to validate LegiScan via getPerson instead of public HTML.\n',
       );
     }
     console.log(
-      'Legend: STAT = final HTTP status after redirects. OK = yes if 2xx–3xx (Ballotpedia often uses 202 — still OK). ' +
-        'LegiScan HTML commonly returns 403 to this script: OK shows skip by default (not counted in Failed); ' +
-        'with --strict-legiscan, OK shows no and those rows count as Failed.\n',
+      'Legend: STAT = HTTP status (or 200 for LegiScan API OK). OK = yes if 2xx–3xx. ' +
+        'LegiScan **skip** = public legiscan.com returned 403 to automated HTTP (Cloudflare); the store link may still work in a browser. ' +
+        'With LEGISCAN_API_KEY, LegiScan rows use the API instead of public HTML. ' +
+        'Use --http-legiscan-only to force HTTP probes only.\n',
     );
     const wName = Math.min(28, Math.max(12, ...table.map((t) => t.name.length), 12));
     const head = `${'NAME'.padEnd(wName)} ${'FIELD'.padEnd(14)} ${'HTTP'.padEnd(4)} OK    URL`;
