@@ -6,7 +6,7 @@ Do not rewrite earlier entries. Append new dated sections at the bottom.
 
 ## 2026-05-09
 
-- Adopted UI/UX Operating Principles for designer-assisted work (modes Generative vs Critique; conflict resolution layers hierarchy / trade-off / decision questions; documentation via `tasks.md` UX tracker + this file). Existing roadmap sections in `tasks.md` retained; UX subsection added for Active/Done/Blocked/Notes.
+- Adopted UI/UX Operating Principles for designer-assisted work (modes Generative vs Critique; conflict resolution layers hierarchy / trade-off / decision questions; documentation via `TASKS.md` UX tracker + this file). Existing roadmap sections in `TASKS.md` retained; UX subsection added for Active/Done/Blocked/Notes.
 - Home page product choice: **prioritize new-user orientation** over bill-first entry. **Optimization:** comprehension and correct first visit path (map / roster before deep bill exploration). **Cost:** returning users who primarily track bills see map as the hero primary CTA until they scroll.
 - Topic exploration: **single module** (`Explore by topic`) combining trending tiles (when data exists) and full chip list under subheadings, replacing two separate section headers.
 - Home loading UX: orientation copy and topic module stay visible during fetch; spinner scoped to bill rails only so static guidance does not compete with a full-page wait state.

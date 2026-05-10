@@ -20,8 +20,11 @@
 # production
 /build
 
-# Illustrator scratch files (often huge / noisy)
-branding/~*.tmp
+# Branding assets (source files / working copies — keep out of git)
+/branding/
+
+# Optional local install of dormant npm packages (manifest: docs/legacy-npm-deps/)
+/optional/legacy-npm-deps/
 
 # misc
 .claude/

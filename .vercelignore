@@ -1,6 +1,5 @@
 # Large backup files
 *.tar.gz
-seespan-backup-*
 
 # Build cache
 .next/cache/
@@ -38,10 +37,3 @@ test-*
 # Temporary files
 *.tmp
 *.temp
-
-# Framer plugin directory (separate from main app)
-seespan-video-sync/
-
-# Local development files for Framer plugin
-src/local-dev.tsx
-src/sync.ts 

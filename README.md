@@ -1,6 +1,6 @@
 # Know Your Vote Kentucky (KYVK)
 
-A civic transparency platform for Kentucky citizens. Track state bills, local ordinances, school board actions, and county government — all in one place with AI-powered plain-language summaries.
+A civic transparency platform focused on the **Kentucky General Assembly**: browse and search bills, read plain-language AI summaries where enabled, and explore the legislative roster with profiles and an interactive district map. Vercel cron and manual sync also load **local civic datasets** (ordinances, school boards, county meeting calendars) into the database for pipelines and future product surfaces; those sources do **not** yet have first-class browse pages in the public navigation.
 
 **Deferred — executive orders:** Not part of the MVP while governor.ky.gov listings are unreliable for automated sync (404s, client-only rendering). Revisit when there is a stable index URL, an official feed/API, or a maintainable headless fetch path. The scraper (`src/lib/ky-executive-orders.ts`), DB table, `syncExecutiveOrders()`, and `generateEOSummary()` remain in the codebase for a future re-enable; they are omitted from the product surface, search, intelligence API, automated sync map, and Vercel cron until then.
 
@@ -9,10 +9,12 @@ A civic transparency platform for Kentucky citizens. Track state bills, local or
 **Start here if you're an AI picking up this project.**
 
 - **Current tasks and roadmap:** `[TASKS.md](./TASKS.md)` — always check this first
+- **CLI scripts:** see **Local maintenance scripts** under [Quick Start](#local-maintenance-scripts) (`npm run sync:ky`, verify scripts, geo build, etc.)
+- **Optional dormant npm deps:** [`docs/legacy-npm-deps/`](./docs/legacy-npm-deps/README.md) — install into gitignored `optional/legacy-npm-deps/`, not the root app
 - **This is a Kentucky state legislature app**, not a federal Congress app. All terminology, chamber sizes, and process descriptions must refer to the Kentucky General Assembly (100 House members, 38 Senators, Governor not President, 3/5 veto override threshold)
 - **Primary language:** TypeScript / Next.js 15 App Router. No pages router.
 - **Styling:** MUI (Material UI) is the primary component library. Tailwind is present but used minimally for the custom tooltip layer.
-- **Database:** Supabase (PostgreSQL). Schema in `supabase/migrations/`. Data comes from LegiScan API via `src/lib/ky-legiscan-client.ts`.
+- **Database:** Supabase (PostgreSQL). Schema in `supabase/migrations/`. Bills and votes flow from LegiScan (`src/lib/ky-legiscan-client.ts`); legislators from Open States (`src/lib/ky-openstates-client.ts`). Orchestration: `src/lib/ky-sync-pipeline.ts`.
 
 ### Key files for common tasks
 
@@ -51,7 +53,7 @@ Content lives in `src/lib/tooltipContent.ts` (`governmentTooltips` record). Add 
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -76,6 +78,31 @@ Visit `http://localhost:3000` to see the application.
 
 If `next dev` returns 500s or missing webpack chunks, stop every process on port 3000, then run `npm run dev:clean` (deletes `.next` and starts the dev server).
 
+### Local maintenance scripts
+
+All runnable tooling lives in `scripts/` and is exposed via `package.json`. There is no Jest/Vitest suite; `npm run test:env` only validates that `.env.local` has non-placeholder values for core keys.
+
+| Script | Purpose |
+| ------ | ------- |
+| `npm run test:env` | Sanity-check `.env.local` (Supabase, LegiScan, OpenStates, sync secret, Anthropic, Mapbox). |
+| `npm run sync:ky` | Manual Kentucky sync (see script help / `manual-sync.ts`). |
+| `npm run sync:ky:legislators` | Legislator-only sync pass. |
+| `npm run sync:ky:sessions` | List LegiScan sessions (helper). |
+| `npm run sync:ky:quota` | Bill sync with quota backfill flag. |
+| `npm run sync:ky:dry` | Dry-run sync (no writes). |
+| `npm run bulk-seed:ky` | LegiScan bulk seed (operator). |
+| `npm run check:legiscan-quota` | Print current month LegiScan API usage vs 30k cap. |
+| `npm run clear-dataset-hashes` | Clear dataset sync hashes (see script). |
+| `npm run db:apply-sql` | Apply SQL from repo when `DATABASE_URL` or password is set. |
+| `npm run geo:ky-districts` / `geo:ky-mask` | Rebuild district GeoJSON / outside mask assets. |
+| `npm run verify:votes` | Verify LegiScan vote counts vs DB. |
+| `npm run verify:legislator-links` | HTTP checks on stored legislator URLs. |
+| `npm run slack:smoke-test` | Post a test message to configured Slack webhooks. |
+
+### Optional legacy npm packages
+
+Heavy dependencies removed from the root app (puppeteer, pdf tooling, GCS client, `three`, etc.) are listed in [`docs/legacy-npm-deps/`](./docs/legacy-npm-deps/README.md). Copy that manifest into **`optional/legacy-npm-deps/`** (gitignored), run `npm install` there, and use `npx` or small scripts from that directory when needed. The Next.js app does not depend on that folder.
+
 ## Tech Stack
 
 - **Framework**: Next.js 15 (App Router), React 18, TypeScript
@@ -86,19 +113,26 @@ If `next dev` returns 500s or missing webpack chunks, stop every process on port
 
 ## MVP scope (public story)
 
-Primary navigation highlights **bills, ordinances, meetings, members, search, and about**. Legacy or experimental tools (explore, live content, table/activity dashboards, etc.) remain reachable by URL for development but use `**noindex`** metadata so they are not promoted in search results.
+**In the app bar:** **Bills** (with House/Senate shortcuts), **Members**, **District map**, plus a global **Search** field (bill designation or keywords; results on `/search`).
 
-## Key Features
+**Footer:** **About** (placeholder `ComingSoonPage` today), **Licenses**.
 
-- **Bill Tracking** — Kentucky General Assembly bills with status, sponsors, and AI summaries
-- **Local Ordinances** — City/county ordinance monitoring
-- **School Boards** — District-level education policy tracking
-- **Intelligence Scoring** — Multi-factor relevance scoring for civic items
-- **Plain-Language Summaries** — AI-generated "why this matters" explanations
+`/about` is not yet substantive editorial content; treat it as a stub until real copy ships.
+
+Legacy or experimental areas (**`/events`**, explore, live content, table/activity dashboards, etc.) stay reachable by direct URL for development; many use **`noindex`** so they are not promoted in search results. **`/events`** is explicitly deprioritized (hidden from nav, known federal-terminology debt) until cleaned up.
+
+## Key Features (what the public UI emphasizes today)
+
+- **Bill tracking** — Session bills with status, sponsors, committee context, and AI-assisted summaries on bill detail where configured
+- **Member roster and profiles** — Active legislators, portraits, sponsored bills, vote summaries, outbound links (LRC, LegiScan, Ballotpedia where available)
+- **District map** — Mapbox-backed House/Senate layers and address lookup (Kentucky-biased geocoding)
+- **Bill search** — Filtered search UI on `/search`; `GET /api/search` serves bill results for programmatic use
+
+**Backend and APIs (not primary nav):** The **`GET /api/intelligence`** endpoint exposes multi-factor relevance scoring and related helpers from `src/lib/ky-intelligence.ts`. Ordinance, school-board, and county-action sync populate Postgres for operators and future UI; there is no dedicated ordinances/meetings browse route in the App Router today.
 
 ## Data Sync
 
-Sync sources and status (as of last verification):
+Scheduled jobs are listed in `vercel.json`. The table below is **pipeline** status (data landing in Supabase), not a map of every public page.
 
 
 | Source         | Status  | Notes                                                                                                                                             |
@@ -110,6 +144,8 @@ Sync sources and status (as of last verification):
 | school-boards  | Working | JCPS + FCPS via KSBA portal                                                                                                                       |
 | county-actions | Working | Jefferson & Fayette **Legistar** public calendars (`louisville.legistar.com`, `lexington.legistar.com`); meeting rows sync to `ky_county_actions` |
 
+Only **bills**, **legislators** (roster/profiles), and **district geometry** are wired into the main navigation experience today; other rows are consumed by sync, reporting, or future features.
+
 
 ## API Endpoints
 
@@ -117,7 +153,7 @@ Sync sources and status (as of last verification):
 | Endpoint                | Description                                                                                                  |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `GET /api/bills`        | Kentucky bills with filtering                                                                                |
-| `GET /api/search`       | Full-text search across all content types                                                                    |
+| `GET /api/search`       | Kentucky bill search (`q`, optional filters); returns bill-shaped results JSON                                 |
 | `GET /api/intelligence` | Top-scored items with AI analysis                                                                            |
 | `POST /api/sync`        | Trigger data sync (Bearer `SYNC_API_KEY` or `CRON_SECRET`)                                                   |
 | `GET /api/sync`         | Without `?source=`: sync status. With `?source=bills` etc.: run that source (used by Vercel Cron; same auth) |
@@ -148,9 +184,7 @@ All counters land in `ky_sync_state` (JSONB payload, bucketed by date) via the `
 | `anthropic_cache_misses` | `YYYY-MM-DD` | Anthropic response cache misses               |
 
 
-These counters feed the `/admin/sync-status` dashboard (see 3a.2).
-
-Operator dashboard: `/admin/sync-status` (requires `ADMIN_TOKEN` header)
+These counters feed the **`/admin/sync-status`** operator dashboard (requires `ADMIN_TOKEN` header).
 
 ## Deployment
 
@@ -166,7 +200,7 @@ Executive-order sync is not scheduled (deferred); see the note at the top of thi
 
 See `env-template.txt` for the full list of required and optional environment variables.
 
-To show **data freshness** on the home, search, bills, and ordinances pages, the anonymous Supabase client must be allowed to `**SELECT` on `ky_sources`** (or the note is omitted silently). Civic tables used for browsing typically already allow read; add a read policy for `ky_sources` if needed.
+To show **`DataFreshnessNote`** (home, search, bills, and any other page that mounts it), the anonymous Supabase client must be allowed to **`SELECT` on `ky_sources`** (or the note is omitted silently). Civic tables used for browsing typically already allow read; add a read policy for `ky_sources` if needed.
 
 ## License
 
