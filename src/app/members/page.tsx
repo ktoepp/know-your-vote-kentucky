@@ -84,7 +84,9 @@ function ChamberSection({
 
 export default function MembersPage() {
   const [roster, setRoster] = useState<KYLegislator[]>([]);
-  const legislators = useMemo(() => dedupeKyLegislators(roster), [roster]);
+  /** Includes inactive rows so LRC district URLs can be suppressed when a predecessor still shares the seat in DB. */
+  const legislatorRoster = useMemo(() => dedupeKyLegislators(roster), [roster]);
+  const legislators = useMemo(() => legislatorRoster.filter((l) => l.active), [legislatorRoster]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,11 +101,7 @@ export default function MembersPage() {
         setLoading(false);
         return;
       }
-      let query = supabase
-        .from('ky_legislators')
-        .select('*')
-        .eq('active', true)
-        .order('last_name', { ascending: true });
+      let query = supabase.from('ky_legislators').select('*').order('last_name', { ascending: true });
       if (chamberFilter === 'house' || chamberFilter === 'senate') {
         query = query.eq('chamber', chamberFilter);
       }
@@ -317,26 +315,26 @@ export default function MembersPage() {
               title="Governor"
               icon={<AccountBalance sx={{ fontSize: 28 }} />}
               legislators={governorLegislators}
-              legislatorRoster={legislators}
+              legislatorRoster={legislatorRoster}
               cardFeatured
             />
             <ChamberSection
               title="House of Representatives"
               icon={<House sx={{ fontSize: 28 }} />}
               legislators={houseLegislators}
-              legislatorRoster={legislators}
+              legislatorRoster={legislatorRoster}
             />
             <ChamberSection
               title="Senate"
               icon={<Groups sx={{ fontSize: 28 }} />}
               legislators={senateLegislators}
-              legislatorRoster={legislators}
+              legislatorRoster={legislatorRoster}
             />
             <ChamberSection
               title="Other statewide officials"
               icon={<AccountBalance sx={{ fontSize: 28 }} />}
               legislators={otherStatewideLegislators}
-              legislatorRoster={legislators}
+              legislatorRoster={legislatorRoster}
             />
           </Box>
         ) : (
@@ -347,7 +345,7 @@ export default function MembersPage() {
                   leg={leg}
                   featured={chamberFilter === 'governor'}
                   profileHref={memberProfilePath(leg)}
-                  legislatorRoster={legislators}
+                  legislatorRoster={legislatorRoster}
                 />
               </Grid>
             ))}

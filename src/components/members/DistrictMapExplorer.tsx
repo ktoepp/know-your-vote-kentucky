@@ -170,7 +170,7 @@ export default function DistrictMapExplorer() {
       setLegError(null);
       try {
         const { data, error } = await withTimeout(
-          supabase.from('ky_legislators').select('*').eq('active', true),
+          supabase.from('ky_legislators').select('*'),
           30_000,
           'Loading legislators timed out.',
         );
@@ -218,25 +218,27 @@ export default function DistrictMapExplorer() {
     };
   }, []);
 
+  const activeLegislators = useMemo(() => legislators.filter((l) => l.active), [legislators]);
+
   const houseByDistrict = useMemo(() => {
     const m = new Map<string, KYLegislator>();
-    for (const leg of legislators) {
+    for (const leg of activeLegislators) {
       if (leg.chamber !== 'house') continue;
       const k = parseKyDistrictNumber(leg.district);
       if (k) m.set(k, leg);
     }
     return m;
-  }, [legislators]);
+  }, [activeLegislators]);
 
   const senateByDistrict = useMemo(() => {
     const m = new Map<string, KYLegislator>();
-    for (const leg of legislators) {
+    for (const leg of activeLegislators) {
       if (leg.chamber !== 'senate') continue;
       const k = parseKyDistrictNumber(leg.district);
       if (k) m.set(k, leg);
     }
     return m;
-  }, [legislators]);
+  }, [activeLegislators]);
 
   /** Aligns Census NAME (e.g. "19") with roster `district` (e.g. "House District 19"). */
   const selectedHouseDistrictKey = useMemo(
@@ -905,7 +907,7 @@ export default function DistrictMapExplorer() {
               <Typography variant="body2" sx={{ mb: 1 }}>
                 <strong>House:</strong> District {selectedHouseName}
                 {!selectedHouseLeg &&
-                  (legislators.length === 0 && !legLoading
+                  (activeLegislators.length === 0 && !legLoading
                     ? ' — load the legislator roster (Supabase) to see your representative.'
                     : ' — no roster match for this district (check district data in sync).')}
               </Typography>
@@ -914,7 +916,7 @@ export default function DistrictMapExplorer() {
               <Typography variant="body2" sx={{ mb: selectedHouseLeg || selectedSenateLeg ? 2 : 0 }}>
                 <strong>Senate:</strong> District {selectedSenateName}
                 {!selectedSenateLeg &&
-                  (legislators.length === 0 && !legLoading
+                  (activeLegislators.length === 0 && !legLoading
                     ? ' — load the legislator roster (Supabase) to see your senator.'
                     : ' — no roster match for this district (check district data in sync).')}
               </Typography>

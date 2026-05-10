@@ -92,13 +92,17 @@ export function MemberCard({
   const { tooltipsEnabled } = useTooltips();
   const anchorId = memberSlug(leg.name || leg.id);
   const governor = isKentuckyGovernor(leg);
+  /** Open States marks former members inactive after sync; links to LRC/LegiScan often describe the seat or current session, not this row. */
+  const isFormerMember = leg.active === false;
   const avatarSize = featured || governor ? 88 : 72;
   const telHref = leg.phone ? `tel:${leg.phone.replace(/[^\d+]/g, '')}` : undefined;
   const lrcProfileOnly = kyLegislatureProfileUrl(leg, legislatorRoster);
   const lrcPublicUrl = kyLegislaturePublicUrl(leg, legislatorRoster);
   const showKyLegislatureButton =
-    (leg.chamber === 'house' || leg.chamber === 'senate' || Boolean(lrcProfileOnly)) && Boolean(lrcPublicUrl);
-  const campaignUrl = kyLegislatorCampaignWebsite(leg);
+    !isFormerMember &&
+    (leg.chamber === 'house' || leg.chamber === 'senate' || Boolean(lrcProfileOnly)) &&
+    Boolean(lrcPublicUrl);
+  const campaignUrl = isFormerMember ? null : kyLegislatorCampaignWebsite(leg);
   const ballotpediaHref = normalizeBallotpediaHref(leg.ballotpedia);
   const pointerPassthrough = Boolean(profileHref);
   const avatarAlt = leg.name?.trim() ? `Portrait of ${leg.name.trim()}` : '';
@@ -209,6 +213,9 @@ export function MemberCard({
                   sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(leg.party), color: '#fff' }}
                 />
               )}
+              {isFormerMember && (
+                <Chip label="Not a current member" size="small" variant="outlined" color="warning" sx={CHIP.compact} />
+              )}
               {governor && (
                 <Chip
                   label="Governor"
@@ -239,10 +246,32 @@ export function MemberCard({
               <Email sx={{ fontSize: ICON_REM.nav, color: 'text.secondary', flexShrink: 0, mt: 0.2 }} aria-hidden />
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <CopyableEmail email={leg.email} display="block" variant="body2" />
+                {isFormerMember && (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                    From our last update — may be outdated if this person no longer holds this office.
+                  </Typography>
+                )}
               </Box>
             </Box>
           )}
-          {!leg.email && lrcPublicUrl && (
+          {!leg.email && isFormerMember && (
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 1.25,
+                alignItems: 'flex-start',
+                minWidth: 0,
+                pointerEvents: pointerPassthrough ? 'auto' : undefined,
+              }}
+            >
+              <Email sx={{ fontSize: ICON_REM.nav, color: 'text.disabled', flexShrink: 0, mt: 0.2 }} aria-hidden />
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.45 }}>
+                Capitol contact is not shown for former members — the official LRC directory lists whoever currently holds
+                this seat.
+              </Typography>
+            </Box>
+          )}
+          {!leg.email && !isFormerMember && lrcPublicUrl && (
             <Box
               sx={{
                 display: 'flex',
@@ -306,15 +335,22 @@ export function MemberCard({
               aria-label="Phone"
             >
               <Phone sx={{ fontSize: ICON_REM.nav, color: 'text.secondary', flexShrink: 0, mt: 0.2 }} aria-hidden />
-              <Typography
-                component="a"
-                variant="body2"
-                href={telHref}
-                fontWeight={600}
-                sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-              >
-                {leg.phone}
-              </Typography>
+              <Box>
+                <Typography
+                  component="a"
+                  variant="body2"
+                  href={telHref}
+                  fontWeight={600}
+                  sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                >
+                  {leg.phone}
+                </Typography>
+                {isFormerMember && (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                    From our last update — may no longer be current.
+                  </Typography>
+                )}
+              </Box>
             </Box>
           )}
         </Stack>
@@ -381,7 +417,13 @@ export function MemberCard({
         )}
         {ballotpediaHref && (
           <Tooltip
-            title={tooltipsEnabled ? "Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record." : ""}
+            title={
+              tooltipsEnabled
+                ? isFormerMember
+                  ? 'Ballotpedia often covers former officeholders; verify dates and current roles on official sources when needed.'
+                  : 'Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record.'
+                : ''
+            }
             placement="top"
             arrow
             enterDelay={400}
@@ -408,7 +450,7 @@ export function MemberCard({
             </Button>
           </Tooltip>
         )}
-        {leg.legiscan_id != null && (
+        {leg.legiscan_id != null && !isFormerMember && (
           <Button
             component="a"
             size="small"

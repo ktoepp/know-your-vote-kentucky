@@ -49,6 +49,17 @@ export interface LegiScanPerson {
   ballotpedia?: string;
 }
 
+/** Record from `getSessionPeople` (same core fields as getPerson for matching). */
+export interface LegiScanSessionPerson {
+  people_id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  party: string;
+  role: string;
+  district: string;
+}
+
 const LEGISCAN_QUERY_COUNTER_KEY = 'legiscan_query_counter';
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -215,6 +226,13 @@ export class KyLegiScanClient {
 
   async search(query: string): Promise<LegiScanSearchResult[]> {
     return this.searchBills(query);
+  }
+
+  async getSessionPeople(sessionId: number): Promise<LegiScanSessionPerson[]> {
+    const d = await this.request<any>({ op: 'getSessionPeople', id: String(sessionId) });
+    const people = d?.sessionpeople?.people;
+    if (!Array.isArray(people)) return [];
+    return people.filter((p: any) => p && typeof p.people_id === 'number');
   }
 
   async getPerson(peopleId: number): Promise<LegiScanPerson | null> {

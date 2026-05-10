@@ -33,7 +33,7 @@ import {
 import { normalizeBallotpediaForStorage } from './external-legislative-links';
 import { normalizeHttpsUrl } from './legislator-link-normalize';
 import { normalizeKyLegislatorDistrictForDb } from './ky-district-geo';
-import { normalizeLegislatorPhotoUrl } from './ky-member-utils';
+import { normalizeLegislatorPhotoUrl, normalizeSponsorNameForMatch } from './ky-member-utils';
 import type { KYSource } from '../types/kentucky';
 import type {
   KyLegiScanClient,
@@ -935,6 +935,89 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
 }
 
 // --- Legislators (Open States) ---
+
+function legiscanSessionRoleToChamber(role: string | null | undefined): 'house' | 'senate' | null {
+  const r = (role || '').toLowerCase();
+  if (r.includes('sen')) return 'senate';
+  if (r.includes('rep') || r.includes('del')) return 'house';
+  return null;
+}
+
+/**
+ * Refresh `ky_legislators.legiscan_id` from LegiScan `getSessionPeople` for the latest KY session so public
+ * `/people/id/{id}` links and vote joins stay aligned after turnover (stale rows often keep the predecessor id).
+ */
+async function reconcileKyLegislatorLegiscanIdsFromLatestSession(
+  db: ReturnType<typeof getSupabase>,
+  legiscanClient: KyLegiScanClient,
+): Promise<number> {
+  const sessions = await legiscanClient.fetchSessions();
+  if (!sessions.length) return 0;
+  const sessionId = sessions[sessions.length - 1]!.session_id;
+  const people = await legiscanClient.getSessionPeople(sessionId);
+  if (!people.length) return 0;
+
+  const { data: legs, error } = await db
+    .from('ky_legislators')
+    .select('id, name, first_name, last_name, chamber, district, legiscan_id')
+    .eq('active', true);
+  if (error) throw new Error(error.message);
+  if (!legs?.length) return 0;
+
+  const nowIso = new Date().toISOString();
+  let updated = 0;
+
+  for (const leg of legs as Array<{
+    id: string;
+    name: string;
+    first_name: string | null;
+    last_name: string | null;
+    chamber: string | null;
+    district: string | null;
+    legiscan_id: number | null;
+  }>) {
+    if (leg.chamber !== 'house' && leg.chamber !== 'senate') continue;
+    const districtNorm = (leg.district || '').trim();
+    if (!districtNorm) continue;
+
+    const legName = normalizeSponsorNameForMatch(
+      (leg.name || '').trim() || `${leg.first_name || ''} ${leg.last_name || ''}`.trim(),
+    );
+    if (!legName) continue;
+
+    const matches = people.filter((p) => {
+      const ch = legiscanSessionRoleToChamber(p.role);
+      if (ch !== leg.chamber) return false;
+      const pDist = normalizeKyLegislatorDistrictForDb(ch, p.district);
+      if (!pDist || pDist !== districtNorm) return false;
+      const pName = normalizeSponsorNameForMatch(
+        (p.name || '').trim() || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+      );
+      return pName.length > 0 && pName === legName;
+    });
+
+    if (matches.length !== 1) continue;
+    const pid = matches[0]!.people_id;
+    if (leg.legiscan_id === pid) continue;
+
+    const { error: clearErr } = await db
+      .from('ky_legislators')
+      .update({ legiscan_id: null, updated_at: nowIso })
+      .eq('legiscan_id', pid)
+      .neq('id', leg.id);
+    if (clearErr) throw new Error(clearErr.message);
+
+    const { error: upErr } = await db
+      .from('ky_legislators')
+      .update({ legiscan_id: pid, updated_at: nowIso })
+      .eq('id', leg.id);
+    if (upErr) throw new Error(upErr.message);
+    updated++;
+  }
+
+  return updated;
+}
+
 export async function syncKyLegislators(options: SyncOptions = {}): Promise<SyncResult> {
   const start = Date.now();
   const source = 'legislators';
@@ -996,7 +1079,52 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       await updateSourceStatus(source, 'error', 0, error.message);
       return { source, status: 'error', itemsSynced: 0, error: error.message, duration: Date.now() - start };
     }
+
+    const nowIso = new Date().toISOString();
+    const syncedOpenStatesIds = new Set(
+      rows.map((r) => r.openstates_id).filter((id): id is string => typeof id === 'string' && id.length > 0),
+    );
+    if (syncedOpenStatesIds.size > 0) {
+      const { data: withOs, error: osFetchErr } = await db
+        .from('ky_legislators')
+        .select('id, openstates_id')
+        .not('openstates_id', 'is', null);
+      if (osFetchErr) {
+        logError(source, `Could not read legislators for active cleanup: ${osFetchErr.message}`);
+      } else {
+        const staleIds = (withOs || [])
+          .filter((r) => {
+            const oid = r.openstates_id as string | null;
+            return Boolean(oid && !syncedOpenStatesIds.has(oid));
+          })
+          .map((r) => r.id as string);
+        const CHUNK = 100;
+        for (let i = 0; i < staleIds.length; i += CHUNK) {
+          const chunk = staleIds.slice(i, i + CHUNK);
+          const { error: deactErr } = await db
+            .from('ky_legislators')
+            .update({ active: false, updated_at: nowIso })
+            .in('id', chunk);
+          if (deactErr) logError(source, `Mark inactive chunk failed: ${deactErr.message}`);
+        }
+        if (staleIds.length) {
+          log(source, `Marked ${staleIds.length} legislator row(s) inactive (Open States id not in current chamber list)`);
+        }
+      }
+    }
+
     log(source, `Synced ${synced}/${legislators.length} legislators`);
+
+    if (process.env.LEGISCAN_API_KEY) {
+      try {
+        const legiscan = getKyLegiScanClient();
+        const n = await reconcileKyLegislatorLegiscanIdsFromLatestSession(db, legiscan);
+        if (n > 0) log(source, `Refreshed LegiScan people_id on ${n} legislators (session roster match)`);
+      } catch (e: any) {
+        logError(source, `LegiScan people_id refresh failed (non-fatal): ${e.message}`);
+      }
+    }
+
     await updateSourceStatus(source, 'success', synced);
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
   } catch (err: any) {

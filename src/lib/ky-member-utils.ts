@@ -147,6 +147,16 @@ function sanitizeStoredKyLegislatureUrl(raw: string | null | undefined): string 
   return null;
 }
 
+/** Strip honorifics and punctuation for comparing LegiScan names to Open States roster. */
+export function normalizeSponsorNameForMatch(name: string): string {
+  return name
+    .replace(/\b(rep\.?|representative|sen\.?|senator|del\.?|delegate)\b/gi, ' ')
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 /** Seat identity for conflict checks: House/Senate + numeric district from `district` string. */
 function kyDistrictSeatKey(leg: Pick<KYLegislator, 'chamber' | 'district'>): string | null {
   if (leg.chamber !== 'house' && leg.chamber !== 'senate') return null;
@@ -155,11 +165,51 @@ function kyDistrictSeatKey(leg: Pick<KYLegislator, 'chamber' | 'district'>): str
   return `${leg.chamber}:${n}`;
 }
 
-/** Another active row claims the same chamber + district (duplicate/stale Open States / LegiScan overlap). */
-function hasConflictingActiveDistrictSeatHolder(leg: Pick<KYLegislator, 'id' | 'active' | 'chamber' | 'district'>, roster: KYLegislator[]): boolean {
-  const key = kyDistrictSeatKey(leg);
-  if (!key) return false;
-  return roster.some((p) => p.id !== leg.id && p.active && kyDistrictSeatKey(p) === key);
+/** Stable identity for “same person” when comparing roster rows (dedupe / transition-period seats). */
+function kyLegislatorIdentityNorm(leg: Pick<KYLegislator, 'name' | 'first_name' | 'last_name' | 'openstates_id'>): string {
+  const os = (leg.openstates_id || '').trim();
+  if (os) return `os:${os}`;
+  const raw = (leg.name || '').trim() || [leg.first_name, leg.last_name].map((x) => (x || '').trim()).filter(Boolean).join(' ');
+  return `n:${normalizeSponsorNameForMatch(raw)}`;
+}
+
+/**
+ * Another roster member represents a **different person** for the same chamber + district.
+ * LRC `Legislator-Profile.aspx?DistrictNumber=` always tracks the **current** listing for the seat, so those URLs are
+ * unsafe whenever the seat has turned over and we still retain the prior legislator row (often `active = false`).
+ */
+function hasKyDistrictSeatDifferentPersonConflict(
+  leg: Pick<KYLegislator, 'id' | 'name' | 'first_name' | 'last_name' | 'openstates_id' | 'chamber' | 'district'>,
+  roster: KYLegislator[],
+): boolean {
+  const seat = kyDistrictSeatKey(leg);
+  if (!seat) return false;
+  const selfId = kyLegislatorIdentityNorm(leg as KYLegislator);
+  return roster.some((p) => {
+    if (p.id === leg.id) return false;
+    if (kyDistrictSeatKey(p) !== seat) return false;
+    return kyLegislatorIdentityNorm(p) !== selfId;
+  });
+}
+
+/** True when URL is the LRC district-based profile (current officeholder for that seat, not a person-stable id). */
+export function isKyLrcDistrictNumberProfileUrl(url: string | null | undefined): boolean {
+  const raw = (url ?? '').trim();
+  if (!raw) return false;
+  const n = normalizeHttpsUrl(raw) ?? raw;
+  try {
+    const u = new URL(n);
+    if (!isKentuckyLegislatureHost(u.hostname)) return false;
+    if (!u.pathname.toLowerCase().includes('legislator-profile.aspx')) return false;
+    const q = u.search.replace(/^\?/, '').split('&');
+    for (const pair of q) {
+      const [k, v] = pair.split('=').map((s) => decodeURIComponent(s));
+      if ((k || '').toLowerCase() === 'districtnumber' && (v || '').trim() !== '') return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -188,13 +238,18 @@ export function inferKyLrcProfileUrlFromDistrict(leg: {
 
 /**
  * Kentucky LRC profile URL: stored legislature.ky.gov / apps links first; otherwise infer from chamber + district.
- * When `roster` is provided, district inference is skipped if another active legislator claims the same seat — avoids
- * linking a stale row to the **current** officeholder's profile (only one person holds a district at a time).
+ * When `roster` is provided, district-based targets (`?DistrictNumber=`) are skipped if any **other** roster row
+ * represents a different person for the same seat (e.g. predecessor still in DB) — those pages track the current
+ * listing for the district, not a stable per-person id.
  */
 export function kyLegislatureProfileUrl(
   leg: {
     id?: string;
     active?: boolean;
+    name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    openstates_id?: string | null;
     lrc_profile_url?: string | null;
     website?: string | null;
     chamber?: 'house' | 'senate' | null;
@@ -202,19 +257,26 @@ export function kyLegislatureProfileUrl(
   },
   roster?: KYLegislator[],
 ): string | null {
+  const seatConflict =
+    roster?.length &&
+    typeof leg.id === 'string' &&
+    hasKyDistrictSeatDifferentPersonConflict(leg as KYLegislator, roster);
+
   const fromLrc = sanitizeStoredKyLegislatureUrl(leg.lrc_profile_url);
-  if (fromLrc) return fromLrc;
+  if (fromLrc) {
+    if (seatConflict && isKyLrcDistrictNumberProfileUrl(fromLrc)) return null;
+    return fromLrc;
+  }
   const fromWebsite = sanitizeStoredKyLegislatureUrl(leg.website);
-  if (fromWebsite) return fromWebsite;
+  if (fromWebsite) {
+    if (seatConflict && isKyLrcDistrictNumberProfileUrl(fromWebsite)) return null;
+    return fromWebsite;
+  }
 
   const inferred = inferKyLrcProfileUrlFromDistrict(leg);
   if (!inferred) return null;
 
-  if (
-    roster?.length &&
-    typeof leg.id === 'string' &&
-    hasConflictingActiveDistrictSeatHolder(leg as KYLegislator, roster)
-  ) {
+  if (seatConflict) {
     return null;
   }
 
@@ -248,6 +310,10 @@ export function kyLegislaturePublicUrl(
   leg: {
     id?: string;
     active?: boolean;
+    name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    openstates_id?: string | null;
     chamber?: 'house' | 'senate' | null;
     lrc_profile_url?: string | null;
     website?: string | null;
@@ -352,16 +418,6 @@ export function kyMemberTitleShort(leg: {
   if (leg.chamber === 'house') return 'Representative';
   if (leg.chamber === 'senate') return 'Senator';
   return 'Statewide official';
-}
-
-/** Strip honorifics and punctuation for comparing LegiScan names to Open States roster. */
-export function normalizeSponsorNameForMatch(name: string): string {
-  return name
-    .replace(/\b(rep\.?|representative|sen\.?|senator|del\.?|delegate)\b/gi, ' ')
-    .replace(/[^a-z0-9\s]/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
 }
 
 /** Input shape for `formatMemberDisplay` — accepts `KYLegislator` or a LegiScan sponsor row. */
