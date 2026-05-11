@@ -88,8 +88,8 @@ const nextConfig: NextConfig = {
         value: [
           "default-src 'self'",
           "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com",
-          "style-src 'self' 'unsafe-inline' https://api.mapbox.com https://fonts.googleapis.com",
-          "font-src 'self' data: https://fonts.gstatic.com",
+          "style-src 'self' 'unsafe-inline' https://api.mapbox.com https://fonts.googleapis.com https://use.typekit.net https://p.typekit.net",
+          "font-src 'self' data: https://fonts.gstatic.com https://use.typekit.net",
           "img-src 'self' data: blob: https://*.supabase.co https://api.mapbox.com https://*.tiles.mapbox.com",
           "worker-src 'self' blob:",
           "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://api.anthropic.com",
