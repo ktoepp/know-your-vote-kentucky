@@ -44,6 +44,6 @@
     { "path": "/api/sync?source=ordinances", "schedule": "0 7 * * *" },
     { "path": "/api/sync?source=school-boards", "schedule": "0 10 * * 1" },
     { "path": "/api/sync?source=county-actions", "schedule": "0 11 * * 1" },
-    { "path": "/api/cron/health-check", "schedule": "*/15 * * * *" }
+    { "path": "/api/cron/health-check", "schedule": "0 14 * * *" }
   ]
 }
