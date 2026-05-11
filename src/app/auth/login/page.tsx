@@ -1,12 +1,27 @@
-"use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabaseClient";
+'use client';
 
-export default function LoginPage() {
+import { Suspense, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Divider,
+  Link as MuiLink,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { supabase } from '../../lib/supabaseClient';
+import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
+import { safeAuthRedirectPath } from '@/lib/auth-redirect';
+
+function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,60 +30,88 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     if (!supabase) {
-      setError('Authentication service is not configured');
+      setError('Authentication service is not configured.');
       setLoading(false);
       return;
     }
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error: signErr } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     setLoading(false);
-    if (error) {
-      setError(error.message);
+    if (signErr) {
+      setError(signErr.message);
     } else {
-      router.push("/dashboard");
+      const next = safeAuthRedirectPath(searchParams.get('next'), '/profile');
+      router.push(next);
+      router.refresh();
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-8 rounded shadow-md w-full max-w-md"
-      >
-        <h1 className="text-2xl font-bold mb-6 text-center">Log In</h1>
-        <label className="block mb-2 font-medium">Email</label>
-        <input
+    <AuthPaperLayout title="Log in" subtitle="Sign in to manage your account and preferences.">
+      <Box component="form" onSubmit={handleLogin}>
+        <TextField
+          label="Email"
           type="email"
-          className="w-full p-2 mb-4 border rounded"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          fullWidth
+          autoComplete="email"
+          margin="normal"
         />
-        <label className="block mb-2 font-medium">Password</label>
-        <input
+        <TextField
+          label="Password"
           type="password"
-          className="w-full p-2 mb-4 border rounded"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
+          fullWidth
+          autoComplete="current-password"
+          margin="normal"
         />
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded font-semibold hover:bg-blue-700 transition"
-          disabled={loading}
-        >
-          {loading ? "Logging in..." : "Log In"}
-        </button>
-        {error && <p className="text-red-600 mt-4 text-center">{error}</p>}
-        <p className="mt-6 text-center text-gray-600">
-          Don&apos;t have an account?{' '}
-          <a href="/auth/register" className="text-blue-600 hover:underline">
-            Register
-          </a>
-        </p>
-      </form>
-    </div>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+          <MuiLink component={Link} href="/auth/forgot" variant="body2" underline="hover">
+            Forgot password?
+          </MuiLink>
+        </Box>
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 3 }} disabled={loading}>
+          {loading ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </Box>
+      <Divider sx={{ my: 3 }}>
+        <Typography variant="caption" color="text.secondary">
+          New here?
+        </Typography>
+      </Divider>
+      <Typography variant="body2" color="text.secondary" align="center">
+        Need an account?{' '}
+        <MuiLink component={Link} href="/auth/register" underline="hover">
+          Create one
+        </MuiLink>
+      </Typography>
+    </AuthPaperLayout>
   );
-} 
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthPaperLayout title="Log in" subtitle="Loading…">
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress aria-label="Loading" />
+          </Box>
+        </AuthPaperLayout>
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
+}
