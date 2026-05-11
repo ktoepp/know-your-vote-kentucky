@@ -20,6 +20,7 @@ import {
 import { ArrowBack, Description, HowToVote } from '@mui/icons-material';
 import type { KYBill, KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
+import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
 import { ICON_REM, TYPE } from '@/lib/ui-tokens';
 import { billStatusChipLabel, formatBillLabelText } from '@/lib/bill-display';
 import type { MemberVoteRecord } from '@/lib/member-profile-data';
@@ -54,7 +55,7 @@ export function MemberProfileView({
   sponsoredBills?: KYBill[];
   voteRecord?: MemberVoteRecord;
 }) {
-  const hasLegiscan = leg.legiscan_id != null;
+  const hasLegiscan = legiscanMemberPersonUrl(leg.legiscan_id) != null;
   const tally = voteRecord?.tally;
 
   return (

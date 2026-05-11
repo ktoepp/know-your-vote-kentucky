@@ -7,7 +7,7 @@ import {
   isObsoleteKyLrcHostname,
   normalizeHttpsUrl,
 } from '@/lib/legislator-link-normalize';
-import { normalizeBallotpediaHref, legiscanPersonUrl } from './external-legislative-links';
+import { legiscanMemberPersonUrl, normalizeBallotpediaHref, legiscanPersonUrl } from './external-legislative-links';
 
 /** Two-letter initials for `Avatar` when photo is missing (uses first/last or parses `name`). */
 export function kyLegislatorAvatarInitials(leg: Pick<KYLegislator, 'name' | 'first_name' | 'last_name'>): string {
@@ -133,7 +133,7 @@ export function findLegislatorByProfileSlug(
   return null;
 }
 
-export { normalizeBallotpediaHref, legiscanPersonUrl };
+export { normalizeBallotpediaHref, legiscanPersonUrl, legiscanMemberPersonUrl };
 
 /** Ignore broken legacy `*.lrc.ky.gov` profile URLs and prefer current legislature.ky.gov (stored or inferred). */
 function sanitizeStoredKyLegislatureUrl(raw: string | null | undefined): string | null {

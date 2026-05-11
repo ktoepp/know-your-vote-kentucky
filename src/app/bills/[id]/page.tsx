@@ -60,6 +60,7 @@ import {
 import {
   legiscanRollCallPublicUrl,
   normalizeBallotpediaHref,
+  httpUrlForUiLink,
 } from '@/lib/external-legislative-links';
 import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-tokens';
 import { useTooltips } from '@/lib/TooltipContext';
@@ -161,10 +162,8 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
   const theme = useTheme();
   const photo = normalizeLegislatorPhotoUrl(rosterPhoto || sponsor.bio?.social?.image);
   const memberHref = memberProfilePath({ name: sponsor.name, id: sponsor.name });
-  const rawBallotpedia = sponsor.bio?.social?.ballotpedia ?? sponsor.ballotpedia;
-  const ballotpediaUrl =
-    rawBallotpedia != null && String(rawBallotpedia).trim() !== '' ? normalizeBallotpediaHref(String(rawBallotpedia)) : null;
-  const kyProfileUrl = sponsor.bio?.social?.biography;
+  const ballotpediaUrl = normalizeBallotpediaHref(sponsor.bio?.social?.ballotpedia ?? sponsor.ballotpedia);
+  const officialProfileHref = httpUrlForUiLink(sponsor.bio?.social?.biography);
   const isPrimary = sponsor.sponsor_type_id === 1;
 
   return (
@@ -230,6 +229,7 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
           </Box>
         )}
 
+        {(ballotpediaUrl || officialProfileHref) && (
         <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
           {ballotpediaUrl && (
             <MuiButton
@@ -244,11 +244,11 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
               Ballotpedia
             </MuiButton>
           )}
-          {kyProfileUrl && (
+          {officialProfileHref && (
             <MuiButton
               size="medium"
               variant="outlined"
-              href={kyProfileUrl}
+              href={officialProfileHref}
               target="_blank"
               rel="noopener noreferrer"
               endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
@@ -258,6 +258,7 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
             </MuiButton>
           )}
         </Box>
+        )}
       </MuiCardContent>
     </MuiCard>
   );
@@ -467,7 +468,11 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
   // Most recent text version first
   const latestText = texts.find(t => t.type === 'Chaptered' || t.type === 'Enrolled' || t.type === 'Engrossed') ?? texts[0];
   const originalText = texts.find(t => t.type === 'Introduced');
-  const officialTextForAi = latestText?.state_link || originalText?.state_link || bill.bill_text_url || null;
+  const officialTextForAi =
+    httpUrlForUiLink(latestText?.state_link) ||
+    httpUrlForUiLink(originalText?.state_link) ||
+    httpUrlForUiLink(bill.bill_text_url);
+  const legiscanBillDocHref = httpUrlForUiLink(bill.bill_text_url);
 
   const primarySponsors = sponsors.filter(s => s.sponsor_type_id === 1);
   const coSponsors = sponsors.filter(s => s.sponsor_type_id !== 1);
@@ -936,11 +941,11 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               <MuiCardContent>
                 <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>Official Sources</Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {bill.bill_text_url && (
+                  {legiscanBillDocHref && (
                     <MuiButton
                       variant="outlined"
                       fullWidth
-                      href={bill.bill_text_url}
+                      href={legiscanBillDocHref}
                       target="_blank"
                       rel="noopener noreferrer"
                       endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}

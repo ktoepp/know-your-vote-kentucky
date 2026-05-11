@@ -35,7 +35,7 @@ import {
   kyLegislatureProfileUrl,
   kyLegislaturePublicUrl,
   kyMemberTitleShort,
-  legiscanPersonUrl,
+  legiscanMemberPersonUrl,
   memberSlug,
   normalizeBallotpediaHref,
   normalizeLegislatorPhotoUrl,
@@ -104,8 +104,18 @@ export function MemberCard({
     Boolean(lrcPublicUrl);
   const campaignUrl = isFormerMember ? null : kyLegislatorCampaignWebsite(leg);
   const ballotpediaHref = normalizeBallotpediaHref(leg.ballotpedia);
+  const legiscanHref = isFormerMember ? null : legiscanMemberPersonUrl(leg.legiscan_id);
   const pointerPassthrough = Boolean(profileHref);
   const avatarAlt = leg.name?.trim() ? `Portrait of ${leg.name.trim()}` : '';
+
+  const hasFooterActions =
+    governor ||
+    Boolean(
+      (showKyLegislatureButton && lrcPublicUrl) ||
+        campaignUrl ||
+        ballotpediaHref ||
+        legiscanHref,
+    );
 
   return (
     <Card
@@ -356,6 +366,7 @@ export function MemberCard({
         </Stack>
       </CardContent>
 
+      {hasFooterActions && (
       <CardActions
         sx={{
           px: { xs: 2, sm: 2.5 },
@@ -450,13 +461,13 @@ export function MemberCard({
             </Button>
           </Tooltip>
         )}
-        {leg.legiscan_id != null && !isFormerMember && (
+        {legiscanHref && (
           <Button
             component="a"
             size="small"
             variant="text"
             color="inherit"
-            href={legiscanPersonUrl(leg.legiscan_id)}
+            href={legiscanHref}
             target="_blank"
             rel="noopener noreferrer"
             endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}
@@ -496,6 +507,7 @@ export function MemberCard({
           </Button>
         )}
       </CardActions>
+      )}
     </Card>
   );
 }
