@@ -808,6 +808,7 @@ export default function DistrictMapExplorer() {
                     color={MAP_MARKER_PIN.color}
                     fill={MAP_MARKER_PIN.fill}
                     aria-hidden
+                    focusable={false}
                   />
                 </Marker>
               )}

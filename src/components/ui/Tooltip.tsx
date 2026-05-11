@@ -1,11 +1,58 @@
 'use client';
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, useId } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useId,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useTooltips } from '@/lib/TooltipContext';
 import { useThemeUtils } from './ThemeUtils';
 
 const TOOLTIP_MAX_WIDTH = 'min(28rem, calc(100vw - 1rem))';
+
+function composeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
+  return (instance: T | null) => {
+    for (const ref of refs) {
+      if (!ref) continue;
+      if (typeof ref === 'function') ref(instance);
+      else (ref as React.MutableRefObject<T | null>).current = instance;
+    }
+  };
+}
+
+function mergeAriaDescribedby(existing: string | undefined, id: string): string {
+  if (!existing?.trim()) return id;
+  const parts = existing.trim().split(/\s+/);
+  return parts.includes(id) ? existing : `${existing} ${id}`;
+}
+
+function getDisplayName(type: unknown): string {
+  if (typeof type !== 'function' && typeof type !== 'object') return '';
+  const t = type as { displayName?: string; name?: string };
+  return t.displayName || t.name || '';
+}
+
+/** Avoid wrapping native/custom controls in a second tab stop (nested interactive / focus bugs). */
+function isInteractiveTooltipChild(el: React.ReactElement): boolean {
+  const p = el.props as Record<string, unknown>;
+  const { tabIndex, role, href, onClick } = p;
+  if (href != null) return true;
+  if (typeof onClick === 'function') return true;
+  if (role === 'button' || role === 'link') return true;
+  if (typeof tabIndex === 'number' && tabIndex >= 0) return true;
+  if (typeof el.type === 'string') {
+    const tag = el.type.toLowerCase();
+    return ['button', 'a', 'input', 'select', 'textarea', 'summary'].includes(tag);
+  }
+  const dn = getDisplayName(el.type);
+  if (/^(Button|IconButton|Chip|Fab|ToggleButton|LoadingButton|Link)$/i.test(dn)) return true;
+  const muiName = (el.type as { muiName?: string }).muiName;
+  return muiName === 'Button' || muiName === 'IconButton' || muiName === 'Chip';
+}
 
 interface TooltipProps {
   content: string | React.ReactNode;
@@ -30,7 +77,7 @@ export const Tooltip = ({
   const [placeReady, setPlaceReady] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const [showTimeout, setShowTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const triggerRef = useRef<HTMLSpanElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const { getSurfaceBackground, getAdaptiveBorder } = useThemeUtils();
   const descId = useId().replace(/:/g, '');
@@ -109,6 +156,13 @@ export const Tooltip = ({
     };
   }, [showTimeout]);
 
+  const childArray = React.Children.toArray(children);
+  const soleChild =
+    childArray.length === 1 && React.isValidElement(childArray[0])
+      ? (childArray[0] as React.ReactElement)
+      : null;
+  const mergeTrigger = Boolean(soleChild && isInteractiveTooltipChild(soleChild));
+
   const floating =
     typeof document !== 'undefined' &&
     isVisible &&
@@ -142,25 +196,58 @@ export const Tooltip = ({
       document.body,
     );
 
+  const mergedTrigger =
+    mergeTrigger && soleChild
+      ? (() => {
+          const childProps = soleChild.props as Record<string, unknown>;
+          const originalRef = (soleChild as unknown as { ref?: React.Ref<HTMLElement> }).ref;
+          return React.cloneElement(soleChild, {
+            ...childProps,
+            ref: composeRefs(triggerRef, originalRef),
+            onMouseEnter: (e: React.MouseEvent) => {
+              (childProps.onMouseEnter as React.MouseEventHandler | undefined)?.(e);
+              showTooltip();
+            },
+            onMouseLeave: (e: React.MouseEvent) => {
+              (childProps.onMouseLeave as React.MouseEventHandler | undefined)?.(e);
+              hideTooltip();
+            },
+            onFocus: (e: React.FocusEvent) => {
+              (childProps.onFocus as React.FocusEventHandler | undefined)?.(e);
+              showTooltip();
+            },
+            onBlur: (e: React.FocusEvent) => {
+              (childProps.onBlur as React.FocusEventHandler | undefined)?.(e);
+              hideTooltip();
+            },
+            'aria-describedby': isVisible
+              ? mergeAriaDescribedby(childProps['aria-describedby'] as string | undefined, descId)
+              : (childProps['aria-describedby'] as string | undefined),
+          } as Record<string, unknown>);
+        })()
+      : null;
+
   return (
     <span
       className="tooltip-container"
       style={{ display: 'inline', position: 'relative', verticalAlign: 'baseline' }}
     >
-      <span
-        ref={triggerRef}
-        onMouseEnter={showTooltip}
-        onMouseLeave={hideTooltip}
-        onFocus={showTooltip}
-        onBlur={hideTooltip}
-        className="tooltip-trigger focusable"
-        style={{ display: 'inline' }}
-        tabIndex={0}
-        role="button"
-        aria-describedby={isVisible ? descId : undefined}
-      >
-        {children}
-      </span>
+      {mergedTrigger ?? (
+        <span
+          ref={triggerRef}
+          onMouseEnter={showTooltip}
+          onMouseLeave={hideTooltip}
+          onFocus={showTooltip}
+          onBlur={hideTooltip}
+          className="tooltip-trigger focusable"
+          style={{ display: 'inline' }}
+          tabIndex={0}
+          role="button"
+          aria-describedby={isVisible ? descId : undefined}
+        >
+          {children}
+        </span>
+      )}
       {floating}
     </span>
   );

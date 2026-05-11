@@ -23,7 +23,6 @@ import {
   ListItemText,
   Divider,
   Avatar,
-  Drawer,
   Tooltip as MuiTooltip,
   Menu,
   MenuItem,
@@ -385,7 +384,7 @@ function GlobalSearchBar({ tone = 'default' }: { tone?: 'default' | 'onPrimary' 
                     ? theme.palette.primary.contrastText
                     : theme.palette.mode === 'dark'
                       ? theme.palette.primary.contrastText
-                      : theme.palette.text.secondary,
+                      : theme.palette.primary.main,
                 }}
               >
                 <SearchIcon sx={{ fontSize: ICON_REM.nav }} />

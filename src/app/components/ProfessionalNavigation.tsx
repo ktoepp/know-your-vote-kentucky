@@ -29,6 +29,7 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@mui/material/styles';
+import { getMainContentModalContainer } from '@/lib/theme';
 
 interface NavigationItem {
   label: string;
@@ -245,6 +246,7 @@ export default function ProfessionalNavigation() {
         onClose={handleDrawerToggle}
         ModalProps={{
           keepMounted: true, // Better open performance on mobile.
+          container: getMainContentModalContainer,
         }}
         sx={{
           display: { xs: 'block', md: 'none' },

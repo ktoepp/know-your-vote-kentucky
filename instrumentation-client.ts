@@ -8,18 +8,13 @@ Sentry.init({
   // 100% in dev, 10% in production
   tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
 
-  // 10% of all sessions; 100% of sessions that contain an error
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0,
-
   enableLogs: true,
 
-  integrations: [
-    Sentry.replayIntegration({
-      maskAllText: true,
-      blockAllMedia: true,
-    }),
-  ],
+  /**
+   * Session Replay is intentionally disabled: it ships a large client bundle and records DOM
+   * continuously on sampled sessions, which noticeably hurts main-thread time and LCP/INP.
+   * Errors and traces still report via this SDK; re-enable replayIntegration only if you need replays.
+   */
 });
 
 // Hook into App Router navigation transitions
