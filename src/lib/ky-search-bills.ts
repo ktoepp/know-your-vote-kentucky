@@ -14,6 +14,21 @@ import { billMatchesCommitteeFilter } from '@/lib/ky-committee-utils';
  */
 let omitLegiscanSubjectSearchFilter = false;
 
+/** Skip RPC when migrations 017/018 not applied or PostgREST cache stale. */
+let omitKyBillsPlainSearchRpc = false;
+
+/** PostgREST when `ky_bills_plain_search` is missing from DB or not yet in schema cache. */
+function isMissingKyBillsPlainSearchRpc(err: { message?: string; details?: string; code?: string } | null | undefined): boolean {
+  const blob = `${err?.message ?? ''} ${err?.details ?? ''}`.toLowerCase();
+  if (!blob.includes('ky_bills_plain_search')) return false;
+  return (
+    blob.includes('does not exist') ||
+    blob.includes('could not find') ||
+    blob.includes('schema cache') ||
+    err?.code === 'PGRST202'
+  );
+}
+
 /** Optional filters (URL: chamber, dateRange, status, committee). */
 export type KyBillSearchFilters = {
   chamber?: 'house' | 'senate';
@@ -160,11 +175,53 @@ function isMissingLegiscanSubjectsSearchColumn(err: { message?: string; details?
   );
 }
 
+function relevanceTokensFromQuery(safe: string): string[] {
+  const q = safe.toLowerCase().trim();
+  return q
+    .split(/\s+/)
+    .map((t) => t.replace(/[^a-z0-9']/gi, ''))
+    .filter((t) => t.length >= 3)
+    .slice(0, 12);
+}
+
+/** Multi-token overlap across narrative fields + curated topics (natural-language queries). */
+function scoreKeywordOverlapTokens(bill: KYBill, tokens: string[]): number {
+  if (tokens.length === 0) return 0;
+  const hay = [
+    bill.title || '',
+    bill.description || '',
+    bill.ai_summary || '',
+    bill.last_action || '',
+    ...(bill.topics || []),
+  ]
+    .join(' ')
+    .toLowerCase();
+  let hits = 0;
+  for (const tok of tokens) {
+    if (hay.includes(tok)) hits++;
+  }
+  const allPresent = tokens.every((tok) => hay.includes(tok));
+  return hits * 200 + (allPresent && tokens.length >= 2 ? 850 : 0);
+}
+
+function scoreTopicTokensPartial(bill: KYBill, tokens: string[]): number {
+  if (!bill.topics?.length || tokens.length === 0) return 0;
+  let add = 0;
+  for (const topic of bill.topics) {
+    const tl = topic.toLowerCase();
+    for (const tok of tokens) {
+      if (tl.includes(tok)) add += 360;
+    }
+  }
+  return add;
+}
+
 function relevanceScoreForKyBillSearch(
   bill: KYBill,
   safe: string,
   compactDesignation: string,
   numericOnlyQuery: boolean,
+  tokens: string[],
 ): number {
   const bnCompact = normalizeKyBillDesignation(bill.bill_number);
   let score = 0;
@@ -188,7 +245,12 @@ function relevanceScoreForKyBillSearch(
   if (bill.ai_summary?.toLowerCase().includes(qLow)) score += 350;
   if (bill.topics?.some((t) => t.toLowerCase() === qLow)) score += 500;
 
+  if (bill.last_action?.toLowerCase().includes(qLow)) score += 320;
+  if (bill.session && qLow.length >= 3 && bill.session.toLowerCase().includes(qLow)) score += 180;
+
   score += scoreLegiscanSubjectSearch(bill.legiscan_subjects_search, qLow);
+  score += scoreKeywordOverlapTokens(bill, tokens);
+  score += scoreTopicTokensPartial(bill, tokens);
 
   return score;
 }
@@ -251,14 +313,28 @@ export async function fetchKyBillsMatchingSearch(
   const subjectsFrag = sanitizeIlikeFragment(safe.toLowerCase());
   const queryLegiscanSubjects = subjectsFrag !== '' && !omitLegiscanSubjectSearchFilter;
 
+  const ftsPromise = (async () => {
+    if (numericOnlyQuery || safe.length < 2 || omitKyBillsPlainSearchRpc) {
+      return { data: [] as KYBill[] | null, error: null };
+    }
+    const { data, error } = await supabase.rpc('ky_bills_plain_search', {
+      search_query: safe,
+      max_rows: mergeCap,
+    });
+    return { data: data as KYBill[] | null, error };
+  })();
+
   const [
     digitsOnlyNumberRes,
     billNumberCompactRes,
+    ftsRes,
     legiscanSubjectsRes,
     titleRes,
     descRes,
     summaryRes,
     topicRes,
+    lastActionRes,
+    sessionRes,
   ] = await Promise.all([
     numericOnlyQuery
       ? base().or(digitBillOrClause).order('session', { ascending: false }).limit(mergeCap)
@@ -271,6 +347,7 @@ export async function fetchKyBillsMatchingSearch(
             .order('session', { ascending: false })
             .limit(mergeCap)
         : Promise.resolve({ data: [] as KYBill[] | null, error: null }),
+    ftsPromise,
     queryLegiscanSubjects
       ? base()
           .ilike('legiscan_subjects_search', `%${subjectsFrag}%`)
@@ -281,6 +358,10 @@ export async function fetchKyBillsMatchingSearch(
     base().ilike('description', likePattern).order('session', { ascending: false }).limit(mergeCap),
     base().ilike('ai_summary', likePattern).order('session', { ascending: false }).limit(mergeCap),
     base().contains('topics', [safe]).order('session', { ascending: false }).limit(mergeCap),
+    base().ilike('last_action', likePattern).order('session', { ascending: false }).limit(mergeCap),
+    safe.length >= 3
+      ? base().ilike('session', likePattern).order('session', { ascending: false }).limit(mergeCap)
+      : Promise.resolve({ data: [] as KYBill[] | null, error: null }),
   ]);
 
   if (
@@ -304,10 +385,28 @@ export async function fetchKyBillsMatchingSearch(
     }
   }
 
+  if (ftsRes.error) {
+    if (isMissingKyBillsPlainSearchRpc(ftsRes.error)) {
+      omitKyBillsPlainSearchRpc = true;
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(
+          '[ky-search-bills] ky_bills_plain_search RPC unavailable (run migrations 017+018 or reload schema). Falling back to ilike legs only until restart.',
+        );
+      }
+    } else if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[ky-search-bills] ky_bills_plain_search RPC failed (FTS leg skipped); ilike legs still apply.',
+        ftsRes.error.message ?? ftsRes.error,
+      );
+    }
+  }
+
   const legiscanSubjectRows =
     queryLegiscanSubjects && !legiscanSubjectsRes.error
       ? (legiscanSubjectsRes.data as KYBill[] | null)
       : null;
+
+  const ftsRows = !ftsRes.error ? (ftsRes.data as KYBill[] | null) : null;
 
   const staticResChecks = [
     digitsOnlyNumberRes,
@@ -315,6 +414,9 @@ export async function fetchKyBillsMatchingSearch(
     titleRes,
     descRes,
     summaryRes,
+    topicRes,
+    lastActionRes,
+    sessionRes,
   ];
   for (const res of staticResChecks) {
     if (res.error) throw res.error;
@@ -325,11 +427,14 @@ export async function fetchKyBillsMatchingSearch(
   /** Bill-number matches must rank ahead of titles so busy keyword sessions do not bury them. */
   let merged = mergeUniqueByIdAllChunks<KYBill>(
     numericOnlyQuery ? (digitsOnlyNumberRes.data as KYBill[] | null) : (billNumberCompactRes.data as KYBill[] | null),
+    ftsRows,
     legiscanSubjectRows,
     topicRows,
     titleRes.data as KYBill[] | null,
     descRes.data as KYBill[] | null,
     summaryRes.data as KYBill[] | null,
+    lastActionRes.data as KYBill[] | null,
+    sessionRes.data as KYBill[] | null,
   );
 
   merged = filterKyBillsByDateRange(merged, filters.dateRange);
@@ -343,10 +448,11 @@ export async function fetchKyBillsMatchingSearch(
     merged = merged.filter((b) => billMatchesBrowseStatusFilter(b, filters.status));
   }
 
+  const rankingTokens = relevanceTokensFromQuery(safe);
   const stable = [...merged];
   stable.sort((a, b) => {
-    const ra = relevanceScoreForKyBillSearch(a, safe, compactDesignation, numericOnlyQuery);
-    const rb = relevanceScoreForKyBillSearch(b, safe, compactDesignation, numericOnlyQuery);
+    const ra = relevanceScoreForKyBillSearch(a, safe, compactDesignation, numericOnlyQuery, rankingTokens);
+    const rb = relevanceScoreForKyBillSearch(b, safe, compactDesignation, numericOnlyQuery, rankingTokens);
     if (rb !== ra) return rb - ra;
     return compareSessionsDescKy(a, b);
   });
