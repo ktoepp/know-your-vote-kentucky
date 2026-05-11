@@ -20,7 +20,7 @@
 # production
 /build
 
-# Branding assets (source files / working copies — keep out of git)
+# Branding assets (source / Illustrator — keep out of git). Ship nav/favicon PNGs under public/branding/.
 /branding/
 
 # Optional local install of dormant npm packages (manifest: docs/legacy-npm-deps/)

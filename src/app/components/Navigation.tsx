@@ -49,8 +49,11 @@ import { KentuckyStateIcon } from '@/components/icons/KentuckyStateIcon';
 import { useThemeUtils } from '@/components/ui/ThemeUtils';
 import { useTooltips } from '@/lib/TooltipContext';
 import { useUser } from "../lib/UserContext";
-import { ICON_REM, TYPE } from '@/lib/ui-tokens';
+import { ICON_REM } from '@/lib/ui-tokens';
 import { canonicalizeKyBillSearchInput } from '@/lib/ky-search-bills';
+
+/** Served from `public/branding/` so deploys include it (`/branding/` is gitignored for source exports). */
+const NAV_WORDMARK_SRC = '/branding/Logo-03.png';
 
 type NavSubLink = { href: string; label: string };
 
@@ -503,74 +506,48 @@ export default function Navigation() {
     >
       <Container maxWidth="xl">
         <Toolbar sx={{ px: { xs: 1, sm: 2 }, py: 1 }}>
-          {/* Logo */}
+          {/* Logo / wordmark */}
           <Box sx={{ display: 'flex', alignItems: 'center', mr: { lg: 4 } }}>
             <Link href="/" style={{ textDecoration: 'none' }} aria-label="Know Your Vote Kentucky home">
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 2,
-                p: 1,
-                borderRadius: 2,
-                transition: 'background-color 0.2s ease',
-                '@media (prefers-reduced-motion: no-preference)': {
-                  transition: 'all 0.2s ease',
-                },
-                '&:hover': {
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(255,255,255,0.1)' 
-                    : 'rgba(0,0,0,0.05)',
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  py: 0.75,
+                  px: { xs: 0.75, sm: 1 },
+                  borderRadius: 2,
+                  transition: 'background-color 0.2s ease',
                   '@media (prefers-reduced-motion: no-preference)': {
-                    transform: 'scale(1.02)',
+                    transition: 'all 0.2s ease',
                   },
-                }
-              }}>
+                  '&:hover': {
+                    backgroundColor:
+                      theme.palette.mode === 'dark'
+                        ? 'rgba(255,255,255,0.1)'
+                        : 'rgba(0,0,0,0.05)',
+                    '@media (prefers-reduced-motion: no-preference)': {
+                      transform: 'scale(1.02)',
+                    },
+                  },
+                }}
+              >
                 <Box
                   sx={{
                     position: 'relative',
-                    width: 48,
-                    height: 48,
+                    height: { xs: 40, sm: 48 },
+                    width: { xs: 200, sm: 280 },
                     flexShrink: 0,
-                    borderRadius: 2,
-                    overflow: 'hidden',
-                    boxShadow: 2,
                   }}
                   aria-hidden
                 >
                   <Image
-                    src="/logo.svg"
+                    src={NAV_WORDMARK_SRC}
                     alt=""
-                    width={48}
-                    height={48}
-                    sizes="48px"
+                    fill
+                    sizes="(max-width: 600px) 200px, 280px"
                     priority
+                    style={{ objectFit: 'contain', objectPosition: 'left center' }}
                   />
-                </Box>
-                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                  <Typography
-                    variant={TYPE.sectionTitle.variant}
-                    component="span"
-                    sx={{
-                      color: theme.palette.mode === 'dark'
-                        ? theme.palette.primary.contrastText
-                        : theme.palette.text.primary,
-                      lineHeight: 1,
-                      letterSpacing: '0.02em',
-                    }}
-                  >
-                    Know Your Vote KY
-                  </Typography>
-                  <Typography
-                    variant={TYPE.meta.variant}
-                    sx={{
-                      color: theme.palette.mode === 'dark'
-                        ? 'rgba(255,255,255,0.8)'
-                        : 'rgba(0,0,0,0.7)',
-                      display: 'block',
-                    }}
-                  >
-                    Kentucky Legislature Tracker
-                  </Typography>
                 </Box>
               </Box>
             </Link>
