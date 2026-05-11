@@ -43,6 +43,9 @@
   --warning: #a16207;
   --error: #b91c1c;
   --info: #1e40af;
+
+  /* Adobe Typekit (layout `<link>`) — matches `FONT_HEADING` in `src/lib/theme.ts` */
+  --font-heading: "aesthet-nova", serif;
 }
 
 /* Dark mode - simplified */
@@ -97,6 +100,15 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
 }
 
 /* ===== COMPONENT STYLES - CONSOLIDATED ===== */

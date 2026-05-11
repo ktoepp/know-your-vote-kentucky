@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { alpha, useTheme, type Theme, type SxProps } from '@mui/material/styles';
 import {
@@ -524,31 +525,37 @@ export default function Navigation() {
                   },
                 }
               }}>
-                <Avatar sx={{ 
-                  width: 48, 
-                  height: 48,
-                  background: theme.palette.mode === 'dark'
-                    ? `linear-gradient(135deg, ${theme.palette.primary.contrastText} 0%, ${theme.palette.primary.light} 100%)`
-                    : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-                  color: theme.palette.mode === 'dark' 
-                    ? theme.palette.primary.main 
-                    : theme.palette.primary.contrastText,
-                  fontWeight: 'bold',
-                  fontSize: '1.25rem',
-                  boxShadow: 2,
-                }}>
-                  KY
-                </Avatar>
+                <Box
+                  sx={{
+                    position: 'relative',
+                    width: 48,
+                    height: 48,
+                    flexShrink: 0,
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    boxShadow: 2,
+                  }}
+                  aria-hidden
+                >
+                  <Image
+                    src="/logo.svg"
+                    alt=""
+                    width={48}
+                    height={48}
+                    sizes="48px"
+                    priority
+                  />
+                </Box>
                 <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                   <Typography
                     variant={TYPE.sectionTitle.variant}
                     component="span"
                     sx={{
-                      fontWeight: TYPE.sectionTitle.fontWeight,
                       color: theme.palette.mode === 'dark'
                         ? theme.palette.primary.contrastText
                         : theme.palette.text.primary,
                       lineHeight: 1,
+                      letterSpacing: '0.02em',
                     }}
                   >
                     Know Your Vote KY

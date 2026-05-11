@@ -1,5 +1,8 @@
 import { createTheme, ThemeOptions, Theme } from '@mui/material/styles';
 
+/** Heading / display type (Adobe Typekit kit — `<link>` in root layout). */
+export const FONT_HEADING = '"aesthet-nova", serif';
+
 // Government and Civic Color Palette (source tokens for docs and light theme roots)
 export const civicPaletteTokens = {
   // Primary: Government Blue (trustworthy, authoritative) - Updated to match navigation
@@ -122,34 +125,40 @@ export const lightTheme = createTheme({
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
     h1: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '2.5rem',
       lineHeight: 1.2,
       letterSpacing: '-0.02em',
     },
     h2: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '2rem',
       lineHeight: 1.3,
       letterSpacing: '-0.01em',
     },
     h3: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '1.5rem',
       lineHeight: 1.4,
     },
     h4: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '1.25rem',
       lineHeight: 1.4,
     },
     h5: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '1.125rem',
       lineHeight: 1.4,
     },
     h6: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '1rem',
       lineHeight: 1.4,
     },
@@ -471,34 +480,40 @@ export const darkTheme = createTheme({
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
     h1: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '2.5rem',
       lineHeight: 1.2,
       letterSpacing: '-0.02em',
     },
     h2: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '2rem',
       lineHeight: 1.3,
       letterSpacing: '-0.01em',
     },
     h3: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '1.5rem',
       lineHeight: 1.4,
     },
     h4: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '1.25rem',
       lineHeight: 1.4,
     },
     h5: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '1.125rem',
       lineHeight: 1.4,
     },
     h6: {
-      fontWeight: 600,
+      fontFamily: FONT_HEADING,
+      fontWeight: 700,
       fontSize: '1rem',
       lineHeight: 1.4,
     },
