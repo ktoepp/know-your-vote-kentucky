@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:env": "tsx scripts/test-env.ts",
+    "test:supabase-auth": "tsx scripts/test-supabase-auth-api.ts",
     "db:apply-sql": "tsx scripts/apply-migration-sql.ts",
     "geo:ky-districts": "NODE_OPTIONS=--dns-result-order=ipv4first tsx scripts/build-ky-district-geojson.ts",
     "geo:ky-mask": "tsx scripts/build-ky-outside-mask.ts",

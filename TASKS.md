@@ -8,12 +8,46 @@
 
 ## In Progress
 
-- **Legislator outbound links** — (1) Run production **`sync:ky:legislators`** so ranked/normalized URLs persist in `ky_legislators`. (2) Run **`npm run verify:legislator-links`** locally or in CI to catch broken outbound URLs; tune timeouts if LRC is slow.
+- **Legislator outbound links** — Run **`npm run verify:legislator-links`** locally or in CI to catch broken outbound URLs; tune timeouts if LRC is slow. Re-run **`sync:ky:legislators`** on a cadence that fits ops so URLs and **`committee_memberships`** stay current (requires **`OPENSTATES_API_KEY`** in env).
+- **Follow bills — product & email** — Schema **019** + bill follow API + `FollowBillButton` on bill detail exist in repo; **still to build:** profile followed lists / prefs UI, browse `?follows=me`, card/topic indicators, sync diff → `ky_bill_status_history`, digest + **Resend** app mail (separate from Supabase Auth SMTP). See **Handoff — next agent** below and [docs/specs/follow-bills.md](./docs/specs/follow-bills.md).
+
+---
+
+## Handoff — next agent (Follow + login + Resend)
+
+Use this when continuing **user follow**, **auth/session behavior**, and **email**.
+
+### Context (already in repo)
+
+- **Auth:** Supabase with **`@supabase/ssr`** — cookie-backed browser client ([`src/app/lib/supabaseClient.ts`](./src/app/lib/supabaseClient.ts)), middleware session refresh ([`src/lib/supabase/middleware.ts`](./src/lib/supabase/middleware.ts), [`src/middleware.ts`](./src/middleware.ts)), [`UserContext`](./src/app/lib/UserContext.tsx), auth routes under [`src/app/auth/`](./src/app/auth/), centered layout [`src/app/auth/layout.tsx`](./src/app/auth/layout.tsx) + [`AuthPaperLayout`](./src/components/auth/AuthPaperLayout.tsx).
+- **Follow data:** Migration [**`019_ky_follow_bills_schema.sql`**](./supabase/migrations/019_ky_follow_bills_schema.sql) — `ky_bill_follows`, `ky_notification_preferences`, `ky_bill_status_history`, `ky_notifications_log` + RLS.
+- **Follow API:** [`GET/POST/DELETE /api/bills/[id]/follow`](./src/app/api/bills/[id]/follow/route.ts) — uses **Bearer `session.access_token`** via [`getAuthedUser`](./src/lib/supabase/route-auth.ts) (not cookies on the route). Client: [`FollowBillButton`](./src/components/bills/FollowBillButton.tsx) on [`/bills/[id]`](./src/app/bills/[id]/page.tsx). List follows: [`GET /api/me/follows`](./src/app/api/me/follows/route.ts).
+- **Two different “Resend” uses:** (1) **Supabase Auth** transactional mail (verify, reset) — configure in **Supabase Dashboard → SMTP** (host `smtp.resend.com`, user `resend`, password = API key). (2) **App digests** (spec M6–M7) — **`RESEND_API_KEY`** / **`RESEND_FROM_EMAIL`** in Vercel + Next route or cron sending via Resend SDK; not implemented yet.
+
+### Ops / env
+
+- Apply **019** on any environment that does not have it yet (`npm run db:apply-sql` or SQL editor). **Operator checklist** order: **016 → 017 → 019** (then existing **018** if present in that branch).
+- **`env-template.txt`** — SMTP notes, rate limits, CAPTCHA troubleshooting (“For security purposes…”).
+- **`npm run test:supabase-auth`** — smoke reachability for Auth API (no mail send).
+
+### Suggested next implementation order (align with spec milestones)
+
+1. **`GET/PATCH /api/me/preferences`** — `ky_notification_preferences` (frequency, `event_types`, `topic_filters`); ensure row exists on first follow or first prefs save (insert policy if missing).
+2. **`/profile`** — **Followed bills** + **Followed topics** sections using **`/api/me/follows`**; **Notifications** panel per spec M4.
+3. **Browse / cards / chips** — `?follows=me`, `KYBillCard` bookmark, topic “followed” variant (spec M3 pre-build checklist in follow-bills.md).
+4. **Sync pipeline** — append classified events to **`ky_bill_status_history`** (M5).
+5. **Digest email** — React Email templates + **`/api/cron/notify`** + Resend **app** key (M6–M7); unsubscribe route using `unsubscribe_token` from preferences.
+
+### Files to read first
+
+- [docs/specs/follow-bills.md](./docs/specs/follow-bills.md) — source of truth for UX and phases.
+- [decisions.md](./decisions.md) — auth / product decisions (append new ones).
 
 ---
 
 ## Operator checklist
 
+- **Database migrations** — **Primary environment:** migrations **016–017** applied (2026-05-11); **`sync:ky:legislators`** run successfully after fixing [`scripts/load-env.ts`](./scripts/load-env.ts) (repo-root `.env.local`, `override: true`). **New Supabase projects / restores:** apply in order **`016_ky_user_profiles`** → **`017_search_members_discovery`** → **`018_ky_bills_plain_search_hardening`** → **`019_ky_follow_bills_schema`** (`npm run db:apply-sql` or SQL editor); after **017**, run **`npm run sync:ky:legislators`** so `committee_memberships` can populate from Open States `roles` when present.
 - **Remove `SENTRY_ENABLE_EXAMPLE_PAGE`** from Vercel (and `.env.local` if set). The `/sentry-example-page` routes were removed from the repo; stale env vars are harmless but should be cleared.
 - **Legacy npm stacks** (puppeteer, GCS, pdf-parse, `three`, etc.) are **not** in root `package.json`. If you need them for a one-off script, use [`docs/legacy-npm-deps/`](./docs/legacy-npm-deps/README.md) and install into gitignored `optional/legacy-npm-deps/`.
 
@@ -21,6 +55,7 @@
 
 ## Recently completed
 
+- **Follow Bills — M1 auth & profile foundation** — Migration `016_ky_user_profiles` + Auth sync triggers; MUI auth pages (`login`, `register`, `forgot`, `reset`, `verify`, `logout`); `/profile` **Account** + **Security** (password, email change, resend verification, typed-email delete); `DELETE /api/me/account`; post-login `/profile`; nav user menu Profile-first. Apply migration (`npm run db:apply-sql` or Supabase SQL) and configure redirect URLs for `/auth/verify` and `/auth/reset`. See `decisions.md` § 2026-05-11.
 - **Sentry** — Example page and `/api/sentry-example-api` removed; production monitoring remains via `@sentry/nextjs` configs and `/monitoring`.
 - **Tooltips** — `MemberCard` Ballotpedia / bill history segments respect global `tooltipsEnabled`; clerical-stage hint on timelines.
 - **District map** — Kentucky state-shape nav icon (`KentuckyStateIcon`); exclusive House/Senate layer toggle; right-column **two legislators** explainer (**100 House / 38 Senate**); “How to contact your legislators” accordion; Mapbox-backed address lookup (biased to KY).
@@ -29,16 +64,18 @@
 - **UI polish** — Mobile nav Paper styling; hero CTAs; LRC committee schedule banner link; session status banner semantics; footer © / `APP_VERSION` / `/licenses`; bill detail sponsor avatars + sidebar spacing; curated bill list hides view count when appropriate.
 - **Browse & search** — Bills browse `BROWSE_QUERY_ROW_LIMIT = 1000`; search merge cap aligned; **25 / 50 / 100** page sizes (`usePersistedPageSize`).
 - **LegiScan subjects** — `legiscan_subjects` + `legiscan_subjects_search` (migration `015`), sync + search hooks.
+- **Discovery & bill search (migration 017)** — FTS RPC `ky_bills_plain_search`; parallel search legs (`last_action`, `session`); multi-token relevance ranking (`ky-search-bills.ts`). LegiScan-backed search suggestion chips (`useKySearchSuggestionSubjects`, `ky_top_legiscan_subject_names`). Members roster committee filter (`?committee=`, `committee_memberships` from Open States roles + sync). Clearer non–bill-type search alert.
+- **Verification snapshot (2026-05-11)** — Confirmed in repo: [`supabase/migrations/017_search_members_discovery.sql`](./supabase/migrations/017_search_members_discovery.sql); app wiring in [`src/lib/ky-search-bills.ts`](./src/lib/ky-search-bills.ts), [`src/lib/use-ky-search-suggestion-subjects.ts`](./src/lib/use-ky-search-suggestion-subjects.ts), [`src/lib/ky-committee-utils.ts`](./src/lib/ky-committee-utils.ts), [`src/app/search/page.tsx`](./src/app/search/page.tsx), [`src/app/members/page.tsx`](./src/app/members/page.tsx), [`src/lib/ky-sync-pipeline.ts`](./src/lib/ky-sync-pipeline.ts). Auth recovery typing fix in [`src/app/auth/reset/page.tsx`](./src/app/auth/reset/page.tsx) (`establishRecoverySession`). Latest **`npm run build`** succeeds.
+- **Supabase apply** — Migrations **016–017** deployed on the primary project (2026-05-11): auth/profile (`016`); FTS bill search RPC, LegiScan subject RPC, and **`committee_memberships`** column (`017`). **`sync:ky:legislators`** run: URLs and committee arrays updated from Open States when **`roles`** / **`links`** are returned.
+- **Sync CLI env loading** — [`scripts/load-env.ts`](./scripts/load-env.ts) resolves **`.env`** / **`.env.local`** from the repo root (not `cwd`) and applies **`.env.local` with `override: true`** so **`OPENSTATES_API_KEY`** and friends load reliably for **`npm run sync:ky:*`**.
+- **Spot-check — links & discovery (2026-05-11)** — **`npm run verify:legislator-links -- --limit 48`**: 0 failures (LRC **200**, Ballotpedia **202**, LegiScan **`getPerson`**). **`npm run spot-check:bill-links`**: 12 recent **`ky_votes`** roll calls OK via LegiScan **`getRollCall`** (public legiscan.com/HTML returns **403** to automation—normal); 10 sponsor Ballotpedia URLs **202**. Production smoke (**www**): `/search` loads with suggestion chips (**education**, **budget**, **23**, **HB 1**); `/members` roster **381** after client fetch (member cards show KY Legislature / Ballotpedia / LegiScan links). Assistive snapshot before hydration can briefly show **0 people**—confirm count after load.
 
 ---
 
 ## Up Next
 
-- **Spot-check external legislative links** — Sponsors, roll calls, and Ballotpedia search URLs across a sample of bills and member rows (production + edge cases).
-- **Members page: filter by committee** — Surface Education (etc.) committee membership from synced roster data (`ky_legislators` / committees) without requiring the district map.
-- **Search: make search fully functional** — Current search has functional gaps. Goal is reliable full-text bill search that correctly surfaces results for natural-language queries (e.g. "Medicaid", "education funding", "gun rights") as well as bill designations (HB 23, SB 6). Audit `fetchKyBillsMatchingSearch` for coverage and ranking issues.
-- **Search: suggestion chips using LegiScan schema** — Replace the hardcoded `Try: "..."` chips with dynamic suggestions informed by LegiScan subjects/topics. Chips should reflect actual data in the current session and help users discover what's active, not just serve as format examples.
-- **Search: fix nonBillType URL error message** — When `?type=` is set to an unrecognized value, the alert shown to users exposes internal language ("The URL is set to type..."). Replace with a plain-English message that doesn't reference URL parameters or query strings.
+- **Follow bills (profile + prefs + browse)** — Wire **`/api/me/preferences`** and **`/profile`** lists (follow-bills spec M3–M4); then digest plumbing with **Resend** (M6–M7). See **Handoff — next agent**.
+- **Regression cadence** — After large syncs or schema changes, re-run **`npm run verify:legislator-links`** (optional **`--limit`**) and **`npm run spot-check:bill-links`**.
 
 ---
 
@@ -47,7 +84,17 @@
 - **Legislator links — full fidelity** — Add JSON storage (e.g. `ky_legislators.external_links` or `link_manifest` jsonb) for **all** Open States `links` entries including **social** (with `note`), not only LRC + single campaign URL. Backfill via legislator sync + optional one-off migration from current rows. UI: group **Official** vs **Social** (accessibility labels, external icons).
 - **Legislator links — verifier in CI** — Add scheduled or release-gated workflow running **`npm run verify:legislator-links`** with Supabase secrets; fail or upload artifact on 4xx; allowlist known flaky endpoints if necessary.
 - **LRC vs structured APIs (legislator data strategy)** — Kentucky LRC / `legislature.ky.gov` is the **canonical public-facing** source, but it does **not** provide a stable, documented **bulk API** for the full chamber roster the way Open States does. The app **syncs** from Open States into `ky_legislators` and **points users to the LRC** with stored profile URLs and official House/Senate directory fallbacks (`kyLegislaturePublicUrl` in `src/lib/ky-member-utils.ts`). **Revisit** if the state publishes **machine-readable bulk data** (CSV, API) with clear reuse terms.
-- **"Follow this bill" — email alerts** — Subscribe by email on status / vote / signed / veto. Needs accounts or email opt-in, Supabase subscription table, sync diff notifications, transactional email (e.g. Resend).
+- **"Follow this bill" — email alerts** — Full spec: [docs/specs/follow-bills.md](./docs/specs/follow-bills.md). Login-only follows, daily digest default, factual content (no AI summaries in v1), Resend on `knowyourvotekentucky.com`. Phased milestones:
+  - **M1 — Auth polish & profile foundation:** **Complete.** `ky_user_profiles` migration `016`, Supabase sync triggers, auth/forgot/reset/verify flows, `/profile` Account + Security, account deletion API, login → `/profile`, Profile-first nav. Cookie-session middleware + auth layout/register polish. See Recently completed and `decisions.md` § 2026-05-11.
+  - **M2 — Data model for follows:** **In repo** — migration [`019_ky_follow_bills_schema.sql`](./supabase/migrations/019_ky_follow_bills_schema.sql) (`ky_bill_follows`, `ky_notification_preferences`, `ky_bill_status_history`, `ky_notifications_log` + RLS). **Apply 019** on all deployed DBs.
+  - **M3 — Follow UX (inline, no dashboard):** **Partial.** `GET/POST/DELETE /api/bills/[id]/follow` + `FollowBillButton` on bill detail **done**; **remaining:** bookmark on `KYBillCard`, `?follows=me` on browse, topic-chip followed state, followed lists + topic management on `/profile`.
+  - **M4 — Preferences UI:** Notification panel on `/profile` — frequency radio, event-type checkboxes with Major-milestones/Everything presets, 20-topic checkbox grid. `GET/PATCH /api/me/preferences`.
+  - **M5 — Diff capture in sync:** Extend `ky-sync-pipeline.ts` to classify LegiScan changes into event types and append to `ky_bill_status_history` with dedupe hash. No emails yet.
+  - **M6 — Email plumbing:** Verify `knowyourvotekentucky.com` in Resend; redirect `knowyourvoteky.com` / `kyvky.com`; add `RESEND_API_KEY` + `RESEND_FROM_EMAIL` envs; React Email templates for `BillDigest` + `WelcomeEmail`; token-based `/api/unsubscribe/[token]`.
+  - **M7 — Digest cron:** `/api/cron/notify` (CRON_SECRET-gated); daily + weekly Vercel cron entries; idempotency via `ky_notifications_log`; Sentry on failures.
+  - **M8 — Launch hardening:** Bounce / failure handling; digest cap (10 events with "and N more"); copy review; List-Unsubscribe headers verified; end-to-end test of a real bill state change.
+  - **Follow-up — verify digest send time:** After first DST transition (Nov 2026) or once open-rate data exists, evaluate whether `0 11 * * *` UTC is still the right hour. Consider open rates by hour, user feedback, and whether to add a per-user time-zone preference.
+  - **Investigation — official vs. inferred topic taxonomy:** Audit how `ky_bills.topics` (project keyword/AI classifier) and `legiscan_subjects` (official LegiScan taxonomy from migration `015`) currently surface in the frontend (browse filters, search, suggestion chips, bill detail). Outputs: (a) which taxonomy users actually see and where, (b) user-visible cost of an untagged bill, (c) recommendation on whether the follow-bills preferences UI should expose project topics, LegiScan subjects, or both, (d) revisit decision on AI-fallback tagging for untagged bills.
 - **Address search UX on map** — Street address lookup exists (`mapbox-geocode.ts`). Optional improvements: autocomplete/typeahead, clearer empty states.
 - **"How to contact your rep"** — District map accordion covers basics; expand with capitol workflows, hearings, testimony links to LRC as product needs evolve.
 
@@ -63,7 +110,7 @@ Done:
 
 - Home IA (2026-05-09): orientation-first hero primary CTA (district map), merged topic module, bill-area-only loading spinner — see `decisions.md`.
 - Members (2026-05-09): filtered roster `profileHref` bugfix; member profile `h1`/`h2`/`h3` outline, `Link` back control, bill links identifiable by underline; roster card keyboard profile navigation + portrait alt + refresh `aria-label` — see `decisions.md`.
-- Legislator outbound links (2026-05-09): link ranking + normalization in code (`legislator-link-normalize.ts`, sync + read paths); production DB updates pending legislator sync — see `decisions.md`.
+- Legislator outbound links (2026-05-09): link ranking + normalization in code (`legislator-link-normalize.ts`, sync + read paths); primary DB refreshed via **`sync:ky:legislators`** — spot-check with **`npm run verify:legislator-links`** — see `decisions.md`.
 - **Link verifier:** `npm run verify:legislator-links` (`scripts/verify-legislator-external-links.ts`) — HEAD/GET checks for LRC, website, Ballotpedia, LegiScan URLs per active legislator.
 
 Blocked:

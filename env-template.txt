@@ -10,8 +10,42 @@
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+# Supabase Dashboard → Authentication → URL Configuration: set Site URL to your app origin;
+# add Redirect URLs for `/auth/verify` (signup confirmation) and `/auth/reset` (password recovery),
+# e.g. http://localhost:3000/auth/verify and https://your-domain.org/auth/verify (same for reset).
+# Authentication → Providers → Email: turn ON "Confirm email" if you want verification links sent.
 # ^ Also backs the shared rate limiter (ky_rate_limit_buckets table, migration 008).
 # No extra env vars needed — the existing service role key is reused.
+
+# -----------------------------------------------------------------------------
+# SMTP (transactional auth email) — Sender name + inbox "From" address
+# -----------------------------------------------------------------------------
+# Hosted Supabase (production / preview):
+#   Dashboard → Project Settings → Authentication → SMTP Settings
+#   - Enable custom SMTP and enter Host, Port, Username, Password from your provider.
+#   - Sender email address: must be allowed by the provider (e.g. onboarding@your-domain.org).
+#   - Sender name: shown as the display name in the recipient's inbox (e.g. "Know Your Vote Kentucky").
+#   Save; auth emails (verify signup, password reset) use these settings.
+#
+# Local Supabase CLI (`supabase start`):
+#   1. Add the variables below to a `.env` file in the REPO ROOT (same folder as `supabase/config.toml`).
+#   2. Uncomment `[auth.email.smtp]` in `supabase/config.toml`.
+#   3. Run `supabase stop` && `supabase start`.
+#
+# Resend (example): https://resend.com/docs/send-with-smtp
+#   Host smtp.resend.com | Port 587 | User resend | Pass = API key (re_...)
+#   Sender email must use a domain you verified in Resend.
+#
+# SUPABASE_SMTP_PASS=re_xxxxxxxx_or_app_password
+# SUPABASE_SMTP_SENDER_EMAIL=auth@kyvky.com
+# SUPABASE_SMTP_SENDER_NAME=Know Your Vote Kentucky
+
+# Auth errors: "For security purposes…" / repeated signup blocked — not fixable in app code.
+#   • Dashboard → Authentication → Rate Limits — raise "Signup confirmation" / email cooldown (see
+#     https://supabase.com/docs/guides/auth/rate-limits ).
+#   • Dashboard → Authentication → Attack Protection (Bot / CAPTCHA) — if "Enable CAPTCHA" is ON,
+#     either turn it OFF or add a captcha widget and pass `options.captchaToken` on signUp / recover
+#     ( https://supabase.com/docs/guides/auth/auth-captcha ).
 
 # Optional: Postgres connection for CLI / scripts (Settings → Database → URI).
 # Used by: npm run db:apply-sql (apply SQL migrations when not using hosted SQL editor).
