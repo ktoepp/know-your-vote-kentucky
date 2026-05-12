@@ -1,13 +1,25 @@
-"use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabaseClient";
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  Alert,
+  Box,
+  Button,
+  Link as MuiLink,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { supabase } from '../../lib/supabaseClient';
+import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -18,78 +30,88 @@ export default function RegisterPage() {
     setError(null);
     setSuccess(false);
     if (!supabase) {
-      setError('Authentication service is not configured');
+      setError('Authentication service is not configured.');
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase.auth.signUp({
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const { data, error: signErr } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName },
+        emailRedirectTo: origin ? `${origin}/auth/verify` : undefined,
       },
     });
     setLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
-      setSuccess(true);
-      // Optionally, create a profile row here if using RLS
-      // router.push("/auth/login");
+    if (signErr) {
+      setError(signErr.message);
+      return;
     }
+    // No session until the user confirms — hosted/local with email confirmations on.
+    if (data.session) {
+      router.refresh();
+      router.push('/profile');
+      return;
+    }
+    setSuccess(true);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form
-        onSubmit={handleRegister}
-        className="bg-white p-8 rounded shadow-md w-full max-w-md"
-      >
-        <h1 className="text-2xl font-bold mb-6 text-center">Create Account</h1>
-        <label className="block mb-2 font-medium">Full Name</label>
-        <input
-          type="text"
-          className="w-full p-2 mb-4 border rounded"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          required
-        />
-        <label className="block mb-2 font-medium">Email</label>
-        <input
-          type="email"
-          className="w-full p-2 mb-4 border rounded"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <label className="block mb-2 font-medium">Password</label>
-        <input
-          type="password"
-          className="w-full p-2 mb-4 border rounded"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded font-semibold hover:bg-blue-700 transition"
-          disabled={loading}
-        >
-          {loading ? "Creating..." : "Create Account"}
-        </button>
-        {error && <p className="text-red-600 mt-4 text-center">{error}</p>}
-        {success && (
-          <p className="text-green-600 mt-4 text-center">
-            Registration successful! Check your email to confirm your account.
-          </p>
+    <AuthPaperLayout
+      title="Create account"
+      subtitle="Use your email to register. We will send a link to verify your address."
+    >
+      <Box component="form" onSubmit={handleRegister}>
+        <Stack spacing={2}>
+          <TextField
+            label="Display name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            fullWidth
+            autoComplete="name"
+          />
+          <TextField
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            fullWidth
+            autoComplete="email"
+          />
+          <TextField
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            fullWidth
+            autoComplete="new-password"
+            helperText="Choose a strong password you do not reuse elsewhere."
+          />
+        </Stack>
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
         )}
-        <p className="mt-6 text-center text-gray-600">
-          Already have an account?{' '}
-          <a href="/auth/login" className="text-blue-600 hover:underline">
-            Log in
-          </a>
-        </p>
-      </form>
-    </div>
+        {success && (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            Check your email for a confirmation link. After verifying, you can sign in.
+          </Alert>
+        )}
+        <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 3 }} disabled={loading || success}>
+          {loading ? 'Creating…' : 'Create account'}
+        </Button>
+      </Box>
+      <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 3 }}>
+        Already registered?{' '}
+        <MuiLink component={Link} href="/auth/login" underline="hover">
+          Log in
+        </MuiLink>
+      </Typography>
+    </AuthPaperLayout>
   );
-} 
+}

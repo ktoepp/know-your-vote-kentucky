@@ -126,7 +126,9 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# Local messages are captured by Inbucket: http://127.0.0.1:54324 (see [inbucket] above).
+# Hosted projects: Dashboard → Authentication → Providers → Email → enable "Confirm email".
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -136,15 +138,25 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
+# Custom SMTP — Auth emails (signup confirm, reset password, magic links).
+# Hosted Supabase: Dashboard → Project Settings → Authentication → SMTP Settings
+# (Enable custom SMTP, then set host/port/user/password, Sender email, Sender name).
+#
+# Local `supabase start`: uncomment the block below and set SUPABASE_SMTP_* in a root `.env` file
+# (the CLI loads it for env(...); Next.js `.env.local` is NOT read by the CLI).
+# When enabled here, GoTrue sends via your relay instead of Inbucket.
+#
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
+# host = "smtp.resend.com"
 # port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# user = "resend"
+# pass = "env(SUPABASE_SMTP_PASS)"
+# admin_email = "env(SUPABASE_SMTP_SENDER_EMAIL)"
+# sender_name = "env(SUPABASE_SMTP_SENDER_NAME)"
+#
+# Alternatives (examples): SendGrid host=smtp.sendgrid.net user=apikey pass=<API key>;
+# Google Workspace host=smtp.gmail.com port=587 user=<full email> pass=<app password>.
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
