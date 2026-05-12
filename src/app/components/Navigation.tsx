@@ -23,7 +23,6 @@ import {
   ListItemText,
   Divider,
   Avatar,
-  Drawer,
   Tooltip as MuiTooltip,
   Menu,
   MenuItem,
@@ -385,7 +384,7 @@ function GlobalSearchBar({ tone = 'default' }: { tone?: 'default' | 'onPrimary' 
                     ? theme.palette.primary.contrastText
                     : theme.palette.mode === 'dark'
                       ? theme.palette.primary.contrastText
-                      : theme.palette.text.secondary,
+                      : theme.palette.primary.main,
                 }}
               >
                 <SearchIcon sx={{ fontSize: ICON_REM.nav }} />
@@ -400,6 +399,7 @@ function GlobalSearchBar({ tone = 'default' }: { tone?: 'default' | 'onPrimary' 
 
 // UserMenu component
 function UserMenu() {
+  const pathname = usePathname();
   const { user, loading } = useUser();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -446,7 +446,13 @@ function UserMenu() {
       </>
     );
   }
-  return null;
+  const nextPath = pathname && !pathname.startsWith('/auth') ? pathname : '/';
+  const loginHref = `/auth/login?next=${encodeURIComponent(nextPath)}`;
+  return (
+    <Button component={Link} href={loginHref} variant="outlined" size="small" sx={{ ml: 1, whiteSpace: 'nowrap' }}>
+      Log in
+    </Button>
+  );
 }
 
 export default function Navigation() {

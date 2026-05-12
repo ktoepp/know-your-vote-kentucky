@@ -41,10 +41,11 @@ import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
+import { KY_TOPICS } from '@/lib/ky-topic-classifier';
 
 /**
  * One query loads up to this many rows; client filters/sorts, then `PaginatedSection` paginates 25/50/100.
- * A full KY session is on the order of ~500–600 bills — well under Supabase’s 1000 per-request cap.
+ * Dense sessions can exceed this cap; when no client filters run, the banner uses an exact chamber-scoped count query.
  */
 const BROWSE_QUERY_ROW_LIMIT = 1000;
 
@@ -54,8 +55,10 @@ function defaultSortDirForKey(key: KyBillSortKey): 'asc' | 'desc' {
 
 export type BillsBrowseChamberMode = 'all' | 'house' | 'senate';
 
-/** Shared Supabase query for browse + refresh (house/senate include prefix fallback when `chamber` is null). Status is never filtered in SQL; use `billMatchesBrowseStatusFilter` in the client. */
-function applyKyBillsQuery(
+const KY_BILLS_COUNT_SELECT = 'id';
+
+/** Chamber-scoped row query for browse + refresh (house/senate include prefix fallback when `chamber` is null). Status is never filtered in SQL; use `billMatchesBrowseStatusFilter` in the client. */
+function applyKyBillsRowQuery(
   chamberMode: BillsBrowseChamberMode,
   chamberFilter: 'all' | 'house' | 'senate',
 ) {
@@ -70,6 +73,22 @@ function applyKyBillsQuery(
   return query.limit(BROWSE_QUERY_ROW_LIMIT);
 }
 
+/** Exact chamber-scoped bill count (matches {@link applyKyBillsRowQuery} predicates, no limit). */
+function applyKyBillsCountQuery(
+  chamberMode: BillsBrowseChamberMode,
+  chamberFilter: 'all' | 'house' | 'senate',
+) {
+  if (!supabase) return null;
+  let query = supabase.from('ky_bills').select(KY_BILLS_COUNT_SELECT, { count: 'exact', head: true });
+  const effectiveChamber = chamberMode === 'all' ? chamberFilter : chamberMode;
+  if (effectiveChamber === 'house') {
+    query = query.or('chamber.eq.house,bill_number.ilike.H%');
+  } else if (effectiveChamber === 'senate') {
+    query = query.or('chamber.eq.senate,bill_number.ilike.S%');
+  }
+  return query;
+}
+
 export interface BillsBrowseProps {
   title: string;
   subtitle: string;
@@ -80,6 +99,8 @@ export interface BillsBrowseProps {
 
 export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: BillsBrowseProps) {
   const [bills, setBills] = useState<KYBill[]>([]);
+  /** Exact rows matching chamber scope in DB (ignores client-only filters). */
+  const [chamberBillTotal, setChamberBillTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -117,18 +138,26 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
       setLoading(true);
       setError(null);
       try {
-        const query = applyKyBillsQuery(chamberMode, chamberFilter);
-        if (!query) {
+        const rowQuery = applyKyBillsRowQuery(chamberMode, chamberFilter);
+        const countQuery = applyKyBillsCountQuery(chamberMode, chamberFilter);
+        if (!rowQuery) {
           if (!cancelled) setLoading(false);
           return;
         }
-        const { data, error: fetchError } = await withTimeout(
-          query,
-          30_000,
-          'Loading bills timed out. Check Supabase or your network.',
-        );
-        if (fetchError) throw fetchError;
-        if (!cancelled) setBills(data || []);
+        const [rowRes, countRes] = await Promise.all([
+          withTimeout(rowQuery, 30_000, 'Loading bills timed out. Check Supabase or your network.'),
+          countQuery
+            ? withTimeout(countQuery, 30_000, 'Loading bill count timed out. Check Supabase or your network.')
+            : Promise.resolve({ count: null as number | null, error: null }),
+        ]);
+        if (rowRes.error) throw rowRes.error;
+        if (countRes.error) {
+          console.warn('ky_bills count:', countRes.error);
+          if (!cancelled) setChamberBillTotal(null);
+        } else if (!cancelled) {
+          setChamberBillTotal(countRes.count ?? null);
+        }
+        if (!cancelled) setBills(rowRes.data || []);
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load bills');
       } finally {
@@ -205,6 +234,58 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
     return committeeOptions.find((c) => c.slug === committeeFilter)?.label ?? committeeFilter.replace(/-/g, ' ');
   }, [committeeFilter, committeeOptions]);
 
+  const topicMenuItems = useMemo(() => {
+    const canonical = [...KY_TOPICS].sort((a, b) => a.localeCompare(b));
+    if (topicFilter && !(KY_TOPICS as readonly string[]).includes(topicFilter)) {
+      return [...canonical, topicFilter].sort((a, b) => a.localeCompare(b));
+    }
+    return canonical;
+  }, [topicFilter]);
+
+  const hasActiveClientFilters = useMemo(
+    () =>
+      Boolean(searchQuery.trim()) ||
+      statusFilter !== 'all' ||
+      Boolean(committeeFilter) ||
+      Boolean(topicFilter) ||
+      (chamberMode === 'all' && chamberFilter !== 'all'),
+    [searchQuery, statusFilter, committeeFilter, topicFilter, chamberMode, chamberFilter],
+  );
+
+  const hitFetchCap = bills.length >= BROWSE_QUERY_ROW_LIMIT;
+
+  const billsFoundSummary = useMemo(() => {
+    const n = sortedBills.length;
+    const billsWord = n === 1 ? 'bill' : 'bills';
+    if (!hasActiveClientFilters && chamberBillTotal != null) {
+      const total = chamberBillTotal;
+      const totalWord = total === 1 ? 'bill' : 'bills';
+      if (total > bills.length && hitFetchCap) {
+        return `${total.toLocaleString()} ${totalWord} · Showing ${bills.length.toLocaleString()} with the most recent activity`;
+      }
+      return `${total.toLocaleString()} ${totalWord}`;
+    }
+    if (!hasActiveClientFilters && chamberBillTotal == null) {
+      let s = `${n.toLocaleString()} ${billsWord} loaded`;
+      if (hitFetchCap) {
+        s += ` · Only the ${BROWSE_QUERY_ROW_LIMIT.toLocaleString()} most recently updated bills are loaded; full total unavailable`;
+      }
+      return s;
+    }
+    const verb = n === 1 ? 'matches' : 'match';
+    let s = `${n.toLocaleString()} ${billsWord} ${verb} your filters`;
+    if (hitFetchCap) {
+      s += ` · Based on the ${BROWSE_QUERY_ROW_LIMIT.toLocaleString()} most recently updated bills in this view; more may match`;
+    }
+    return s;
+  }, [
+    hasActiveClientFilters,
+    chamberBillTotal,
+    sortedBills.length,
+    bills.length,
+    hitFetchCap,
+  ]);
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -224,7 +305,7 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
         )}
 
         <Paper elevation={1} sx={{ p: 2, mb: 1.5, borderRadius: 2 }}>
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: { md: 'flex-start' } }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
             <TextField
               fullWidth
               placeholder="Search by bill number, title, session, status, or summary..."
@@ -233,17 +314,35 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search />
+                    <Search sx={{ color: 'primary.main', opacity: 0.92 }} aria-hidden />
                   </InputAdornment>
                 ),
               }}
               size="small"
-              sx={{ mt: { md: 2.75 } }}
+              sx={{ minWidth: 0 }}
             />
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, flexShrink: 0 }}>
+            <Box
+              component="div"
+              role="region"
+              aria-label="Bill browse filters"
+              sx={{
+                display: 'flex',
+                flexDirection: 'row',
+                flexWrap: 'nowrap',
+                gap: 2,
+                alignItems: 'flex-start',
+                minWidth: 0,
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                pb: 1,
+                mx: -0.5,
+                px: 0.5,
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
               {showChamberSelect && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <Box sx={{ flexShrink: 0 }}>
+                  <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'text.primary' }}>
                     Chamber
                   </Typography>
                   <ToggleButtonGroup
@@ -252,6 +351,7 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                     size="small"
                     onChange={(_, v) => { if (v !== null) setChamberFilter(v); }}
                     aria-label="Filter by chamber"
+                    sx={{ flexShrink: 0 }}
                   >
                     <ToggleButton value="all">All</ToggleButton>
                     <ToggleButton value="house">House</ToggleButton>
@@ -259,8 +359,8 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                   </ToggleButtonGroup>
                 </Box>
               )}
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <Box sx={{ flexShrink: 0 }}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'text.primary' }}>
                   Status
                 </Typography>
                 <ToggleButtonGroup
@@ -269,7 +369,7 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                   size="small"
                   onChange={(_, v) => { if (v !== null) setStatusFilter(v); }}
                   aria-label="Filter by status"
-                  sx={{ flexWrap: 'wrap' }}
+                  sx={{ flexShrink: 0, flexWrap: 'nowrap' }}
                 >
                   <ToggleButton value="all">All</ToggleButton>
                   <ToggleButton value="introduced">Intro</ToggleButton>
@@ -280,11 +380,11 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                   <ToggleButton value="vetoed">Vetoed</ToggleButton>
                 </ToggleButtonGroup>
               </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <Box sx={{ flexShrink: 0 }}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'text.primary' }}>
                   Committee
                 </Typography>
-                <FormControl size="small" sx={{ minWidth: 200 }}>
+                <FormControl size="small" sx={{ minWidth: 200, flexShrink: 0 }}>
                   <InputLabel id="browse-committee-label">Committee</InputLabel>
                   <Select
                     labelId="browse-committee-label"
@@ -301,7 +401,28 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                   </Select>
                 </FormControl>
               </Box>
-              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end', pb: 0.25 }}>
+              <Box sx={{ flexShrink: 0 }}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'text.primary' }}>
+                  Topic
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 200, flexShrink: 0 }}>
+                  <InputLabel id="browse-topic-label">Topic / subject</InputLabel>
+                  <Select
+                    labelId="browse-topic-label"
+                    label="Topic / subject"
+                    value={topicFilter}
+                    onChange={(e) => setTopicFilter(e.target.value)}
+                  >
+                    <MenuItem value="">All topics</MenuItem>
+                    {topicMenuItems.map((t) => (
+                      <MenuItem key={t} value={t}>
+                        {t}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end', pb: 0.25, flexShrink: 0 }}>
                 <Tooltip title="Grid or list">
                   <ToggleButtonGroup
                     size="small"
@@ -325,18 +446,30 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                       setLoading(true);
                       setError(null);
                       try {
-                        const query = applyKyBillsQuery(chamberMode, chamberFilter);
-                        if (!query) {
+                        const rowQuery = applyKyBillsRowQuery(chamberMode, chamberFilter);
+                        const countQuery = applyKyBillsCountQuery(chamberMode, chamberFilter);
+                        if (!rowQuery) {
                           setLoading(false);
                           return;
                         }
-                        const { data, error: fetchError } = await withTimeout(
-                          query,
-                          30_000,
-                          'Loading bills timed out. Check Supabase or your network.',
-                        );
-                        if (fetchError) throw fetchError;
-                        setBills(data || []);
+                        const [rowRes, countRes] = await Promise.all([
+                          withTimeout(rowQuery, 30_000, 'Loading bills timed out. Check Supabase or your network.'),
+                          countQuery
+                            ? withTimeout(
+                                countQuery,
+                                30_000,
+                                'Loading bill count timed out. Check Supabase or your network.',
+                              )
+                            : Promise.resolve({ count: null as number | null, error: null }),
+                        ]);
+                        if (rowRes.error) throw rowRes.error;
+                        if (countRes.error) {
+                          console.warn('ky_bills count:', countRes.error);
+                          setChamberBillTotal(null);
+                        } else {
+                          setChamberBillTotal(countRes.count ?? null);
+                        }
+                        setBills(rowRes.data || []);
                       } catch (err: any) {
                         setError(err.message || 'Failed to load bills');
                       } finally {
@@ -357,7 +490,7 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
         {/* Active filter chips */}
         {(chamberFilter !== 'all' || statusFilter !== 'all' || committeeFilter || topicFilter || searchQuery) && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, mr: 0.5, color: 'text.primary' }}>
               Active filters:
             </Typography>
             {showChamberSelect && chamberFilter !== 'all' && (
@@ -422,8 +555,8 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Gavel sx={{ fontSize: '1.2rem', color: 'primary.main' }} />
-          <Typography variant="body2" fontWeight={600}>
-            {sortedBills.length} bill{sortedBills.length !== 1 ? 's' : ''} found
+          <Typography variant="body2" fontWeight={600} component="p" sx={{ m: 0 }}>
+            {billsFoundSummary}
           </Typography>
           {loading && <CircularProgress size={18} />}
         </Box>

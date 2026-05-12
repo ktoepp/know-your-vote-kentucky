@@ -39,6 +39,7 @@ import {
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
+import { useKySearchSuggestionSubjects } from '@/lib/use-ky-search-suggestion-subjects';
 
 /** Enough merged hits for several pages at 25/50/100; search runs multiple parallel `ilike` legs. */
 const SEARCH_FETCH_LIMIT = 500;
@@ -64,6 +65,7 @@ function SearchPageContent() {
   const filterKey = searchParams.toString();
   const { pageSize: searchPageSize, setPageSize: setSearchPageSize } = usePersistedPageSize('search', 25);
   const { committees: committeeOptions } = useKyBillCommittees();
+  const { rows: subjectSuggestions, loading: suggestionsLoading } = useKySearchSuggestionSubjects({ limit: 14 });
 
   useEffect(() => {
     if (!supabase) return;
@@ -208,18 +210,32 @@ function SearchPageContent() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             InputProps={{
-              startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ color: 'primary.main', opacity: 0.92 }} aria-hidden />
+                </InputAdornment>
+              ),
               endAdornment: <Button type="submit" variant="contained" disabled={loading}>Search</Button>,
             }}
           />
-          <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1, mx: 0.5 }}>
+          <Typography variant="body2" color="text.primary" component="p" sx={{ mt: 1, mx: 0.5, lineHeight: 1.5 }}>
             Bill numbers work with or without spaces and common punctuation ({`HB23`}, {`HB 23`}, {`HB-23`}). Typing{' '}
             <Box component="span" sx={{ fontWeight: 600 }}>only a number</Box> finds every designation with that
             numeral (House, Senate, and resolutions together).
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  mb: 0.5,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  color: 'text.primary',
+                }}
+              >
                 Chamber
               </Typography>
               <ToggleButtonGroup
@@ -295,7 +311,7 @@ function SearchPageContent() {
           {/* Active filter chips */}
           {(chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect) && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1.5, alignItems: 'center' }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, mr: 0.5, color: 'text.primary' }}>
                 Active filters:
               </Typography>
               {chamberSelect && (
@@ -314,39 +330,78 @@ function SearchPageContent() {
             </Box>
           )}
           {!searched && (
-            <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
-              <Chip
-                label='Try: "education"'
-                onClick={() => {
-                  setQuery('education');
-                  pushSearchUrl('education');
-                }}
-                sx={{ cursor: 'pointer' }}
-              />
-              <Chip
-                label='Try: "budget"'
-                onClick={() => {
-                  setQuery('budget');
-                  pushSearchUrl('budget');
-                }}
-                sx={{ cursor: 'pointer' }}
-              />
-              <Chip
-                label='Try: "23" (bill number)'
-                onClick={() => {
-                  setQuery('23');
-                  pushSearchUrl('23');
-                }}
-                sx={{ cursor: 'pointer' }}
-              />
-              <Chip
-                label='Try: "HB 1"'
-                onClick={() => {
-                  setQuery('HB 1');
-                  pushSearchUrl('HB 1');
-                }}
-                sx={{ cursor: 'pointer' }}
-              />
+            <Box sx={{ mt: 2 }}>
+              <Typography
+                variant="caption"
+                sx={{ display: 'block', mb: 1, fontWeight: 700, color: 'text.primary' }}
+              >
+                Popular LegiScan subjects this session
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                {suggestionsLoading &&
+                  [1, 2, 3, 4].map((k) => (
+                    <Chip key={k} label="…" size="small" sx={{ opacity: 0.4 }} />
+                  ))}
+                {!suggestionsLoading &&
+                  subjectSuggestions.map((s) => (
+                    <Chip
+                      key={s.subject_name}
+                      label={`${s.subject_name} (${s.bill_count})`}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      onClick={() => {
+                        setQuery(s.subject_name);
+                        pushSearchUrl(s.subject_name);
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  ))}
+                {!suggestionsLoading && subjectSuggestions.length === 0 && (
+                  <>
+                    <Chip
+                      label="Try: education"
+                      size="small"
+                      variant="outlined"
+                      onClick={() => {
+                        setQuery('education');
+                        pushSearchUrl('education');
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                    <Chip
+                      label="Try: Medicaid"
+                      size="small"
+                      variant="outlined"
+                      onClick={() => {
+                        setQuery('Medicaid');
+                        pushSearchUrl('Medicaid');
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  </>
+                )}
+                <Chip
+                  label='Bill number: 23'
+                  size="small"
+                  variant="outlined"
+                  onClick={() => {
+                    setQuery('23');
+                    pushSearchUrl('23');
+                  }}
+                  sx={{ cursor: 'pointer' }}
+                />
+                <Chip
+                  label="HB 1"
+                  size="small"
+                  variant="outlined"
+                  onClick={() => {
+                    setQuery('HB 1');
+                    pushSearchUrl('HB 1');
+                  }}
+                  sx={{ cursor: 'pointer' }}
+                />
+              </Box>
             </Box>
           )}
         </Paper>
@@ -369,8 +424,10 @@ function SearchPageContent() {
               </Button>
             }
           >
-            The URL is set to type &quot;{nonBillType}&quot;. This page only searches Kentucky bills. Use the button
-            to clear that filter, or remove <code>type</code> from the address bar.
+            <Typography variant="body2" component="span">
+              You are filtering by a category this page does not search yet. This search covers Kentucky bills only —
+              use &quot;Search bills&quot; to reset that filter and show bill matches again.
+            </Typography>
           </Alert>
         )}
 

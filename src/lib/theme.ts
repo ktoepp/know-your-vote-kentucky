@@ -3,6 +3,41 @@ import { createTheme, ThemeOptions, Theme } from '@mui/material/styles';
 /** Heading / display type (Adobe Typekit kit — `<link>` in root layout). */
 export const FONT_HEADING = '"aesthet-nova", serif';
 
+/**
+ * MUI Modal marks direct siblings in its container with aria-hidden while open. Using document.body,
+ * that hides the skip link, header, main landmark, and footer while they stay keyboard-focusable (axe: aria-hidden-focus).
+ * Portaling into `#main-content` scopes hiding to in-main siblings only.
+ */
+export function getMainContentModalContainer(): Element | null {
+  if (typeof document === 'undefined') return null;
+  return document.getElementById('main-content') ?? document.body;
+}
+
+const muiModalAccessibilityPortal = {
+  MuiModal: {
+    defaultProps: {
+      container: getMainContentModalContainer,
+    },
+  },
+  MuiDialog: {
+    defaultProps: {
+      container: getMainContentModalContainer,
+    },
+  },
+  MuiDrawer: {
+    defaultProps: {
+      ModalProps: {
+        container: getMainContentModalContainer,
+      },
+    },
+  },
+  MuiPopover: {
+    defaultProps: {
+      container: getMainContentModalContainer,
+    },
+  },
+};
+
 // Government and Civic Color Palette (source tokens for docs and light theme roots)
 export const civicPaletteTokens = {
   // Primary: Government Blue (trustworthy, authoritative) - Updated to match navigation
@@ -199,6 +234,7 @@ export const lightTheme = createTheme({
     borderRadius: 8,
   },
   components: {
+    ...muiModalAccessibilityPortal,
     MuiButton: {
       styleOverrides: {
         root: {
@@ -551,6 +587,7 @@ export const darkTheme = createTheme({
     borderRadius: 8,
   },
   components: {
+    ...muiModalAccessibilityPortal,
     MuiButton: {
       styleOverrides: {
         root: {

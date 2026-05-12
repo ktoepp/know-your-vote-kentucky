@@ -33,6 +33,7 @@
     "@mui/material": "^5.15.15",
     "@mui/system": "^5.15.15",
     "@sentry/nextjs": "^10.51.0",
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.50.1",
     "@turf/bbox": "^7.3.5",
     "@turf/boolean-point-in-polygon": "^7.3.5",

@@ -21,7 +21,7 @@ export default function SiteFooter() {
       }}
     >
       <Container maxWidth="lg">
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 720, mb: 1.5 }}>
+        <Typography variant="body2" color="text.primary" sx={{ maxWidth: 720, mb: 1.5, lineHeight: 1.5 }}>
           Profile information is sourced from public data (Open States and official Kentucky sources) and may lag
           updates.
         </Typography>
@@ -33,19 +33,26 @@ export default function SiteFooter() {
             flexWrap: 'wrap',
             alignItems: 'center',
             gap: { xs: 0.5, sm: 1 },
-            typography: 'caption',
-            color: 'text.disabled',
+            typography: 'body2',
+            color: 'text.primary',
+            lineHeight: 1.5,
           }}
         >
           <span>© {new Date().getFullYear()} The Eighth Dimension, LLC</span>
           <span aria-hidden>·</span>
           <span>v{APP_VERSION}</span>
           <span aria-hidden>·</span>
-          <MuiLink component={Link} href="/about" color="inherit" sx={{ textDecoration: 'underline' }}>
-            About
-          </MuiLink>
-          <span aria-hidden>·</span>
-          <MuiLink component={Link} href="/licenses" color="inherit" sx={{ textDecoration: 'underline' }}>
+          <MuiLink
+            component={Link}
+            href="/licenses"
+            underline="always"
+            sx={{
+              color: 'primary.main',
+              fontWeight: 600,
+              textUnderlineOffset: 3,
+              '&:hover': { color: 'primary.dark' },
+            }}
+          >
             Licenses
           </MuiLink>
         </Box>

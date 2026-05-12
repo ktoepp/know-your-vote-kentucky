@@ -58,7 +58,7 @@ export function HomeCuratedBillList({ title, caption, bills, line, emptyMessage,
             color: kind === 'passed' ? 'success.main' : 'info.main',
           }}
         >
-          <Icon size={18} strokeWidth={1.75} />
+          <Icon size={18} strokeWidth={1.75} focusable={false} />
         </Box>
         <Box sx={{ minWidth: 0 }}>
           <Typography id={headingId} variant="subtitle1" fontWeight={700} component="h2" sx={{ lineHeight: 1.3 }}>
