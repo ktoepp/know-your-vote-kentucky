@@ -30,6 +30,11 @@ async function main() {
   for (const k of pick) {
     if (k in settings) console.log(`  ${k}:`, JSON.stringify(settings[k]));
   }
+  if (settings.mailer_autoconfirm === true) {
+    console.log(
+      '\n  Note: mailer_autoconfirm=true means users get a session immediately and signup confirmation emails are skipped.',
+    );
+  }
 
   const restRes = await fetch(`${url}/rest/v1/`, { headers });
   const restNote =
@@ -38,8 +43,10 @@ async function main() {
       : `HTTP ${restRes.status}`;
   console.log(`GET /rest/v1/ → ${restNote}`);
 
-  console.log('\nAuth API is reachable. SMTP/Resend delivery is configured in the Supabase Dashboard;');
-  console.log('confirm by signing up a test user or checking Resend → Logs after a forgot-password flow.');
+  console.log('\nAuth API is reachable.');
+  console.log('If confirmation emails never arrive: Dashboard → Authentication → emails (confirm enabled, SMTP);');
+  console.log('URL Configuration → Redirect URLs must include https://YOUR-DOMAIN/auth/verify');
+  console.log('(same origin as signup). Then check Authentication → Logs for send errors.');
 }
 
 main().catch((e) => {

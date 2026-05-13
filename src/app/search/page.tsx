@@ -40,6 +40,7 @@ import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
 import { useKySearchSuggestionSubjects } from '@/lib/use-ky-search-suggestion-subjects';
+import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
 
 /** Enough merged hits for several pages at 25/50/100; search runs multiple parallel `ilike` legs. */
 const SEARCH_FETCH_LIMIT = 500;
@@ -66,6 +67,7 @@ function SearchPageContent() {
   const { pageSize: searchPageSize, setPageSize: setSearchPageSize } = usePersistedPageSize('search', 25);
   const { committees: committeeOptions } = useKyBillCommittees();
   const { rows: subjectSuggestions, loading: suggestionsLoading } = useKySearchSuggestionSubjects({ limit: 14 });
+  const { followedBillIds, followedTopics, authed: followAuthed } = useFollowedBillsAndTopics();
 
   useEffect(() => {
     if (!supabase) return;
@@ -501,7 +503,12 @@ function SearchPageContent() {
                     <Grid container spacing={3}>
                       {pageBills.map((bill) => (
                         <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                          <KYBillCard bill={bill} legislators={legislators} />
+                          <KYBillCard
+                            bill={bill}
+                            legislators={legislators}
+                            followedBillIds={followAuthed ? followedBillIds : null}
+                            followedTopics={followAuthed ? followedTopics : null}
+                          />
                         </Grid>
                       ))}
                     </Grid>

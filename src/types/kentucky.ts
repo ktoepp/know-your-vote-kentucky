@@ -32,6 +32,11 @@ export interface KYLegislator {
   ballotpedia: string | null;
   /** LegiScan bio photo URL, used as fallback when photo_url is null. */
   legiscan_image_url: string | null;
+  /**
+   * Committee assignment slugs (migration 017), from Open States roles when available.
+   * Tokens align with {@link committeeSlugFromName} / bill committee filters.
+   */
+  committee_memberships?: string[] | null;
   active: boolean;
   created_at: string;
   updated_at: string;

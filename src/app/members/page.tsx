@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Container,
   Typography,
@@ -17,7 +18,12 @@ import {
   Link as MuiLink,
   ToggleButton,
   ToggleButtonGroup,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
+import ListSubheader from '@mui/material/ListSubheader';
 import { AccountBalance, Cancel, Groups, House, Refresh, Search } from '@mui/icons-material';
 import { supabase } from '../lib/supabaseClient';
 import type { KYLegislator } from '../../types/kentucky';
@@ -26,6 +32,8 @@ import { dedupeKyLegislators, isKentuckyGovernor, memberProfilePath } from '@/li
 import { formatPartyLabel } from '@/lib/bill-display';
 import { MemberCard } from '@/components/members/MemberCard';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
+import { committeeMembershipSlugMatchesFilter } from '@/lib/ky-committee-utils';
+import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
 
 function sortLegislatorsByName(a: KYLegislator, b: KYLegislator) {
   const al = (a.last_name || '').trim().toLowerCase() || a.name.trim().toLowerCase();
@@ -82,7 +90,21 @@ function ChamberSection({
   );
 }
 
-export default function MembersPage() {
+function MembersPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlSearchParams = useSearchParams();
+  const { committees: committeeOptions } = useKyBillCommittees();
+
+  const committeeSelect = urlSearchParams.get('committee') || '';
+
+  const setCommitteeParam = (slug: string) => {
+    const params = new URLSearchParams(urlSearchParams.toString());
+    if (!slug) params.delete('committee');
+    else params.set('committee', slug);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
   const [roster, setRoster] = useState<KYLegislator[]>([]);
   /** Includes inactive rows so LRC district URLs can be suppressed when a predecessor still shares the seat in DB. */
   const legislatorRoster = useMemo(() => dedupeKyLegislators(roster), [roster]);
@@ -124,6 +146,17 @@ export default function MembersPage() {
     fetchLegislators();
   }, [chamberFilter, partyFilter]);
 
+  const committeeChipLabel = useMemo(() => {
+    if (!committeeSelect) return '';
+    const found = committeeOptions.find((c) => c.slug === committeeSelect);
+    return found?.label ?? committeeSelect.replace(/-/g, ' ');
+  }, [committeeSelect, committeeOptions]);
+
+  const rosterHasCommitteeMemberships = useMemo(
+    () => roster.some((l) => l.active && (l.committee_memberships?.length ?? 0) > 0),
+    [roster],
+  );
+
   const legislatorsByParty = useMemo(() => {
     if (partyFilter === 'all') return legislators;
     return legislators.filter((leg) => formatPartyLabel(leg.party) === partyFilter);
@@ -134,7 +167,16 @@ export default function MembersPage() {
     return legislatorsByParty.filter(isKentuckyGovernor);
   }, [legislatorsByParty, chamberFilter]);
 
-  const filtered = legislatorsScoped
+  const legislatorsWithCommittee = useMemo(() => {
+    if (!committeeSelect) return legislatorsScoped;
+    return legislatorsScoped.filter((leg) => {
+      const mem = leg.committee_memberships;
+      if (!mem?.length) return false;
+      return mem.some((m) => committeeMembershipSlugMatchesFilter(m, committeeSelect));
+    });
+  }, [legislatorsScoped, committeeSelect]);
+
+  const filtered = legislatorsWithCommittee
     .filter((leg) => {
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
@@ -216,6 +258,32 @@ export default function MembersPage() {
                   <ToggleButton value="Independent">I</ToggleButton>
                 </ToggleButtonGroup>
               </Box>
+              <FormControl size="small" sx={{ minWidth: 220 }}>
+                <InputLabel id="members-committee-label">Committee</InputLabel>
+                <Select
+                  labelId="members-committee-label"
+                  label="Committee"
+                  value={committeeSelect}
+                  onChange={(e) => setCommitteeParam(e.target.value as string)}
+                  MenuProps={{ PaperProps: { sx: { maxHeight: 420 } } }}
+                >
+                  <MenuItem value="">Any committee</MenuItem>
+                  {(() => {
+                    const items: React.ReactNode[] = [];
+                    let lastChamber: string | undefined;
+                    const chamberLabel: Record<string, string> = { house: 'House', senate: 'Senate', joint: 'Joint / Interim' };
+                    for (const c of committeeOptions) {
+                      const ch = c.chamber ?? 'joint';
+                      if (ch !== lastChamber) {
+                        items.push(<ListSubheader key={`m-hdr-${ch}`} disableSticky>{chamberLabel[ch] ?? ch}</ListSubheader>);
+                        lastChamber = ch;
+                      }
+                      items.push(<MenuItem key={`m-${c.slug}`} value={c.slug} sx={{ pl: 3 }}>{c.label}</MenuItem>);
+                    }
+                    return items;
+                  })()}
+                </Select>
+              </FormControl>
             </Box>
             <IconButton
               type="button"
@@ -230,7 +298,7 @@ export default function MembersPage() {
         </Paper>
 
         {/* Active filter chips */}
-        {(chamberFilter !== 'all' || partyFilter !== 'all' || searchQuery) && (
+        {(chamberFilter !== 'all' || partyFilter !== 'all' || searchQuery || committeeSelect) && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
               Active filters:
@@ -255,6 +323,16 @@ export default function MembersPage() {
                 variant="outlined"
               />
             )}
+            {committeeSelect && (
+              <Chip
+                label={committeeChipLabel}
+                size="small"
+                onDelete={() => setCommitteeParam('')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
             {searchQuery && (
               <Chip
                 label={`"${searchQuery}"`}
@@ -265,16 +343,23 @@ export default function MembersPage() {
                 variant="outlined"
               />
             )}
-            {(chamberFilter !== 'all' || partyFilter !== 'all' || searchQuery) && (
+            {(chamberFilter !== 'all' || partyFilter !== 'all' || searchQuery || committeeSelect) && (
               <Chip
                 label="Clear all"
                 size="small"
-                onClick={() => { setChamberFilter('all'); setPartyFilter('all'); setSearchQuery(''); }}
+                onClick={() => { setChamberFilter('all'); setPartyFilter('all'); setSearchQuery(''); setCommitteeParam(''); }}
                 variant="outlined"
                 sx={{ ml: 0.5 }}
               />
             )}
           </Box>
+        )}
+
+        {committeeSelect && !loading && roster.length > 0 && !rosterHasCommitteeMemberships && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Committee assignments will appear after you apply migration <strong>017_search_members_discovery</strong> and
+            run a legislators sync so Open States roles can populate <strong>committee_memberships</strong>.
+          </Alert>
         )}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -353,5 +438,19 @@ export default function MembersPage() {
         )}
       </Container>
     </Box>
+  );
+}
+
+export default function MembersPage() {
+  return (
+    <Suspense
+      fallback={
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+          <CircularProgress aria-label="Loading members page" />
+        </Box>
+      }
+    >
+      <MembersPageContent />
+    </Suspense>
   );
 }

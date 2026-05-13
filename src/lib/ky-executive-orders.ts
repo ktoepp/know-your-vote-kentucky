@@ -42,7 +42,7 @@ export class KyExecutiveOrdersClient {
     for (let i = 1; i <= MAX_RETRIES; i++) {
       try {
         const r = await axios.get(url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; KnowYourVoteKYBot/1.0; +https://knowyourvotekentucky.org)' },
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; KnowYourVoteKYBot/1.0; +https://kyvky.com)' },
           timeout: 15000,
         });
         return cheerio.load(r.data);

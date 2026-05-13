@@ -88,6 +88,46 @@ function keywordsForSlug(slug: string): string[] {
 }
 
 /**
+ * Extract committee-like organization slugs from Open States Popolo `roles[]` when present.
+ * Used during legislator sync; keeps tokens aligned with {@link committeeSlugFromName}.
+ */
+export function extractCommitteeMembershipSlugsFromOpenStatesPerson(leg: unknown): string[] {
+  const raw = leg as Record<string, unknown>;
+  const roles = raw.roles;
+  if (!Array.isArray(roles)) return [];
+  const slugs = new Set<string>();
+  for (const r of roles) {
+    if (!r || typeof r !== 'object') continue;
+    const ro = r as Record<string, unknown>;
+    const org = ro.organization;
+    let orgName = '';
+    if (typeof org === 'string') orgName = org;
+    else if (org && typeof org === 'object') {
+      const n = (org as Record<string, unknown>).name;
+      orgName = typeof n === 'string' ? n : '';
+    }
+    const lower = orgName.toLowerCase();
+    if (!lower.includes('committee') && !lower.includes('commission')) continue;
+    const slug = committeeSlugFromName(orgName);
+    if (slug.length >= 4) slugs.add(slug);
+  }
+  return [...slugs];
+}
+
+/** Loose slug match for comparing synced membership tokens to browse/search committee filter slugs. */
+export function committeeMembershipSlugMatchesFilter(memberSlug: string, filterSlug: string): boolean {
+  const f = filterSlug.trim().toLowerCase();
+  const m = memberSlug.trim().toLowerCase();
+  if (!f || !m) return false;
+  if (m === f) return true;
+  const fPhrase = f.replace(/-/g, ' ');
+  const mPhrase = m.replace(/-/g, ' ');
+  if (fPhrase.length >= 5 && mPhrase.includes(fPhrase)) return true;
+  if (mPhrase.length >= 5 && fPhrase.includes(mPhrase)) return true;
+  return false;
+}
+
+/**
  * `committeeSlug` is from the filter UI (slug of a LegiScan committee name or a static committee).
  * Tries exact slug match on `committee_name` first, then phrase search in last_action / title.
  */

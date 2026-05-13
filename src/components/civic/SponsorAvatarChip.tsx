@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Chip, Avatar } from '@mui/material';
-import { formatMemberDisplay, memberSlug, normalizeLegislatorPhotoUrl } from '@/lib/ky-member-utils';
+import { formatMemberDisplay, memberSlug, normalizeLegislatorPhotoUrl, kySponsorPortraitAlt } from '@/lib/ky-member-utils';
 import { formatRepresentativePartyChipLabel } from '@/lib/bill-display';
 import { CHIP } from '@/lib/ui-tokens';
 
@@ -43,6 +43,7 @@ export function SponsorAvatarChip({
       avatar={
         <Avatar
           src={normalizeLegislatorPhotoUrl(photoUrl) || undefined}
+          alt={kySponsorPortraitAlt(name)}
           imgProps={{ referrerPolicy: 'no-referrer' }}
           sx={{
             width: 24,

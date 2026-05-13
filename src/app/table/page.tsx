@@ -34,7 +34,6 @@ import {
 import { 
   Upload, 
   Add, 
-  Help, 
   FilterList, 
   Sort, 
   Visibility,
@@ -353,14 +352,6 @@ export default function TablePage() {
           size="large"
         >
           Browse Content
-        </Button>
-        <Button
-          variant="text"
-          startIcon={<Help />}
-          onClick={() => window.location.href = '/about'}
-          size="large"
-        >
-          Learn More
         </Button>
       </Box>
       

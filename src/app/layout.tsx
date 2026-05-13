@@ -6,6 +6,11 @@ import Navigation from "./components/Navigation";
 import SiteFooter from "./components/SiteFooter";
 import { TooltipProvider } from '@/lib/TooltipContext';
 import { UserProvider } from "./lib/UserContext";
+import { publicSiteOrigin } from '@/lib/site-canonical';
+
+const siteOrigin = publicSiteOrigin();
+const ogImageUrl = `${siteOrigin}/og-image.jpg`;
+
 export const metadata: Metadata = {
   title: 'Know Your Vote Kentucky',
   description: 'Track Kentucky legislation, representatives, and civic engagement',
@@ -18,15 +23,15 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL("https://knowyourvotekentucky.org"),
+  metadataBase: new URL(siteOrigin),
   openGraph: {
     title: "Know Your Vote Kentucky - Track Kentucky Legislation",
     description: "Track Kentucky legislation, representatives, and civic engagement. Making government accessible through AI.",
-    url: "https://knowyourvotekentucky.org",
+    url: siteOrigin,
     siteName: "Know Your Vote Kentucky",
     images: [
       {
-        url: "https://knowyourvotekentucky.org/og-image.jpg",
+        url: ogImageUrl,
         width: 1200,
         height: 630,
         alt: "Know Your Vote Kentucky",
@@ -39,7 +44,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Know Your Vote Kentucky - Track Kentucky Legislation",
     description: "Track Kentucky legislation, representatives, and civic engagement. Making government accessible through AI.",
-    images: ["https://knowyourvotekentucky.org/og-image.jpg"],
+    images: [ogImageUrl],
   },
   robots: {
     index: true,

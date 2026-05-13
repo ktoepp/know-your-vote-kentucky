@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Box, Button, Chip, Typography } from '@mui/material';
 import { ArrowForward } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
-import { ICON_REM, TYPE } from '@/lib/ui-tokens';
+import { ICON_REM, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
 
 export interface SectionHeaderProps {
   title: string;
@@ -27,7 +27,12 @@ export function SectionHeader({ title, icon, href, caption, beta }: SectionHeade
             {React.cloneElement(icon as React.ReactElement<{ sx?: object }>, {
               sx: { color: theme.palette.primary.main, fontSize: ICON_REM.section },
             })}
-            <Typography variant={TYPE.sectionTitle.variant} fontWeight={TYPE.sectionTitle.fontWeight} color="text.primary">
+            <Typography
+              variant={TYPE.sectionTitle.variant}
+              fontWeight={TYPE.sectionTitle.fontWeight}
+              color="text.primary"
+              sx={SECTION_TITLE_DISPLAY_SX}
+            >
               {title}
             </Typography>
             {beta && (
