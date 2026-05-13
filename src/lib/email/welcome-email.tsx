@@ -29,14 +29,14 @@ export function WelcomeEmail(props: {
         <Container style={container}>
           <Heading style={h1}>{greeting}</Heading>
           <Text style={lead}>
-            Your email is verified and your account is set up. Here is how to get the most out of
-            the site:
+            Your email is verified. From here we&rsquo;ll only email you when bills you follow
+            change status — no marketing, no noise.
           </Text>
           <Section style={card}>
             <Text style={cardHeading}>Follow bills you care about</Text>
             <Text style={body}>
-              Open any bill page and tap <strong>Follow</strong> to receive a daily digest when its
-              status changes (committee action, floor votes, sent to governor, signed, vetoed).
+              Open any bill page and tap <strong>Follow</strong>. We&rsquo;ll add it to your daily
+              digest when it moves — committee action, floor votes, sent to governor, signed, vetoed.
             </Text>
             <Text style={cta}>
               <Link href={browseBillsHref} style={link}>Browse bills →</Link>
@@ -45,8 +45,7 @@ export function WelcomeEmail(props: {
           <Section style={card}>
             <Text style={cardHeading}>Find your legislators</Text>
             <Text style={body}>
-              Use the district map to look up your House and Senate representatives by address —
-              two legislators per Kentuckian.
+              Look up your two legislators (one House, one Senate) by address on the district map.
             </Text>
             <Text style={cta}>
               <Link href={districtMapHref} style={link}>Open the district map →</Link>
@@ -55,15 +54,16 @@ export function WelcomeEmail(props: {
           <Section style={card}>
             <Text style={cardHeading}>Tune your digest</Text>
             <Text style={body}>
-              Choose daily or weekly cadence, pick which event types you care about, and add topic
-              filters from your profile.
+              Pick daily or weekly cadence, choose which event types matter to you, and follow whole
+              topics (Education, Healthcare, etc.) — we&rsquo;ll match bills automatically.
             </Text>
             <Text style={cta}>
               <Link href={preferencesHref} style={link}>Notification preferences →</Link>
             </Text>
           </Section>
           <Text style={muted}>
-            Manage your account anytime at <Link href={profileHref} style={link}>{profileHref}</Link>.
+            This is a one-time welcome email. Manage your account anytime at{' '}
+            <Link href={profileHref} style={link}>{profileHref}</Link>.
           </Text>
         </Container>
       </Body>

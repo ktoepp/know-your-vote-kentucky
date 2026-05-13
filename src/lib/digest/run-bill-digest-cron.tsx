@@ -264,9 +264,11 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const unsubscribeToken = pref.unsubscribe_token as string;
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
     const followedBillsHref = `${origin}/bills?follows=me`;
+    const preferencesHref = `${origin}/profile#notifications`;
 
-    const previewText = `${groups.length} bill${groups.length === 1 ? '' : 's'} with updates`;
-    const subject = `KY bill digest — ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium' }).format(now)}`;
+    const eventTotal = top.length + overflow;
+    const previewText = `${eventTotal} update${eventTotal === 1 ? '' : 's'} on ${groups.length} bill${groups.length === 1 ? '' : 's'} you follow`;
+    const subject = `Your KY bill digest — ${eventTotal} update${eventTotal === 1 ? '' : 's'}`;
 
     const needsHtml = renderPreview || !(dryRun || !resend);
     const html = needsHtml
@@ -276,6 +278,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
             groups={groups}
             moreCount={overflow}
             followedBillsHref={followedBillsHref}
+            preferencesHref={preferencesHref}
             unsubscribeHref={unsubscribeHref}
           />,
         )
