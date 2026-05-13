@@ -8,17 +8,13 @@ function page(title: string, body: string, ok: boolean) {
 
 type Ctx = { params: Promise<{ token: string }> };
 
-/**
- * One-click unsubscribe from digest emails (no login). Sets digest to off and marks unsubscribed_all_at.
- */
-export async function GET(_req: NextRequest, { params }: Ctx) {
-  const { token: raw } = await params;
-  const token = decodeURIComponent(raw || '').trim();
+async function unsubscribe(token: string): Promise<{ ok: boolean; status: number; body: string }> {
   if (!token || !supabaseAdmin) {
-    return new NextResponse(page('Unsubscribe', 'This link is invalid or the server is not configured.', false), {
+    return {
+      ok: false,
       status: 400,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
+      body: page('Unsubscribe', 'This link is invalid or the server is not configured.', false),
+    };
   }
 
   const { data: row, error: selErr } = await supabaseAdmin
@@ -28,10 +24,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     .maybeSingle();
 
   if (selErr || !row?.user_id) {
-    return new NextResponse(page('Unsubscribe', 'We could not find a subscription for this link.', false), {
+    return {
+      ok: false,
       status: 404,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
+      body: page('Unsubscribe', 'We could not find a subscription for this link.', false),
+    };
   }
 
   const { error: upErr } = await supabaseAdmin
@@ -43,18 +40,39 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     .eq('unsubscribe_token', token);
 
   if (upErr) {
-    return new NextResponse(page('Something went wrong', 'Please try again later or update preferences in your profile.', false), {
+    return {
+      ok: false,
       status: 500,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
+      body: page('Something went wrong', 'Please try again later or update preferences in your profile.', false),
+    };
   }
 
-  return new NextResponse(
-    page(
+  return {
+    ok: true,
+    status: 200,
+    body: page(
       'You are unsubscribed',
       'You will not receive further bill digest emails. You can turn digests back on anytime from your profile.',
       true,
     ),
-    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-  );
+  };
+}
+
+/** Browser click → friendly HTML page. */
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  const { token: raw } = await params;
+  const token = decodeURIComponent(raw || '').trim();
+  const result = await unsubscribe(token);
+  return new NextResponse(result.body, {
+    status: result.status,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
+}
+
+/** RFC 8058 one-click (List-Unsubscribe-Post). Mail clients POST here without user interaction. */
+export async function POST(_req: NextRequest, { params }: Ctx) {
+  const { token: raw } = await params;
+  const token = decodeURIComponent(raw || '').trim();
+  const result = await unsubscribe(token);
+  return NextResponse.json({ ok: result.ok }, { status: result.status });
 }

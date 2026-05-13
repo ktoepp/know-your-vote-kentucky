@@ -30,6 +30,12 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 - **`env-template.txt`** — SMTP notes, rate limits, CAPTCHA troubleshooting (“For security purposes…”).
 - **`npm run test:supabase-auth`** — smoke reachability for Auth API (no mail send).
 
+### Digest E2E validation harness
+
+- **`npm run preview:digest -- --email <addr>`** renders the digest for one user (no send) and writes `digest-preview.html`. Add **`--inject HB1`** to insert a synthetic `ky_bill_status_history` row (cleaned up on exit) so you can drive the full path even when no real bill movement is in the window. Add **`--send`** to actually send via Resend, and **`--ignore-last-sent`** to bypass the prior-window cutoff.
+- Bounce / complaint events update `ky_notifications_log.delivery_status` and flip `ky_notification_preferences.bounce_state` / `suppressed_at` via **`POST /api/webhooks/resend`** (requires **`RESEND_WEBHOOK_SECRET`** + Resend webhook configured for `email.delivered`, `email.bounced`, `email.complained`, `email.delivery_delayed`).
+- One-click unsubscribe: digest emails now set **`List-Unsubscribe`** + **`List-Unsubscribe-Post: List-Unsubscribe=One-Click`**; the unsubscribe route accepts both **`GET`** (HTML page) and **`POST`** (RFC 8058).
+
 ### Suggested next implementation order (align with spec milestones)
 
 1. ~~**`GET/PATCH /api/me/preferences`**~~ — **Done in repo** (`src/app/api/me/preferences/route.ts`, `src/lib/ky-notification-preferences.ts`, migration **020** insert policy). Wire **`/profile`** Notifications panel next.
