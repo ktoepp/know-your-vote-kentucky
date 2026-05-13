@@ -7,6 +7,19 @@ import { normalizeHttpsUrl } from './legislator-link-normalize';
 
 const KY_STATE = 'KY';
 
+const KY_DEFAULT_SESSION_LABEL = '2026 RS';
+
+/**
+ * Official Kentucky LRC HTML bill page (`legislature.ky.gov`).
+ * Use {@link kyLrcBillDetailsUrl}; validity depends on session and whether LRC published the bill.
+ */
+export function kyLrcBillDetailsUrl(billNumber: string | null | undefined, session: string | null | undefined): string {
+  const leg = String(billNumber ?? '').trim();
+  const sessRaw = String(session ?? '').trim();
+  const sess = sessRaw !== '' ? sessRaw : KY_DEFAULT_SESSION_LABEL;
+  return `https://legislature.ky.gov/Legislation/Pages/bill-details.aspx?legislation=${encodeURIComponent(leg)}&session=${encodeURIComponent(sess)}`;
+}
+
 /** “HB 6”, “hb 6” -> “HB6” (LegiScan /rollcall/ path segment). */
 export function legiscanBillPathSlug(billNumber: string | null | undefined): string {
   return String(billNumber ?? '')

@@ -1,25 +1,250 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
+  Alert,
   Box,
-  Container,
-  Typography,
   Button,
-  Paper,
+  Chip,
   CircularProgress,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Paper,
+  TextField,
+  Typography,
 } from '@mui/material';
-import { Person, Dashboard as DashboardIcon, Logout } from '@mui/icons-material';
+import {
+  PersonOutline,
+  ShieldOutlined,
+  Logout as LogoutIcon,
+} from '@mui/icons-material';
 import { useUser } from '../lib/UserContext';
+import { supabase } from '../lib/supabaseClient';
+import type { KyUserProfileRow } from '@/types/user-profile';
+import { ProfileNotificationsSection } from '@/components/profile/ProfileNotificationsSection';
+import { ProfileFollowedBillsSection } from '@/components/profile/ProfileFollowedBillsSection';
+import { authEmailRedirectOrigin } from '@/lib/site-canonical';
+
+function SectionCard({
+  id,
+  icon,
+  title,
+  children,
+}: {
+  id: string;
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Paper id={id} component="section" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2 }}>
+        <Box sx={{ color: 'primary.main', display: 'flex' }} aria-hidden>
+          {icon}
+        </Box>
+        <Typography variant="h6" component="h2" fontWeight={700}>
+          {title}
+        </Typography>
+      </Box>
+      {children}
+    </Paper>
+  );
+}
 
 export default function ProfilePage() {
-  const { user, loading } = useUser();
+  const router = useRouter();
+  const { user, session, loading: authLoading } = useUser();
+  const [profile, setProfile] = useState<KyUserProfileRow | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
-  if (loading) {
+  const [displayName, setDisplayName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [nameSaved, setNameSaved] = useState(false);
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  const [newEmail, setNewEmail] = useState('');
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const emailVerified = Boolean(user?.email_confirmed_at);
+
+  const loadProfile = useCallback(async () => {
+    if (!supabase || !user?.id) {
+      setProfile(null);
+      setProfileLoading(false);
+      return;
+    }
+    setProfileLoading(true);
+    setProfileError(null);
+    const { data, error } = await supabase
+      .from('ky_user_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    setProfileLoading(false);
+    if (error) {
+      setProfileError(error.message);
+      setProfile(null);
+      return;
+    }
+    setProfile(data as KyUserProfileRow | null);
+    if (data?.display_name) {
+      setDisplayName(data.display_name);
+    } else if (user.user_metadata?.full_name) {
+      setDisplayName(String(user.user_metadata.full_name));
+    } else {
+      setDisplayName('');
+    }
+  }, [user?.id, user?.user_metadata?.full_name]);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  const accessToken = session?.access_token;
+
+  const handleSaveDisplayName = async () => {
+    if (!supabase || !user?.id) return;
+    setSavingName(true);
+    setNameSaved(false);
+    const trimmed = displayName.trim();
+    const { error } = await supabase
+      .from('ky_user_profiles')
+      .update({ display_name: trimmed || null })
+      .eq('user_id', user.id);
+    setSavingName(false);
+    if (error) {
+      setProfileError(error.message);
+      return;
+    }
+    setNameSaved(true);
+    void loadProfile();
+    setTimeout(() => setNameSaved(false), 3000);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMsg(null);
+    if (newPassword.length < 8) {
+      setPasswordMsg({ tone: 'error', text: 'Password must be at least 8 characters.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ tone: 'error', text: 'Passwords do not match.' });
+      return;
+    }
+    if (!supabase) return;
+    setPasswordBusy(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setPasswordBusy(false);
+    if (error) {
+      setPasswordMsg({ tone: 'error', text: error.message });
+      return;
+    }
+    setPasswordMsg({ tone: 'success', text: 'Password updated.' });
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const handleChangeEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailMsg(null);
+    const next = newEmail.trim().toLowerCase();
+    if (!next || next === user?.email?.toLowerCase()) {
+      setEmailMsg({ tone: 'error', text: 'Enter a new email address.' });
+      return;
+    }
+    if (!supabase) return;
+    const origin = authEmailRedirectOrigin();
+    setEmailBusy(true);
+    const { error } = await supabase.auth.updateUser(
+      { email: next },
+      { emailRedirectTo: `${origin}/auth/verify` },
+    );
+    setEmailBusy(false);
+    if (error) {
+      setEmailMsg({ tone: 'error', text: error.message });
+      return;
+    }
+    setEmailMsg({
+      tone: 'success',
+      text: 'Check your new inbox for a confirmation link. You may need to sign in again afterward.',
+    });
+    setNewEmail('');
+  };
+
+  const handleResendVerification = async () => {
+    if (!supabase || !user?.email) return;
+    setResendBusy(true);
+    setResendMsg(null);
+    const origin = authEmailRedirectOrigin();
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: user.email,
+      options: { emailRedirectTo: `${origin}/auth/verify` },
+    });
+    setResendBusy(false);
+    if (error) {
+      setResendMsg(error.message);
+      return;
+    }
+    setResendMsg('Verification email sent.');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!accessToken) return;
+    if (deleteConfirm.trim().toLowerCase() !== user?.email?.trim().toLowerCase()) {
+      setDeleteError('Email does not match.');
+      return;
+    }
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch('/api/me/account', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(typeof body.error === 'string' ? body.error : 'Could not delete account.');
+        setDeleteBusy(false);
+        return;
+      }
+      await supabase?.auth.signOut();
+      router.push('/');
+    } catch {
+      setDeleteError('Could not delete account.');
+    }
+    setDeleteBusy(false);
+  };
+
+  const layoutLoading = authLoading || (Boolean(user) && profileLoading);
+
+  const accountEmail = useMemo(() => user?.email ?? profile?.email ?? '', [user?.email, profile?.email]);
+
+  if (layoutLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
-        <CircularProgress />
+        <CircularProgress aria-label="Loading profile" />
       </Box>
     );
   }
@@ -32,10 +257,14 @@ export default function ProfilePage() {
             Sign in
           </Typography>
           <Typography color="text.secondary" sx={{ mb: 3 }}>
-            View your account details after you sign in.
+            Sign in to manage your account and security settings.
           </Typography>
-          <Button component={Link} href="/auth/login" variant="contained">
-            Go to login
+          <Button
+            component={Link}
+            href={`/auth/login?next=${encodeURIComponent('/profile')}`}
+            variant="contained"
+          >
+            Go to log in
           </Button>
         </Paper>
       </Container>
@@ -43,29 +272,202 @@ export default function ProfilePage() {
   }
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Paper elevation={1} sx={{ p: 4, borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-          <Person color="primary" />
-          <Typography variant="h5" fontWeight={700}>
-            Account
+    <Container maxWidth="md" sx={{ py: { xs: 3, sm: 5 } }}>
+      <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+        Profile
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        Manage your account, email digest preferences, followed bills, and sign-in security.
+      </Typography>
+
+      {!emailVerified && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3 }}
+          action={
+            <Button color="inherit" size="small" disabled={resendBusy} onClick={() => void handleResendVerification()}>
+              {resendBusy ? 'Sending…' : 'Resend email'}
+            </Button>
+          }
+        >
+          Your email is not verified yet. Some features stay limited until you confirm your address.
+          {resendMsg && (
+            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+              {resendMsg}
+            </Typography>
+          )}
+        </Alert>
+      )}
+
+      <SectionCard id="account" icon={<PersonOutline sx={{ fontSize: 28 }} />} title="Account">
+        {profileError && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Could not load extended profile ({profileError}). If this persists after refresh, ensure migration{' '}
+            <Typography component="span" variant="body2" sx={{ fontFamily: 'monospace' }}>
+              016_ky_user_profiles
+            </Typography>{' '}
+            is applied.
+          </Alert>
+        )}
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
+          Email
+        </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>
+            {accountEmail}
           </Typography>
+          <Chip
+            size="small"
+            label={emailVerified ? 'Verified' : 'Unverified'}
+            color={emailVerified ? 'success' : 'warning'}
+            variant={emailVerified ? 'filled' : 'outlined'}
+          />
         </Box>
-        <Typography color="text.secondary" sx={{ mb: 1 }}>
-          Signed in as
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
+          Display name
         </Typography>
-        <Typography variant="body1" sx={{ mb: 3, wordBreak: 'break-word' }}>
-          {user.email}
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+          Shown where we personalize copy for you (email templates and future profile surfaces).
         </Typography>
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-          <Button component={Link} href="/dashboard" variant="outlined" startIcon={<DashboardIcon />}>
-            Dashboard
-          </Button>
-          <Button component={Link} href="/auth/logout" variant="outlined" color="inherit" startIcon={<Logout />}>
-            Log out
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, alignItems: { sm: 'flex-start' } }}>
+          <TextField
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="Your name"
+            fullWidth
+            size="small"
+            inputProps={{ maxLength: 120 }}
+          />
+          <Button variant="contained" disabled={savingName} onClick={() => void handleSaveDisplayName()}>
+            {savingName ? 'Saving…' : 'Save'}
           </Button>
         </Box>
+        {nameSaved && (
+          <Typography variant="caption" color="success.main" sx={{ mt: 1, display: 'block' }}>
+            Saved.
+          </Typography>
+        )}
+      </SectionCard>
+
+      <Paper component="section" id="notifications" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+        <ProfileNotificationsSection />
       </Paper>
+
+      <Paper component="section" id="followed-bills" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+        <ProfileFollowedBillsSection />
+      </Paper>
+
+      <SectionCard id="security" icon={<ShieldOutlined sx={{ fontSize: 28 }} />} title="Security">
+        <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 1 }}>
+          Change password
+        </Typography>
+        <Box component="form" onSubmit={handleChangePassword} sx={{ maxWidth: 440 }}>
+          <TextField
+            label="New password"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            fullWidth
+            size="small"
+            margin="dense"
+            autoComplete="new-password"
+          />
+          <TextField
+            label="Confirm new password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            fullWidth
+            size="small"
+            margin="dense"
+            autoComplete="new-password"
+          />
+          {passwordMsg && (
+            <Alert severity={passwordMsg.tone} sx={{ mt: 1 }}>
+              {passwordMsg.text}
+            </Alert>
+          )}
+          <Button type="submit" variant="outlined" sx={{ mt: 2 }} disabled={passwordBusy}>
+            {passwordBusy ? 'Updating…' : 'Update password'}
+          </Button>
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+          Change email
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          We send a confirmation link to the new address. Your sign-in email updates after you confirm.
+        </Typography>
+        <Box component="form" onSubmit={handleChangeEmail} sx={{ maxWidth: 440 }}>
+          <TextField
+            label="New email"
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            fullWidth
+            size="small"
+            margin="dense"
+            autoComplete="email"
+          />
+          {emailMsg && (
+            <Alert severity={emailMsg.tone} sx={{ mt: 1 }}>
+              {emailMsg.text}
+            </Alert>
+          )}
+          <Button type="submit" variant="outlined" sx={{ mt: 2 }} disabled={emailBusy}>
+            {emailBusy ? 'Sending…' : 'Request email change'}
+          </Button>
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        <Typography variant="subtitle1" fontWeight={600} gutterBottom color="error">
+          Delete account
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Permanently deletes your account and associated preferences. This cannot be undone.
+        </Typography>
+        <Button variant="outlined" color="error" onClick={() => setDeleteOpen(true)}>
+          Delete account…
+        </Button>
+      </SectionCard>
+
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+        <Button component={Link} href="/auth/logout" variant="outlined" color="inherit" startIcon={<LogoutIcon />}>
+          Log out
+        </Button>
+      </Box>
+
+      <Dialog open={deleteOpen} onClose={() => !deleteBusy && setDeleteOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Delete account?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Type your email <strong>{user.email}</strong> to confirm.
+          </Typography>
+          <TextField
+            label="Email"
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            fullWidth
+            autoComplete="off"
+          />
+          {deleteError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteOpen(false)} disabled={deleteBusy}>
+            Cancel
+          </Button>
+          <Button color="error" variant="contained" disabled={deleteBusy} onClick={() => void handleDeleteAccount()}>
+            {deleteBusy ? 'Deleting…' : 'Delete forever'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

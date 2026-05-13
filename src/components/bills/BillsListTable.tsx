@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import {
+  Box,
   Paper,
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { Bookmark } from '@mui/icons-material';
 import type { KYBill } from '@/types/kentucky';
 import type { KyBillSortKey } from '@/lib/bill-display';
 import {
@@ -31,6 +33,7 @@ export interface BillsListTableProps {
   sortBy: KyBillSortKey;
   sortDir: 'asc' | 'desc';
   onRequestSort: (key: KyBillSortKey) => void;
+  followedBillIds?: ReadonlySet<string> | null;
 }
 
 function billHref(bill: KYBill): string {
@@ -51,7 +54,7 @@ function chamberLabel(bill: KYBill): string {
   return '';
 }
 
-export function BillsListTable({ bills, sortBy, sortDir, onRequestSort }: BillsListTableProps) {
+export function BillsListTable({ bills, sortBy, sortDir, onRequestSort, followedBillIds }: BillsListTableProps) {
   const head = (id: KyBillSortKey, label: string, width?: string) => (
     <TableCell sortDirection={sortBy === id ? sortDir : false} sx={{ fontWeight: 600, width }}>
       <TableSortLabel active={sortBy === id} direction={sortBy === id ? sortDir : 'asc'} onClick={() => onRequestSort(id)}>
@@ -78,13 +81,25 @@ export function BillsListTable({ bills, sortBy, sortDir, onRequestSort }: BillsL
           {bills.map((bill) => (
             <TableRow key={bill.id} hover sx={{ '&:last-child td': { border: 0 } }}>
               <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}>
-                <Typography
-                  component={Link}
-                  href={billHref(bill)}
-                  sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                >
-                  {bill.bill_number}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  {followedBillIds?.has(bill.id) ? (
+                    <Box
+                      component="span"
+                      role="img"
+                      aria-label="Followed"
+                      sx={{ display: 'inline-flex', color: 'primary.main', flexShrink: 0 }}
+                    >
+                      <Bookmark sx={{ fontSize: '1.05rem' }} aria-hidden />
+                    </Box>
+                  ) : null}
+                  <Typography
+                    component={Link}
+                    href={billHref(bill)}
+                    sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                  >
+                    {bill.bill_number}
+                  </Typography>
+                </Box>
               </TableCell>
               <TableCell>
                 <Typography

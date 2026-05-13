@@ -49,6 +49,31 @@ export function formatBillLabelText(input: string | null | undefined): string {
   return lower.replace(/(^|[\s\-/([{&])([a-z])/g, (_m, sep: string, letter: string) => sep + letter.toUpperCase());
 }
 
+/**
+ * Bill designation for links and headings (HB 23, SB 98, SR 224).
+ * Uppercases the leading letter prefix only; preserves digits and spacing from the DB.
+ * Do not use {@link formatBillLabelText} here — it title-cases prose and breaks designations (e.g. "Sb98").
+ */
+export function formatKyBillNumberDisplay(input: string | null | undefined): string {
+  const s = String(input ?? '').trim();
+  if (!s) return '';
+  const m = s.match(/^([A-Za-z]+)(\s*)([\s\S]*)$/);
+  if (!m) return s;
+  return (m[1].toUpperCase() + m[2] + m[3]).trimEnd();
+}
+
+/** ISO calendar/date string → short US locale (same pattern as KYBillCard / BillsListTable). */
+export function formatKyIsoDateShort(iso: string | null | undefined): string {
+  if (iso == null || iso === '') return '';
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return String(iso).trim();
+  return new Date(t).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 /** Governor has signed the bill (KY sync often stores short label "Signed"). */
 export function isSignedByGovernorBillStatus(status: string | null | undefined): boolean {
   if (status == null) return false;

@@ -14,8 +14,13 @@ import {
 } from './ky-data-sources';
 import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 import { classifyTopics } from './ky-topic-classifier';
+import { extractCommitteeMembershipSlugsFromOpenStatesPerson } from './ky-committee-utils';
 import { legiscanSubjectColumnsFromDetail } from './ky-legiscan-subjects';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
+import {
+  fetchBillHistorySnapshots,
+  recordBillStatusHistoryForBuiltBatch,
+} from './ky-bill-status-history';
 import {
   buildOrdinanceSponsorsJson,
   isLegistarMatterLikelyTestNoise,
@@ -251,6 +256,11 @@ const logError = (source: string, msg: string) => console.error(`[Sync:${source}
 /** PostgREST when `lrc_profile_url` column exists in repo migrations but remote DB was not migrated. */
 function isMissingLrcProfileUrlColumn(err: { message?: string } | null): boolean {
   return (err?.message || '').toLowerCase().includes('lrc_profile_url');
+}
+
+function isMissingCommitteeMembershipsColumn(err: { message?: string } | null): boolean {
+  const m = (err?.message || '').toLowerCase();
+  return m.includes('committee_memberships');
 }
 
 function getSupabase() {
@@ -710,8 +720,22 @@ async function syncKyBillsByHash(
         log(source, `Hash-gated enrich ${i + 1}/${changedOrNew.length}`);
       }
     }
+    const prevSnapshots = await fetchBillHistorySnapshots(
+      db,
+      changedOrNew.map((b) => b.bill_id),
+    );
     const synced = await upsertKyBillRows(source, db, rows);
     grandSynced += synced;
+    try {
+      await recordBillStatusHistoryForBuiltBatch({
+        db,
+        prevByLegiscan: prevSnapshots,
+        rawBills: changedOrNew,
+        builtRows: rows,
+      });
+    } catch (histErr: unknown) {
+      logError(source, `Bill status history: ${histErr instanceof Error ? histErr.message : String(histErr)}`);
+    }
     log(source, `${session.session_name}: upserted ${synced}/${rows.length} (hash-gated)`);
   }
 
@@ -902,8 +926,24 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
           existingSponsors: existing,
           existingLegiscanSubjects,
         });
+        const legiscanIds = rows.map((r) => Number(r.legiscan_id));
+        const prevSnapshots = await fetchBillHistorySnapshots(db, legiscanIds);
         const synced = await upsertKyBillRows(source, db, rows);
         totalSynced += synced;
+        try {
+          const rawBills = legiscanIds.map((id, i) => ({
+            bill_id: id,
+            change_hash: (rows[i]!.change_hash as string | null | undefined) ?? null,
+          }));
+          await recordBillStatusHistoryForBuiltBatch({
+            db,
+            prevByLegiscan: prevSnapshots,
+            rawBills,
+            builtRows: rows,
+          });
+        } catch (histErr: unknown) {
+          logError(source, `Bill status history: ${histErr instanceof Error ? histErr.message : String(histErr)}`);
+        }
         log(source, `Upserted ${synced}/${bills.length} for ${session.session_name} (quota backfill)`);
       } else {
         const toSync = selectBillsForSync(bills, limit);
@@ -914,8 +954,24 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
           `${session.session_name}: syncing ${toSync.length} of ${bills.length} bills (house ${nHouse}, senate ${nSenate}, other ${toSync.length - nHouse - nSenate})`,
         );
         const rows = await buildBillRowsForSession(source, client, session, toSync, skipSponsors);
+        const legiscanIds = rows.map((r) => Number(r.legiscan_id));
+        const prevSnapshots = await fetchBillHistorySnapshots(db, legiscanIds);
         const synced = await upsertKyBillRows(source, db, rows);
         totalSynced += synced;
+        try {
+          const rawBills = legiscanIds.map((id, i) => ({
+            bill_id: id,
+            change_hash: (rows[i]!.change_hash as string | null | undefined) ?? null,
+          }));
+          await recordBillStatusHistoryForBuiltBatch({
+            db,
+            prevByLegiscan: prevSnapshots,
+            rawBills,
+            builtRows: rows,
+          });
+        } catch (histErr: unknown) {
+          logError(source, `Bill status history: ${histErr instanceof Error ? histErr.message : String(histErr)}`);
+        }
         log(source, `Upserted ${synced}/${toSync.length} for ${session.session_name}`);
       }
     }
@@ -1040,6 +1096,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       const { lrcProfileUrl, otherWebsiteUrl } = extractOpenStatesLegislatorWebLinks(leg);
       const { first_name, last_name } = openStatesLegislatorNames(leg);
       const { email, phone } = extractOpenStatesContactDetails(leg);
+      const committee_memberships = extractCommitteeMembershipSlugsFromOpenStatesPerson(leg);
       return {
         openstates_id: leg.id,
         name: leg.name,
@@ -1055,9 +1112,22 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         lrc_profile_url: normalizeHttpsUrl(lrcProfileUrl),
         website: normalizeHttpsUrl(otherWebsiteUrl),
         active: true,
+        committee_memberships,
       };
     });
     let { error } = await db.from('ky_legislators').upsert(rows, { onConflict: 'openstates_id' });
+    if (error && isMissingCommitteeMembershipsColumn(error)) {
+      log(
+        source,
+        'Retrying legislator upsert without committee_memberships (run supabase/migrations/017_search_members_discovery.sql)',
+      );
+      const rowsLegacy = rows.map((r) => {
+        const { committee_memberships: _c, ...rest } = r;
+        return rest;
+      });
+      const retryCm = await db.from('ky_legislators').upsert(rowsLegacy, { onConflict: 'openstates_id' });
+      error = retryCm.error;
+    }
     if (error && isMissingLrcProfileUrlColumn(error)) {
       log(
         source,

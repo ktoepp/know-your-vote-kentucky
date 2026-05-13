@@ -2,11 +2,11 @@
 
 import React from 'react';
 import { Box, Chip, Tooltip, Typography, Avatar } from '@mui/material';
-import { Check } from '@mui/icons-material';
+import { Check, Bookmark } from '@mui/icons-material';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
-import { memberSlug, normalizeLegislatorPhotoUrl } from '@/lib/ky-member-utils';
+import { memberSlug, normalizeLegislatorPhotoUrl, kySponsorPortraitAlt } from '@/lib/ky-member-utils';
 import { SponsorAvatarChip } from '@/components/civic/SponsorAvatarChip';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { ChamberChip, MetaChip } from '@/components/ui/Chip';
@@ -31,10 +31,14 @@ function sponsorInitials(name: string) {
 export interface KYBillCardProps {
   bill: KYBill;
   legislators: KYLegislatorRoster[];
+  /** When provided, a filled bookmark appears for bills in this set (browse/search/home). */
+  followedBillIds?: ReadonlySet<string> | null;
+  /** Topic labels the user follows; matching topic chips use filled variant. */
+  followedTopics?: ReadonlySet<string> | null;
 }
 
 /** Bill grid card — matches home page layout (face + hover tooltip). */
-export function KYBillCard({ bill, legislators }: KYBillCardProps) {
+export function KYBillCard({ bill, legislators, followedBillIds, followedTopics }: KYBillCardProps) {
   const router = useRouter();
   const chamber = effectiveBillChamber(bill);
   const statusTooltipKey = billStatusToTooltipKey(bill.status);
@@ -130,18 +134,23 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
       )}
       {bill.topics && bill.topics.length > 0 && (
         <Box component="span" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-          {bill.topics.slice(0, 4).map((t) => (
-            <Chip
-              key={t}
-              component={Link}
-              href={`/search?q=${encodeURIComponent(t)}`}
-              clickable
-              label={t}
-              size="medium"
-              variant="outlined"
-              sx={{ fontSize: '0.875rem', fontWeight: 600, '& .MuiChip-label': { px: 1.1 } }}
-            />
-          ))}
+          {bill.topics.slice(0, 4).map((t) => {
+            const topicFollowed = followedTopics?.has(t) ?? false;
+            return (
+              <Chip
+                key={t}
+                component={Link}
+                href={`/search?q=${encodeURIComponent(t)}`}
+                clickable
+                label={t}
+                size="medium"
+                variant={topicFollowed ? 'filled' : 'outlined'}
+                color="primary"
+                aria-label={topicFollowed ? `Following: ${t}` : undefined}
+                sx={{ fontSize: '0.875rem', fontWeight: 600, '& .MuiChip-label': { px: 1.1 } }}
+              />
+            );
+          })}
         </Box>
       )}
     </Box>
@@ -166,23 +175,39 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
       : '';
 
   const cardHeader = (
-    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-      {chamber && <ChamberChip chamber={chamber} />}
-      {bill.status &&
-        (isSignedByGovernorBillStatus(bill.status) ? (
-          <MetaChip
-            icon={<Check sx={{ fontSize: '1.125rem !important' }} />}
-            label={billStatusChipLabel(bill.status)}
-            tone="success"
-            variant="outlined"
-          />
-        ) : (
-          <MetaChip
-            label={formatBillLabelText(bill.status)}
-            tone="default"
-            variant="outlined"
-          />
-        ))}
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 1,
+      }}
+    >
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        {chamber && <ChamberChip chamber={chamber} />}
+        {bill.status &&
+          (isSignedByGovernorBillStatus(bill.status) ? (
+            <MetaChip
+              icon={<Check sx={{ fontSize: '1.125rem !important' }} />}
+              label={billStatusChipLabel(bill.status)}
+              tone="success"
+              variant="outlined"
+            />
+          ) : (
+            <MetaChip label={formatBillLabelText(bill.status)} tone="default" variant="outlined" />
+          ))}
+      </Box>
+      {followedBillIds?.has(bill.id) ? (
+        <Box
+          component="span"
+          role="img"
+          aria-label="Followed"
+          sx={{ display: 'inline-flex', alignItems: 'center', color: 'primary.main', lineHeight: 0 }}
+        >
+          <Bookmark sx={{ fontSize: '1.25rem' }} aria-hidden />
+        </Box>
+      ) : null}
     </Box>
   );
 
@@ -220,6 +245,7 @@ export function KYBillCard({ bill, legislators }: KYBillCardProps) {
                   <Avatar
                     key={`${s.name}-${i}`}
                     src={normalizeLegislatorPhotoUrl(s.photoUrl) || undefined}
+                    alt={kySponsorPortraitAlt(s.name)}
                     imgProps={{ referrerPolicy: 'no-referrer' }}
                     onClick={(e) => {
                       e.preventDefault();
