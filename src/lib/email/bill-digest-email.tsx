@@ -29,9 +29,10 @@ export function BillDigestEmail(props: {
   groups: BillDigestGroup[];
   moreCount: number;
   followedBillsHref: string;
+  preferencesHref: string;
   unsubscribeHref: string;
 }) {
-  const { previewText, groups, moreCount, followedBillsHref, unsubscribeHref } = props;
+  const { previewText, groups, moreCount, followedBillsHref, preferencesHref, unsubscribeHref } = props;
 
   return (
     <Html>
@@ -40,7 +41,9 @@ export function BillDigestEmail(props: {
       <Body style={main}>
         <Container style={container}>
           <Heading style={h1}>Your Kentucky bill digest</Heading>
-          <Text style={muted}>Updates from bills and topics you follow (factual status from LegiScan-synced data).</Text>
+          <Text style={muted}>
+            Status changes on bills and topics you follow — factual updates pulled from LegiScan.
+          </Text>
           <Section style={{ marginTop: 24 }}>
             {groups.map((g) => (
               <Section key={g.billHref} style={billBlock}>
@@ -63,9 +66,16 @@ export function BillDigestEmail(props: {
               <Link href={followedBillsHref}>view followed bills on the site</Link>.
             </Text>
           )}
-          <Text style={{ marginTop: 32, fontSize: 12, color: '#64748b' }}>
-            <Link href={unsubscribeHref}>Unsubscribe from these digests</Link>
-          </Text>
+          <Section style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+            <Text style={footerText}>
+              You&rsquo;re getting this because you follow bills or topics on Know Your Vote Kentucky.
+            </Text>
+            <Text style={footerLinks}>
+              <Link href={preferencesHref} style={footerLink}>Change frequency or topics</Link>
+              {' · '}
+              <Link href={unsubscribeHref} style={footerLink}>Unsubscribe from digests</Link>
+            </Text>
+          </Section>
         </Container>
       </Body>
     </Html>
@@ -85,3 +95,6 @@ const billBlock = {
 const billLink = { fontSize: 16, color: '#1e40af' };
 const title = { fontSize: 14, margin: '4px 0 8px', color: '#0f172a' };
 const lineText = { fontSize: 13, margin: '4px 0', color: '#334155' };
+const footerText = { fontSize: 12, color: '#64748b', margin: '0 0 6px', lineHeight: '1.5' };
+const footerLinks = { fontSize: 12, color: '#64748b', margin: 0 };
+const footerLink = { color: '#1e40af', textDecoration: 'underline' };

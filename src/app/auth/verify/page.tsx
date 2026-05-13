@@ -22,6 +22,22 @@ async function exchangeSessionTokens(
   window.history.replaceState(null, '', window.location.pathname + window.location.search);
 }
 
+/**
+ * Fire-and-forget welcome email request. The API is idempotent (it stamps
+ * welcome_email_sent_at first and only sends when that update affects a row),
+ * so multiple calls or retries can't double-send.
+ */
+async function requestWelcomeEmail(token: string): Promise<void> {
+  try {
+    await fetch('/api/me/welcome-email', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // best-effort; user-visible verification status is unaffected
+  }
+}
+
 export default function VerifyEmailPage() {
   const [status, setStatus] = useState<'working' | 'ok' | 'error'>('working');
   const [message, setMessage] = useState<string | null>(null);
@@ -52,8 +68,11 @@ export default function VerifyEmailPage() {
             return;
           }
           await exchangeSessionTokens(client, access_token, refresh_token);
+          const isRecovery = type === 'recovery';
+          if (!isRecovery) {
+            void requestWelcomeEmail(access_token);
+          }
           if (!cancelled) {
-            const isRecovery = type === 'recovery';
             setStatus('ok');
             setMessage(
               isRecovery

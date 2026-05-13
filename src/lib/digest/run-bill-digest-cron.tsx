@@ -8,15 +8,10 @@ import {
   KY_DIGEST_MAJOR_MILESTONE_SET,
   type KyDigestEventType,
 } from '@/lib/ky-notification-preferences';
+import { billMatchesTopicFilters } from '@/lib/ky-topic-legiscan-mapping';
 import { publicSiteOrigin } from '@/lib/site-canonical';
 
 const DIGEST_CAP = 10;
-
-function topicsMatch(billTopics: string[] | null | undefined, filters: string[]): boolean {
-  if (!filters.length) return false;
-  const f = new Set(filters);
-  return (billTopics ?? []).some((t) => f.has(t));
-}
 
 function milestoneScore(eventType: string): number {
   return KY_DIGEST_MAJOR_MILESTONE_SET.has(eventType as KyDigestEventType) ? 1 : 0;
@@ -49,6 +44,7 @@ type BillRow = {
   bill_number: string | null;
   title: string | null;
   topics: string[] | null;
+  legiscan_subjects: Array<{ subject_id?: number; subject_name?: string }> | null;
 };
 
 export type DigestCronResult = {
@@ -173,7 +169,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const chunk = billIds.slice(i, i + CHUNK);
     const { data: bills } = await supabaseAdmin
       .from('ky_bills')
-      .select('id, bill_number, title, topics')
+      .select('id, bill_number, title, topics, legiscan_subjects')
       .in('id', chunk);
     for (const b of bills ?? []) {
       billById.set(String(b.id), b as BillRow);
@@ -219,7 +215,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       const bill = billById.get(String(h.bill_id));
       if (!bill) return false;
       if (followedSet.has(String(h.bill_id))) return true;
-      return topicsMatch(bill.topics, topicFilters);
+      return billMatchesTopicFilters(bill.topics, bill.legiscan_subjects, topicFilters);
     });
 
     if (!candidates.length) {
@@ -268,9 +264,11 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const unsubscribeToken = pref.unsubscribe_token as string;
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
     const followedBillsHref = `${origin}/bills?follows=me`;
+    const preferencesHref = `${origin}/profile#notifications`;
 
-    const previewText = `${groups.length} bill${groups.length === 1 ? '' : 's'} with updates`;
-    const subject = `KY bill digest — ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium' }).format(now)}`;
+    const eventTotal = top.length + overflow;
+    const previewText = `${eventTotal} update${eventTotal === 1 ? '' : 's'} on ${groups.length} bill${groups.length === 1 ? '' : 's'} you follow`;
+    const subject = `Your KY bill digest — ${eventTotal} update${eventTotal === 1 ? '' : 's'}`;
 
     const needsHtml = renderPreview || !(dryRun || !resend);
     const html = needsHtml
@@ -280,6 +278,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
             groups={groups}
             moreCount={overflow}
             followedBillsHref={followedBillsHref}
+            preferencesHref={preferencesHref}
             unsubscribeHref={unsubscribeHref}
           />,
         )
