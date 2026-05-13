@@ -1,10 +1,6 @@
 # Large backup files
 *.tar.gz
 
-# Build cache
-.next/cache/
-.next/server/
-
 # Node modules (will be installed on Vercel)
 node_modules/
 
