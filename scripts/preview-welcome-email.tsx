@@ -83,6 +83,8 @@ async function main() {
       profileHref={`${origin}/profile`}
       preferencesHref={`${origin}/profile#notifications`}
       districtMapHref={`${origin}/district-map`}
+      privacyHref={`${origin}/privacy`}
+      termsHref={`${origin}/terms`}
     />,
   );
 
