@@ -36,7 +36,7 @@ import {
   openStatesLegislatorNames,
 } from './ky-openstates-client';
 import { normalizeBallotpediaForStorage } from './external-legislative-links';
-import { normalizeHttpsUrl } from './legislator-link-normalize';
+import { buildLegislatorExternalLinks, normalizeHttpsUrl } from './legislator-link-normalize';
 import { normalizeKyLegislatorDistrictForDb } from './ky-district-geo';
 import { normalizeLegislatorPhotoUrl, normalizeSponsorNameForMatch } from './ky-member-utils';
 import type { KYSource } from '../types/kentucky';
@@ -261,6 +261,10 @@ function isMissingLrcProfileUrlColumn(err: { message?: string } | null): boolean
 function isMissingCommitteeMembershipsColumn(err: { message?: string } | null): boolean {
   const m = (err?.message || '').toLowerCase();
   return m.includes('committee_memberships');
+}
+
+function isMissingExternalLinksColumn(err: { message?: string } | null): boolean {
+  return (err?.message || '').toLowerCase().includes('external_links');
 }
 
 function getSupabase() {
@@ -1097,6 +1101,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       const { first_name, last_name } = openStatesLegislatorNames(leg);
       const { email, phone } = extractOpenStatesContactDetails(leg);
       const committee_memberships = extractCommitteeMembershipSlugsFromOpenStatesPerson(leg);
+      const external_links = buildLegislatorExternalLinks(leg.links);
       return {
         openstates_id: leg.id,
         name: leg.name,
@@ -1113,16 +1118,29 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         website: normalizeHttpsUrl(otherWebsiteUrl),
         active: true,
         committee_memberships,
+        external_links,
       };
     });
     let { error } = await db.from('ky_legislators').upsert(rows, { onConflict: 'openstates_id' });
+    if (error && isMissingExternalLinksColumn(error)) {
+      log(
+        source,
+        'Retrying legislator upsert without external_links (run supabase/migrations/023_ky_legislators_external_links.sql)',
+      );
+      const rowsLegacy = rows.map((r) => {
+        const { external_links: _e, ...rest } = r;
+        return rest;
+      });
+      const retryEl = await db.from('ky_legislators').upsert(rowsLegacy, { onConflict: 'openstates_id' });
+      error = retryEl.error;
+    }
     if (error && isMissingCommitteeMembershipsColumn(error)) {
       log(
         source,
         'Retrying legislator upsert without committee_memberships (run supabase/migrations/017_search_members_discovery.sql)',
       );
       const rowsLegacy = rows.map((r) => {
-        const { committee_memberships: _c, ...rest } = r;
+        const { committee_memberships: _c, external_links: _e, ...rest } = r;
         return rest;
       });
       const retryCm = await db.from('ky_legislators').upsert(rowsLegacy, { onConflict: 'openstates_id' });
@@ -1134,7 +1152,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         'Retrying without lrc_profile_url (run supabase/migrations/004_ky_legislators_lrc_profile_url.sql for split LRC vs campaign URLs)',
       );
       const rowsLegacy = rows.map((r) => {
-        const { lrc_profile_url: lrc, website: w, ...rest } = r;
+        const { lrc_profile_url: lrc, website: w, external_links: _e, ...rest } = r;
         return {
           ...rest,
           website: w || lrc || null,

@@ -1,0 +1,59 @@
+name: Legislator links — weekly sync + verify
+
+on:
+  schedule:
+    # Mondays 12:00 UTC (07:00 / 08:00 ET).
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+    inputs:
+      probe_social:
+        description: 'Also probe social links (default: skip; bot-blocking is noisy)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legislator-links-weekly
+  cancel-in-progress: false
+
+jobs:
+  sync-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      OPENSTATES_API_KEY: ${{ secrets.OPENSTATES_API_KEY }}
+      LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+
+      # Pull fresh Open States data so we verify against the latest URLs
+      # (catches new members + incumbent link updates within a week).
+      - name: Sync legislators from Open States
+        run: npm run sync:ky:legislators
+
+      - name: Verify outbound links
+        id: verify
+        run: |
+          mkdir -p reports
+          ARGS="--json --output reports/legislator-links.json"
+          if [ "${{ github.event.inputs.probe_social }}" = "true" ]; then
+            ARGS="$ARGS --probe-social"
+          fi
+          npx tsx scripts/verify-legislator-external-links.ts $ARGS
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legislator-links-report
+          path: reports/legislator-links.json
+          retention-days: 30

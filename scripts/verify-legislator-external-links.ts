@@ -22,16 +22,24 @@
  *
  * Exit: 0 if every non-exempt probe returns 2xx/3xx (LegiScan API counts as OK when getPerson succeeds); 1 if any other failure.
  */
+import fs from 'node:fs';
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { legiscanPersonUrl, normalizeBallotpediaHref } from '../src/lib/external-legislative-links';
-import { normalizeHttpsUrl } from '../src/lib/legislator-link-normalize';
+import { normalizeHttpsUrl, type LegislatorExternalLink } from '../src/lib/legislator-link-normalize';
 import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
 
 const TIMEOUT_MS = 18_000;
 const CONCURRENCY = 6;
 
-type FieldKey = 'lrc_profile_url' | 'website' | 'ballotpedia' | 'legiscan';
+type FieldKey =
+  | 'lrc_profile_url'
+  | 'website'
+  | 'ballotpedia'
+  | 'legiscan'
+  | 'external_official'
+  | 'external_other'
+  | 'external_social';
 
 interface Row {
   id: string;
@@ -40,6 +48,7 @@ interface Row {
   lrc_profile_url: string | null;
   website: string | null;
   ballotpedia: string | null;
+  external_links: LegislatorExternalLink[] | null;
 }
 
 interface LinkProbe {
@@ -61,12 +70,16 @@ function parseArgs(): {
   json: boolean;
   strictLegiscan: boolean;
   httpLegiscanOnly: boolean;
+  probeSocial: boolean;
+  output: string | null;
 } {
   const args = process.argv.slice(2);
   let limit: number | null = null;
   let json = false;
   let strictLegiscan = false;
   let httpLegiscanOnly = false;
+  let probeSocial = false;
+  let output: string | null = null;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--limit' && args[i + 1]) {
       limit = Math.max(1, parseInt(args[i + 1]!, 10));
@@ -77,14 +90,38 @@ function parseArgs(): {
       strictLegiscan = true;
     } else if (args[i] === '--http-legiscan-only') {
       httpLegiscanOnly = true;
+    } else if (args[i] === '--probe-social') {
+      probeSocial = true;
+    } else if (args[i] === '--output' && args[i + 1]) {
+      output = args[i + 1]!;
+      i++;
     } else if (args[i] === '--help' || args[i] === '-h') {
       console.log(
-        'Usage: npx tsx scripts/verify-legislator-external-links.ts [--limit N] [--json] [--strict-legiscan] [--http-legiscan-only]',
+        'Usage: npx tsx scripts/verify-legislator-external-links.ts [--limit N] [--json [--output FILE]] [--strict-legiscan] [--http-legiscan-only] [--probe-social]',
       );
       process.exit(0);
     }
   }
-  return { limit, json, strictLegiscan, httpLegiscanOnly };
+  return { limit, json, strictLegiscan, httpLegiscanOnly, probeSocial, output };
+}
+
+/** Hosts that routinely return 401/403/429 to automated probes; we still record them but don't treat as failures. */
+const BOT_BLOCKING_HOSTS = new Set([
+  'twitter.com',
+  'x.com',
+  'facebook.com',
+  'fb.com',
+  'instagram.com',
+  'tiktok.com',
+  'linkedin.com',
+  'threads.net',
+  'truth.social',
+]);
+
+function isBotBlockedExempt(field: FieldKey, host: string, status: number): boolean {
+  if (status !== 401 && status !== 403 && status !== 429 && status !== 999) return false;
+  if (field === 'external_social') return BOT_BLOCKING_HOSTS.has(host.replace(/^www\./i, ''));
+  return false;
 }
 
 /** LegiScan blocks many automated GETs with 403; URL pattern is often still valid in a browser. */
@@ -123,29 +160,47 @@ async function verifyLegiscanPersonViaApi(peopleId: number): Promise<ProbeResult
   }
 }
 
-function collectProbes(rows: Row[]): LinkProbe[] {
+function collectProbes(rows: Row[], probeSocial: boolean): LinkProbe[] {
   const probes: LinkProbe[] = [];
+  const seenPerLegislator = new Map<string, Set<string>>();
+  const pushUnique = (legislatorId: string, name: string, field: FieldKey, url: string) => {
+    let seen = seenPerLegislator.get(legislatorId);
+    if (!seen) {
+      seen = new Set<string>();
+      seenPerLegislator.set(legislatorId, seen);
+    }
+    if (seen.has(url)) return;
+    seen.add(url);
+    probes.push({ legislatorId, name, field, url });
+  };
+
   for (const row of rows) {
     const push = (field: FieldKey, raw: string | null | undefined) => {
       const t = (raw ?? '').trim();
       if (!t) return;
       const n = normalizeHttpsUrl(t) ?? t;
-      probes.push({ legislatorId: row.id, name: row.name, field, url: n });
+      pushUnique(row.id, row.name, field, n);
     };
 
     push('lrc_profile_url', row.lrc_profile_url);
     push('website', row.website);
 
     const bp = normalizeBallotpediaHref(row.ballotpedia);
-    if (bp) probes.push({ legislatorId: row.id, name: row.name, field: 'ballotpedia', url: bp });
+    if (bp) pushUnique(row.id, row.name, 'ballotpedia', bp);
 
     if (row.legiscan_id != null && Number.isFinite(Number(row.legiscan_id))) {
-      probes.push({
-        legislatorId: row.id,
-        name: row.name,
-        field: 'legiscan',
-        url: legiscanPersonUrl(Number(row.legiscan_id)),
-      });
+      pushUnique(row.id, row.name, 'legiscan', legiscanPersonUrl(Number(row.legiscan_id)));
+    }
+
+    for (const link of row.external_links ?? []) {
+      const field: FieldKey =
+        link.category === 'official'
+          ? 'external_official'
+          : link.category === 'social'
+            ? 'external_social'
+            : 'external_other';
+      if (field === 'external_social' && !probeSocial) continue;
+      pushUnique(row.id, row.name, field, link.url);
     }
   }
   return probes;
@@ -209,7 +264,7 @@ async function mapLimit<T, R>(items: T[], concurrency: number, fn: (item: T) => 
 }
 
 async function main() {
-  const { limit, json, strictLegiscan, httpLegiscanOnly } = parseArgs();
+  const { limit, json, strictLegiscan, httpLegiscanOnly, probeSocial, output } = parseArgs();
 
   if (!supabaseAdmin) {
     console.error(
@@ -222,7 +277,7 @@ async function main() {
 
   let query = supabaseAdmin
     .from('ky_legislators')
-    .select('id, name, legiscan_id, lrc_profile_url, website, ballotpedia')
+    .select('id, name, legiscan_id, lrc_profile_url, website, ballotpedia, external_links')
     .eq('active', true)
     .order('last_name', { ascending: true });
 
@@ -237,7 +292,7 @@ async function main() {
   }
 
   const rows = (data ?? []) as Row[];
-  const probes = collectProbes(rows);
+  const probes = collectProbes(rows, probeSocial);
   const httpProbeList = probes.filter((p) => !(useLegiscanApi && p.field === 'legiscan'));
   const uniqueUrls = [...new Set(httpProbeList.map((p) => p.url))];
 
@@ -250,6 +305,7 @@ async function main() {
   type RowOut = LinkProbe &
     ProbeResult & {
       exemptLegiscan403: boolean;
+      exemptSocialBlock: boolean;
       legiscanVia?: 'api' | 'http';
     };
   const table: RowOut[] = [];
@@ -260,46 +316,66 @@ async function main() {
         pid != null
           ? await verifyLegiscanPersonViaApi(pid)
           : ({ ok: false, status: 0, finalUrl: p.url, error: 'Could not parse people id from URL' } satisfies ProbeResult);
-      table.push({ ...p, ...r, exemptLegiscan403: false, legiscanVia: 'api' });
+      table.push({ ...p, ...r, exemptLegiscan403: false, exemptSocialBlock: false, legiscanVia: 'api' });
       continue;
     }
     const r = urlCache.get(p.url)!;
     const exemptLegiscan403 = isLegiscanPublic403Exempt(p.field, r.status, strictLegiscan);
-    table.push({ ...p, ...r, exemptLegiscan403, legiscanVia: p.field === 'legiscan' ? 'http' : undefined });
+    let host = '';
+    try {
+      host = new URL(p.url).hostname;
+    } catch {
+      // ignore
+    }
+    const exemptSocialBlock = !exemptLegiscan403 && isBotBlockedExempt(p.field, host, r.status);
+    table.push({
+      ...p,
+      ...r,
+      exemptLegiscan403,
+      exemptSocialBlock,
+      legiscanVia: p.field === 'legiscan' ? 'http' : undefined,
+    });
   }
 
   let failed = 0;
   let skippedLegiscan403 = 0;
+  let skippedSocialBlock = 0;
   for (const row of table) {
     if (row.exemptLegiscan403) skippedLegiscan403++;
+    else if (row.exemptSocialBlock) skippedSocialBlock++;
     else if (!row.ok) failed++;
   }
 
   if (json) {
-    console.log(
-      JSON.stringify(
-        {
-          legislators: rows.length,
-          probes: table.length,
-          failed,
-          skippedLegiscan403,
-          strictLegiscan,
-          legiscanVerification: useLegiscanApi ? 'legiscan_api_getperson' : 'public_http',
-          rows: table.map(({ exemptLegiscan403, ...rest }) => ({
-            ...rest,
-            ...(exemptLegiscan403 ? { verifierNote: 'legiscan_html_403_exempt' } : {}),
-          })),
-        },
-        null,
-        2,
-      ),
-    );
+    const payload = {
+      legislators: rows.length,
+      probes: table.length,
+      failed,
+      skippedLegiscan403,
+      skippedSocialBlock,
+      strictLegiscan,
+      probeSocial,
+      legiscanVerification: useLegiscanApi ? 'legiscan_api_getperson' : 'public_http',
+      rows: table.map(({ exemptLegiscan403, exemptSocialBlock, ...rest }) => ({
+        ...rest,
+        ...(exemptLegiscan403 ? { verifierNote: 'legiscan_html_403_exempt' } : {}),
+        ...(exemptSocialBlock ? { verifierNote: 'social_host_bot_block_exempt' } : {}),
+      })),
+    };
+    const json2 = JSON.stringify(payload, null, 2);
+    if (output) {
+      fs.writeFileSync(output, json2, 'utf8');
+      console.log(`Wrote ${output}`);
+    } else {
+      console.log(json2);
+    }
   } else {
     const legApiN = table.filter((t) => t.legiscanVia === 'api').length;
     const skipNote =
       skippedLegiscan403 > 0 && !strictLegiscan
-        ? ` | LegiScan HTTP skipped (403 bot block, not missing link): ${skippedLegiscan403}`
+        ? ` | LegiScan HTTP skipped (403 bot block): ${skippedLegiscan403}`
         : '';
+    const socialNote = skippedSocialBlock > 0 ? ` | Social hosts skipped (401/403/429 bot block): ${skippedSocialBlock}` : '';
     const apiNote =
       useLegiscanApi && legApiN > 0
         ? ` | LegiScan checked via API (getPerson): ${legApiN}`
@@ -307,7 +383,7 @@ async function main() {
           ? ' | LegiScan: set LEGISCAN_API_KEY to validate people_id via API (public HTML often 403).'
           : '';
     console.log(
-      `Legislators: ${rows.length} | Link checks: ${table.length} (${uniqueUrls.length} unique HTTP URLs) | Failed: ${failed}${skipNote}${apiNote}\n`,
+      `Legislators: ${rows.length} | Link checks: ${table.length} (${uniqueUrls.length} unique HTTP URLs) | Failed: ${failed}${skipNote}${socialNote}${apiNote}\n`,
     );
     if (strictLegiscan && !useLegiscanApi) {
       console.log(
@@ -322,18 +398,18 @@ async function main() {
         'Use --http-legiscan-only to force HTTP probes only.\n',
     );
     const wName = Math.min(28, Math.max(12, ...table.map((t) => t.name.length), 12));
-    const head = `${'NAME'.padEnd(wName)} ${'FIELD'.padEnd(14)} ${'HTTP'.padEnd(4)} OK    URL`;
+    const head = `${'NAME'.padEnd(wName)} ${'FIELD'.padEnd(18)} ${'HTTP'.padEnd(4)} OK    URL`;
     console.log(head);
     console.log('-'.repeat(Math.min(120, head.length + 40)));
     for (const t of table) {
       let okStr = 'yes';
       if (!t.ok) {
-        okStr = t.exemptLegiscan403 ? 'skip' : 'no ';
+        okStr = t.exemptLegiscan403 || t.exemptSocialBlock ? 'skip' : 'no ';
       }
-      const line = `${t.name.slice(0, wName).padEnd(wName)} ${t.field.padEnd(14)} ${String(t.status).padEnd(4)} ${okStr}   ${t.finalUrl}`;
+      const line = `${t.name.slice(0, wName).padEnd(wName)} ${t.field.padEnd(18)} ${String(t.status).padEnd(4)} ${okStr}   ${t.finalUrl}`;
       console.log(line);
-      if (!t.ok && !t.exemptLegiscan403 && t.error)
-        console.log(`${''.padEnd(wName)} ${''.padEnd(14)}      note: ${t.error}`);
+      if (!t.ok && !t.exemptLegiscan403 && !t.exemptSocialBlock && t.error)
+        console.log(`${''.padEnd(wName)} ${''.padEnd(18)}      note: ${t.error}`);
     }
   }
 

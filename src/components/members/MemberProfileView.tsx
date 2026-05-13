@@ -17,10 +17,11 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { ArrowBack, Description, HowToVote } from '@mui/icons-material';
+import { ArrowBack, Description, HowToVote, OpenInNew } from '@mui/icons-material';
 import type { KYBill, KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
+import { groupLegislatorExternalLinks, labelForLinkHost } from '@/lib/legislator-link-normalize';
 import { ICON_REM, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
 import { billStatusChipLabel, formatKyBillNumberDisplay, formatKyIsoDateShort } from '@/lib/bill-display';
 import type { MemberVoteRecord } from '@/lib/member-profile-data';
@@ -57,6 +58,8 @@ export function MemberProfileView({
 }) {
   const hasLegiscan = legiscanMemberPersonUrl(leg.legiscan_id) != null;
   const tally = voteRecord?.tally;
+  const { social: socialLinks, other: otherLinks } = groupLegislatorExternalLinks(leg.external_links);
+  const hasConnectLinks = socialLinks.length > 0 || otherLinks.length > 0;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -80,6 +83,66 @@ export function MemberProfileView({
         )}
 
         <MemberCard leg={leg} featured={false} profileNameHeading="h1" legislatorRoster={legislatorRoster} />
+
+        {hasConnectLinks && (
+          <Box sx={{ mt: 3 }}>
+            <Typography
+              component="h2"
+              variant="subtitle2"
+              fontWeight={700}
+              color="text.secondary"
+              sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.75rem', mb: 1 }}
+            >
+              Connect &amp; follow
+            </Typography>
+            {socialLinks.length > 0 && (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 0.75, mb: otherLinks.length > 0 ? 1 : 0 }}>
+                {socialLinks.map((link) => {
+                  const platform = labelForLinkHost(link.host);
+                  return (
+                    <Button
+                      key={link.url}
+                      component="a"
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      size="small"
+                      variant="outlined"
+                      endIcon={<OpenInNew sx={{ fontSize: '0.85rem' }} aria-hidden />}
+                      aria-label={`${platform} profile for ${leg.name} (opens in a new tab)`}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      {platform}
+                    </Button>
+                  );
+                })}
+              </Stack>
+            )}
+            {otherLinks.length > 0 && (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 0.75 }}>
+                {otherLinks.map((link) => {
+                  const label = link.note?.trim() || link.host.replace(/^www\./i, '');
+                  return (
+                    <Button
+                      key={link.url}
+                      component="a"
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      size="small"
+                      variant="outlined"
+                      endIcon={<OpenInNew sx={{ fontSize: '0.85rem' }} aria-hidden />}
+                      aria-label={`${label} (opens in a new tab)`}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      {label}
+                    </Button>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
+        )}
 
         {!hasLegiscan && (
           <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
