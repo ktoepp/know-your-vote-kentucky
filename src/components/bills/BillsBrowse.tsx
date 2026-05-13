@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Container,
   Typography,
@@ -20,6 +22,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Button,
 } from '@mui/material';
 import { Cancel, Search, Refresh, Gavel } from '@mui/icons-material';
 import { LayoutGrid, List } from 'lucide-react';
@@ -41,6 +44,7 @@ import { withTimeout } from '@/lib/async-utils';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
+import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
 import { KY_TOPICS } from '@/lib/ky-topic-classifier';
 
 /**
@@ -98,6 +102,27 @@ export interface BillsBrowseProps {
 }
 
 export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: BillsBrowseProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const followsParam = searchParams.get('follows') === 'me';
+  const { followedBillIds, followedTopics, ready: followsReady, authed } = useFollowedBillsAndTopics();
+  const effectiveFollowsMe = authed && followsParam;
+  const followsAwaiting = effectiveFollowsMe && !followsReady;
+
+  const browseBaseHref = chamberMode === 'house' ? '/bills/house' : chamberMode === 'senate' ? '/bills/senate' : '/bills';
+
+  const setFollowsMeInUrl = useCallback(
+    (next: boolean) => {
+      const p = new URLSearchParams(searchParams.toString());
+      if (next) p.set('follows', 'me');
+      else p.delete('follows');
+      const qs = p.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    },
+    [pathname, router, searchParams],
+  );
+
   const [bills, setBills] = useState<KYBill[]>([]);
   /** Exact rows matching chamber scope in DB (ignores client-only filters). */
   const [chamberBillTotal, setChamberBillTotal] = useState<number | null>(null);
@@ -183,6 +208,10 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
     if (topicFilter && !bill.topics?.includes(topicFilter)) {
       return false;
     }
+    if (effectiveFollowsMe) {
+      if (!followsReady) return false;
+      if (!followedBillIds.has(bill.id)) return false;
+    }
     if (!searchQuery) return true;
     const rawSq = searchQuery.trim();
     const q = rawSq.toLowerCase();
@@ -225,7 +254,7 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
     [sortBy],
   );
 
-  const browsePagerResetKey = `${searchQuery}|${chamberFilter}|${statusFilter}|${committeeFilter}|${topicFilter}|${viewMode}|${sortBy}|${sortDir}|${pageSize}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
+  const browsePagerResetKey = `${followsParam}|${searchQuery}|${chamberFilter}|${statusFilter}|${committeeFilter}|${topicFilter}|${viewMode}|${sortBy}|${sortDir}|${pageSize}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
 
   const showChamberSelect = chamberMode === 'all';
 
@@ -248,8 +277,9 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
       statusFilter !== 'all' ||
       Boolean(committeeFilter) ||
       Boolean(topicFilter) ||
+      effectiveFollowsMe ||
       (chamberMode === 'all' && chamberFilter !== 'all'),
-    [searchQuery, statusFilter, committeeFilter, topicFilter, chamberMode, chamberFilter],
+    [searchQuery, statusFilter, committeeFilter, topicFilter, effectiveFollowsMe, chamberMode, chamberFilter],
   );
 
   const hitFetchCap = bills.length >= BROWSE_QUERY_ROW_LIMIT;
@@ -359,6 +389,31 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                   </ToggleButtonGroup>
                 </Box>
               )}
+              <Box sx={{ flexShrink: 0 }}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'text.primary' }}>
+                  Your bills
+                </Typography>
+                <Tooltip title={!authed ? 'Sign in to show only bills you follow' : ''} disableHoverListener={authed}>
+                  <span>
+                    <ToggleButtonGroup
+                      value={followsParam ? 'following' : 'all'}
+                      exclusive
+                      size="small"
+                      onChange={(_, v) => {
+                        if (v === null) return;
+                        setFollowsMeInUrl(v === 'following');
+                      }}
+                      aria-label="Filter to followed bills"
+                      sx={{ flexShrink: 0 }}
+                    >
+                      <ToggleButton value="all">All bills</ToggleButton>
+                      <ToggleButton value="following" disabled={!authed}>
+                        Following
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </span>
+                </Tooltip>
+              </Box>
               <Box sx={{ flexShrink: 0 }}>
                 <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'text.primary' }}>
                   Status
@@ -488,11 +543,21 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
         </Paper>
 
         {/* Active filter chips */}
-        {(chamberFilter !== 'all' || statusFilter !== 'all' || committeeFilter || topicFilter || searchQuery) && (
+        {(chamberFilter !== 'all' || statusFilter !== 'all' || committeeFilter || topicFilter || searchQuery || effectiveFollowsMe) && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
             <Typography variant="caption" sx={{ fontWeight: 700, mr: 0.5, color: 'text.primary' }}>
               Active filters:
             </Typography>
+            {effectiveFollowsMe && (
+              <Chip
+                label="Following"
+                size="small"
+                onDelete={() => setFollowsMeInUrl(false)}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
             {showChamberSelect && chamberFilter !== 'all' && (
               <Chip
                 label={chamberFilter === 'house' ? 'House' : 'Senate'}
@@ -546,7 +611,17 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
             <Chip
               label="Clear all"
               size="small"
-              onClick={() => { setChamberFilter('all'); setStatusFilter('all'); setCommitteeFilter(''); setTopicFilter(''); setSearchQuery(''); }}
+              onClick={() => {
+                setChamberFilter('all');
+                setStatusFilter('all');
+                setCommitteeFilter('');
+                setTopicFilter('');
+                setSearchQuery('');
+                const p = new URLSearchParams(searchParams.toString());
+                p.delete('follows');
+                const qs = p.toString();
+                router.replace(qs ? `${pathname}?${qs}` : pathname);
+              }}
               variant="outlined"
               sx={{ ml: 0.5 }}
             />
@@ -567,19 +642,41 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
           </Alert>
         )}
 
-        {!loading && sortedBills.length === 0 ? (
+        {followsParam && !authed && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Sign in to use the <strong>Following</strong> filter.{' '}
+            <Button component={Link} href={`/auth/login?next=${encodeURIComponent(pathname + (searchParams.toString() ? `?${searchParams}` : ''))}`} size="small" sx={{ ml: 1 }}>
+              Log in
+            </Button>
+          </Alert>
+        )}
+
+        {followsAwaiting && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }} aria-busy="true" aria-label="Loading followed bills">
+            <CircularProgress />
+          </Box>
+        )}
+
+        {!loading && !followsAwaiting && sortedBills.length === 0 ? (
           <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
             <Search sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              No bills found
+              {effectiveFollowsMe ? 'No followed bills in this view' : 'No bills found'}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ mb: effectiveFollowsMe ? 2 : 0 }}>
               {!supabase
                 ? 'Supabase is not configured. Bills will appear once connected.'
-                : 'Try adjusting your search terms or filters.'}
+                : effectiveFollowsMe
+                  ? "You haven't followed any bills yet. Browse current bills and tap Follow on a bill to start tracking."
+                  : 'Try adjusting your search terms or filters.'}
             </Typography>
+            {effectiveFollowsMe && (
+              <Button component={Link} href={browseBaseHref} variant="contained">
+                Browse all bills
+              </Button>
+            )}
           </Paper>
-        ) : (
+        ) : !followsAwaiting ? (
           <PaginatedSection
             items={sortedBills}
             pageSize={pageSize}
@@ -595,19 +692,25 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                   sortBy={sortBy}
                   sortDir={sortDir}
                   onRequestSort={handleRequestSort}
+                  followedBillIds={followedBillIds}
                 />
               ) : (
                 <Grid container spacing={3}>
                   {pageBills.map((bill) => (
                     <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                      <KYBillCard bill={bill} legislators={legislators} />
+                      <KYBillCard
+                        bill={bill}
+                        legislators={legislators}
+                        followedBillIds={authed ? followedBillIds : null}
+                        followedTopics={authed ? followedTopics : null}
+                      />
                     </Grid>
                   ))}
                 </Grid>
               )
             }
           </PaginatedSection>
-        )}
+        ) : null}
       </Container>
     </Box>
   );

@@ -32,6 +32,7 @@ import {
   isKentuckyGovernor,
   kyLegislatorAvatarInitials,
   kyLegislatorCampaignWebsite,
+  kyLegislatorPortraitAlt,
   kyLegislatureProfileUrl,
   kyLegislaturePublicUrl,
   kyMemberTitleShort,
@@ -106,8 +107,6 @@ export function MemberCard({
   const ballotpediaHref = normalizeBallotpediaHref(leg.ballotpedia);
   const legiscanHref = isFormerMember ? null : legiscanMemberPersonUrl(leg.legiscan_id);
   const pointerPassthrough = Boolean(profileHref);
-  const avatarAlt = leg.name?.trim() ? `Portrait of ${leg.name.trim()}` : '';
-
   const hasFooterActions =
     governor ||
     Boolean(
@@ -179,7 +178,7 @@ export function MemberCard({
         >
           <Avatar
             src={normalizeLegislatorPhotoUrl(leg.photo_url) || normalizeLegislatorPhotoUrl(leg.legiscan_image_url) || undefined}
-            alt={avatarAlt}
+            alt={kyLegislatorPortraitAlt(leg)}
             imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{
               width: avatarSize,

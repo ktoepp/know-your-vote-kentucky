@@ -61,6 +61,7 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import BackNavigation from '@/app/components/BackNavigation';
 import NavigationLoader from '@/app/components/NavigationLoader';
 import { trackEventNavigation, trackUserFlow } from '@/lib/analytics';
+import { kySponsorPortraitAlt } from '@/lib/ky-member-utils';
 
 import Timeline, { TimelineStage } from '../../components/Timeline';
 import { useBillsData, Bill } from '../../lib/useBillsData';
@@ -371,7 +372,9 @@ export default function EventDetailPage() {
   // Enhanced speaker component with navigation
   const InteractiveSpeaker = ({ speaker }: { speaker: any }) => (
     <ListItem alignItems="flex-start">
-      <Avatar sx={{ mr: 2 }}>{speaker.name[0]}</Avatar>
+      <Avatar sx={{ mr: 2 }} aria-hidden>
+        {speaker.name[0]}
+      </Avatar>
       <ListItemText
         primary={
           <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
@@ -857,13 +860,15 @@ export default function EventDetailPage() {
                     <Card>
                       <CardContent>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Avatar sx={{ width: 56, height: 56 }}>
-                            {speaker.avatar ? (
-                              <img src={speaker.avatar} alt={speaker.name} />
-                            ) : (
-                              speaker.name.split(' ').map(n => n[0]).join('')
-                            )}
-                          </Avatar>
+                          {speaker.avatar ? (
+                            <Avatar sx={{ width: 56, height: 56 }}>
+                              <img src={speaker.avatar} alt={kySponsorPortraitAlt(speaker.name)} />
+                            </Avatar>
+                          ) : (
+                            <Avatar sx={{ width: 56, height: 56 }} aria-hidden>
+                              {speaker.name.split(' ').map((n: string) => n[0]).join('')}
+                            </Avatar>
+                          )}
                           <Box>
                             <Typography variant="h6">{speaker.name}</Typography>
                             {speaker.role && (

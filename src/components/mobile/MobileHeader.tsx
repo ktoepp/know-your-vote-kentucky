@@ -24,7 +24,7 @@ import {
 } from '@mui/icons-material';
 import { styled, alpha } from '@mui/material/styles';
 import Link from 'next/link';
-import { ICON_REM, TYPE } from '@/lib/ui-tokens';
+import { ICON_REM, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
 
 const SearchWrapper = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -155,7 +155,15 @@ export default function MobileHeader({
         }}
       >
         <Box sx={{ p: 2 }}>
-          <Typography variant={TYPE.sectionTitle.variant} sx={{ fontWeight: TYPE.sectionTitle.fontWeight, color: 'primary.main', mb: 2 }}>
+          <Typography
+            variant={TYPE.sectionTitle.variant}
+            sx={{
+              ...SECTION_TITLE_DISPLAY_SX,
+              fontWeight: TYPE.sectionTitle.fontWeight,
+              color: 'primary.main',
+              mb: 2,
+            }}
+          >
             Know Your Vote KY
           </Typography>
           <Divider sx={{ mb: 2 }} />

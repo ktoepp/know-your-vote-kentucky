@@ -8,6 +8,7 @@ import { CHIP } from '@/lib/ui-tokens';
 import {
   isKentuckyGovernor,
   kyLegislatorAvatarInitials,
+  kyLegislatorPortraitAlt,
   kyLegislaturePublicUrl,
   kyMemberTitleShort,
   memberProfilePath,
@@ -94,8 +95,12 @@ function DistrictMapTooltipSectionView({
       {leg && (
         <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mb: 1.25 }}>
           <Avatar
-            src={normalizeLegislatorPhotoUrl(leg.photo_url) || undefined}
-            alt=""
+            src={
+              normalizeLegislatorPhotoUrl(leg.photo_url) ||
+              normalizeLegislatorPhotoUrl(leg.legiscan_image_url) ||
+              undefined
+            }
+            alt={kyLegislatorPortraitAlt(leg)}
             imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{ width: 48, height: 48, flexShrink: 0, fontWeight: 700, fontSize: '1rem' }}
           >

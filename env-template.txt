@@ -14,6 +14,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 # add Redirect URLs for `/auth/verify` (signup confirmation) and `/auth/reset` (password recovery),
 # e.g. http://localhost:3000/auth/verify and https://your-domain.org/auth/verify (same for reset).
 # Authentication → Providers → Email: turn ON "Confirm email" if you want verification links sent.
+#   If this stays OFF, sign-ups succeed but no confirmation email is sent (users are not email-verified via link).
 # ^ Also backs the shared rate limiter (ky_rate_limit_buckets table, migration 008).
 # No extra env vars needed — the existing service role key is reused.
 
@@ -84,10 +85,19 @@ SYNC_API_KEY=your_sync_api_key_here
 # CRON_SECRET=your_random_16_plus_char_secret
 
 # =============================================================================
+# OPTIONAL — Bill digest (Resend app API; not Supabase Auth SMTP)
+# =============================================================================
+# Used by GET /api/cron/notify (Vercel Cron: 11:00 UTC daily — see vercel.json).
+# RESEND_API_KEY=re_xxxxxxxx
+# RESEND_FROM_EMAIL=alerts@kyvky.com
+# APP_PUBLIC_URL=https://kyvky.com
+# DIGEST_DRY_RUN=true
+
+# =============================================================================
 # OPTIONAL — Application Settings
 # =============================================================================
 NODE_ENV=development
-# Public site origin (sitemap.xml, robots.txt). In production set to your real domain, e.g. https://knowyourvotekentucky.org
+# Public site origin (sitemap.xml, robots.txt, metadata). Production: https://kyvky.com
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # =============================================================================
@@ -96,7 +106,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 # Create a token at https://account.mapbox.com/access-tokens/ (URL restrictions recommended).
 NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 
-# Optional: Identify your app when geocoding ZIP codes (Nominatim). Recommended in production.
+# =============================================================================
 # NOMINATIM_USER_AGENT=KnowYourVoteKentucky/1.0 (https://your-domain.example/contact)
 
 # Optional: Debug / Logging
@@ -118,6 +128,10 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # NEXT_PUBLIC_SENTRY_DSN is read by the browser bundle; SENTRY_DSN by the server.
 # NEXT_PUBLIC_SENTRY_DSN=https://xxx@oXXX.ingest.sentry.io/YYY
 # SENTRY_DSN=https://xxx@oXXX.ingest.sentry.io/YYY
+#
+# Local dev does not report to Sentry unless you opt in (avoids ENOENT/HMR noise on your machine):
+# SENTRY_REPORT_DEV=true
+# NEXT_PUBLIC_SENTRY_REPORT_DEV=true
 #
 # For source map uploads during production builds, create .env.sentry-build-plugin
 # (already in .gitignore) with:

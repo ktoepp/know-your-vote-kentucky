@@ -216,7 +216,7 @@ export default function EventPreviewModal({ open, onClose, event }: EventPreview
                   label={speaker}
                   size="small"
                   variant="outlined"
-                  avatar={<Avatar sx={{ width: 20, height: 20, fontSize: '0.75rem' }}>
+                  avatar={<Avatar sx={{ width: 20, height: 20, fontSize: '0.75rem' }} aria-hidden>
                     {speaker.split(' ').map(n => n[0]).join('')}
                   </Avatar>}
                 />

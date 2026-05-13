@@ -24,12 +24,22 @@ export function iconRemSx(role: IconRole) {
 
 /**
  * Semantic typography roles — pair with MUI Typography `variant`.
- * Page: one primary h1 (usually variant h3–h4 visually); sections: h5–h6.
+ * Page: one primary h1 (usually variant h3–h4 visually); card titles: h6.
  */
+/**
+ * Section headings (MemberProfileView, SectionHeader, MobileHeader): sans-serif stack at ~former h5 size.
+ * Page / hero titles remain serif via theme `h3`–`h4`.
+ */
+export const SECTION_TITLE_DISPLAY_SX = {
+  fontSize: '1.125rem',
+  lineHeight: 1.4,
+} as const;
+
 export const TYPE = {
   heroTitle: { variant: 'h3' as const, fontWeight: 700 },
   pageTitle: { variant: 'h4' as const, fontWeight: 700 },
-  sectionTitle: { variant: 'h5' as const, fontWeight: 700 },
+  /** In-body section headings — sans-serif to match subtitle2-style labels (e.g. “Trending now”). */
+  sectionTitle: { variant: 'subtitle2' as const, fontWeight: 700 },
   cardTitle: { variant: 'h6' as const, fontWeight: 700 },
   subsection: { variant: 'subtitle1' as const, fontWeight: 600 },
   body: { variant: 'body1' as const },

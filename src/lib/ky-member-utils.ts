@@ -26,6 +26,25 @@ export function kyLegislatorAvatarInitials(leg: Pick<KYLegislator, 'name' | 'fir
   return '?';
 }
 
+/** Accessible `alt` for legislator headshots when `name` / roster row is available. */
+export function kyLegislatorPortraitAlt(
+  leg: Pick<KYLegislator, 'name' | 'first_name' | 'last_name'> | null | undefined,
+): string {
+  const n = leg?.name?.trim();
+  if (n) return `Portrait of ${n}`;
+  const fi = leg?.first_name?.trim();
+  const la = leg?.last_name?.trim();
+  const composite = [fi, la].filter(Boolean).join(' ').trim();
+  if (composite) return `Portrait of ${composite}`;
+  return 'Legislator portrait';
+}
+
+/** Accessible `alt` for sponsor / chip headshots when only a display name string is known. */
+export function kySponsorPortraitAlt(displayName: string | null | undefined): string {
+  const n = (displayName ?? '').trim();
+  return n ? `Portrait of ${n}` : 'Sponsor portrait';
+}
+
 /** URL fragment id for /members — must match `id` on member cards. */
 export function memberSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');

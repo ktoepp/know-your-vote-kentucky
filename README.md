@@ -97,6 +97,7 @@ All runnable tooling lives in `scripts/` and is exposed via `package.json`. Ther
 | `npm run geo:ky-districts` / `geo:ky-mask` | Rebuild district GeoJSON / outside mask assets. |
 | `npm run verify:votes` | Verify LegiScan vote counts vs DB. |
 | `npm run verify:legislator-links` | HTTP checks on stored legislator URLs. |
+| `npm run spot-check:bill-links` | Sample roll-call URLs (LegiScan API when key set) + sponsor Ballotpedia from `ky_bills`. |
 | `npm run slack:smoke-test` | Post a test message to configured Slack webhooks. |
 
 ### Optional legacy npm packages

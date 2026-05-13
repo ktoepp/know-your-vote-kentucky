@@ -10,7 +10,22 @@ import { withSentryConfig } from "@sentry/nextjs";
  */
 const nextConfig: NextConfig = {
   async redirects() {
+    const apex = 'https://kyvky.com';
+    const hostsToApex = [
+      'knowyourvotekentucky.com',
+      'www.knowyourvotekentucky.com',
+      'knowyourvotekentucky.org',
+      'www.knowyourvotekentucky.org',
+      'knowyourvoteky.com',
+      'www.knowyourvoteky.com',
+    ];
     return [
+      ...hostsToApex.map((host) => ({
+        source: '/:path*',
+        has: [{ type: 'host' as const, value: host }],
+        destination: `${apex}/:path*`,
+        permanent: true,
+      })),
       {
         source: '/ordinances',
         destination: '/',
@@ -23,7 +38,7 @@ const nextConfig: NextConfig = {
   },
   /** Map libs ship modern ESM; transpiling avoids occasional webpack chunk/module id mismatches in the App Router. */
   transpilePackages: ['mapbox-gl', 'react-map-gl'],
-  webpack: (config, { dev }) => {
+  webpack: (config) => {
     // Fix MUI imports for Next.js 15 compatibility
     config.resolve.alias = {
       ...config.resolve.alias,
@@ -31,13 +46,11 @@ const nextConfig: NextConfig = {
     };
 
     /**
-     * In development, use in-memory webpack cache instead of on-disk pack files.
-     * Avoids intermittent ENOENT rename errors under `.next/cache/webpack/...` on macOS
-     * (parallel writes / antivirus) and reduces stale chunk name mismatches after crash/restart.
+     * Use webpack's default filesystem cache in dev. An in-memory cache was tried earlier to
+     * reduce macOS ENOENT under `.next/cache/webpack/`; it can also desync chunk paths vs
+     * `webpack-runtime.js` (`Cannot find module './NNNN.js'`). If cache renames fail locally,
+     * run `npm run dev:clean` or delete `.next` and restart.
      */
-    if (dev) {
-      config.cache = { type: "memory" as const };
-    }
 
     return config;
   },
@@ -79,7 +92,7 @@ const nextConfig: NextConfig = {
          *   - Supabase (*.supabase.co)         — data API, auth, storage
          *   - Mapbox (api.mapbox.com, events.mapbox.com) — map tiles & telemetry
          *   - Anthropic (api.anthropic.com)    — LLM summarization (server-side only, listed defensively)
-         *   - Google Fonts (fonts.googleapis.com, fonts.gstatic.com)
+         *   - Vercel Live / preview toolbar (vercel.live) — iframe + connections in preview only
          * `'unsafe-inline'` / `'unsafe-eval'` are present for Next.js runtime and
          * Mapbox GL's WebGL shader compilation; tightening them is a follow-up
          * task once we add nonces / hashes.
@@ -92,7 +105,8 @@ const nextConfig: NextConfig = {
           "font-src 'self' data: https://fonts.gstatic.com https://use.typekit.net",
           "img-src 'self' data: blob: https://*.supabase.co https://api.mapbox.com https://*.tiles.mapbox.com",
           "worker-src 'self' blob:",
-          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://api.anthropic.com",
+          "frame-src 'self' https://vercel.live",
+          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://api.anthropic.com https://vercel.live",
           "frame-ancestors 'none'",
           "base-uri 'self'",
           "form-action 'self'",

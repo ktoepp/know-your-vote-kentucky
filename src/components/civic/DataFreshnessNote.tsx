@@ -79,7 +79,8 @@ export default function DataFreshnessNote({ variant = 'page', source }: DataFres
       <Typography variant="caption" component="p" sx={{ lineHeight: 1.5, color: textColor }}>
         Last updated {lastUpdatedWhen}.
         <br />
-        This site compiles and presents information with AI assistance—please verify important details with official sources.
+        This site compiles and presents information with AI assistance. Please verify important details with official
+        sources.
       </Typography>
     </Box>
   );

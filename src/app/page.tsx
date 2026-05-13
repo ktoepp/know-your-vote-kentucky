@@ -31,7 +31,8 @@ import { HomeCuratedBillList } from '@/components/home/HomeCuratedBillList';
 import { selectRecentlyPassedBills, selectMostViewedBills } from '@/lib/home-bill-curated';
 import { KY_SESSIONS, getActiveSession } from '@/lib/ky-sessions';
 import { KY_TOPICS } from '@/lib/ky-topic-classifier';
-import { TYPE } from '@/lib/ui-tokens';
+import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
+import { TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
 
 const HOME_SECTION_DISPLAY = 6;
 const HOME_SECTION_FETCH = 60;
@@ -175,6 +176,7 @@ function SessionBanner() {
 
 export default function HomePage() {
   const theme = useTheme();
+  const { followedBillIds, followedTopics, authed: followAuthed } = useFollowedBillsAndTopics();
   const [bills, setBills] = useState<KYBill[]>([]);
   const [houseBills, setHouseBills] = useState<KYBill[]>([]);
   const [senateBills, setSenateBills] = useState<KYBill[]>([]);
@@ -391,7 +393,16 @@ export default function HomePage() {
               Search bills
             </Button>
           </Stack>
-          <Typography variant="caption" component="p" sx={{ opacity: 0.75, mt: 1.5, maxWidth: 560 }}>
+          <Typography
+            variant="caption"
+            component="p"
+            sx={{
+              mt: 1.5,
+              maxWidth: 560,
+              lineHeight: 1.5,
+              color: alpha(theme.palette.common.white, 0.9),
+            }}
+          >
             Prefer to dive into legislation first? Browse or search bills anytime.
           </Typography>
           <DataFreshnessNote variant="hero" />
@@ -424,14 +435,18 @@ export default function HomePage() {
         {/* Single topic module: trending (when loaded) + full topic chips */}
         <Box sx={{ mb: 5 }}>
           <SectionHeader
-            title="Explore by topic"
+            title="Explore bills by topic"
             icon={<Category />}
             href="/bills"
-            caption="Trending reflects recent bill activity in our dataset. Chips cover every topic filter."
           />
           {topicCounts.length > 0 && (
             <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ mb: 1.5 }}>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color="text.primary"
+                sx={{ mb: 1.5, ...SECTION_TITLE_DISPLAY_SX }}
+              >
                 Trending now
               </Typography>
               <Grid container spacing={2}>
@@ -463,10 +478,7 @@ export default function HomePage() {
                       <Typography variant="h5" fontWeight={700} color="primary.main" lineHeight={1}>
                         {count}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
-                        bills
-                      </Typography>
-                      <Typography variant="body2" fontWeight={600} sx={{ mt: 0.75, lineHeight: 1.2 }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ mt: 1, lineHeight: 1.2 }}>
                         {topic}
                       </Typography>
                     </Box>
@@ -475,22 +487,31 @@ export default function HomePage() {
               </Grid>
             </Box>
           )}
-          <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ mb: 1.5 }}>
+          <Typography
+            variant="subtitle2"
+            fontWeight={700}
+            color="text.primary"
+            sx={{ mb: 1.5, ...SECTION_TITLE_DISPLAY_SX }}
+          >
             All topics
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {KY_TOPICS.map((topic) => (
-              <Chip
-                key={topic}
-                label={topic}
-                component="a"
-                href={`/bills?topic=${encodeURIComponent(topic)}`}
-                clickable
-                color="primary"
-                variant="outlined"
-                sx={{ fontWeight: 500 }}
-              />
-            ))}
+            {KY_TOPICS.map((topic) => {
+              const topicFollowed = followAuthed && followedTopics.has(topic);
+              return (
+                <Chip
+                  key={topic}
+                  label={topic}
+                  component="a"
+                  href={`/bills?topic=${encodeURIComponent(topic)}`}
+                  clickable
+                  color="primary"
+                  variant={topicFollowed ? 'filled' : 'outlined'}
+                  aria-label={topicFollowed ? `Following: ${topic}` : undefined}
+                  sx={{ fontWeight: 500 }}
+                />
+              );
+            })}
           </Box>
         </Box>
 
@@ -524,7 +545,12 @@ export default function HomePage() {
                       <Grid container spacing={3}>
                         {pageBills.map((bill) => (
                           <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                            <KYBillCard bill={bill} legislators={legislators} />
+                            <KYBillCard
+                              bill={bill}
+                              legislators={legislators}
+                              followedBillIds={followAuthed ? followedBillIds : null}
+                              followedTopics={followAuthed ? followedTopics : null}
+                            />
                           </Grid>
                         ))}
                       </Grid>
@@ -557,7 +583,12 @@ export default function HomePage() {
                           <Grid container spacing={3}>
                             {pageBills.map((bill) => (
                               <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                                <KYBillCard bill={bill} legislators={legislators} />
+                                <KYBillCard
+                              bill={bill}
+                              legislators={legislators}
+                              followedBillIds={followAuthed ? followedBillIds : null}
+                              followedTopics={followAuthed ? followedTopics : null}
+                            />
                               </Grid>
                             ))}
                           </Grid>
@@ -588,7 +619,12 @@ export default function HomePage() {
                           <Grid container spacing={3}>
                             {pageBills.map((bill) => (
                               <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                                <KYBillCard bill={bill} legislators={legislators} />
+                                <KYBillCard
+                              bill={bill}
+                              legislators={legislators}
+                              followedBillIds={followAuthed ? followedBillIds : null}
+                              followedTopics={followAuthed ? followedTopics : null}
+                            />
                               </Grid>
                             ))}
                           </Grid>

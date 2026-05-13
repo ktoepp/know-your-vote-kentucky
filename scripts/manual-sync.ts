@@ -92,6 +92,19 @@ async function main() {
     process.exit(1);
   }
 
+  const sourcesToRun = sourceArg ? [sourceArg] : Object.keys(SYNC_SOURCES);
+  const needsOpenStatesKey = sourcesToRun.includes('legislators');
+  const openStatesKey = (process.env.OPENSTATES_API_KEY || '').trim();
+  if (needsOpenStatesKey && !openStatesKey) {
+    console.error('');
+    console.error('❌ OPENSTATES_API_KEY is missing or empty.');
+    console.error('   The sync CLI loads `.env.local` first (see scripts/load-env.ts).');
+    console.error('   Add OPENSTATES_API_KEY there or export it in your shell.');
+    console.error('   Get a key: https://openstates.org/account/profile/');
+    console.error('');
+    process.exit(1);
+  }
+
   // Align with src/app/lib/supabaseClient.ts (URL from NEXT_PUBLIC_* or SUPABASE_URL)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   if (!dryRun) {

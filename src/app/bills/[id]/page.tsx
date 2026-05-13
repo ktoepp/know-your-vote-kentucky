@@ -56,15 +56,18 @@ import {
   matchLegislatorBySponsorName,
   memberProfilePath,
   normalizeLegislatorPhotoUrl,
+  kySponsorPortraitAlt,
 } from '@/lib/ky-member-utils';
 import {
   legiscanRollCallPublicUrl,
   normalizeBallotpediaHref,
   httpUrlForUiLink,
+  kyLrcBillDetailsUrl,
 } from '@/lib/external-legislative-links';
 import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-tokens';
 import { useTooltips } from '@/lib/TooltipContext';
 import { BillHistoryActionText } from '@/components/bills/BillHistoryActionText';
+import { FollowBillButton } from '@/components/bills/FollowBillButton';
 import { LegislativeStageTooltip } from '@/components/ui/LegislativeStageTooltip';
 
 /* ------------------------------------------------------------------ */
@@ -172,6 +175,7 @@ function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; roste
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', mb: 1.5 }}>
           <MuiAvatar
             src={photo || undefined}
+            alt={kySponsorPortraitAlt(sponsor.name)}
             imgProps={{ referrerPolicy: 'no-referrer' }}
             sx={{ width: 78, height: 78, flexShrink: 0 }}
           >
@@ -374,6 +378,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
   const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [omitKyLegislatureBillLink404, setOmitKyLegislatureBillLink404] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -394,6 +399,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
     async function load() {
       setLoading(true);
       setError(null);
+      setBill(null);
+      setDetail(null);
       try {
         const res = await fetch(`/api/bills/${encodeURIComponent(id)}`, {
           signal: AbortSignal.timeout(30_000),
@@ -416,6 +423,28 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
     }
     load();
   }, [id]);
+
+  useEffect(() => {
+    setOmitKyLegislatureBillLink404(false);
+  }, [id]);
+
+  useEffect(() => {
+    if (!bill?.bill_number || !bill?.id) return;
+    let cancelled = false;
+    setOmitKyLegislatureBillLink404(false);
+    const q = new URLSearchParams({ legislation: bill.bill_number });
+    const sess = typeof bill.session === 'string' ? bill.session.trim() : '';
+    if (sess) q.set('session', sess);
+    fetch(`/api/lrc/bill-link-status?${q}`)
+      .then((r) => (r.ok ? r.json() : Promise.resolve({})))
+      .then((d: { notFound?: boolean }) => {
+        if (!cancelled && d.notFound === true) setOmitKyLegislatureBillLink404(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [bill?.id, bill?.bill_number, bill?.session]);
 
   useEffect(() => {
     if (!supabase || !bill?.id) return;
@@ -473,6 +502,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
     httpUrlForUiLink(originalText?.state_link) ||
     httpUrlForUiLink(bill.bill_text_url);
   const legiscanBillDocHref = httpUrlForUiLink(bill.bill_text_url);
+  const kyLegBillHref = kyLrcBillDetailsUrl(bill.bill_number, bill.session);
+  const showOfficialKyBillLink = !omitKyLegislatureBillLink404;
 
   const primarySponsors = sponsors.filter(s => s.sponsor_type_id === 1);
   const coSponsors = sponsors.filter(s => s.sponsor_type_id !== 1);
@@ -602,9 +633,21 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               })()}
             </Box>
 
-            <Typography variant="h5" fontWeight={700} color="primary.main" gutterBottom>
-              {bill.bill_number}
-            </Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 2,
+                mb: 1,
+              }}
+            >
+              <Typography variant="h5" fontWeight={700} color="primary.main" sx={{ flex: '1 1 auto', minWidth: 0 }}>
+                {bill.bill_number}
+              </Typography>
+              <FollowBillButton billId={bill.id} />
+            </Box>
             <Typography
               component="h1"
               variant="h4"
@@ -812,6 +855,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                       <Box key={s.people_id} sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                         <MuiAvatar
                           src={coPhoto || undefined}
+                          alt={kySponsorPortraitAlt(s.name)}
                           imgProps={{ referrerPolicy: 'no-referrer' }}
                           sx={{ width: 54, height: 54, flexShrink: 0 }}
                         >
@@ -937,39 +981,43 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
             )}
 
             {/* Official links */}
-            <MuiCard sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
-              <MuiCardContent>
-                <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>Official Sources</Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {legiscanBillDocHref && (
-                    <MuiButton
-                      variant="outlined"
-                      fullWidth
-                      href={legiscanBillDocHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                      size="medium"
-                      sx={{ color: 'primary.main', borderColor: 'primary.main', fontSize: '1rem', py: 1.25 }}
-                    >
-                      View on LegiScan
-                    </MuiButton>
-                  )}
-                  <MuiButton
-                    variant="outlined"
-                    fullWidth
-                    href={`https://legislature.ky.gov/Legislation/Pages/bill-details.aspx?legislation=${encodeURIComponent(bill.bill_number)}&session=${encodeURIComponent(bill.session || '2026 RS')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                    size="medium"
-                    sx={{ color: 'primary.main', borderColor: 'primary.main', fontSize: '1rem', py: 1.25 }}
-                  >
-                    Kentucky Legislature
-                  </MuiButton>
-                </Box>
-              </MuiCardContent>
-            </MuiCard>
+            {(legiscanBillDocHref || showOfficialKyBillLink) && (
+              <MuiCard sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+                <MuiCardContent>
+                  <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>Official Sources</Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {legiscanBillDocHref && (
+                      <MuiButton
+                        variant="outlined"
+                        fullWidth
+                        href={legiscanBillDocHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                        size="medium"
+                        sx={{ color: 'primary.main', borderColor: 'primary.main', fontSize: '1rem', py: 1.25 }}
+                      >
+                        View on LegiScan
+                      </MuiButton>
+                    )}
+                    {showOfficialKyBillLink && (
+                      <MuiButton
+                        variant="outlined"
+                        fullWidth
+                        href={kyLegBillHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
+                        size="medium"
+                        sx={{ color: 'primary.main', borderColor: 'primary.main', fontSize: '1rem', py: 1.25 }}
+                      >
+                        Kentucky Legislature
+                      </MuiButton>
+                    )}
+                  </Box>
+                </MuiCardContent>
+              </MuiCard>
+            )}
           </MuiGrid>
         </MuiGrid>
       </MuiContainer>

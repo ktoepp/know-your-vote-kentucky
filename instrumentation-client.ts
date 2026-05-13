@@ -1,7 +1,15 @@
 import * as Sentry from "@sentry/nextjs";
 
+const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+const reportInDev =
+  process.env.NEXT_PUBLIC_SENTRY_REPORT_DEV === "1" ||
+  process.env.NEXT_PUBLIC_SENTRY_REPORT_DEV === "true";
+
 Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  dsn,
+
+  enabled:
+    !!dsn && (process.env.NODE_ENV === "production" || reportInDev),
 
   sendDefaultPii: true,
 

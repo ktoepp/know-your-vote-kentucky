@@ -56,6 +56,8 @@ export interface OpenStatesLegislator {
   contactDetails?: OpenStatesContactDetail[] | null;
   /** v3: request `include=offices` for capitol / district phone and sometimes email. */
   offices?: OpenStatesOffice[] | null;
+  /** Popolo-style roles (committee memberships). Included when API returns them on `/people`. */
+  roles?: unknown[] | null;
 }
 
 /**
@@ -217,8 +219,12 @@ export class KyOpenStatesClient {
         console.error(`[KyOpenStates] Attempt ${i}/${MAX_RETRIES}: ${err.message} (${status ?? '?'}) ${msg}`);
 
         if (status && status >= 400 && status < 500 && status !== 429) {
+          const keyHint =
+            status === 403 || status === 401
+              ? ' Set OPENSTATES_API_KEY in .env.local (sync CLI) or Vercel env; get a key at https://openstates.org/account/profile/'
+              : '';
           throw new Error(
-            `OpenStates API ${status}: ${msg || err.message}. If 422: check query (e.g. include). If 401: bad OPENSTATES_API_KEY. Docs: open.pluralpolicy.com`,
+            `OpenStates API ${status}: ${msg || err.message}. If 422: check query (e.g. include). If 401/403: missing or invalid OPENSTATES_API_KEY.${keyHint} Docs: open.pluralpolicy.com`,
           );
         }
         if (i === MAX_RETRIES) {

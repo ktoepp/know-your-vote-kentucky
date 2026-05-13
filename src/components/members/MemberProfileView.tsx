@@ -21,8 +21,8 @@ import { ArrowBack, Description, HowToVote } from '@mui/icons-material';
 import type { KYBill, KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
-import { ICON_REM, TYPE } from '@/lib/ui-tokens';
-import { billStatusChipLabel, formatBillLabelText } from '@/lib/bill-display';
+import { ICON_REM, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
+import { billStatusChipLabel, formatKyBillNumberDisplay, formatKyIsoDateShort } from '@/lib/bill-display';
 import type { MemberVoteRecord } from '@/lib/member-profile-data';
 import type { VoteBucket } from '@/lib/legiscan-vote-tally';
 
@@ -96,6 +96,7 @@ export function MemberProfileView({
                 variant={TYPE.sectionTitle.variant}
                 fontWeight={TYPE.sectionTitle.fontWeight}
                 color="text.primary"
+                sx={SECTION_TITLE_DISPLAY_SX}
               >
                 Sponsored bills
               </Typography>
@@ -125,7 +126,7 @@ export function MemberProfileView({
                                   style={{ textDecoration: 'underline', textUnderlineOffset: 2, fontWeight: 600 }}
                                 >
                                   <Typography component="span" color="primary.main" variant="body1">
-                                    {formatBillLabelText(b.bill_number)}
+                                    {formatKyBillNumberDisplay(b.bill_number)}
                                     {b.title ? ` — ${b.title}` : ''}
                                   </Typography>
                                 </Link>
@@ -136,7 +137,7 @@ export function MemberProfileView({
                                 {statusLabel ? <Chip size="small" label={statusLabel} variant="outlined" /> : null}
                                 {b.last_action_date && (
                                   <Typography component="span" variant="caption" color="text.secondary">
-                                    Last action {b.last_action_date}
+                                    Last action {formatKyIsoDateShort(b.last_action_date)}
                                   </Typography>
                                 )}
                               </Stack>
@@ -158,6 +159,7 @@ export function MemberProfileView({
                 variant={TYPE.sectionTitle.variant}
                 fontWeight={TYPE.sectionTitle.fontWeight}
                 color="text.primary"
+                sx={SECTION_TITLE_DISPLAY_SX}
               >
                 Voting record
               </Typography>
@@ -212,8 +214,8 @@ export function MemberProfileView({
                                           href={`/bills/${r.bill.id}`}
                                           style={{ textDecoration: 'underline', textUnderlineOffset: 2 }}
                                         >
-                                          <Typography component="span" color="primary.main" fontWeight={600} variant="body2">
-                                            {formatBillLabelText(r.bill.bill_number)}
+                                          <Typography component="span" color="primary.main" fontWeight={600} variant="body1">
+                                            {formatKyBillNumberDisplay(r.bill.bill_number)}
                                             {r.bill.title ? ` — ${r.bill.title}` : ''}
                                           </Typography>
                                         </Link>
@@ -227,7 +229,7 @@ export function MemberProfileView({
                                       <Box sx={{ pt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                                         {r.date && (
                                           <Typography component="span" variant="caption" color="text.secondary">
-                                            {r.date}
+                                            {formatKyIsoDateShort(r.date)}
                                           </Typography>
                                         )}
                                         <Chip
@@ -237,7 +239,7 @@ export function MemberProfileView({
                                           variant="outlined"
                                         />
                                         {r.description && (
-                                          <Typography component="span" variant="body2" color="text.secondary">
+                                          <Typography component="span" variant="caption" color="text.secondary">
                                             {r.description}
                                           </Typography>
                                         )}
