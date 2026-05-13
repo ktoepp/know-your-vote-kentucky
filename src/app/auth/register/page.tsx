@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
+import { authEmailRedirectOrigin } from '@/lib/site-canonical';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -34,18 +35,26 @@ export default function RegisterPage() {
       setLoading(false);
       return;
     }
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const origin = authEmailRedirectOrigin();
     const { data, error: signErr } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: origin ? `${origin}/auth/verify` : undefined,
+        emailRedirectTo: `${origin}/auth/verify`,
       },
     });
     setLoading(false);
     if (signErr) {
       setError(signErr.message);
+      return;
+    }
+    // Duplicate or reused email: Supabase may return a user row with no identities (no email sent again).
+    const identities = data.user?.identities;
+    if (identities && identities.length === 0) {
+      setError(
+        'This email is already registered or could not be confirmed. Try logging in, or use “Forgot password” on the login page.',
+      );
       return;
     }
     // No session until the user confirms — hosted/local with email confirmations on.
@@ -99,7 +108,16 @@ export default function RegisterPage() {
         )}
         {success && (
           <Alert severity="success" sx={{ mt: 2 }}>
-            Check your email for a confirmation link. After verifying, you can sign in.
+            <Typography variant="body2" component="div" sx={{ fontWeight: 600, mb: 0.5 }}>
+              Check your email for a confirmation link. After verifying, you can sign in.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" component="div">
+              If nothing arrives in a few minutes: check spam, try again, and confirm your Supabase project has
+              <strong> Authentication → Providers → Email → Confirm email</strong> enabled, custom{' '}
+              <strong>SMTP</strong> saved correctly (if you use it), and{' '}
+              <strong>URL Configuration → Redirect URLs</strong> includes this site&apos;s{' '}
+              <code style={{ fontSize: '0.85em' }}>/auth/verify</code> URL.
+            </Typography>
           </Alert>
         )}
         <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 3 }} disabled={loading || success}>
