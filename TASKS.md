@@ -9,7 +9,7 @@
 ## In Progress
 
 - **Legislator outbound links** — Run **`npm run verify:legislator-links`** locally or in CI to catch broken outbound URLs; tune timeouts if LRC is slow. Re-run **`sync:ky:legislators`** on a cadence that fits ops so URLs and **`committee_memberships`** stay current (requires **`OPENSTATES_API_KEY`** in env).
-- **Follow bills — launch hardening (M8)** — Bounce handling, copy review, end-to-end test of digest after a real bill change; optional **Welcome** React Email on first verification (spec M6) still not in repo. See [docs/specs/follow-bills.md](./docs/specs/follow-bills.md).
+- **Follow bills — launch hardening (M8)** — **Bounce handling shipped** (Resend webhook + suppression — see Recently completed 2026-05-13). **Welcome email shipped** (migration 022 + `WelcomeEmail` template + `/api/me/welcome-email` fired from `/auth/verify`). Remaining: copy review of `BillDigest`/`WelcomeEmail` templates, production digest validation against a real bill state change. See [docs/specs/follow-bills.md](./docs/specs/follow-bills.md).
 
 ---
 
@@ -26,7 +26,7 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ### Ops / env
 
-- Apply **019** + **020** on any environment that does not have them yet (`npm run db:apply-sql` or SQL editor). **020** adds `INSERT` RLS on `ky_notification_preferences` for the preferences API / follow helper. **Operator checklist** order: **016 → 017 → 018 → 019 → 020** (match your branch’s migrations).
+- Apply **019**, **020**, **021**, **022** on any environment that does not have them yet (`npm run db:apply-sql` or SQL editor). **020** adds `INSERT` RLS on `ky_notification_preferences`. **021** adds bounce / complaint / suppression columns powering Resend webhook handling. **022** adds `welcome_email_sent_at` for one-time welcome email idempotency. **Operator checklist** order: **016 → 017 → 018 → 019 → 020 → 021 → 022** (match your branch’s migrations). Also set Vercel env vars `RESEND_WEBHOOK_SECRET` (Production + Preview), and ensure `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` use the canonical `www.kyvky.com` host (apex 307-redirects to www, which breaks webhook POST and one-click unsubscribe POST).
 - **`env-template.txt`** — SMTP notes, rate limits, CAPTCHA troubleshooting (“For security purposes…”).
 - **`npm run test:supabase-auth`** — smoke reachability for Auth API (no mail send).
 
@@ -62,6 +62,7 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Recently completed
 
+- **Follow Bills — M8 bounce + welcome (2026-05-13)** — Resend webhook (`/api/webhooks/resend`) verifies Svix signatures and updates `ky_notifications_log.delivery_status` + `ky_notification_preferences.{bounce_state,bounce_count,suppressed_at}` (migration **021**). Digest cron filters `suppressed_at` users; emails set `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click`; `/api/unsubscribe/[token]` accepts both GET (HTML) and POST (RFC 8058). One-time welcome email after first verification: `WelcomeEmail` template + `/api/me/welcome-email` (idempotent stamp-then-send) fired from `/auth/verify` (migration **022**). New harness scripts: `npm run preview:digest`, `npm run verify:digest-state`, `npm run preview:welcome`. `scripts/load-env.ts` now falls back to the main repo when running inside a `.claude/worktrees/*` worktree and stubs `WebSocket` so supabase-js works on Node < 22.
 - **Follow Bills — M5–M7 (2026-05-12)** — `ky_bill_status_history` with **pre-upsert** snapshots + **`recordBillStatusHistoryForBuiltBatch`** on all **`syncKyBills`** code paths; digest cron + Resend + unsubscribe route (`decisions.md` § 2026-05-12).
 - **Follow Bills — M1 auth & profile foundation** — Migration `016_ky_user_profiles` + Auth sync triggers; MUI auth pages (`login`, `register`, `forgot`, `reset`, `verify`, `logout`); `/profile` **Account** + **Security** (password, email change, resend verification, typed-email delete); `DELETE /api/me/account`; post-login `/profile`; nav user menu Profile-first. Apply migration (`npm run db:apply-sql` or Supabase SQL) and configure redirect URLs for `/auth/verify` and `/auth/reset`. See `decisions.md` § 2026-05-11.
 - **Sentry** — Example page and `/api/sentry-example-api` removed; production monitoring remains via `@sentry/nextjs` configs and `/monitoring`.

@@ -61,3 +61,6 @@ next-env.d.ts
 
 # Local digest preview output (npm run preview:digest)
 digest-preview.html
+
+# Local welcome email preview output (npm run preview:welcome)
+welcome-preview.html

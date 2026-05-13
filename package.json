@@ -27,7 +27,8 @@
     "verify:legislator-links": "tsx scripts/verify-legislator-external-links.ts",
     "spot-check:bill-links": "tsx scripts/spot-check-bill-external-links.ts",
     "preview:digest": "tsx scripts/preview-bill-digest.ts",
-    "verify:digest-state": "tsx scripts/verify-digest-state.ts"
+    "verify:digest-state": "tsx scripts/verify-digest-state.ts",
+    "preview:welcome": "tsx scripts/preview-welcome-email.tsx"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
