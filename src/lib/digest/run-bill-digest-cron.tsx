@@ -265,6 +265,8 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
     const followedBillsHref = `${origin}/bills?follows=me`;
     const preferencesHref = `${origin}/profile#notifications`;
+    const privacyHref = `${origin}/privacy`;
+    const termsHref = `${origin}/terms`;
 
     const eventTotal = top.length + overflow;
     const previewText = `${eventTotal} update${eventTotal === 1 ? '' : 's'} on ${groups.length} bill${groups.length === 1 ? '' : 's'} you follow`;
@@ -280,6 +282,8 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
             followedBillsHref={followedBillsHref}
             preferencesHref={preferencesHref}
             unsubscribeHref={unsubscribeHref}
+            privacyHref={privacyHref}
+            termsHref={termsHref}
           />,
         )
       : '';

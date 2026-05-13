@@ -44,6 +44,34 @@ export default function SiteFooter() {
           <span aria-hidden>·</span>
           <MuiLink
             component={Link}
+            href="/privacy"
+            underline="always"
+            sx={{
+              color: 'primary.main',
+              fontWeight: 600,
+              textUnderlineOffset: 3,
+              '&:hover': { color: 'primary.dark' },
+            }}
+          >
+            Privacy
+          </MuiLink>
+          <span aria-hidden>·</span>
+          <MuiLink
+            component={Link}
+            href="/terms"
+            underline="always"
+            sx={{
+              color: 'primary.main',
+              fontWeight: 600,
+              textUnderlineOffset: 3,
+              '&:hover': { color: 'primary.dark' },
+            }}
+          >
+            Terms
+          </MuiLink>
+          <span aria-hidden>·</span>
+          <MuiLink
+            component={Link}
             href="/licenses"
             underline="always"
             sx={{

@@ -83,6 +83,8 @@ export async function POST(request: NextRequest) {
       profileHref={`${origin}/profile`}
       preferencesHref={`${origin}/profile#notifications`}
       districtMapHref={`${origin}/district-map`}
+      privacyHref={`${origin}/privacy`}
+      termsHref={`${origin}/terms`}
     />,
   );
 

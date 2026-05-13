@@ -31,8 +31,19 @@ export function BillDigestEmail(props: {
   followedBillsHref: string;
   preferencesHref: string;
   unsubscribeHref: string;
+  privacyHref: string;
+  termsHref: string;
 }) {
-  const { previewText, groups, moreCount, followedBillsHref, preferencesHref, unsubscribeHref } = props;
+  const {
+    previewText,
+    groups,
+    moreCount,
+    followedBillsHref,
+    preferencesHref,
+    unsubscribeHref,
+    privacyHref,
+    termsHref,
+  } = props;
 
   return (
     <Html>
@@ -73,7 +84,11 @@ export function BillDigestEmail(props: {
             <Text style={footerLinks}>
               <Link href={preferencesHref} style={footerLink}>Change frequency or topics</Link>
               {' · '}
-              <Link href={unsubscribeHref} style={footerLink}>Unsubscribe from digests</Link>
+              <Link href={unsubscribeHref} style={footerLink}>Unsubscribe</Link>
+              {' · '}
+              <Link href={privacyHref} style={footerLink}>Privacy</Link>
+              {' · '}
+              <Link href={termsHref} style={footerLink}>Terms</Link>
             </Text>
           </Section>
         </Container>

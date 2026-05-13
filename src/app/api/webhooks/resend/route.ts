@@ -8,6 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
+import * as Sentry from '@sentry/nextjs';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 
 export const runtime = 'nodejs';
@@ -96,6 +97,10 @@ function classifyEvent(event: ResendWebhookEvent): {
 export async function POST(req: NextRequest) {
   const secret = process.env.RESEND_WEBHOOK_SECRET?.trim();
   if (!secret) {
+    Sentry.captureMessage('Resend webhook called but RESEND_WEBHOOK_SECRET is not set', {
+      level: 'error',
+      tags: { route: 'webhooks/resend' },
+    });
     return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 });
   }
   if (!supabaseAdmin) {
@@ -106,6 +111,8 @@ export async function POST(req: NextRequest) {
   if (!verifySignature(rawBody, req.headers, secret)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
+
+  try {
 
   let event: ResendWebhookEvent;
   try {
@@ -173,5 +180,15 @@ export async function POST(req: NextRequest) {
     await supabaseAdmin.from('ky_notification_preferences').update(update).eq('user_id', userId);
   }
 
-  return NextResponse.json({ ok: true, type: event.type, suppressed: suppress }, { status: 200 });
+    return NextResponse.json({ ok: true, type: event.type, suppressed: suppress }, { status: 200 });
+  } catch (e) {
+    console.error('[webhooks/resend]', e);
+    Sentry.captureException(e, { tags: { route: 'webhooks/resend' } });
+    // Return 500 so Resend retries (the operation is idempotent enough to
+    // tolerate replay — log row update by message_id, prefs update by user_id).
+    return NextResponse.json(
+      { ok: false, error: e instanceof Error ? e.message : String(e) },
+      { status: 500 },
+    );
+  }
 }

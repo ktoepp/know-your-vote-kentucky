@@ -17,8 +17,18 @@ export function WelcomeEmail(props: {
   profileHref: string;
   preferencesHref: string;
   districtMapHref: string;
+  privacyHref: string;
+  termsHref: string;
 }) {
-  const { displayName, browseBillsHref, profileHref, preferencesHref, districtMapHref } = props;
+  const {
+    displayName,
+    browseBillsHref,
+    profileHref,
+    preferencesHref,
+    districtMapHref,
+    privacyHref,
+    termsHref,
+  } = props;
   const greeting = displayName?.trim() ? `Welcome, ${displayName.trim()}` : 'Welcome to Know Your Vote Kentucky';
 
   return (
@@ -64,6 +74,11 @@ export function WelcomeEmail(props: {
           <Text style={muted}>
             This is a one-time welcome email. Manage your account anytime at{' '}
             <Link href={profileHref} style={link}>{profileHref}</Link>.
+          </Text>
+          <Text style={muted}>
+            <Link href={privacyHref} style={link}>Privacy</Link>
+            {' · '}
+            <Link href={termsHref} style={link}>Terms</Link>
           </Text>
         </Container>
       </Body>
