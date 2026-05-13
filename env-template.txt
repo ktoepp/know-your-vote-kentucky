@@ -92,6 +92,12 @@ SYNC_API_KEY=your_sync_api_key_here
 # RESEND_FROM_EMAIL=alerts@kyvky.com
 # APP_PUBLIC_URL=https://kyvky.com
 # DIGEST_DRY_RUN=true
+#
+# Resend webhooks (bounce / complaint handling).
+# Resend dashboard → Webhooks → add endpoint https://kyvky.com/api/webhooks/resend
+# with events: email.delivered, email.bounced, email.complained, email.delivery_delayed.
+# Copy the "Signing Secret" (whsec_...) into RESEND_WEBHOOK_SECRET.
+# RESEND_WEBHOOK_SECRET=whsec_xxxxxxxx
 
 # =============================================================================
 # OPTIONAL — Application Settings

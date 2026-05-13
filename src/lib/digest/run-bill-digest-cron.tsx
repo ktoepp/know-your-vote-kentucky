@@ -58,11 +58,23 @@ export type DigestCronResult = {
   emailsSent: number;
   skippedNoEvents: number;
   errors: string[];
-  samples?: { email: string; eventCount: number }[];
+  samples?: { email: string; eventCount: number; previewHtml?: string; previewSubject?: string }[];
 };
 
-export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promise<DigestCronResult> {
+export type RunBillDigestCronOptions = {
+  dryRun?: boolean;
+  /** Limit to specific user ids (E2E preview). */
+  onlyUserIds?: string[];
+  /** When true (and dryRun), include rendered HTML in samples. */
+  renderPreview?: boolean;
+  /** Override the "force send" filter so we ignore prior-window logs (preview only). */
+  ignoreLastSentWindow?: boolean;
+};
+
+export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Promise<DigestCronResult> {
   const dryRun = opts.dryRun === true || process.env.DIGEST_DRY_RUN === 'true';
+  const onlyUserIds = opts.onlyUserIds && opts.onlyUserIds.length ? new Set(opts.onlyUserIds) : null;
+  const renderPreview = dryRun && opts.renderPreview === true;
   const errors: string[] = [];
   let usersConsidered = 0;
   let emailsSent = 0;
@@ -92,7 +104,8 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
     .from('ky_notification_preferences')
     .select('user_id, digest_frequency, event_types, topic_filters, unsubscribe_token')
     .neq('digest_frequency', 'off')
-    .is('unsubscribed_all_at', null);
+    .is('unsubscribed_all_at', null)
+    .is('suppressed_at', null);
 
   if (prefsErr) {
     return {
@@ -106,6 +119,8 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
   }
 
   const prefs = (prefsRows ?? []).filter((p) => {
+    if (onlyUserIds && !onlyUserIds.has(p.user_id as string)) return false;
+    if (onlyUserIds) return true; // bypass weekly-day gate in targeted preview
     if (p.digest_frequency === 'weekly') return dow === 1;
     return p.digest_frequency === 'daily';
   });
@@ -185,7 +200,7 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
       .limit(1)
       .maybeSingle();
 
-    if (lastLog?.digest_window_end) {
+    if (lastLog?.digest_window_end && !opts.ignoreLastSentWindow) {
       const le = new Date(lastLog.digest_window_end as string).getTime();
       if (!Number.isNaN(le) && le > new Date(windowStart).getTime()) {
         windowStart = new Date(le).toISOString();
@@ -255,30 +270,41 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
     const followedBillsHref = `${origin}/bills?follows=me`;
 
     const previewText = `${groups.length} bill${groups.length === 1 ? '' : 's'} with updates`;
+    const subject = `KY bill digest — ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium' }).format(now)}`;
+
+    const needsHtml = renderPreview || !(dryRun || !resend);
+    const html = needsHtml
+      ? await render(
+          <BillDigestEmail
+            previewText={previewText}
+            groups={groups}
+            moreCount={overflow}
+            followedBillsHref={followedBillsHref}
+            unsubscribeHref={unsubscribeHref}
+          />,
+        )
+      : '';
 
     if (dryRun || !resend) {
-      if (samples.length < 3) samples.push({ email, eventCount: top.length });
+      if (samples.length < 3) {
+        samples.push({
+          email,
+          eventCount: top.length,
+          ...(renderPreview ? { previewHtml: html, previewSubject: subject } : {}),
+        });
+      }
       continue;
     }
-
-    const html = await render(
-      <BillDigestEmail
-        previewText={previewText}
-        groups={groups}
-        moreCount={overflow}
-        followedBillsHref={followedBillsHref}
-        unsubscribeHref={unsubscribeHref}
-      />,
-    );
 
     try {
       const { data: sendData, error: sendErr } = await resend.emails.send({
         from: fromEmail,
         to: email,
-        subject: `KY bill digest — ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium' }).format(now)}`,
+        subject,
         html,
         headers: {
           'List-Unsubscribe': `<${unsubscribeHref}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         },
       });
       if (sendErr) {
