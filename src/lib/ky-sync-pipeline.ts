@@ -1201,6 +1201,50 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       }
     }
 
+    // Second pass: deactivate LegiScan-only rows (no openstates_id) at seats
+    // where this sync just produced a current Open States row. Those legacy
+    // rows are predecessors or alias dupes (e.g. "Matthew Lehman" alongside
+    // the canonical "Matt Lehman" with openstates_id). Conservative: only
+    // deactivate at seats Open States covers; never at seats it doesn't.
+    {
+      const activeSeats = new Set<string>();
+      for (const r of rows) {
+        if (!r.openstates_id || !r.chamber || !r.district) continue;
+        activeSeats.add(`${r.chamber}|${r.district}`);
+      }
+      if (activeSeats.size > 0) {
+        const { data: legacyRows, error: legacyErr } = await db
+          .from('ky_legislators')
+          .select('id, chamber, district')
+          .is('openstates_id', null)
+          .eq('active', true);
+        if (legacyErr) {
+          logError(source, `Could not read LegiScan-only rows for cleanup: ${legacyErr.message}`);
+        } else {
+          const stale = (legacyRows || []).filter((r) => {
+            const ch = r.chamber as string | null;
+            const d = r.district as string | null;
+            return Boolean(ch && d && activeSeats.has(`${ch}|${d}`));
+          });
+          const CHUNK = 100;
+          for (let i = 0; i < stale.length; i += CHUNK) {
+            const ids = stale.slice(i, i + CHUNK).map((r) => r.id as string);
+            const { error: deactErr } = await db
+              .from('ky_legislators')
+              .update({ active: false, updated_at: nowIso })
+              .in('id', ids);
+            if (deactErr) logError(source, `Legacy deactivate chunk failed: ${deactErr.message}`);
+          }
+          if (stale.length) {
+            log(
+              source,
+              `Marked ${stale.length} LegiScan-only row(s) inactive (seat covered by current Open States legislator)`,
+            );
+          }
+        }
+      }
+    }
+
     log(source, `Synced ${synced}/${legislators.length} legislators`);
 
     if (process.env.LEGISCAN_API_KEY) {
