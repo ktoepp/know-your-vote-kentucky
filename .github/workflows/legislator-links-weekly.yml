@@ -50,10 +50,21 @@ jobs:
           fi
           npx tsx scripts/verify-legislator-external-links.ts $ARGS
 
-      - name: Upload report
+      # Surface unmapped LegiScan subjects so we keep the
+      # KY_TOPIC ↔ LegiScan mapping fresh as new subjects appear.
+      # Informational only — never fails the job.
+      - name: Audit LegiScan subject coverage
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          npx tsx scripts/audit-legiscan-subjects.ts --json --output reports/legiscan-subjects.json
+          npx tsx scripts/audit-legiscan-subjects.ts || true
+
+      - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: legislator-links-report
-          path: reports/legislator-links.json
+          path: reports/
           retention-days: 30

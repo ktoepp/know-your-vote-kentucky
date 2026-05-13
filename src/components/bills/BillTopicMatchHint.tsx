@@ -16,10 +16,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box } from '@mui/material';
 import { NotificationsActive } from '@mui/icons-material';
 import { useUser } from '@/app/lib/UserContext';
+import { topicsForLegiScanSubjects } from '@/lib/ky-topic-legiscan-mapping';
 
 type Props = {
   billId: string;
   topics: string[] | null;
+  legiScanSubjects?: Array<{ subject_id?: number; subject_name?: string }> | null;
 };
 
 type PreferencesResponse = {
@@ -38,10 +40,14 @@ function intersect(a: string[] | null | undefined, b: string[] | null | undefine
   return b.filter((t) => set.has(t));
 }
 
-export function BillTopicMatchHint({ billId, topics }: Props) {
+export function BillTopicMatchHint({ billId, topics, legiScanSubjects }: Props) {
   const { user, session, loading: userLoading } = useUser();
   const token = session?.access_token ?? null;
-  const billTopics = useMemo(() => topics ?? [], [topics]);
+  const billTopics = useMemo(() => {
+    const own = topics ?? [];
+    const fromSubjects = topicsForLegiScanSubjects(legiScanSubjects ?? []);
+    return Array.from(new Set([...own, ...fromSubjects]));
+  }, [topics, legiScanSubjects]);
 
   const [prefs, setPrefs] = useState<PreferencesResponse | null>(null);
   const [following, setFollowing] = useState<boolean | null>(null);

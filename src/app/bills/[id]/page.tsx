@@ -90,6 +90,7 @@ interface KYBill {
   topics: string[] | null;
   sponsors: any;
   legiscan_id: number | null;
+  legiscan_subjects?: Array<{ subject_id?: number; subject_name?: string }> | null;
 }
 
 interface LegiScanSponsor {
@@ -649,7 +650,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               </Typography>
               <FollowBillButton billId={bill.id} />
             </Box>
-            <BillTopicMatchHint billId={bill.id} topics={bill.topics} />
+            <BillTopicMatchHint billId={bill.id} topics={bill.topics} legiScanSubjects={bill.legiscan_subjects ?? null} />
             <Typography
               component="h1"
               variant="h4"
