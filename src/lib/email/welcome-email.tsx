@@ -29,24 +29,25 @@ export function WelcomeEmail(props: {
     privacyHref,
     termsHref,
   } = props;
-  const greeting = displayName?.trim() ? `Welcome, ${displayName.trim()}` : 'Welcome to Know Your Vote Kentucky';
+  const greeting = displayName?.trim() ? `Your account is set up, ${displayName.trim()}.` : 'Your account is set up.';
 
   return (
     <Html>
       <Head />
-      <Preview>Your Know Your Vote Kentucky account is ready.</Preview>
+      <Preview>You can now follow Kentucky bills and receive status updates by email.</Preview>
       <Body style={main}>
         <Container style={container}>
           <Heading style={h1}>{greeting}</Heading>
           <Text style={lead}>
-            Your email is verified. From here we&rsquo;ll only email you when bills you follow
-            change status — no marketing, no noise.
+            Know Your Vote Kentucky sends a digest when bills you follow change status.
+            You will only receive email when there is an update to report.
           </Text>
           <Section style={card}>
-            <Text style={cardHeading}>Follow bills you care about</Text>
+            <Text style={cardHeading}>Follow bills</Text>
             <Text style={body}>
-              Open any bill page and tap <strong>Follow</strong>. We&rsquo;ll add it to your daily
-              digest when it moves — committee action, floor votes, sent to governor, signed, vetoed.
+              Select <strong>Follow</strong> on any bill page to track it. You will receive
+              digest updates when it moves — committee action, floor votes, sent to governor,
+              signed, or vetoed.
             </Text>
             <Text style={cta}>
               <Link href={browseBillsHref} style={link}>Browse bills →</Link>
@@ -55,24 +56,25 @@ export function WelcomeEmail(props: {
           <Section style={card}>
             <Text style={cardHeading}>Find your legislators</Text>
             <Text style={body}>
-              Look up your two legislators (one House, one Senate) by address on the district map.
+              Enter your address on the district map to see your House and Senate
+              representatives in the current session.
             </Text>
             <Text style={cta}>
-              <Link href={districtMapHref} style={link}>Open the district map →</Link>
+              <Link href={districtMapHref} style={link}>District map →</Link>
             </Text>
           </Section>
           <Section style={card}>
-            <Text style={cardHeading}>Tune your digest</Text>
+            <Text style={cardHeading}>Set digest preferences</Text>
             <Text style={body}>
-              Pick daily or weekly cadence, choose which event types matter to you, and follow whole
-              topics (Education, Healthcare, etc.) — we&rsquo;ll match bills automatically.
+              Choose daily or weekly delivery, select which event types to include, and
+              follow topics by subject area — bills in that area will be matched automatically.
             </Text>
             <Text style={cta}>
               <Link href={preferencesHref} style={link}>Notification preferences →</Link>
             </Text>
           </Section>
           <Text style={muted}>
-            This is a one-time welcome email. Manage your account anytime at{' '}
+            This is a one-time setup email. Manage your account at{' '}
             <Link href={profileHref} style={link}>{profileHref}</Link>.
           </Text>
           <Text style={muted}>
