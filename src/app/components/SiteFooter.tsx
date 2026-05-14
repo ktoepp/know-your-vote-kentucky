@@ -45,6 +45,7 @@ export default function SiteFooter() {
           <MuiLink
             component={Link}
             href="/privacy"
+            variant="body2"
             underline="always"
             sx={{
               color: 'primary.main',
@@ -59,6 +60,7 @@ export default function SiteFooter() {
           <MuiLink
             component={Link}
             href="/terms"
+            variant="body2"
             underline="always"
             sx={{
               color: 'primary.main',
@@ -73,6 +75,7 @@ export default function SiteFooter() {
           <MuiLink
             component={Link}
             href="/licenses"
+            variant="body2"
             underline="always"
             sx={{
               color: 'primary.main',

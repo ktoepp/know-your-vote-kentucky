@@ -29,6 +29,7 @@ import { supabase } from '../lib/supabaseClient';
 import type { KyUserProfileRow } from '@/types/user-profile';
 import { ProfileNotificationsSection } from '@/components/profile/ProfileNotificationsSection';
 import { ProfileFollowedBillsSection } from '@/components/profile/ProfileFollowedBillsSection';
+import { ProfileDigestHistorySection } from '@/components/profile/ProfileDigestHistorySection';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
 
 function SectionCard({
@@ -355,6 +356,10 @@ export default function ProfilePage() {
 
       <Paper component="section" id="followed-bills" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
         <ProfileFollowedBillsSection />
+      </Paper>
+
+      <Paper component="section" id="digest-history" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+        <ProfileDigestHistorySection />
       </Paper>
 
       <SectionCard id="security" icon={<ShieldOutlined sx={{ fontSize: 28 }} />} title="Security">
