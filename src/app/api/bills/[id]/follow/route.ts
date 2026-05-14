@@ -2,8 +2,21 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
 import { resolveBillUuid } from '@/lib/bill-id-resolver';
 import { ensureKyNotificationPreferencesRow } from '@/lib/ky-notification-preferences';
+import { rateLimit } from '@/lib/rate-limit';
 
 type Ctx = { params: Promise<{ id: string }> };
+
+/** 60 follow/unfollow actions per minute per user. Generous burst, blocks runaway clients. */
+async function checkWriteRateLimit(userId: string, route: string) {
+  return rateLimit(`follow-write:${userId}`, { capacity: 60, refillPerSec: 1, route });
+}
+
+function rateLimitResponse(retryAfterSec: number) {
+  return NextResponse.json(
+    { error: 'Too many requests. Try again shortly.' },
+    { status: 429, headers: { 'Retry-After': String(retryAfterSec) } },
+  );
+}
 
 export async function GET(request: NextRequest, { params }: Ctx) {
   const auth = await getAuthedUser(request);
@@ -34,6 +47,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   const auth = await getAuthedUser(request);
   if ('error' in auth) return auth.error;
 
+  const limit = await checkWriteRateLimit(auth.userId, 'bills/[id]/follow:POST');
+  if (!limit.allowed) return rateLimitResponse(limit.retryAfterSec);
+
   const { id: raw } = await params;
   const billId = await resolveBillUuid(auth.supabase, raw);
   if (!billId) {
@@ -61,6 +77,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
 export async function DELETE(request: NextRequest, { params }: Ctx) {
   const auth = await getAuthedUser(request);
   if ('error' in auth) return auth.error;
+
+  const limit = await checkWriteRateLimit(auth.userId, 'bills/[id]/follow:DELETE');
+  if (!limit.allowed) return rateLimitResponse(limit.retryAfterSec);
 
   const { id: raw } = await params;
   const billId = await resolveBillUuid(auth.supabase, raw);

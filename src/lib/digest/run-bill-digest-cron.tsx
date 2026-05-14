@@ -273,20 +273,20 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const subject = `Your KY bill digest — ${eventTotal} update${eventTotal === 1 ? '' : 's'}`;
 
     const needsHtml = renderPreview || !(dryRun || !resend);
-    const html = needsHtml
-      ? await render(
-          <BillDigestEmail
-            previewText={previewText}
-            groups={groups}
-            moreCount={overflow}
-            followedBillsHref={followedBillsHref}
-            preferencesHref={preferencesHref}
-            unsubscribeHref={unsubscribeHref}
-            privacyHref={privacyHref}
-            termsHref={termsHref}
-          />,
-        )
-      : '';
+    const emailEl = (
+      <BillDigestEmail
+        previewText={previewText}
+        groups={groups}
+        moreCount={overflow}
+        followedBillsHref={followedBillsHref}
+        preferencesHref={preferencesHref}
+        unsubscribeHref={unsubscribeHref}
+        privacyHref={privacyHref}
+        termsHref={termsHref}
+      />
+    );
+    const html = needsHtml ? await render(emailEl) : '';
+    const text = needsHtml ? await render(emailEl, { plainText: true }) : '';
 
     if (dryRun || !resend) {
       if (samples.length < 3) {
@@ -303,8 +303,10 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       const { data: sendData, error: sendErr } = await resend.emails.send({
         from: fromEmail,
         to: email,
+        replyTo: 'hello@kyvky.com',
         subject,
         html,
+        text,
         headers: {
           'List-Unsubscribe': `<${unsubscribeHref}>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
