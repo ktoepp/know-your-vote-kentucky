@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: profile.email as string,
-      subject: 'Welcome to Know Your Vote Kentucky',
+      subject: 'Your Know Your Vote Kentucky account is set up',
       html,
     });
     if (error) {
