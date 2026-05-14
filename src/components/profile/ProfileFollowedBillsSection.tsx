@@ -99,13 +99,50 @@ export function ProfileFollowedBillsSection() {
           <CircularProgress size={28} aria-label="Loading followed bills" />
         </Box>
       ) : rows.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          You&apos;re not following any bills yet.{' '}
-          <MuiLink component={NextLink} href="/bills">
-            Browse current bills
-          </MuiLink>{' '}
-          and use Follow on a bill to track it.
-        </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            gap: 1.5,
+            py: 4,
+            px: 3,
+            mb: 2,
+            border: '1px dashed',
+            borderColor: 'divider',
+            borderRadius: 2,
+            bgcolor: 'background.default',
+          }}
+        >
+          <BookmarkBorder sx={{ fontSize: 36, color: 'text.disabled' }} aria-hidden />
+          <Typography variant="subtitle1" fontWeight={600}>
+            No bills followed yet
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420 }}>
+            Tap <strong>Follow</strong> on any bill page to add it here. We&apos;ll email you a
+            digest when it changes status — committee action, floor votes, sent to governor,
+            signed, vetoed.
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Button
+              component={NextLink}
+              href="/bills"
+              variant="contained"
+              size="small"
+            >
+              Browse bills
+            </Button>
+            <Button
+              component={NextLink}
+              href="/district-map"
+              variant="outlined"
+              size="small"
+            >
+              Find your legislators
+            </Button>
+          </Box>
+        </Box>
       ) : (
         <List disablePadding>
           {rows.map((row) => {

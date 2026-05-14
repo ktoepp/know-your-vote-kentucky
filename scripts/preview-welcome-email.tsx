@@ -76,7 +76,7 @@ async function main() {
   }
 
   const origin = publicSiteOrigin();
-  const html = await render(
+  const emailEl = (
     <WelcomeEmail
       displayName={profile.display_name as string | null}
       browseBillsHref={`${origin}/bills`}
@@ -85,8 +85,10 @@ async function main() {
       districtMapHref={`${origin}/district-map`}
       privacyHref={`${origin}/privacy`}
       termsHref={`${origin}/terms`}
-    />,
+    />
   );
+  const html = await render(emailEl);
+  const text = await render(emailEl, { plainText: true });
 
   if (!args.send) {
     await fs.writeFile(args.out, html, 'utf8');
@@ -104,8 +106,10 @@ async function main() {
   const { data, error: sendErr } = await resend.emails.send({
     from,
     to: profile.email as string,
-    subject: 'Welcome to Know Your Vote Kentucky',
+    replyTo: 'hello@kyvky.com',
+    subject: 'Your Know Your Vote Kentucky account is set up',
     html,
+    text,
   });
   if (sendErr) {
     console.error('Send failed:', sendErr.message);

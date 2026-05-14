@@ -8,11 +8,20 @@
 
 ## In Progress
 
-- **Follow bills — passive production validation** — All M8 hardening shipped: bounce handling, welcome email, hybrid topic match, copy review (see Recently completed 2026-05-13). Only remaining item is to confirm the path against a real bill state change once the next sync produces movement on a followed bill — passive, no code work needed.
+- (none — feature set "auth + profile + follow + email" is shipped and launch-blockers cleared, see Recently completed 2026-05-13)
 
 ## Maintained on autopilot
 
 - **Legislator outbound links** — `.github/workflows/legislator-links-weekly.yml` runs Mondays 12:00 UTC: `sync:ky:legislators` → `verify:legislator-links --json` → `audit:legiscan-subjects --json`, uploading `reports/` as artifacts. Manual fallback: `npm run verify:legislator-links`. Required GH secrets: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENSTATES_API_KEY`, `LEGISCAN_API_KEY` (last optional).
+- **Email digest** — `/api/cron/notify` runs daily 11:00 UTC via Vercel Cron (weekly users batched on Mondays). Suppressed users skipped. Failures + per-user-error spikes captured in Sentry (tags `route:cron/notify` and `route:webhooks/resend`).
+- **Outbound mail policy** — `From: alerts@kyvky.com` (transactional only, do not reply); `Reply-To: hello@kyvky.com` (real inbox). All inbound contact / vulnerability reports go to `hello@kyvky.com`. Webhook deliveries from Resend → `https://www.kyvky.com/api/webhooks/resend` (apex 307s break POST). Plain-text fallback included on every transactional send.
+
+## Operator follow-ups (not blocking, but recommended before public launch)
+
+- **Resend → Domains → kyvky.com** — confirm SPF / DKIM / DMARC are all green. Cold-start sends to Gmail otherwise land in Junk.
+- **Sentry → Alerts** — add two rules: (1) any event tagged `route:cron/notify` → notify; (2) ≥5 events tagged `route:webhooks/resend` in 5 min → notify.
+- **Inbox routing** — confirm `hello@kyvky.com` lands somewhere a human reads (privacy/terms pages and email Reply-To all point there).
+- **Legal review** — `/privacy` and `/terms` are honest practical drafts (`src/app/privacy/page.tsx` + `src/app/terms/page.tsx`); a lawyer should review before scaling beyond a small audience.
 
 ---
 
@@ -29,7 +38,8 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ### Ops / env
 
-- Apply **019**, **020**, **021**, **022** on any environment that does not have them yet (`npm run db:apply-sql` or SQL editor). **020** adds `INSERT` RLS on `ky_notification_preferences`. **021** adds bounce / complaint / suppression columns powering Resend webhook handling. **022** adds `welcome_email_sent_at` for one-time welcome email idempotency. **Operator checklist** order: **016 → 017 → 018 → 019 → 020 → 021 → 022** (match your branch’s migrations). Also set Vercel env vars `RESEND_WEBHOOK_SECRET` (Production + Preview), and ensure `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` use the canonical `www.kyvky.com` host (apex 307-redirects to www, which breaks webhook POST and one-click unsubscribe POST).
+- Apply **019**, **020**, **021**, **022**, **023** on any environment that does not have them yet (`npm run db:apply-sql` or SQL editor). **020** adds `INSERT` RLS on `ky_notification_preferences`. **021** adds bounce / complaint / suppression columns powering Resend webhook handling. **022** adds `welcome_email_sent_at` for one-time welcome email idempotency. **023** adds `external_links` JSONB on `ky_legislators` (full Open States links + grouped Social/Other UI). **Operator checklist** order: **016 → 017 → 018 → 019 → 020 → 021 → 022 → 023** (match your branch's migrations). Also set Vercel env vars `RESEND_WEBHOOK_SECRET` (Production + Preview), and ensure `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` use the canonical `www.kyvky.com` host (apex 307-redirects to www, which breaks webhook POST and one-click unsubscribe POST).
+- After applying **023** for the first time on a database with legacy data: run `npm run normalize:legislator-districts -- --apply` then `npm run cleanup:stale-legislators -- --apply`, then `npm run diagnose:legislators` to confirm active count is ~141 (100 House + 38 Senate + 3 statewide). Future syncs handle this automatically.
 - **`env-template.txt`** — SMTP notes, rate limits, CAPTCHA troubleshooting (“For security purposes…”).
 - **`npm run test:supabase-auth`** — smoke reachability for Auth API (no mail send).
 
@@ -65,6 +75,8 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Recently completed
 
+- **Launch blockers — Sentry alerts + privacy + terms + email polish (2026-05-13)** — `/api/cron/notify` and `/api/webhooks/resend` now `Sentry.captureException` on thrown errors and `Sentry.captureMessage` on silent partial-failure 200s, tagged `route:*` for alert-rule scoping. New `/privacy` and `/terms` pages cover what we collect, who we share with, retention, user controls, and acceptable use; both linked from `SiteFooter`, the register page (acknowledgment line), and email footers. Outbound mail policy: `From: alerts@kyvky.com` (transactional only); `Reply-To: hello@kyvky.com` (real inbox, also used in privacy/terms contact). Plain-text fallback (`render(el, { plainText: true })`) included on every transactional send for deliverability + a11y. Per-user rate limits on `/api/bills/[id]/follow` (60/min) and `/api/me/preferences` (30/min) keyed by user id with 429 + Retry-After. `/profile` followed-bills now shows a CTA empty-state card (browse bills / find your legislators) when no follows.
+- **Legislator stale row cleanup + Senate district format (2026-05-13)** — Members page was showing 381 active legislators when the General Assembly has 138 seats. Two fixes: `syncKyLegislators` now runs a second deactivation pass for active LegiScan-only rows at seats covered by a current Open States row (predecessors and alias dupes); `scripts/normalize-legislator-districts.ts` rewrites legacy Senate `SD-0XX` to canonical `SD-XX` so the seat-key compare actually matches. New `npm run cleanup:stale-legislators`, `npm run normalize:legislator-districts`, `npm run diagnose:legislators`, and `npm run debug:openstates-roster`. After running cleanup + normalize the live count drops to ~141 active (100 House + 38 Senate + 3 statewide).
 - **Email copy / structure pass (2026-05-13)** — `BillDigest` subject line is count-led ("Your KY bill digest — N updates"); preview text names bills + updates; new footer adds "Change frequency or topics" alongside unsubscribe and a one-line "why am I getting this" attribution. `WelcomeEmail` lead clarifies cadence ("we'll only email when followed bills change — no marketing"); marked one-time so users don't expect repeats; topic-follow card mentions automatic matching.
 - **Topic taxonomy — hybrid digest matching (2026-05-13)** — Added `src/lib/ky-topic-legiscan-mapping.ts` translating LegiScan subject patterns to KY_TOPIC tags so the digest cron matches a user's `topic_filters` against EITHER `ky_bills.topics` (heuristic) OR `legiscan_subjects` (official) — closes the silent-miss path where a bill's correct LegiScan subject didn't earn a heuristic topic tag. `BillTopicMatchHint` reflects the same union so UI agrees with the digest. New `npm run audit:legiscan-subjects` and a workflow step on the weekly job report unmapped subjects sorted by frequency so the mapping stays current.
 - **Legislator links — full fidelity + weekly verifier (2026-05-13)** — Migration **023** adds `external_links` JSONB on `ky_legislators`. Sync persists the full Open States `links[]` (URL + note + category + host); `MemberProfileView` renders a "Connect & follow" section grouped Social / Other (hidden when empty). Verifier now probes `external_links` (skips social by default, `--probe-social` to opt in) and emits JSON with `--output`. New `.github/workflows/legislator-links-weekly.yml` runs Mondays 12:00 UTC: `sync:ky:legislators` → `verify:legislator-links` → `audit:legiscan-subjects`, uploading reports as artifacts.
@@ -90,7 +102,17 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Up Next
 
-- ~~**Follow bills (M8 + optional welcome email)**~~ — **Shipped 2026-05-13.** Production validation against a real bill state change is the only remaining check (passive — happens organically on next followed-bill movement).
+The auth + profile + follow + email feature set is shipped and launch-blockers are cleared. Pick from these "should-haves" when picking the work back up:
+
+- **Digest history archive on `/profile`** (~3–4 hr) — list the user's last ~10 `ky_notifications_log` entries with bill links so users who lose an email can read past digests on the web. Solves the most common support question.
+- **GDPR-style data export** (~2 hr) — `GET /api/me/export` returns JSON of profile + follows + prefs + log. Pairs with the existing `DELETE /api/me/account`.
+- **Resend "Send welcome again" button on `/profile`** (~1 hr) — manual recovery if a user lost the original.
+- **Email rendering QA across Gmail / Outlook / Apple Mail** (~2 hr, manual) — best done after the plain-text fallback shipped.
+- **Per-user time-zone preference for digest send** (~4–6 hr) — revisit after first DST transition (Nov 2026) or when open-rate data exists.
+- **In-app notification badge** (~4–8 hr) — needs a viewed_at cursor on `ky_notifications_log` or a separate read receipt.
+- **Snooze / mute individual bills** (~2–3 hr) — boolean column on `ky_bill_follows`; digest skips snoozed.
+- **Address autocomplete on the district map** (~3 hr).
+- **"How to contact your rep" content expansion** (~2 hr).
 - **Regression cadence** — After large syncs or schema changes, re-run **`npm run verify:legislator-links`** (optional **`--limit`**) and **`npm run spot-check:bill-links`**.
 
 ---

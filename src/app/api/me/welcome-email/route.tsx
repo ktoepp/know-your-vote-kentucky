@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
   }
 
   const origin = publicSiteOrigin();
-  const html = await render(
+  const emailEl = (
     <WelcomeEmail
       displayName={profile.display_name as string | null}
       browseBillsHref={`${origin}/bills`}
@@ -85,16 +85,20 @@ export async function POST(request: NextRequest) {
       districtMapHref={`${origin}/district-map`}
       privacyHref={`${origin}/privacy`}
       termsHref={`${origin}/terms`}
-    />,
+    />
   );
+  const html = await render(emailEl);
+  const text = await render(emailEl, { plainText: true });
 
   try {
     const resend = new Resend(resendKey);
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: profile.email as string,
+      replyTo: 'hello@kyvky.com',
       subject: 'Your Know Your Vote Kentucky account is set up',
       html,
+      text,
     });
     if (error) {
       // Roll back the stamp so a future call can retry.

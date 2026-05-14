@@ -6,6 +6,7 @@ import {
   normalizeDigestEventTypes,
   normalizeTopicFilters,
 } from '@/lib/ky-notification-preferences';
+import { rateLimit } from '@/lib/rate-limit';
 
 const SELECT_FIELDS =
   'digest_frequency, event_types, topic_filters, unsubscribed_all_at, updated_at';
@@ -37,6 +38,18 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const auth = await getAuthedUser(request);
   if ('error' in auth) return auth.error;
+
+  const limit = await rateLimit(`prefs-write:${auth.userId}`, {
+    capacity: 30,
+    refillPerSec: 0.5,
+    route: 'me/preferences:PATCH',
+  });
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Try again shortly.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSec) } },
+    );
+  }
 
   let body: unknown;
   try {

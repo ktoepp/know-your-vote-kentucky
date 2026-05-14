@@ -64,7 +64,7 @@ export default function TermsPage() {
             <li>Don&rsquo;t scrape the site or hammer the API; use the official LRC and LegiScan APIs for bulk data.</li>
             <li>Don&rsquo;t attempt to impersonate other users, legislators, or staff.</li>
             <li>Don&rsquo;t use the site to harass legislators or other users.</li>
-            <li>Don&rsquo;t reverse-engineer, probe for vulnerabilities, or attempt to disrupt the service. Responsible vulnerability reports to <MuiLink href="mailto:security@kyvky.com">security@kyvky.com</MuiLink> are welcome.</li>
+            <li>Don&rsquo;t reverse-engineer, probe for vulnerabilities, or attempt to disrupt the service. Responsible vulnerability reports to <MuiLink href="mailto:hello@kyvky.com">hello@kyvky.com</MuiLink> are welcome.</li>
           </Typography>
         </section>
 
