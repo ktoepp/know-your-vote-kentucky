@@ -2,68 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== DESIGN SYSTEM TOKENS ===== */
-/* Source of truth. All values derived from the approved Framer design.
-   Tailwind reads from these via tailwind.config.js theme.extend.colors.
-   MUI reads from these via src/lib/theme.ts.
-   Do not use raw hex anywhere outside this file. */
+/* ===================================================================
+   KYvKY design tokens — canonical names mirror the Framer design.
+   Source of truth: kyvky/project/guidelines.md
+   =================================================================== */
 
 :root {
-  /* --- Brand --- */
-  --primary:       #1E40AF;   /* Primary blue: buttons, links, focus ring */
-  --primary-dark:  #1E3A8A;   /* Hero gradient start, pressed state */
-  --primary-light: #2563EB;   /* Hero gradient end, hover state */
-  --primary-50:    #EFF6FF;   /* Selected pill bg, info banner bg */
+  /* Brand */
+  --primary:       #1E40AF;
+  --primary-dark:  #1E3A8A;
+  --primary-light: #2563EB;
+  --primary-50:    #EFF6FF;
 
-  /* --- Neutrals (cool Slate scale) --- */
-  --bg-surface:    #FFFFFF;   /* Card, input fill, hero text */
-  --bg-page:       #F8FAFC;   /* Page background */
-  --bg-tertiary:   #F1F5F9;   /* Subtle banner, striped row, muted surface */
-  --border-light:  #E2E8F0;   /* Hairline borders, dividers, input border */
-  --border:        #CBD5E1;   /* Disabled border, chip border, hover border */
-  --text-muted:    #94A3B8;   /* Placeholder text, tertiary metadata */
-  --text-tertiary: #64748B;   /* Muted body, footer copy, italic disclaimers */
-  --text-secondary:#334155;   /* Secondary body text, card descriptions */
-  --text-primary:  #0F172A;   /* Headings, dark CTA bg, primary body text */
+  /* Neutrals (Slate scale) */
+  --bg-surface:    #FFFFFF;
+  --bg-page:       #F8FAFC;
+  --bg-tertiary:   #F1F5F9;
+  --border-light:  #E2E8F0;
+  --border:        #CBD5E1;
+  --text-muted:    #94A3B8;
+  --text-tertiary: #64748B;
+  --text-secondary:#334155;
+  --text-primary:  #0F172A;
 
-  /* --- Semantic --- */
-  --success:       #16A34A;   /* House badge, Passed, Signed, Yea pill */
-  --success-tint:  #F0FDF4;   /* Success badge bg (light variant) */
-  --error:         #DC2626;   /* Nay vote, destructive actions, error state */
-  --error-tint:    #FEF2F2;   /* Error banner bg */
-  --warning:       #D97706;   /* Independent party, in-committee / pending */
+  /* Semantic */
+  --success:       #16A34A;
+  --success-tint:  #F0FDF4;
+  --error:         #DC2626;
+  --error-tint:    #FEF2F2;
+  --warning:       #D97706;
 
-  /* --- Chamber & party (own tokens to prevent semantic drift) --- */
-  --chamber-senate: #6B21A8;  /* Senate badge fill */
-  --chamber-house:  #16A34A;  /* House badge fill */
-  --party-r:        #DC2626;  /* Republican avatar dot */
-  --party-d:        #2563EB;  /* Democrat avatar dot */
-  --party-i:        #D97706;  /* Independent avatar dot */
-  --party-fg:       #FFFFFF;  /* Text on top of any party dot */
+  /* Chamber & party */
+  --chamber-senate:#6B21A8;
+  --chamber-house: #16A34A;
+  --party-r:       #DC2626;
+  --party-d:       #2563EB;
+  --party-i:       #D97706;
+  --party-fg:      #FFFFFF;
 
-  /* --- Elevation --- */
+  /* Elevation */
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
 
-  /* --- Typography --- */
-  --font-heading: "aesthet-nova", Georgia, "Times New Roman", serif;
-  --font-sans:    "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* Type */
+  --font-display: "aesthet-nova", Georgia, "Times New Roman", serif;
+  --font-sans:    var(--font-instrument-sans, "Instrument Sans"),
+                  -apple-system, BlinkMacSystemFont, "Segoe UI",
+                  "Helvetica Neue", Arial, sans-serif;
   --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-display);
 
-  /* --- Legacy aliases (keep for one release, then delete) --- */
+  /* Back-compat aliases (consumers still reference these names) */
   --bg-primary:    var(--bg-surface);
   --bg-secondary:  var(--bg-page);
   --blue-primary:  var(--primary);
+  --blue-secondary:var(--primary-light);
+  --blue-light:    var(--primary-light);
+  --green-primary: var(--success);
+  --red-primary:   var(--error);
+  --yellow-primary:var(--warning);
+  --info:          var(--primary);
   --focus-ring:    var(--primary);
+  --hover-bg:      var(--bg-tertiary);
 }
 
-/* ===== BASE STYLES ===== */
-
+/* Base */
 body {
   margin: 0;
   padding: 0;
   font-family: var(--font-sans);
-  font-size: 0.875rem;   /* 14px — text-body */
+  font-size: 14px;
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -71,159 +79,101 @@ body {
   color: var(--text-primary);
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading);
+  font-family: var(--font-display);
   font-weight: 500;
-  text-wrap: balance;
+  letter-spacing: 0;
 }
 
-/* ===== FOCUS (mandatory on every interactive element) ===== */
-
+/* Global focus ring — every interactive element */
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
   border-radius: inherit;
 }
 
-/* ===== NAVIGATION ===== */
-
-nav.nav-container {
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-light);
-  height: 72px;
-  box-shadow: var(--shadow-sm);
-}
-
-nav.nav-container a {
-  color: var(--text-primary);
-  text-decoration: none;
-  font-size: 0.8125rem;   /* text-body-sm */
-  font-weight: 500;
-  transition: color 120ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-nav.nav-container a[aria-current="page"] {
-  font-weight: 600;
-  box-shadow: inset 0 -2px 0 var(--primary);
-}
-
-nav.nav-container a:hover {
-  color: var(--primary);
-}
-
-/* ===== SKELETON LOADING ===== */
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
-}
-
-/* ===== SKIP LINK (accessibility) ===== */
-
+/* Skip link */
 .skip-link {
   position: absolute;
   top: -40px;
   left: 6px;
   background: var(--primary);
   color: var(--bg-surface);
-  padding: 8px;
+  padding: 8px 12px;
   text-decoration: none;
-  border-radius: 4px;
+  border-radius: 8px;
   z-index: 1000;
-  font-size: 0.875rem;
-  font-weight: 500;
 }
+.skip-link:focus { top: 6px; }
 
-.skip-link:focus {
-  top: 6px;
-}
-
-/* ===== SCREEN READER ONLY ===== */
-
+/* Screen reader only */
 .sr-only {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
 }
 
-/* ===== TOUCH TARGETS ===== */
-
+/* Touch target helper */
 .touch-target {
   min-height: 44px;
   min-width: 44px;
 }
 
-/* ===== TOOLTIP ===== */
-
-.tooltip-container {
-  position: relative;
-  display: inline;
+/* Nav — flat white, hairline bottom border (guidelines §6.7) */
+nav.nav-container {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+}
+nav.nav-container a,
+nav.nav-container .nav-link {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+nav.nav-container a[aria-current="page"],
+nav.nav-container .nav-link.active {
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--primary);
 }
 
-/* Portaled floating layer (Tooltip.tsx) */
+/* Skeleton pulse — kept for loading states */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* Tooltip surface (portaled by Tooltip.tsx) */
 .ky-tooltip-surface {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   line-height: 1.4;
   padding: 8px 12px;
-  border-radius: 6px;
-  background: var(--text-primary);
+  border-radius: 8px;
+  background-color: var(--text-primary);
   color: var(--bg-surface);
-  transition: opacity 120ms, visibility 120ms;
-  box-sizing: border-box;
   box-shadow: var(--shadow-md);
+  box-sizing: border-box;
   max-width: min(28rem, calc(100vw - 1rem));
 }
 
-.tooltip-trigger {
-  cursor: help;
-}
+.tooltip-container { position: relative; display: inline; }
 
-/* ===== ANIMATION ===== */
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-  animation: fadeIn 200ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-/* ===== ACCESSIBILITY MEDIA QUERIES ===== */
-
+/* Accessibility media queries */
 @media (prefers-contrast: high) {
-  nav.nav-container,
-  .card,
-  button {
-    border: 2px solid;
-  }
-
-  :focus-visible {
-    outline-width: 3px;
-  }
+  nav.nav-container { border-bottom-width: 2px; }
+  :focus-visible    { outline-width: 3px; }
 }
 
 @media (forced-colors: active) {
-  .gradient-text {
-    background: none;
-    color: CanvasText;
-  }
+  .gradient-text { background: none; color: CanvasText; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

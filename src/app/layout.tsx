@@ -2,14 +2,14 @@ import React from 'react';
 import './globals.css';
 import type { Metadata } from 'next';
 import { Instrument_Sans } from 'next/font/google';
+import ClientThemeProvider from './components/ClientThemeProvider';
 
 const instrumentSans = Instrument_Sans({
-  subsets:  ['latin'],
-  weight:   ['400', '500', '600'],
-  variable: '--font-sans',
-  display:  'swap',
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-instrument-sans',
+  display: 'swap',
 });
-import ClientThemeProvider from './components/ClientThemeProvider';
 import Navigation from "./components/Navigation";
 import SiteFooter from "./components/SiteFooter";
 import { TooltipProvider } from '@/lib/TooltipContext';
