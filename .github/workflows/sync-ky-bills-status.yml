@@ -1,0 +1,66 @@
+# Conservative LegiScan bills sync focused on status / metadata refresh.
+#
+# Strategy (see src/lib/ky-sync-pipeline.ts — syncKyBillsByHash):
+#   --use-change-hash     Master list raw + DB change_hash; unchanged bills skip writes and skip getBill.
+#   --skip-bill-sponsor-details   Never calls getBill — lowest API usage; status/last_action from raw list.
+# Topic tags use keyword classifyTopics only during sync (no Anthropic calls on this path).
+#
+# Does NOT replace occasional full sponsor enrichment — run a bills sync without skip locally when needed.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   LEGISCAN_API_KEY
+#   NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#
+# Schedule runs on default branch only (same as other cron workflows).
+name: Sync KY bill statuses
+
+on:
+  workflow_dispatch:
+    inputs:
+      historic_sessions:
+        description: 'How many recent KY sessions to scan (1 = current GA only). Hash skips unchanged bills.'
+        type: string
+        default: '1'
+  schedule:
+    # Weekly — Tuesdays 07:30 UTC (offset from outbound-links workflow)
+    - cron: '30 7 * * 2'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# Avoid overlapping runs hammering LegiScan if a job is slow or manually re-triggered.
+concurrency:
+  group: sync-ky-bills-status
+  cancel-in-progress: false
+
+jobs:
+  sync-bills:
+    name: Sync bill statuses (conservative)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Bills sync (hash-gated, no getBill)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            EXTRA="--historic-sessions=${{ inputs.historic_sessions }}"
+          fi
+          npm run sync:ky:bills:status -- ${EXTRA}

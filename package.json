@@ -18,6 +18,7 @@
     "sync:ky:legislators": "tsx scripts/manual-sync.ts legislators",
     "sync:ky:sessions": "tsx scripts/list-ky-legiscan-sessions.ts",
     "sync:ky:quota": "tsx scripts/manual-sync.ts bills --quota-backfill",
+    "sync:ky:bills:status": "tsx scripts/manual-sync.ts bills --use-change-hash --skip-bill-sponsor-details",
     "sync:ky:dry": "tsx scripts/manual-sync.ts --dry-run",
     "bulk-seed:ky": "tsx scripts/ky-legiscan-bulk-seed.ts",
     "check:legiscan-quota": "tsx scripts/check-quota.ts",
@@ -64,7 +65,8 @@
     "react-dom": "18.2.0",
     "react-map-gl": "^8.1.1",
     "resend": "^6.12.3",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "ws": "^8.20.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -76,6 +78,7 @@
     "@types/react": "^18.2.79",
     "@types/react-dom": "^18.2.25",
     "@types/shpjs": "^3.4.7",
+    "@types/ws": "^8.18.1",
     "adm-zip": "^0.5.17",
     "eslint": "^9",
     "eslint-config-next": "15.5.18",

@@ -73,8 +73,8 @@ export function BillDigestEmail(props: {
           </Section>
           {moreCount > 0 && (
             <Text style={{ marginTop: 16 }}>
-              and {moreCount} more update{moreCount === 1 ? '' : 's'} —{' '}
-              <Link href={followedBillsHref}>view followed bills on the site</Link>.
+              {moreCount} additional update{moreCount === 1 ? '' : 's'} not shown —{' '}
+              <Link href={followedBillsHref}>view all followed bills</Link>.
             </Text>
           )}
           <Section style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>

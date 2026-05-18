@@ -34,12 +34,15 @@ import { MemberCard } from '@/components/members/MemberCard';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { committeeMembershipSlugMatchesFilter } from '@/lib/ky-committee-utils';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
+import { PaginatedSection } from '@/components/ui/PaginatedSection';
 
 function sortLegislatorsByName(a: KYLegislator, b: KYLegislator) {
   const al = (a.last_name || '').trim().toLowerCase() || a.name.trim().toLowerCase();
   const bl = (b.last_name || '').trim().toLowerCase() || b.name.trim().toLowerCase();
   return al.localeCompare(bl);
 }
+
+const MEMBERS_PAGE_SIZE = 24;
 
 function ChamberSection({
   title,
@@ -74,18 +77,26 @@ function ChamberSection({
         </Box>
         <Chip label={legislators.length} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
       </Box>
-      <Grid container spacing={3}>
-        {legislators.map((leg) => (
-          <Grid item xs={12} sm={cardFeatured ? 12 : 6} md={cardFeatured ? 8 : 4} lg={cardFeatured ? 6 : 4} key={leg.id}>
-            <MemberCard
-              leg={leg}
-              featured={cardFeatured}
-              profileHref={memberProfilePath(leg)}
-              legislatorRoster={legislatorRoster}
-            />
+      <PaginatedSection
+        items={legislators}
+        pageSize={MEMBERS_PAGE_SIZE}
+        variant="loadmore"
+      >
+        {(visible) => (
+          <Grid container spacing={3}>
+            {visible.map((leg) => (
+              <Grid item xs={12} sm={cardFeatured ? 12 : 6} md={cardFeatured ? 8 : 4} lg={cardFeatured ? 6 : 4} key={leg.id}>
+                <MemberCard
+                  leg={leg}
+                  featured={cardFeatured}
+                  profileHref={memberProfilePath(leg)}
+                  legislatorRoster={legislatorRoster}
+                />
+              </Grid>
+            ))}
           </Grid>
-        ))}
-      </Grid>
+        )}
+      </PaginatedSection>
     </Box>
   );
 }
@@ -423,18 +434,27 @@ function MembersPageContent() {
             />
           </Box>
         ) : (
-          <Grid container spacing={3}>
-            {filtered.map((leg) => (
-              <Grid item xs={12} sm={6} md={chamberFilter === 'governor' ? 8 : 4} lg={chamberFilter === 'governor' ? 6 : 4} key={leg.id}>
-                <MemberCard
-                  leg={leg}
-                  featured={chamberFilter === 'governor'}
-                  profileHref={memberProfilePath(leg)}
-                  legislatorRoster={legislatorRoster}
-                />
+          <PaginatedSection
+            items={filtered}
+            pageSize={MEMBERS_PAGE_SIZE}
+            resetKey={`${chamberFilter}|${partyFilter}|${searchQuery}|${committeeSelect}`}
+            variant="loadmore"
+          >
+            {(visible) => (
+              <Grid container spacing={3}>
+                {visible.map((leg) => (
+                  <Grid item xs={12} sm={6} md={chamberFilter === 'governor' ? 8 : 4} lg={chamberFilter === 'governor' ? 6 : 4} key={leg.id}>
+                    <MemberCard
+                      leg={leg}
+                      featured={chamberFilter === 'governor'}
+                      profileHref={memberProfilePath(leg)}
+                      legislatorRoster={legislatorRoster}
+                    />
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
+            )}
+          </PaginatedSection>
         )}
       </Container>
     </Box>

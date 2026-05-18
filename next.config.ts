@@ -9,6 +9,8 @@ import { withSentryConfig } from "@sentry/nextjs";
  * To re-enable ESLint in production builds for stricter code quality, remove or set `ignoreDuringBuilds: false`.
  */
 const nextConfig: NextConfig = {
+  /** Native WebSocket impl used by Supabase Realtime when Node is below 22 (see supabaseAdminCore.ts). */
+  serverExternalPackages: ["ws"],
   async redirects() {
     const apex = 'https://kyvky.com';
     const hostsToApex = [

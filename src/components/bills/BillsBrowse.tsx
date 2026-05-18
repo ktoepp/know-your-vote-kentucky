@@ -680,10 +680,8 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
           <PaginatedSection
             items={sortedBills}
             pageSize={pageSize}
-            pageSizeOptions={[...PAGE_SIZE_CHOICES]}
-            onPageSizeChange={(n) => setPageSize(toPageSizeChoice(n))}
             resetKey={browsePagerResetKey}
-            variant="pagination"
+            variant="loadmore"
           >
             {(pageBills) =>
               viewMode === 'list' ? (

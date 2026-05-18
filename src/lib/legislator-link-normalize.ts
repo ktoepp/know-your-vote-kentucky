@@ -3,6 +3,8 @@
  * Used at sync time and defensively when resolving profile targets in the UI.
  */
 
+import { parseKyDistrictNumber } from './ky-district-geo';
+
 const HTTP_HOSTS_UPGRADE = [
   'legislature.ky.gov',
   'ballotpedia.org',
@@ -83,6 +85,45 @@ export function scoreKentuckyLegislatureProfileUrl(url: string): number {
   return score;
 }
 
+/** Legacy per-legislator pages on www.lrc.ky.gov (`H048.htm`, `S03.htm`, …). */
+const LEGACY_LRC_LEGISLATOR_HTM = /\/legislator\/([HS])(\d+)\.htm$/i;
+
+/**
+ * Stored Open States `website`: drop obsolete LRC hosts and legacy `.htm` paths that do not match
+ * chamber + district (bad upstream data — e.g. House 138 linked as `H038.htm`).
+ */
+export function sanitizeLegislatorCampaignWebsiteUrl(
+  url: string | null | undefined,
+  chamber: 'house' | 'senate' | null,
+  districtRaw: string | null | undefined,
+): string | null {
+  const normalized = normalizeHttpsUrl(url);
+  if (!normalized) return null;
+  const host = hostnameOf(normalized);
+  if (!host) return null;
+  if (isObsoleteKyLrcHostname(host)) return null;
+
+  let pathname = '';
+  try {
+    pathname = new URL(normalized).pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return null;
+  }
+  const m = pathname.match(LEGACY_LRC_LEGISLATOR_HTM);
+  if (m && chamber) {
+    const letter = (m[1] ?? '').toUpperCase();
+    const urlDistrictNum = parseInt(m[2] ?? '', 10);
+    const expectedLetter = chamber === 'house' ? 'H' : 'S';
+    if (letter !== expectedLetter || !Number.isFinite(urlDistrictNum)) return null;
+    const distStr = parseKyDistrictNumber(districtRaw ?? null);
+    if (!distStr) return normalized;
+    const distNum = parseInt(distStr, 10);
+    if (!Number.isFinite(distNum) || distNum !== urlDistrictNum) return null;
+  }
+
+  return normalized;
+}
+
 export function pickBestKentuckyLegislatureLink(urls: string[]): string | null {
   const seen = new Set<string>();
   const uniq: string[] = [];
@@ -129,6 +170,8 @@ export function extractOpenStatesLegislatorWebLinksFromRaw(
       lrcCandidates.push(normalized);
       continue;
     }
+
+    if (isObsoleteKyLrcHostname(host)) continue;
 
     if (isSocialMediaHost(host)) continue;
 

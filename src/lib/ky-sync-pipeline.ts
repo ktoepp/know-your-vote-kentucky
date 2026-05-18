@@ -36,7 +36,11 @@ import {
   openStatesLegislatorNames,
 } from './ky-openstates-client';
 import { normalizeBallotpediaForStorage } from './external-legislative-links';
-import { buildLegislatorExternalLinks, normalizeHttpsUrl } from './legislator-link-normalize';
+import {
+  buildLegislatorExternalLinks,
+  normalizeHttpsUrl,
+  sanitizeLegislatorCampaignWebsiteUrl,
+} from './legislator-link-normalize';
 import { normalizeKyLegislatorDistrictForDb } from './ky-district-geo';
 import { normalizeLegislatorPhotoUrl, normalizeSponsorNameForMatch } from './ky-member-utils';
 import type { KYSource } from '../types/kentucky';
@@ -1115,7 +1119,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         email,
         phone,
         lrc_profile_url: normalizeHttpsUrl(lrcProfileUrl),
-        website: normalizeHttpsUrl(otherWebsiteUrl),
+        website: sanitizeLegislatorCampaignWebsiteUrl(otherWebsiteUrl, chamber, districtRaw),
         active: true,
         committee_memberships,
         external_links,

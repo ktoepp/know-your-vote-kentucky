@@ -13,7 +13,11 @@ async function unsubscribe(token: string): Promise<{ ok: boolean; status: number
     return {
       ok: false,
       status: 400,
-      body: page('Unsubscribe', 'This link is invalid or the server is not configured.', false),
+      body: page(
+        'Invalid link',
+        'This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at hello@kyvky.com.',
+        false,
+      ),
     };
   }
 
@@ -27,7 +31,11 @@ async function unsubscribe(token: string): Promise<{ ok: boolean; status: number
     return {
       ok: false,
       status: 404,
-      body: page('Unsubscribe', 'We could not find a subscription for this link.', false),
+      body: page(
+        'Link not found',
+        'No subscription was found for this link. You may have already unsubscribed, or the link may have expired.',
+        false,
+      ),
     };
   }
 
@@ -43,7 +51,11 @@ async function unsubscribe(token: string): Promise<{ ok: boolean; status: number
     return {
       ok: false,
       status: 500,
-      body: page('Something went wrong', 'Please try again later or update preferences in your profile.', false),
+      body: page(
+        'Something went wrong',
+        'Your preference could not be saved. Please try again, or update your digest settings from your profile page.',
+        false,
+      ),
     };
   }
 
@@ -51,8 +63,8 @@ async function unsubscribe(token: string): Promise<{ ok: boolean; status: number
     ok: true,
     status: 200,
     body: page(
-      'You are unsubscribed',
-      'You will not receive further bill digest emails. You can turn digests back on anytime from your profile.',
+      'Digest emails stopped',
+      'You will not receive further bill digest emails from Know Your Vote Kentucky. You can re-enable digests at any time from your profile.',
       true,
     ),
   };

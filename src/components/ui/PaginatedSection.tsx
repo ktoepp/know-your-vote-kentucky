@@ -3,6 +3,7 @@
 import React, { useId, useState, useEffect, useMemo } from 'react';
 import {
   Box,
+  Button,
   FormControl,
   IconButton,
   InputLabel,
@@ -16,7 +17,7 @@ import {
 import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 
-export type PaginatedSectionVariant = 'pagination' | 'gallery' | 'responsive';
+export type PaginatedSectionVariant = 'pagination' | 'gallery' | 'responsive' | 'loadmore';
 
 export interface PaginatedSectionProps<T> {
   items: readonly T[];
@@ -50,15 +51,42 @@ export function PaginatedSection<T>({
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
   const pageSizeLabelId = useId();
   const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(pageSize);
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
 
   useEffect(() => {
     setPage(1);
-  }, [resetKey]);
+    setVisibleCount(pageSize);
+  }, [resetKey, pageSize]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
+
+  // Load more variant
+  if (variant === 'loadmore') {
+    const visibleItems = items.slice(0, visibleCount) as T[];
+    const hasMore = visibleCount < items.length;
+    return (
+      <Box>
+        {children(visibleItems)}
+        <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <Typography variant="caption" color="text.secondary">
+            Showing {visibleItems.length} of {items.length}
+          </Typography>
+          {hasMore && (
+            <Button
+              variant="outlined"
+              onClick={() => setVisibleCount((c) => Math.min(c + pageSize, items.length))}
+              sx={{ minWidth: 160 }}
+            >
+              Load more
+            </Button>
+          )}
+        </Box>
+      </Box>
+    );
+  }
 
   const pageItems = useMemo(() => {
     const start = (page - 1) * pageSize;
