@@ -39,8 +39,8 @@ export function BillDigestEmail(props: {
       <Preview>{previewText}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={h1}>Your Kentucky bill digest</Heading>
-          <Text style={muted}>Updates from bills and topics you follow (factual status from LegiScan-synced data).</Text>
+          <Heading style={h1}>Kentucky bill digest</Heading>
+          <Text style={muted}>Status updates for bills and topics you follow.</Text>
           <Section style={{ marginTop: 24 }}>
             {groups.map((g) => (
               <Section key={g.billHref} style={billBlock}>
@@ -59,12 +59,12 @@ export function BillDigestEmail(props: {
           </Section>
           {moreCount > 0 && (
             <Text style={{ marginTop: 16 }}>
-              and {moreCount} more update{moreCount === 1 ? '' : 's'} —{' '}
-              <Link href={followedBillsHref}>view followed bills on the site</Link>.
+              {moreCount} additional update{moreCount === 1 ? '' : 's'} not shown —{' '}
+              <Link href={followedBillsHref}>view all followed bills</Link>.
             </Text>
           )}
           <Text style={{ marginTop: 32, fontSize: 12, color: '#64748b' }}>
-            <Link href={unsubscribeHref}>Unsubscribe from these digests</Link>
+            <Link href={unsubscribeHref}>Stop receiving these digests</Link>
           </Text>
         </Container>
       </Body>

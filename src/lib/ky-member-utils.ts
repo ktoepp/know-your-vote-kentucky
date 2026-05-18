@@ -6,6 +6,7 @@ import {
   isKentuckyLegislatureHost,
   isObsoleteKyLrcHostname,
   normalizeHttpsUrl,
+  sanitizeLegislatorCampaignWebsiteUrl,
 } from '@/lib/legislator-link-normalize';
 import { legiscanMemberPersonUrl, normalizeBallotpediaHref, legiscanPersonUrl } from './external-legislative-links';
 
@@ -306,10 +307,13 @@ export function kyLegislatureProfileUrl(
 export function kyLegislatorCampaignWebsite(leg: {
   lrc_profile_url?: string | null;
   website?: string | null;
+  chamber?: 'house' | 'senate' | null;
+  district?: string | null;
 }): string | null {
   const w = (leg.website || '').trim();
   if (!w) return null;
-  const n = normalizeHttpsUrl(w) ?? w;
+  const n = sanitizeLegislatorCampaignWebsiteUrl(w, leg.chamber ?? null, leg.district ?? null);
+  if (!n) return null;
   const host = hostnameOf(n);
   if (!host || isObsoleteKyLrcHostname(host)) return null;
   if (isKentuckyLegislatureHost(host)) return null;

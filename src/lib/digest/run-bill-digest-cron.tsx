@@ -254,7 +254,7 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
     const followedBillsHref = `${origin}/bills?follows=me`;
 
-    const previewText = `${groups.length} bill${groups.length === 1 ? '' : 's'} with updates`;
+    const previewText = `${groups.length} bill${groups.length === 1 ? '' : 's'} with new activity`;
 
     if (dryRun || !resend) {
       if (samples.length < 3) samples.push({ email, eventCount: top.length });
@@ -275,7 +275,7 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
       const { data: sendData, error: sendErr } = await resend.emails.send({
         from: fromEmail,
         to: email,
-        subject: `KY bill digest — ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium' }).format(now)}`,
+        subject: `Kentucky bill digest — ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium' }).format(now)}`,
         html,
         headers: {
           'List-Unsubscribe': `<${unsubscribeHref}>`,

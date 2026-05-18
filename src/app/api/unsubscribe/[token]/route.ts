@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const { token: raw } = await params;
   const token = decodeURIComponent(raw || '').trim();
   if (!token || !supabaseAdmin) {
-    return new NextResponse(page('Unsubscribe', 'This link is invalid or the server is not configured.', false), {
+    return new NextResponse(page('Invalid link', 'This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at hello@kyvky.com.', false), {
       status: 400,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     .maybeSingle();
 
   if (selErr || !row?.user_id) {
-    return new NextResponse(page('Unsubscribe', 'We could not find a subscription for this link.', false), {
+    return new NextResponse(page('Link not found', 'No subscription was found for this link. You may have already unsubscribed, or the link may have expired.', false), {
       status: 404,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     .eq('unsubscribe_token', token);
 
   if (upErr) {
-    return new NextResponse(page('Something went wrong', 'Please try again later or update preferences in your profile.', false), {
+    return new NextResponse(page('Something went wrong', 'Your preference could not be saved. Please try again, or update your digest settings from your profile page.', false), {
       status: 500,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
@@ -51,8 +51,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
   return new NextResponse(
     page(
-      'You are unsubscribed',
-      'You will not receive further bill digest emails. You can turn digests back on anytime from your profile.',
+      'Digest emails stopped',
+      'You will not receive further bill digest emails from Know Your Vote Kentucky. You can re-enable digests at any time from your profile.',
       true,
     ),
     { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },

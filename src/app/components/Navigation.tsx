@@ -29,20 +29,12 @@ import {
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  Home as HomeIcon,
-  LiveTv as LiveTvIcon,
   Menu as MenuIcon,
   Close as CloseIcon,
   Description,
   Groups,
-  Timeline,
-  Explore,
-  Upload,
-  Settings,
-  Help as HelpIcon,
   AccountCircle,
   KeyboardArrowDown,
-  EventNote,
 } from '@mui/icons-material';
 import { KentuckyStateIcon } from '@/components/icons/KentuckyStateIcon';
 import { useThemeUtils } from '@/components/ui/ThemeUtils';
@@ -84,7 +76,7 @@ const navLinks: NavLinkConfig[] = [
   },
   {
     href: '/members/map',
-    label: 'District map',
+    label: 'Find my Legislator',
     icon: <KentuckyStateIcon />,
     priority: 'primary',
   },
@@ -154,22 +146,11 @@ function BillsNavDropdown({
       <Button
         component={Link}
         href={item.href}
-        startIcon={React.cloneElement(item.icon, {
-          sx: {
-            fontSize: ICON_REM.nav,
-            color: theme.palette.mode === 'dark'
-              ? theme.palette.primary.contrastText
-              : theme.palette.text.primary,
-          },
-        })}
         endIcon={
           <KeyboardArrowDown
             sx={{
-              fontSize: ICON_REM.nav,
-              opacity: 0.85,
-              color: theme.palette.mode === 'dark'
-                ? theme.palette.primary.contrastText
-                : theme.palette.text.primary,
+              fontSize: '1rem',
+              opacity: 0.6,
               transition: 'transform 0.2s ease',
               transform: menuOpen ? 'rotate(-180deg)' : 'none',
             }}
@@ -178,28 +159,15 @@ function BillsNavDropdown({
         aria-haspopup="true"
         aria-expanded={menuOpen}
         sx={{
-          color: theme.palette.mode === 'dark'
-            ? theme.palette.primary.contrastText
-            : theme.palette.text.primary,
-          backgroundColor: groupActive ? getHoverBackground() : 'transparent',
-          borderRadius: 2,
-          px: 3,
-          py: 1.5,
+          color: groupActive ? 'primary.main' : 'text.primary',
+          backgroundColor: groupActive ? 'rgba(0,0,0,0.06)' : 'transparent',
+          borderRadius: 1.5,
+          px: 2,
+          py: 1,
           textTransform: 'none',
-          fontSize: '1.0625rem',
+          fontSize: '0.9375rem',
           fontWeight: groupActive ? 600 : 500,
-          '&:hover': {
-            backgroundColor: getHoverBackground(),
-          },
-          '& .MuiButton-startIcon': {
-            transition: 'transform 0.2s ease',
-            color: theme.palette.mode === 'dark'
-              ? theme.palette.primary.contrastText
-              : theme.palette.text.primary,
-          },
-          '&:hover .MuiButton-startIcon': {
-            transform: 'scale(1.1)',
-          },
+          '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
         }}
       >
         {item.label}
@@ -336,8 +304,8 @@ function GlobalSearchBar({ tone = 'default' }: { tone?: 'default' | 'onPrimary' 
         size="small"
         fullWidth
         inputProps={{
-          'aria-label': 'Search',
-          title: 'Search bills by designation (HB 23) or keywords',
+          'aria-label': 'Search bills and members',
+          title: 'Search bills (e.g. HB 23) or members by name',
         }}
         sx={{
           '& .MuiOutlinedInput-root': {
@@ -449,9 +417,26 @@ function UserMenu() {
   const nextPath = pathname && !pathname.startsWith('/auth') ? pathname : '/';
   const loginHref = `/auth/login?next=${encodeURIComponent(nextPath)}`;
   return (
-    <Button component={Link} href={loginHref} variant="outlined" size="small" sx={{ ml: 1, whiteSpace: 'nowrap' }}>
-      Log in
-    </Button>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Button
+        component={Link}
+        href={loginHref}
+        variant="text"
+        size="small"
+        sx={{ whiteSpace: 'nowrap', color: 'text.primary', display: { xs: 'none', sm: 'inline-flex' } }}
+      >
+        Sign in
+      </Button>
+      <Button
+        component={Link}
+        href="/auth/register"
+        variant="contained"
+        size="small"
+        sx={{ whiteSpace: 'nowrap' }}
+      >
+        Sign up
+      </Button>
+    </Box>
   );
 }
 
@@ -461,7 +446,7 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const { getHoverBackground } = useThemeUtils();
-  const { tooltipsEnabled, toggleTooltips } = useTooltips();
+  const { tooltipsEnabled } = useTooltips();
   const { user, loading } = useUser();
 
   const isActive = (path: string) => isNavPathActive(path, pathname);
@@ -579,37 +564,16 @@ export default function Navigation() {
                   key={item.href}
                   component={Link}
                   href={item.href}
-                  startIcon={React.cloneElement(item.icon, {
-                    sx: {
-                      fontSize: ICON_REM.nav,
-                      color: theme.palette.mode === 'dark'
-                        ? theme.palette.primary.contrastText
-                        : theme.palette.text.primary,
-                    },
-                  })}
                   sx={{
-                    color: theme.palette.mode === 'dark'
-                      ? theme.palette.primary.contrastText
-                      : theme.palette.text.primary,
-                    backgroundColor: isActive(item.href) ? getHoverBackground() : 'transparent',
-                    borderRadius: 2,
-                    px: 3,
-                    py: 1.5,
+                    color: isActive(item.href) ? 'primary.main' : 'text.primary',
+                    backgroundColor: isActive(item.href) ? 'rgba(0,0,0,0.06)' : 'transparent',
+                    borderRadius: 1.5,
+                    px: 2,
+                    py: 1,
                     textTransform: 'none',
-                    fontSize: '1.0625rem',
+                    fontSize: '0.9375rem',
                     fontWeight: isActive(item.href) ? 600 : 500,
-                    '&:hover': {
-                      backgroundColor: getHoverBackground(),
-                    },
-                    '& .MuiButton-startIcon': {
-                      transition: 'transform 0.2s ease',
-                      color: theme.palette.mode === 'dark'
-                        ? theme.palette.primary.contrastText
-                        : theme.palette.text.primary,
-                    },
-                    '&:hover .MuiButton-startIcon': {
-                      transform: 'scale(1.1)',
-                    },
+                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
                   }}
                 >
                   {item.label}
@@ -621,49 +585,30 @@ export default function Navigation() {
           {/* Spacer */}
           <Box sx={{ flexGrow: 1 }} />
           
-          {/* Desktop Search Bar */}
-          <Box sx={{ display: { xs: 'none', md: 'block' }, mx: 2 }}>
-            <GlobalSearchBar />
+          {/* Desktop search icon */}
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', mx: 1 }}>
+            <MuiTooltip title="Search bills and members" placement="bottom">
+              <IconButton
+                component={Link}
+                href="/search"
+                aria-label="Search"
+                sx={{
+                  color: theme.palette.text.primary,
+                  p: 1.25,
+                  borderRadius: 2,
+                  '&:hover': { backgroundColor: 'rgba(0,0,0,0.05)' },
+                }}
+              >
+                <SearchIcon sx={{ fontSize: ICON_REM.nav }} />
+              </IconButton>
+            </MuiTooltip>
           </Box>
-          
+
           {/* Right side items */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {/* Tooltip toggle - hidden on mobile */}
-            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-              <MuiTooltip 
-                title={tooltipsEnabled ? "Disable tooltips" : "Enable tooltips"}
-                placement="bottom"
-              >
-                <IconButton
-                  onClick={toggleTooltips}
-                  sx={{
-                    color: theme.palette.mode === 'dark' 
-                      ? theme.palette.primary.contrastText 
-                      : theme.palette.text.primary,
-                    p: 1.5,
-                    borderRadius: 2,
-                    transition: 'all 0.2s ease',
-                    backgroundColor: tooltipsEnabled 
-                      ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)')
-                      : 'transparent',
-                    '&:hover': {
-                      backgroundColor: theme.palette.mode === 'dark' 
-                        ? 'rgba(255,255,255,0.2)' 
-                        : 'rgba(0,0,0,0.1)',
-                    },
-                  }}
-                >
-                  <HelpIcon sx={{ 
-                    fontSize: ICON_REM.nav,
-                    opacity: tooltipsEnabled ? 1 : 0.6,
-                  }} />
-                </IconButton>
-              </MuiTooltip>
-            </Box>
-            
             {/* User menu */}
             <UserMenu />
-            
+
             {/* Mobile menu button */}
             <Box sx={{ display: { xs: 'block', lg: 'none' } }}>
               <IconButton
@@ -721,51 +666,13 @@ export default function Navigation() {
                           mb: 0.5,
                           color: isActive(item.href) ? mobileNav.colorActive : mobileNav.color,
                           backgroundColor: isActive(item.href) ? mobileNav.activeBg : 'transparent',
-                          borderLeft: isActive(item.href)
-                            ? `4px solid ${theme.palette.primary.main}`
-                            : '4px solid transparent',
-                          '&:hover': {
-                            backgroundColor: mobileNav.hover,
-                          },
+                          '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
                         }}
                       >
-                        <ListItemIcon
-                          sx={{
-                            color: 'inherit',
-                            minWidth: 40,
-                            '& .MuiSvgIcon-root': {
-                              fontSize: ICON_REM.section,
-                            },
-                          }}
-                        >
-                          {React.cloneElement(item.icon, {
-                            sx: {
-                              fontSize: ICON_REM.section,
-                              color: isActive(item.href) ? mobileNav.colorActive : mobileNav.color,
-                            },
-                          })}
-                        </ListItemIcon>
                         <ListItemText
                           primary={item.label}
-                          sx={{
-                            '& .MuiListItemText-primary': {
-                              fontWeight: 600,
-                              fontSize: '1.125rem',
-                              color: 'inherit',
-                            },
-                          }}
+                          sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem', color: 'inherit' } }}
                         />
-                        {isActive(item.href) && (
-                          <Box
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              backgroundColor: theme.palette.primary.main,
-                              ml: 'auto',
-                            }}
-                          />
-                        )}
                       </ListItemButton>
                     </ListItem>
                     {item.subLinks.map((sub) => (
@@ -824,51 +731,13 @@ export default function Navigation() {
                         mb: 0.5,
                         color: isActive(item.href) ? mobileNav.colorActive : mobileNav.color,
                         backgroundColor: isActive(item.href) ? mobileNav.activeBg : 'transparent',
-                        borderLeft: isActive(item.href)
-                          ? `4px solid ${theme.palette.primary.main}`
-                          : '4px solid transparent',
-                        '&:hover': {
-                          backgroundColor: mobileNav.hover,
-                        },
+                        '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
                       }}
                     >
-                      <ListItemIcon
-                        sx={{
-                          color: 'inherit',
-                          minWidth: 40,
-                          '& .MuiSvgIcon-root': {
-                            fontSize: ICON_REM.section,
-                          },
-                        }}
-                      >
-                        {React.cloneElement(item.icon, {
-                          sx: {
-                            fontSize: ICON_REM.section,
-                            color: isActive(item.href) ? mobileNav.colorActive : mobileNav.color,
-                          },
-                        })}
-                      </ListItemIcon>
                       <ListItemText
                         primary={item.label}
-                        sx={{
-                          '& .MuiListItemText-primary': {
-                            fontWeight: 600,
-                            fontSize: '1.125rem',
-                            color: 'inherit',
-                          },
-                        }}
+                        sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem', color: 'inherit' } }}
                       />
-                      {isActive(item.href) && (
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            backgroundColor: theme.palette.primary.main,
-                            ml: 'auto',
-                          }}
-                        />
-                      )}
                     </ListItemButton>
                   </ListItem>
                 ),

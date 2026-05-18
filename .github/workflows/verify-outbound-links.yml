@@ -1,0 +1,45 @@
+# HTTP checks on legislator outbound URLs (LRC, website, Ballotpedia, LegiScan).
+# Requires repository secrets (Settings → Secrets and variables → Actions):
+#   NEXT_PUBLIC_SUPABASE_URL — or set SUPABASE_URL instead (either works)
+#   SUPABASE_SERVICE_ROLE_KEY — service_role JWT (not anon)
+# Optional but recommended:
+#   LEGISCAN_API_KEY — validates LegiScan via getPerson (public HTML often 403 for bots)
+#
+# Node: opt into Actions’ Node 24 for JS-based actions (checkout/setup-node/upload-artifact)
+# before Node 20 is removed from runners. See:
+# https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+name: Verify outbound links
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly — Mondays 06:00 UTC (adjust as needed)
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  verify-legislator-links:
+    name: Verify outbound links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify legislator links
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+        run: npm run verify:legislator-links

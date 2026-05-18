@@ -1,45 +1,48 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Chip,
-  CircularProgress,
   Container,
   Grid,
-  Link as MuiLink,
+  IconButton,
+  InputAdornment,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
-import { Gavel, Category } from '@mui/icons-material';
-import { ExternalLink, MapPin } from 'lucide-react';
+import { alpha, useTheme } from '@mui/material/styles';
+import { Search as SearchIcon } from '@mui/icons-material';
+import { MapPin, Search, Bell } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { useTheme } from '@mui/material/styles';
-import { alpha } from '@mui/material/styles';
-import { supabase } from './lib/supabaseClient';
-import type { KYBill, KYLegislatorRoster } from '../types/kentucky';
-import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
-import { SectionHeader } from '@/components/civic/SectionHeader';
-import { EmptyState } from '@/components/civic/EmptyState';
-import { KYBillCard } from '@/components/bills/KYBillCard';
-import { withTimeout } from '@/lib/async-utils';
-import { PaginatedSection } from '@/components/ui/PaginatedSection';
-import { HomeCuratedBillList } from '@/components/home/HomeCuratedBillList';
-import { selectRecentlyPassedBills, selectMostViewedBills } from '@/lib/home-bill-curated';
-import { KY_SESSIONS, getActiveSession } from '@/lib/ky-sessions';
-import { KY_TOPICS } from '@/lib/ky-topic-classifier';
-import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
-import { TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
+import { useRouter } from 'next/navigation';
+import { useUser } from './lib/UserContext';
+import { getActiveSession, KY_SESSIONS } from '@/lib/ky-sessions';
+import MapGL, { Layer, NavigationControl, Source } from 'react-map-gl/mapbox';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
-const HOME_SECTION_DISPLAY = 6;
-const HOME_SECTION_FETCH = 60;
-const HOME_CURATED_LIMIT = 6;
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '';
 
-/** LRC meetings & committee schedule (authoritative for day-to-day floor and committee). */
-const KY_LRC_SCHEDULE_URL = 'https://legislature.ky.gov/Committee/Schedule';
+const HOUSE_GEOJSON_URL = '/geo/ky-sldl.geojson';
+const SENATE_GEOJSON_URL = '/geo/ky-sldu.geojson';
+const OUTSIDE_KY_MASK_URL = '/geo/ky-outside-mask.geojson';
+
+const KY_BOUNDS: [[number, number], [number, number]] = [[-89.9, 36.4], [-81.45, 39.35]];
+
+/** Topics shown on the landing page — matches Framer design */
+const LANDING_TOPICS = [
+  { label: 'Education', topic: 'Education' },
+  { label: 'Agriculture', topic: 'Agriculture' },
+  { label: 'Transportation', topic: 'Transportation' },
+  { label: 'Health', topic: 'Healthcare' },
+  { label: 'Budget', topic: 'Budget' },
+  { label: 'Environment', topic: 'Environment' },
+  { label: 'Criminal justice', topic: 'Criminal Justice' },
+];
+
+// ── Session banner ─────────────────────────────────────────────────────────────
 
 function SessionBanner() {
   const theme = useTheme();
@@ -49,620 +52,301 @@ function SessionBanner() {
   const active = getActiveSession();
   const session = active ?? KY_SESSIONS[0]!;
   const isInSession = Boolean(active);
-
-  const sessionStart = new Date(session.start);
   const sessionEnd = new Date(session.end);
   sessionEnd.setHours(23, 59, 59, 999);
-  const beforeSession = today < sessionStart;
-  const afterScheduledSession = today > sessionEnd;
+  const afterSession = today > sessionEnd && !isInSession;
 
   const fmtDate = (d: string) =>
     new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  const statusColor = isInSession
-    ? theme.palette.success.main
-    : beforeSession
-      ? theme.palette.info.main
-      : theme.palette.grey[500];
-  const rowBg = isInSession
-    ? alpha(theme.palette.success.main, 0.08)
-    : beforeSession
-      ? alpha(theme.palette.info.main, 0.06)
-      : alpha(theme.palette.grey[500], 0.08);
-
-  const statusTitle: string | null = isInSession
-    ? 'General Assembly in session'
-    : beforeSession
-      ? 'Upcoming regular session'
-      : null;
-
   return (
-    <Box
-      sx={{
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        bgcolor: rowBg,
-        py: 1.25,
-      }}
-    >
-      <Container maxWidth="lg">
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: 1.5,
-            flexWrap: 'wrap',
-            flexDirection: { xs: 'column', sm: 'row' },
-          }}
-        >
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.5,
-              flexWrap: 'wrap',
-              flex: 1,
-              minWidth: 0,
-            }}
-          >
-            <Box
-              sx={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                bgcolor: statusColor,
-                flexShrink: 0,
-                ...(isInSession && {
-                  '@media (prefers-reduced-motion: no-preference)': {
-                    animation: 'sessionBannerPulse 2s infinite',
-                  },
-                  '@keyframes sessionBannerPulse': {
-                    '0%,100%': { opacity: 1 },
-                    '50%': { opacity: 0.4 },
-                  },
-                }),
-              }}
-            />
-            <Box component="div" sx={{ minWidth: 0 }}>
-              {statusTitle !== null && (
-                <Typography
-                  variant="body2"
-                  fontWeight={600}
-                  color={isInSession ? 'success.main' : 'text.primary'}
-                  component="span"
-                  sx={{ display: 'block' }}
+    <Box sx={{ borderBottom: `1px solid ${theme.palette.divider}`, bgcolor: 'background.paper', py: 1 }}>
+      <Container maxWidth="xl">
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary" fontWeight={500} textAlign="center">
+              {session.name}: {fmtDate(session.start)} – {fmtDate(session.end)}
+            </Typography>
+            {afterSession && (
+              <Typography variant="caption" color="text.secondary" display="block" textAlign="center">
+                Chambers or committees can still post limited activity after the last scheduled day.{' '}
+                <Box
+                  component="a"
+                  href="https://legislature.ky.gov/Committee/Schedule"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{ color: 'primary.main', textDecoration: 'underline' }}
                 >
-                  {statusTitle}
-                </Typography>
-              )}
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                component="span"
-                sx={{ display: 'block', mt: statusTitle !== null ? 0.25 : 0 }}
-              >
-                {session.name} · {fmtDate(session.start)} – {fmtDate(session.end)}
+                  Check the LRC for meetings and published calendars.
+                </Box>
               </Typography>
-              {afterScheduledSession && !isInSession && (
-                <Typography variant="caption" color="text.secondary" component="span" sx={{ display: 'block', mt: 0.5 }}>
-                  Chambers or committees can still post limited activity after the last scheduled day—check the LRC
-                  for meetings and published calendars.
-                </Typography>
-              )}
-              {beforeSession && !isInSession && (
-                <Typography variant="caption" color="text.secondary" component="span" sx={{ display: 'block', mt: 0.5 }}>
-                  Session convenes {fmtDate(session.start)}. Next in-person work after sine die is usually the next
-                  January regular session unless a special session is called.
-                </Typography>
-              )}
-            </Box>
+            )}
           </Box>
-          <Button
-            component={Link}
-            href={KY_LRC_SCHEDULE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            size="medium"
-            title="Opens the LRC committee schedule on legislature.ky.gov in a new tab"
-            endIcon={<ExternalLink size={18} aria-hidden />}
-            sx={{ ml: { sm: 'auto' }, fontSize: '0.95rem', py: 0.75, px: 1.5, flexShrink: 0 }}
-          >
-            LRC schedule
-          </Button>
         </Box>
       </Container>
     </Box>
   );
 }
 
+// ── Lightweight district map preview ──────────────────────────────────────────
+
+function LandingMap() {
+  return (
+    <MapGL
+      initialViewState={{ bounds: KY_BOUNDS, fitBoundsOptions: { padding: 20 } }}
+      mapboxAccessToken={MAPBOX_TOKEN}
+      mapStyle="mapbox://styles/mapbox/light-v11"
+      maxBounds={KY_BOUNDS}
+      style={{ width: '100%', height: '100%' }}
+      interactive={false}
+    >
+      {/* House districts */}
+      <Source id="ky-sldl" type="geojson" data={HOUSE_GEOJSON_URL}>
+        <Layer
+          id="house-fill"
+          type="fill"
+          paint={{ 'fill-color': '#D6C5E3', 'fill-opacity': 0.6 }}
+        />
+        <Layer
+          id="house-outline"
+          type="line"
+          paint={{ 'line-color': '#7637A6', 'line-width': 0.75 }}
+        />
+      </Source>
+
+      {/* Senate districts */}
+      <Source id="ky-sldu" type="geojson" data={SENATE_GEOJSON_URL}>
+        <Layer
+          id="senate-fill"
+          type="fill"
+          paint={{ 'fill-color': '#CEDFC3', 'fill-opacity': 0 }}
+        />
+        <Layer
+          id="senate-outline"
+          type="line"
+          paint={{ 'line-color': '#4A5C3E', 'line-width': 0.75, 'line-opacity': 0 }}
+        />
+      </Source>
+
+      {/* Outside KY mask */}
+      <Source id="ky-mask" type="geojson" data={OUTSIDE_KY_MASK_URL}>
+        <Layer
+          id="outside-mask"
+          type="fill"
+          paint={{ 'fill-color': '#f5f5f5', 'fill-opacity': 0.96 }}
+        />
+      </Source>
+
+      <NavigationControl position="top-right" showCompass={false} />
+    </MapGL>
+  );
+}
+
+function MapSection() {
+  const router = useRouter();
+  const [address, setAddress] = useState('');
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = address.trim();
+    router.push(q ? `/members/map?address=${encodeURIComponent(q)}` : '/members/map');
+  };
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 0, borderRadius: 3, overflow: 'hidden', border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+      {/* Map */}
+      <Box sx={{ flex: '0 0 55%', height: { xs: 260, md: 380 }, position: 'relative' }}>
+        <LandingMap />
+      </Box>
+
+      {/* Address panel */}
+      <Box sx={{ flex: 1, p: { xs: 3, md: 5 }, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <Typography variant="h4" component="h2" fontWeight={700} gutterBottom sx={{ lineHeight: 1.2 }}>
+          Find your representatives
+        </Typography>
+        <Box component="form" onSubmit={handleSearch} sx={{ mt: 2 }}>
+          <TextField
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Enter address or ZIP"
+            size="small"
+            fullWidth
+            sx={{ mb: 1.5 }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton type="submit" size="small" edge="end" aria-label="Search">
+                    <SearchIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button type="submit" variant="contained" fullWidth size="medium">
+            Search
+          </Button>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────────
+
+const FEATURE_CARDS = [
+  {
+    icon: <Search size={28} strokeWidth={1.5} />,
+    title: 'Find your reps',
+    body: 'Enter your address, see your House + Senate rep',
+  },
+  {
+    icon: <Search size={28} strokeWidth={1.5} />,
+    title: 'Track bills',
+    body: 'Browse and search 1,400+ bills by topic',
+  },
+  {
+    icon: <Bell size={28} strokeWidth={1.5} />,
+    title: 'Get notified',
+    body: 'Email alerts when followed bills move',
+  },
+];
+
 export default function HomePage() {
   const theme = useTheme();
-  const { followedBillIds, followedTopics, authed: followAuthed } = useFollowedBillsAndTopics();
-  const [bills, setBills] = useState<KYBill[]>([]);
-  const [houseBills, setHouseBills] = useState<KYBill[]>([]);
-  const [senateBills, setSenateBills] = useState<KYBill[]>([]);
-  const [showChamberSections, setShowChamberSections] = useState(false);
-  const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
-  const [passedSidebarBills, setPassedSidebarBills] = useState<KYBill[]>([]);
-  const [mostViewedBills, setMostViewedBills] = useState<KYBill[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [topicCounts, setTopicCounts] = useState<{ topic: string; count: number }[]>([]);
+  const router = useRouter();
+  const { user, loading: userLoading } = useUser();
 
+  // Redirect logged-in users to /feed
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      setError(null);
-      try {
-        if (!supabase) {
-          setLoading(false);
-          return;
-        }
-        const [billsRes, senateCountRes, legRes, passedRes, mostViewedRes, topicsRes] = await withTimeout(
-          Promise.all([
-            supabase.from('ky_bills').select('*').order('session', { ascending: false }).order('last_action_date', { ascending: false }).limit(HOME_SECTION_FETCH),
-            supabase
-              .from('ky_bills')
-              .select('id', { count: 'exact', head: true })
-              .or('chamber.eq.senate,bill_number.ilike.S%'),
-            supabase
-              .from('ky_legislators')
-              .select('id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url,ballotpedia,legiscan_image_url')
-              .eq('active', true),
-            supabase
-              .from('ky_bills')
-              .select('*')
-              .or('status.ilike.%signed%,status.ilike.%chaptered%,status.ilike.%enrolled%,status.ilike.%veto%override%')
-              .order('session', { ascending: false })
-              .order('last_action_date', { ascending: false, nullsFirst: false })
-              .limit(16),
-            supabase
-              .from('ky_bills')
-              .select('*')
-              .order('view_count', { ascending: false, nullsFirst: false })
-              .order('session', { ascending: false })
-              .order('last_action_date', { ascending: false, nullsFirst: false })
-              .limit(24),
-            // Identical ordering/limit to BillsBrowse so topic counts match click-through results
-            supabase.from('ky_bills').select('topics').order('session', { ascending: false }).order('last_action_date', { ascending: false }).limit(1000),
-          ]),
-          30_000,
-          'Could not reach database (timed out). Check your connection and Supabase status.',
-        );
-        if (billsRes.error) console.warn('[Home] ky_bills:', billsRes.error.message);
-        if (senateCountRes.error) console.warn('[Home] ky_bills (senate count):', senateCountRes.error.message);
-        if (legRes.error) console.warn('[Home] ky_legislators:', legRes.error.message);
-        if (passedRes.error) console.warn('[Home] ky_bills (curated passed):', passedRes.error.message);
-        if (mostViewedRes.error) console.warn('[Home] ky_bills (most viewed):', mostViewedRes.error.message);
-        if (topicsRes.error) console.warn('[Home] ky_bills (topics):', topicsRes.error.message);
-        const billsData = billsRes.data ?? [];
-        setBills(billsData);
-        const passed = selectRecentlyPassedBills(passedRes.data, billsData, HOME_CURATED_LIMIT);
-        setPassedSidebarBills(passed);
-        setMostViewedBills(selectMostViewedBills(mostViewedRes.data, billsData, passed, HOME_CURATED_LIMIT));
-        if (legRes.data) setLegislators(legRes.data);
-        if (topicsRes.data) {
-          const counts = new Map<string, number>();
-          for (const row of topicsRes.data) {
-            for (const topic of row.topics ?? []) {
-              counts.set(topic, (counts.get(topic) ?? 0) + 1);
-            }
-          }
-          setTopicCounts(
-            Array.from(counts.entries())
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 6)
-              .map(([topic, count]) => ({ topic, count })),
-          );
-        }
+    if (!userLoading && user) router.replace('/feed');
+  }, [user, userLoading, router]);
 
-        const senateCount = senateCountRes.count ?? 0;
-        const bicameral = senateCount > 0;
-        setShowChamberSections(bicameral);
-        if (!bicameral) {
-          setHouseBills([]);
-          setSenateBills([]);
-        } else {
-          const [houseBillsRes, senateBillsRes] = await withTimeout(
-            Promise.all([
-              supabase
-                .from('ky_bills')
-                .select('*')
-                .or('chamber.eq.house,bill_number.ilike.H%')
-                .order('session', { ascending: false })
-                .order('last_action_date', { ascending: false })
-                .limit(HOME_SECTION_FETCH),
-              supabase
-                .from('ky_bills')
-                .select('*')
-                .or('chamber.eq.senate,bill_number.ilike.S%')
-                .order('session', { ascending: false })
-                .order('last_action_date', { ascending: false })
-                .limit(HOME_SECTION_FETCH),
-            ]),
-            30_000,
-            'Could not reach database (timed out). Check your connection and Supabase status.',
-          );
-          if (houseBillsRes.error) console.warn('[Home] ky_bills (house):', houseBillsRes.error.message);
-          if (senateBillsRes.error) console.warn('[Home] ky_bills (senate):', senateBillsRes.error.message);
-          if (houseBillsRes.data) setHouseBills(houseBillsRes.data);
-          if (senateBillsRes.data) setSenateBills(senateBillsRes.data);
-        }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load data');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, []);
+  if (!userLoading && user) return null;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <SessionBanner />
-      {/* Hero: Kentucky State Capitol, Frankfort (Wikimedia: File:KY_State_Capitol.jpg, public domain) */}
+
+      {/* Hero — blue gradient */}
       <Box
         sx={{
-          position: 'relative',
-          overflow: 'hidden',
+          background: `linear-gradient(160deg, #1e40af 0%, #2563eb 50%, #1d4ed8 100%)`,
           color: 'common.white',
-          py: { xs: 6, md: 8 },
-          mb: 4,
+          py: { xs: 10, md: 14 },
+          textAlign: 'center',
         }}
       >
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 0,
-          }}
-        >
-          <Image
-            src="/images/ky-capitol-hero.jpg"
-            alt="Kentucky State Capitol in Frankfort"
-            fill
-            priority
-            sizes="100vw"
-            style={{ objectFit: 'cover', objectPosition: 'center' }}
-          />
-        </Box>
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 1,
-            background:
-              theme.palette.mode === 'dark'
-                ? 'linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,24,48,0.6) 100%)'
-                : 'linear-gradient(135deg, rgba(0,40,80,0.78) 0%, rgba(0,60,110,0.5) 45%, rgba(0,0,0,0.4) 100%)',
-          }}
-        />
-        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
-          <Typography variant={TYPE.heroTitle.variant} component="h1" fontWeight={TYPE.heroTitle.fontWeight} gutterBottom>
-            Know Your Vote Kentucky
+        <Container maxWidth="md">
+          <Typography
+            variant="h2"
+            component="h1"
+            fontWeight={700}
+            gutterBottom
+            sx={{ fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' }, lineHeight: 1.15 }}
+          >
+            Your vote doesn't stop at the ballot box.
           </Typography>
-          <Typography variant="subtitle1" component="p" sx={{ opacity: 0.9, mb: 2.5, maxWidth: 640, fontWeight: 400, lineHeight: 1.5 }}>
-            Start by finding who represents you in the Kentucky House and Senate, then follow bills and votes from the General Assembly.
+          <Typography
+            variant="subtitle1"
+            sx={{ opacity: 0.88, mb: 5, maxWidth: 520, mx: 'auto', lineHeight: 1.6 }}
+          >
+            Free tool for Kentucky residents to find their reps, track bills, and get notified when legislation moves.
           </Typography>
-          <Stack direction="row" flexWrap="wrap" spacing={2} useFlexGap sx={{ mb: 0.5 }}>
+          <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap" useFlexGap>
             <Button
               component={Link}
               href="/members/map"
               variant="contained"
-              color="secondary"
               size="large"
-              startIcon={<MapPin size={22} strokeWidth={2} aria-hidden />}
+              startIcon={<MapPin size={18} strokeWidth={2} />}
+              sx={{
+                bgcolor: alpha(theme.palette.common.white, 0.15),
+                color: 'common.white',
+                border: `1px solid ${alpha(theme.palette.common.white, 0.4)}`,
+                backdropFilter: 'blur(8px)',
+                '&:hover': { bgcolor: alpha(theme.palette.common.white, 0.25) },
+              }}
             >
-              Find your legislators
+              Find my legislators
             </Button>
             <Button
               component={Link}
               href="/bills"
-              variant="outlined"
-              color="inherit"
+              variant="contained"
               size="large"
               sx={{
+                bgcolor: '#0f172a',
                 color: 'common.white',
-                borderColor: 'rgba(255, 255, 255, 0.55)',
-                '&:hover': {
-                  color: 'common.white',
-                  borderColor: 'common.white',
-                  bgcolor: 'rgba(255, 255, 255, 0.12)',
-                },
+                '&:hover': { bgcolor: '#1e293b' },
               }}
             >
               Browse bills
             </Button>
-            <Button
-              component={Link}
-              href="/search"
-              variant="outlined"
-              color="inherit"
-              size="large"
-              sx={{
-                color: 'common.white',
-                borderColor: 'rgba(255, 255, 255, 0.55)',
-                '&:hover': {
-                  color: 'common.white',
-                  borderColor: 'common.white',
-                  bgcolor: 'rgba(255, 255, 255, 0.12)',
-                },
-              }}
-            >
-              Search bills
-            </Button>
           </Stack>
-          <Typography
-            variant="caption"
-            component="p"
-            sx={{
-              mt: 1.5,
-              maxWidth: 560,
-              lineHeight: 1.5,
-              color: alpha(theme.palette.common.white, 0.9),
-            }}
-          >
-            Prefer to dive into legislation first? Browse or search bills anytime.
-          </Typography>
-          <DataFreshnessNote variant="hero" />
         </Container>
       </Box>
 
       <Container maxWidth="lg">
-        {!supabase && (
-          <Alert severity="warning" sx={{ mb: 3 }}>
-            Supabase is not configured in the browser. Set{' '}
-            <strong>NEXT_PUBLIC_SUPABASE_URL</strong> and <strong>NEXT_PUBLIC_SUPABASE_ANON_KEY</strong> in{' '}
-            <code>.env.local</code>, then restart the dev server, to load bills and legislators.
-          </Alert>
-        )}
-        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-
-        {/* Orientation — static; visible while bill data loads */}
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 720 }}>
-          Know Your Vote Kentucky helps you learn who represents you and what the legislature is doing.{' '}
-          <MuiLink component={Link} href="/members/map" fontWeight={600}>
-            Open the district map
-          </MuiLink>{' '}
-          by address or ZIP, or{' '}
-          <MuiLink component={Link} href="/members" fontWeight={600}>
-            browse all legislators
-          </MuiLink>
-          . Then use topics or bill lists below to go deeper.
-        </Typography>
-
-        {/* Single topic module: trending (when loaded) + full topic chips */}
-        <Box sx={{ mb: 5 }}>
-          <SectionHeader
-            title="Explore bills by topic"
-            icon={<Category />}
-            href="/bills"
-          />
-          {topicCounts.length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <Typography
-                variant="subtitle2"
-                fontWeight={700}
-                color="text.primary"
-                sx={{ mb: 1.5, ...SECTION_TITLE_DISPLAY_SX }}
-              >
-                Trending now
-              </Typography>
-              <Grid container spacing={2}>
-                {topicCounts.map(({ topic, count }) => (
-                  <Grid item xs={6} sm={4} md={2} key={topic}>
-                    <Box
-                      component="a"
-                      href={`/bills?topic=${encodeURIComponent(topic)}`}
-                      sx={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        textAlign: 'center',
-                        p: 2,
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        bgcolor: 'background.paper',
-                        textDecoration: 'none',
-                        color: 'inherit',
-                        transition: 'border-color 0.15s, box-shadow 0.15s',
-                        '&:hover': {
-                          borderColor: 'primary.main',
-                          boxShadow: 2,
-                        },
-                      }}
-                    >
-                      <Typography variant="h5" fontWeight={700} color="primary.main" lineHeight={1}>
-                        {count}
-                      </Typography>
-                      <Typography variant="body2" fontWeight={600} sx={{ mt: 1, lineHeight: 1.2 }}>
-                        {topic}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-          )}
-          <Typography
-            variant="subtitle2"
-            fontWeight={700}
-            color="text.primary"
-            sx={{ mb: 1.5, ...SECTION_TITLE_DISPLAY_SX }}
-          >
-            All topics
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {KY_TOPICS.map((topic) => {
-              const topicFollowed = followAuthed && followedTopics.has(topic);
-              return (
-                <Chip
-                  key={topic}
-                  label={topic}
-                  component="a"
-                  href={`/bills?topic=${encodeURIComponent(topic)}`}
-                  clickable
-                  color="primary"
-                  variant={topicFollowed ? 'filled' : 'outlined'}
-                  aria-label={topicFollowed ? `Following: ${topic}` : undefined}
-                  sx={{ fontWeight: 500 }}
-                />
-              );
-            })}
-          </Box>
-        </Box>
-
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }} aria-busy="true" aria-label="Loading bill sections">
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Grid container spacing={3} sx={{ alignItems: 'flex-start' }}>
-            <Grid item xs={12} lg={8} sx={{ order: { xs: 0, lg: 0 } }}>
-              {/* Latest KY Bills */}
-              <SectionHeader
-                title="Latest KY Bills"
-                icon={<Gavel />}
-                href="/bills"
-                caption={showChamberSections ? 'Recent activity across the House and Senate.' : undefined}
-              />
-              {bills.length === 0 ? (
-                <Grid container spacing={3} sx={{ mb: 6 }}>
-                  <Grid item xs={12}><EmptyState message="No bills yet. Data will appear once synced." /></Grid>
-                </Grid>
-              ) : (
-                <Box sx={{ mb: 6 }}>
-                  <PaginatedSection
-                    items={bills}
-                    pageSize={HOME_SECTION_DISPLAY}
-                    resetKey={`${bills.length}-${bills[0]?.id ?? ''}`}
-                    variant="responsive"
-                  >
-                    {(pageBills) => (
-                      <Grid container spacing={3}>
-                        {pageBills.map((bill) => (
-                          <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                            <KYBillCard
-                              bill={bill}
-                              legislators={legislators}
-                              followedBillIds={followAuthed ? followedBillIds : null}
-                              followedTopics={followAuthed ? followedTopics : null}
-                            />
-                          </Grid>
-                        ))}
-                      </Grid>
-                    )}
-                  </PaginatedSection>
-                </Box>
-              )}
-
-              {showChamberSections && (
-                <>
-                  <SectionHeader
-                    title="Latest House Bills"
-                    icon={<Gavel />}
-                    href="/bills/house"
-                    caption="House chamber bills and resolutions — see all House activity."
-                  />
-                  {houseBills.length === 0 ? (
-                    <Grid container spacing={3} sx={{ mb: 6 }}>
-                      <Grid item xs={12}><EmptyState message="No House bills yet. Data will appear once synced." /></Grid>
-                    </Grid>
-                  ) : (
-                    <Box sx={{ mb: 6 }}>
-                      <PaginatedSection
-                        items={houseBills}
-                        pageSize={HOME_SECTION_DISPLAY}
-                        resetKey={`h-${houseBills.length}-${houseBills[0]?.id ?? ''}`}
-                        variant="responsive"
-                      >
-                        {(pageBills) => (
-                          <Grid container spacing={3}>
-                            {pageBills.map((bill) => (
-                              <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                                <KYBillCard
-                              bill={bill}
-                              legislators={legislators}
-                              followedBillIds={followAuthed ? followedBillIds : null}
-                              followedTopics={followAuthed ? followedTopics : null}
-                            />
-                              </Grid>
-                            ))}
-                          </Grid>
-                        )}
-                      </PaginatedSection>
-                    </Box>
-                  )}
-
-                  <SectionHeader
-                    title="Latest Senate Bills"
-                    icon={<Gavel />}
-                    href="/bills/senate"
-                    caption="Senate chamber bills and resolutions — see all Senate activity."
-                  />
-                  {senateBills.length === 0 ? (
-                    <Grid container spacing={3} sx={{ mb: 6 }}>
-                      <Grid item xs={12}><EmptyState message="No Senate bills yet. Run a bills sync after updating the app." /></Grid>
-                    </Grid>
-                  ) : (
-                    <Box sx={{ mb: 6 }}>
-                      <PaginatedSection
-                        items={senateBills}
-                        pageSize={HOME_SECTION_DISPLAY}
-                        resetKey={`s-${senateBills.length}-${senateBills[0]?.id ?? ''}`}
-                        variant="responsive"
-                      >
-                        {(pageBills) => (
-                          <Grid container spacing={3}>
-                            {pageBills.map((bill) => (
-                              <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                                <KYBillCard
-                              bill={bill}
-                              legislators={legislators}
-                              followedBillIds={followAuthed ? followedBillIds : null}
-                              followedTopics={followAuthed ? followedTopics : null}
-                            />
-                              </Grid>
-                            ))}
-                          </Grid>
-                        )}
-                      </PaginatedSection>
-                    </Box>
-                  )}
-                </>
-              )}
-            </Grid>
-            <Grid item xs={12} lg={4} sx={{ order: { xs: -1, lg: 0 } }}>
-              <Stack
-                spacing={2}
+        {/* Feature cards */}
+        <Grid container spacing={3} sx={{ mt: { xs: 4, md: 6 }, mb: { xs: 6, md: 8 } }}>
+          {FEATURE_CARDS.map(({ icon, title, body }) => (
+            <Grid item xs={12} sm={4} key={title}>
+              <Box
                 sx={{
-                  position: { lg: 'sticky' },
-                  top: { lg: 24 },
-                  mb: { xs: 1, lg: 0 },
+                  p: 3,
+                  borderRadius: 2,
+                  border: `1px solid ${theme.palette.divider}`,
+                  bgcolor: 'background.paper',
+                  textAlign: 'center',
+                  height: '100%',
                 }}
               >
-                <HomeCuratedBillList
-                  kind="passed"
-                  title="Recently passed"
-                  caption="Signed, chaptered, enrolled, or similar final stages."
-                  bills={passedSidebarBills}
-                  line="status"
-                  emptyMessage="No bills match this view yet. Try again after a sync."
-                />
-                <HomeCuratedBillList
-                  kind="views"
-                  title="Most viewed"
-                  caption="Based on how often people open a bill’s detail page."
-                  bills={mostViewedBills}
-                  emptyMessage="No bills to show yet."
-                />
-              </Stack>
+                <Box sx={{ color: 'text.primary', mb: 1.5, display: 'flex', justifyContent: 'center' }}>
+                  {icon}
+                </Box>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                  {title}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {body}
+                </Typography>
+              </Box>
             </Grid>
-          </Grid>
-        )}
+          ))}
+        </Grid>
+
+        {/* Map section */}
+        <Box sx={{ mb: { xs: 6, md: 8 } }}>
+          <MapSection />
+        </Box>
+
+        {/* Explore by topic */}
+        <Box sx={{ mb: { xs: 6, md: 10 }, textAlign: 'center' }}>
+          <Typography variant="h5" component="h2" fontWeight={700} gutterBottom>
+            Explore by topic
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', mt: 2 }}>
+            {LANDING_TOPICS.map(({ label, topic }) => (
+              <Chip
+                key={label}
+                label={label}
+                component="a"
+                href={`/bills?topic=${encodeURIComponent(topic)}`}
+                clickable
+                variant="outlined"
+                sx={{ fontWeight: 500, borderRadius: '16px' }}
+              />
+            ))}
+            <Chip
+              label="more →"
+              component="a"
+              href="/bills"
+              clickable
+              variant="outlined"
+              sx={{ fontWeight: 500, borderRadius: '16px' }}
+            />
+          </Box>
+        </Box>
       </Container>
     </Box>
   );
