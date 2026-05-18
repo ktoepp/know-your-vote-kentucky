@@ -70,6 +70,10 @@ import { BillHistoryActionText } from '@/components/bills/BillHistoryActionText'
 import { FollowBillButton } from '@/components/bills/FollowBillButton';
 import { BillTopicMatchHint } from '@/components/bills/BillTopicMatchHint';
 import { LegislativeStageTooltip } from '@/components/ui/LegislativeStageTooltip';
+import {
+  legiscanActionIndicatesVetoOverride,
+  legiscanHistoryIndicatesVetoOverride,
+} from '@/lib/map-legiscan-bill-status';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                */
@@ -154,6 +158,7 @@ function fmtDate(d: string | null | undefined, opts?: Intl.DateTimeFormatOptions
 function statusColor(status: string | null): 'success' | 'warning' | 'error' | 'default' {
   if (!status) return 'default';
   const s = status.toLowerCase();
+  if (s.includes('veto override')) return 'success';
   if (s.includes('signed') || s.includes('passed') || s.includes('chaptered')) return 'success';
   if (s.includes('veto') || s.includes('failed')) return 'error';
   if (s.includes('committee') || s.includes('engrossed') || s.includes('enrolled')) return 'warning';
@@ -518,13 +523,17 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
    * it wins when it disagrees.
    */
   const effectiveStatus = (() => {
+    if (legiscanHistoryIndicatesVetoOverride(history)) return 'Veto Override';
+
     if (!history.length) return bill.status;
     const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date) || b.importance - a.importance);
     const topImportant = sorted.find(h => h.importance === 1);
     if (!topImportant) return bill.status;
     const a = topImportant.action.toLowerCase();
-    if (a.includes('vetoed') || a.startsWith('veto')) return 'Vetoed';
+    if (legiscanActionIndicatesVetoOverride(topImportant.action)) return 'Veto Override';
+    if (a.includes('vetoed') || (a.includes('veto') && !a.includes('override'))) return 'Vetoed';
     if (a.includes('signed by governor') || a.includes('enacted') || a.includes('signed into law')) return 'Signed by Governor';
+    if (a.includes('delivered to secretary of state')) return 'Chaptered';
     if (a.includes('became law without')) return 'Enacted';
     if (a.includes('failed') || a.includes('died')) return 'Failed';
     if (a.includes('enrolled')) return 'Enrolled';

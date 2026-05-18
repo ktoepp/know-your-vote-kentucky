@@ -73,15 +73,6 @@ export function MemberProfileView({
           All members
         </Button>
 
-        {!leg.active && (
-          <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
-            This profile is a <strong>historical roster</strong> entry. Kentucky LRC and LegiScan shortcuts are hidden here
-            so we do not send you to pages about whoever currently holds the seat or the latest session alone. Use
-            Ballotpedia (if linked) or a web search for biographical context; verify current representation on the
-            official legislature site.
-          </Alert>
-        )}
-
         <MemberCard leg={leg} featured={false} profileNameHeading="h1" legislatorRoster={legislatorRoster} />
 
         {hasConnectLinks && (

@@ -42,53 +42,22 @@ import {
   sanitizeLegislatorCampaignWebsiteUrl,
 } from './legislator-link-normalize';
 import { normalizeKyLegislatorDistrictForDb } from './ky-district-geo';
-import { normalizeLegislatorPhotoUrl, normalizeSponsorNameForMatch } from './ky-member-utils';
+import {
+  kyLegislatureHeadshotUrlFromLegiscanDistrict,
+  normalizeLegislatorPhotoUrl,
+  normalizeSponsorNameForMatch,
+} from './ky-member-utils';
 import type { KYSource } from '../types/kentucky';
-import type {
-  KyLegiScanClient,
-  LegiScanBillDetail,
-  LegiScanBillSummary,
-  LegiScanMasterListRawBill,
-  LegiScanSession,
-  LegiScanPerson,
+import {
+  legiscanPersonBioSocial,
+  type KyLegiScanClient,
+  type LegiScanBillDetail,
+  type LegiScanBillSummary,
+  type LegiScanMasterListRawBill,
+  type LegiScanSession,
+  type LegiScanPerson,
 } from './ky-legiscan-client';
-
-/**
- * LegiScan numeric status codes for state bills.
- * Cross-validated against last_action text for accuracy.
- */
-const LEGISCAN_STATUS_MAP: Record<number, string> = {
-  1: 'Introduced',
-  2: 'Engrossed',
-  3: 'Enrolled',
-  4: 'Passed',
-  5: 'Vetoed',
-  6: 'Failed',
-  7: 'Veto Override',
-  8: 'Chaptered',
-  9: 'Referred',
-  10: 'Reported',
-  11: 'Failed in Committee',
-  12: 'Draft',
-};
-
-/**
- * Map LegiScan status code to display string, cross-checked against
- * last_action text so Kentucky-specific language (e.g. "delivered to
- * Secretary of State" = signed) is always accurate.
- */
-function mapLegiScanStatus(statusCode: number, lastAction: string): string {
-  const action = (lastAction || '').toLowerCase();
-  if (action.includes('signed by governor')) return 'Signed';
-  if (action.includes('delivered to secretary of state')) return 'Signed';
-  if (action.includes('vetoed by governor') || action.includes('veto')) return 'Vetoed';
-  if (action.includes('veto override')) return 'Veto Override';
-  if (action.includes('died') || action.includes('failed')) return 'Failed';
-  if (action.includes('third reading, passed') || action.includes('passed') && action.includes('third reading')) return 'Passed Chamber';
-  if (action.includes('committee') || action.includes('referred to')) return 'In Committee';
-  if (action.includes('introduced') || action.includes('filed')) return 'Introduced';
-  return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';
-}
+import { mapLegiScanBillStatus } from './map-legiscan-bill-status';
 
 /** LegiScan getBill `committee` (object or occasional array) → `ky_bills` committee columns. */
 function committeeFieldsFromLegiScanDetail(detail: LegiScanBillDetail | null): {
@@ -431,7 +400,7 @@ async function buildBillRowsForSession(
       title: bill.title,
       description: bill.description || null,
       session: latestSession.session_name,
-      status: mapLegiScanStatus(bill.status, bill.last_action || ''),
+      status: mapLegiScanBillStatus(bill.status, bill.last_action || ''),
       chamber: chamberFromBillNumber(bill.number),
       last_action: bill.last_action || null,
       last_action_date: bill.last_action_date || null,
@@ -526,7 +495,7 @@ async function buildBillRowsQuotaSession(
       title: bill.title,
       description: bill.description || null,
       session: session.session_name,
-      status: mapLegiScanStatus(bill.status, bill.last_action || ''),
+      status: mapLegiScanBillStatus(bill.status, bill.last_action || ''),
       chamber: chamberFromBillNumber(bill.number),
       last_action: bill.last_action || null,
       last_action_date: bill.last_action_date || null,
@@ -700,7 +669,7 @@ async function syncKyBillsByHash(
         title: raw.title,
         description: raw.description || null,
         session: session.session_name,
-        status: mapLegiScanStatus(raw.status, raw.last_action || ''),
+        status: mapLegiScanBillStatus(raw.status, raw.last_action || ''),
         chamber: chamberFromBillNumber(raw.number),
         last_action: raw.last_action || null,
         last_action_date: raw.last_action_date || null,
@@ -1017,7 +986,8 @@ async function reconcileKyLegislatorLegiscanIdsFromLatestSession(
 ): Promise<number> {
   const sessions = await legiscanClient.fetchSessions();
   if (!sessions.length) return 0;
-  const sessionId = sessions[sessions.length - 1]!.session_id;
+  const sortedSessions = [...sessions].sort((a, b) => (b.year_end || 0) - (a.year_end || 0));
+  const sessionId = sortedSessions[0]!.session_id;
   const people = await legiscanClient.getSessionPeople(sessionId);
   if (!people.length) return 0;
 
@@ -1271,11 +1241,23 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
 }
 
 // --- Legislator bio enrichment (LegiScan getPerson) ---
+function legislatorRowNeedsBioEnrichment(leg: {
+  ballotpedia: string | null;
+  photo_url: string | null;
+  legiscan_image_url: string | null;
+}): boolean {
+  const blank = (s: string | null | undefined) => s == null || String(s).trim() === '';
+  if (blank(leg.ballotpedia)) return true;
+  // Match migration intent: legiscan_image_url is a fallback when Open States has no photo.
+  if (blank(leg.photo_url) && blank(leg.legiscan_image_url)) return true;
+  return false;
+}
+
 /**
  * For each legislator with a legiscan_id, call getPerson to backfill:
  *   - ballotpedia slug (direct link)
  *   - legiscan_image_url (photo fallback when photo_url is null)
- * Skips legislators where both fields are already populated.
+ * Skips legislators who already have ballotpedia and at least one photo source.
  * Quota cost: 1 query per legislator processed.
  */
 export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<SyncResult> {
@@ -1294,10 +1276,7 @@ export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<S
       return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
     }
 
-    // Only process rows that are missing at least one enrichable field
-    const toEnrich = legislators.filter(
-      (l) => !l.ballotpedia || !l.legiscan_image_url,
-    );
+    const toEnrich = legislators.filter((l) => legislatorRowNeedsBioEnrichment(l));
     log(source, `${toEnrich.length}/${legislators.length} legislators need enrichment`);
 
     if (options.dryRun) {
@@ -1308,32 +1287,48 @@ export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<S
     const legiscanClient = getKyLegiScanClient();
     let synced = 0;
     let failed = 0;
+    let noop = 0;
     for (const leg of toEnrich) {
       try {
         const person: LegiScanPerson | null = await legiscanClient.getPerson(leg.legiscan_id!);
-        if (!person) continue;
-        const ballotpediaRaw = person.bio?.social?.ballotpedia ?? person.ballotpedia;
-        const imageRaw = person.bio?.social?.image;
+        if (!person) {
+          noop++;
+          continue;
+        }
+        const social = legiscanPersonBioSocial(person);
+        const ballotpediaRaw = social?.ballotpedia ?? person.ballotpedia;
+
+        const blank = (s: string | null | undefined) => s == null || String(s).trim() === '';
+        let imageRaw = social?.image;
+        if (!imageRaw && blank(leg.legiscan_image_url) && blank(leg.photo_url)) {
+          imageRaw = kyLegislatureHeadshotUrlFromLegiscanDistrict(person.district) ?? undefined;
+        }
+
         const update: Record<string, string | null> = {};
-        if (!leg.ballotpedia && ballotpediaRaw != null && String(ballotpediaRaw).trim()) {
+        if (blank(leg.ballotpedia) && ballotpediaRaw != null && String(ballotpediaRaw).trim()) {
           const canon = normalizeBallotpediaForStorage(String(ballotpediaRaw));
           if (canon) update.ballotpedia = canon;
         }
-        if (!leg.legiscan_image_url && imageRaw) {
+        if (blank(leg.legiscan_image_url) && blank(leg.photo_url) && imageRaw) {
           const img = normalizeLegislatorPhotoUrl(String(imageRaw));
           if (img) update.legiscan_image_url = img;
         }
-        if (Object.keys(update).length === 0) continue;
+        if (Object.keys(update).length === 0) {
+          noop++;
+          continue;
+        }
         const { error } = await db.from('ky_legislators').update(update).eq('id', leg.id);
-        if (error) { failed++; logError(source, `Failed updating ${leg.id}: ${error.message}`); }
-        else synced++;
+        if (error) {
+          failed++;
+          logError(source, `Failed updating ${leg.id}: ${error.message}`);
+        } else synced++;
       } catch (err: any) {
         failed++;
         logError(source, `getPerson failed for legiscan_id=${leg.legiscan_id}: ${err.message}`);
       }
     }
 
-    log(source, `Enriched ${synced} legislators (${failed} failed)`);
+    log(source, `Enriched ${synced} legislators (${failed} failed, ${noop} unchanged/no data)`);
     await updateSourceStatus(source, failed > 0 && synced === 0 ? 'error' : 'success', synced);
     return { source, status: failed > 0 && synced === 0 ? 'error' : 'success', itemsSynced: synced, duration: Date.now() - start };
   } catch (err: any) {
