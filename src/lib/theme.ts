@@ -1,7 +1,11 @@
-import { createTheme, ThemeOptions, Theme } from '@mui/material/styles';
+import { createTheme, ThemeOptions } from '@mui/material/styles';
 
 /** Heading / display type (Adobe Typekit kit — `<link>` in root layout). */
-export const FONT_HEADING = '"aesthet-nova", serif';
+export const FONT_HEADING = '"aesthet-nova", Georgia, "Times New Roman", serif';
+
+/** UI / body type (loaded via `next/font/google` in `app/layout.tsx`). */
+export const FONT_SANS =
+  'var(--font-instrument-sans), "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
 
 /**
  * MUI Modal marks direct siblings in its container with aria-hidden while open. Using document.body,
@@ -14,87 +18,52 @@ export function getMainContentModalContainer(): Element | null {
 }
 
 const muiModalAccessibilityPortal = {
-  MuiModal: {
-    defaultProps: {
-      container: getMainContentModalContainer,
-    },
-  },
-  MuiDialog: {
-    defaultProps: {
-      container: getMainContentModalContainer,
-    },
-  },
-  MuiDrawer: {
-    defaultProps: {
-      ModalProps: {
-        container: getMainContentModalContainer,
-      },
-    },
-  },
-  MuiPopover: {
-    defaultProps: {
-      container: getMainContentModalContainer,
-    },
-  },
+  MuiModal: { defaultProps: { container: getMainContentModalContainer } },
+  MuiDialog: { defaultProps: { container: getMainContentModalContainer } },
+  MuiDrawer: { defaultProps: { ModalProps: { container: getMainContentModalContainer } } },
+  MuiPopover: { defaultProps: { container: getMainContentModalContainer } },
 };
 
-// Government and Civic Color Palette (source tokens for docs and light theme roots)
+// Slate scale — mirrors the Framer neutral ramp.
+const slate = {
+  50:  '#F8FAFC',
+  100: '#F1F5F9',
+  200: '#E2E8F0',
+  300: '#CBD5E1',
+  400: '#94A3B8',
+  500: '#64748B',
+  600: '#475569',
+  700: '#334155',
+  800: '#1E293B',
+  900: '#0F172A',
+};
+
+// Civic palette tokens consumed by MUI and by the in-app design-system page.
 export const civicPaletteTokens = {
-  // Primary: Government Blue (trustworthy, authoritative) - Updated to match navigation
   primary: {
-    main: '#1e40af', // Updated to match navigation
-    light: '#3b82f6',
-    dark: '#1e3a8a',
-    contrastText: '#ffffff',
+    main: '#1E40AF',
+    light: '#2563EB',
+    dark: '#1E3A8A',
+    contrastText: '#FFFFFF',
   },
-  // Secondary: Civic Green (democracy, engagement)
   secondary: {
-    main: '#2e7d32',
-    light: '#60ad5e',
-    dark: '#005005',
-    contrastText: '#ffffff',
+    main: '#16A34A',
+    light: '#22C55E',
+    dark: '#15803D',
+    contrastText: '#FFFFFF',
   },
-  // Neutral: Professional grays
-  neutral: {
-    50: '#fafafa',
-    100: '#f5f5f5',
-    200: '#eeeeee',
-    300: '#e0e0e0',
-    400: '#bdbdbd',
-    500: '#9e9e9e',
-    600: '#757575',
-    700: '#616161',
-    800: '#424242',
-    900: '#212121',
-  },
-  // Semantic colors
-  success: {
-    main: '#2e7d32',
-    light: '#60ad5e',
-    dark: '#005005',
-  },
-  warning: {
-    main: '#ed6c02',
-    light: '#ff9800',
-    dark: '#e65100',
-  },
-  error: {
-    main: '#d32f2f',
-    light: '#ef5350',
-    dark: '#c62828',
-  },
-  info: {
-    main: '#0288d1',
-    light: '#03a9f4',
-    dark: '#01579b',
-  },
+  neutral: slate,
+  success: { main: '#16A34A', light: '#22C55E', dark: '#15803D' },
+  warning: { main: '#D97706', light: '#F59E0B', dark: '#B45309' },
+  error:   { main: '#DC2626', light: '#EF4444', dark: '#B91C1C' },
+  // `info` aliases `primary` — the system has one blue.
+  info:    { main: '#1E40AF', light: '#2563EB', dark: '#1E3A8A' },
 };
 
-// Theme utility functions
+// Utilities kept for downstream consumers.
 export const getThemeColor = (theme: any, colorPath: string, fallback?: string) => {
   const path = colorPath.split('.');
-  let value = theme;
-  
+  let value: any = theme;
   for (const key of path) {
     if (value && typeof value === 'object' && key in value) {
       value = value[key];
@@ -102,42 +71,28 @@ export const getThemeColor = (theme: any, colorPath: string, fallback?: string) 
       return fallback || '#000000';
     }
   }
-  
   return value;
 };
 
-export const getContrastText = (theme: any, backgroundColor: string) => {
-  return theme.palette.getContrastText(backgroundColor);
-};
+export const getContrastText = (theme: any, backgroundColor: string) =>
+  theme.palette.getContrastText(backgroundColor);
 
-export const getEventTypeColor = (theme: any, eventType: string) => {
-  const isDark = theme.palette.mode === 'dark';
-  
+export const getEventTypeColor = (_theme: any, eventType: string) => {
   switch (eventType) {
-    case 'hearing':
-      return isDark ? '#60a5fa' : '#1e40af';
-    case 'floor':
-      return isDark ? '#a855f7' : '#7c3aed';
-    case 'markup':
-      return isDark ? '#4ade80' : '#15803d';
-    default:
-      return isDark ? theme.palette.text.secondary : theme.palette.text.secondary;
+    case 'hearing': return civicPaletteTokens.primary.main;
+    case 'floor':   return civicPaletteTokens.secondary.main;
+    case 'markup':  return civicPaletteTokens.warning.main;
+    default:        return slate[600];
   }
 };
 
-export const getPriorityColor = (theme: any, priority: number) => {
-  const isDark = theme.palette.mode === 'dark';
-  
-  if (priority <= 3) {
-    return isDark ? '#f87171' : '#dc2626';
-  } else if (priority <= 6) {
-    return isDark ? '#fbbf24' : '#d97706';
-  } else {
-    return isDark ? theme.palette.text.secondary : theme.palette.text.secondary;
-  }
+export const getPriorityColor = (_theme: any, priority: number) => {
+  if (priority <= 3) return civicPaletteTokens.error.main;
+  if (priority <= 6) return civicPaletteTokens.warning.main;
+  return slate[600];
 };
 
-// Light Theme
+// Light theme (single source — dark mode is out of scope, see guidelines §14)
 export const lightTheme = createTheme({
   palette: {
     mode: 'light',
@@ -145,94 +100,42 @@ export const lightTheme = createTheme({
     secondary: civicPaletteTokens.secondary,
     success: civicPaletteTokens.success,
     warning: civicPaletteTokens.warning,
-    error: civicPaletteTokens.error,
-    info: civicPaletteTokens.info,
+    error:   civicPaletteTokens.error,
+    info:    civicPaletteTokens.info,
     background: {
-      default: civicPaletteTokens.neutral[50],
-      paper: '#ffffff',
+      default: slate[50],   // --bg-page
+      paper:   '#FFFFFF',   // --bg-surface
     },
     text: {
-      primary: civicPaletteTokens.neutral[900],
-      secondary: civicPaletteTokens.neutral[700],
+      primary:   slate[900],
+      secondary: slate[700],
+      disabled:  slate[400],
     },
-    divider: civicPaletteTokens.neutral[200],
+    divider: slate[200],
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '2.5rem',
-      lineHeight: 1.2,
-      letterSpacing: '-0.02em',
-    },
-    h2: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '2rem',
-      lineHeight: 1.3,
-      letterSpacing: '-0.01em',
-    },
-    h3: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '1.5rem',
-      lineHeight: 1.4,
-    },
-    h4: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '1.25rem',
-      lineHeight: 1.4,
-    },
-    h5: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '1.125rem',
-      lineHeight: 1.4,
-    },
-    h6: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '1rem',
-      lineHeight: 1.4,
-    },
-    body1: {
-      fontSize: '1rem',
-      lineHeight: 1.6,
-      color: civicPaletteTokens.neutral[700],
-    },
-    body2: {
-      fontSize: '0.875rem',
-      lineHeight: 1.5,
-      color: civicPaletteTokens.neutral[600],
-    },
-    subtitle1: {
-      fontSize: '1rem',
-      lineHeight: 1.5,
-      fontWeight: 500,
-    },
-    subtitle2: {
-      fontSize: '0.875rem',
-      lineHeight: 1.4,
-      fontWeight: 500,
-    },
-    caption: {
-      fontSize: '0.75rem',
-      lineHeight: 1.3,
-      color: civicPaletteTokens.neutral[600],
-    },
+    fontFamily: FONT_SANS,
+    // All headings: Aesthet Nova Medium (500), neutral tracking, line-height 1.4.
+    h1: { fontFamily: FONT_HEADING, fontWeight: 500, fontSize: '2.5rem',    lineHeight: 1.4, letterSpacing: 0 }, // 40px
+    h2: { fontFamily: FONT_HEADING, fontWeight: 500, fontSize: '1.875rem',  lineHeight: 1.4, letterSpacing: 0 }, // 30px
+    h3: { fontFamily: FONT_HEADING, fontWeight: 500, fontSize: '1.625rem',  lineHeight: 1.4, letterSpacing: 0 }, // 26px
+    h4: { fontFamily: FONT_HEADING, fontWeight: 500, fontSize: '1.375rem',  lineHeight: 1.4, letterSpacing: 0 }, // 22px
+    h5: { fontFamily: FONT_HEADING, fontWeight: 500, fontSize: '1.125rem',  lineHeight: 1.4, letterSpacing: 0 }, // 18px
+    h6: { fontFamily: FONT_HEADING, fontWeight: 500, fontSize: '1rem',      lineHeight: 1.4, letterSpacing: 0 }, // 16px
+    body1: { fontSize: '0.875rem',  lineHeight: 1.4, color: slate[700] },   // 14px
+    body2: { fontSize: '0.8125rem', lineHeight: 1.6, color: slate[600] },   // 13px
+    subtitle1: { fontSize: '0.9375rem', lineHeight: 1.5, fontWeight: 500 }, // 15px lead
+    subtitle2: { fontSize: '0.875rem',  lineHeight: 1.4, fontWeight: 500 },
+    caption: { fontSize: '0.75rem', lineHeight: 1.4, color: slate[600] },   // 12px label
     overline: {
       fontSize: '0.75rem',
-      lineHeight: 1.3,
-      fontWeight: 600,
+      lineHeight: 1.4,
+      fontWeight: 500,
       textTransform: 'uppercase',
-      letterSpacing: '0.1em',
+      letterSpacing: '0.08em',
     },
   },
-  shape: {
-    borderRadius: 8,
-  },
+  shape: { borderRadius: 8 },
   components: {
     ...muiModalAccessibilityPortal,
     MuiButton: {
@@ -240,33 +143,32 @@ export const lightTheme = createTheme({
         root: {
           textTransform: 'none',
           fontWeight: 500,
+          fontSize: '0.875rem',
           borderRadius: 8,
-          padding: '8px 16px',
-          minHeight: 40,
+          padding: '10px 20px',
+          minHeight: 44,
+          boxShadow: 'none',
         },
         contained: {
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          '&:hover': {
-            boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
-          },
+          boxShadow: 'none',
+          '&:hover':  { boxShadow: 'none' },
+          '&:active': { boxShadow: 'none' },
         },
         outlined: (props: any) => {
           const { theme } = props;
           return {
             borderRadius: 8,
-            borderWidth: 1.5,
+            borderWidth: 1,
             borderColor: theme.palette.divider,
+            color: theme.palette.text.primary,
             '&.MuiButton-outlinedPrimary': {
               color: theme.palette.primary.main,
               borderColor: theme.palette.primary.main,
-              '& .MuiButton-startIcon, & .MuiButton-endIcon': {
-                color: theme.palette.primary.main,
-              },
             },
             '&:hover': {
-              borderWidth: 1.5,
-              borderColor: theme.palette.primary.light,
-              backgroundColor: 'rgba(30,64,175,0.08)',
+              borderWidth: 1,
+              borderColor: theme.palette.text.disabled,
+              backgroundColor: slate[50],
             },
           };
         },
@@ -274,83 +176,51 @@ export const lightTheme = createTheme({
     },
     MuiCard: {
       styleOverrides: {
-        root: (props: any) => {
-          const { theme } = props;
-          return {
-            borderRadius: 12,
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-          };
-        },
+        root: (props: any) => ({
+          borderRadius: 8,
+          border: `1px solid ${props.theme.palette.divider}`,
+          boxShadow: 'none',
+        }),
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: (props: any) => ({
+          borderRadius: 8,
+          border: `1px solid ${props.theme.palette.divider}`,
+          boxShadow: 'none',
+        }),
+      },
+    },
+    MuiAccordion: {
+      styleOverrides: {
+        root: (props: any) => ({
+          borderRadius: 8,
+          border: `1px solid ${props.theme.palette.divider}`,
+          boxShadow: 'none',
+          '&:before': { display: 'none' },
+        }),
       },
     },
     MuiChip: {
       styleOverrides: {
-        root: (props: any) => {
-          const { theme, ownerState } = props;
-          // Only target outlined chips with color default in dark mode
-          if (
-            ownerState.variant === 'outlined' &&
-            (!ownerState.color || ownerState.color === 'default') &&
-            theme.palette.mode === 'dark'
-          ) {
-            return {
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: theme.palette.primary.light,
-              color: theme.palette.primary.light,
-              backgroundColor: 'rgba(30,64,175,0.10)',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              height: 24,
-              '&.MuiChip-sizeSmall': {
-                fontSize: '0.7rem',
-                height: 20,
-              },
-              '&.MuiChip-sizeLarge': {
-                fontSize: '0.875rem',
-                height: 32,
-              },
-            };
-          }
-          // Existing root styles for all other chips
-          return {
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: 'rgba(0, 0, 0, 0.12)',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            height: 24,
-            '&.MuiChip-sizeSmall': {
-              fontSize: '0.7rem',
-              height: 20,
-            },
-            '&.MuiChip-sizeLarge': {
-              fontSize: '0.875rem',
-              height: 32,
-            },
-          };
+        root: {
+          borderRadius: 9999,
+          borderWidth: 1,
+          borderColor: slate[200],
+          fontFamily: FONT_SANS,
+          fontSize: '0.75rem',
+          fontWeight: 600,
+          height: 24,
+          '&.MuiChip-sizeSmall': { fontSize: '0.7rem',    height: 20 },
+          '&.MuiChip-sizeLarge': { fontSize: '0.875rem',  height: 32 },
         },
-        label: {
-          color: 'inherit',
-        },
-        outlined: (props: any) => {
-          const { theme, ownerState } = props;
-          // Outlined chip with color default in dark mode
-          if (theme.palette.mode === 'dark' && (!ownerState.color || ownerState.color === 'default')) {
-            return {
-              borderColor: theme.palette.primary.light,
-              color: theme.palette.primary.light,
-              backgroundColor: 'rgba(30,64,175,0.10)',
-            };
-          }
-          // Default for other cases
-          return {
-            borderColor: 'rgba(0, 0, 0, 0.12)',
-            color: theme.palette.text.primary,
-            backgroundColor: 'transparent',
-          };
-        },
+        label: { color: 'inherit' },
+        outlined: (props: any) => ({
+          borderColor: slate[200],
+          color: props.theme.palette.text.primary,
+          backgroundColor: 'transparent',
+        }),
       },
     },
     MuiTextField: {
@@ -359,7 +229,7 @@ export const lightTheme = createTheme({
           borderRadius: 8,
           '& .MuiOutlinedInput-root': {
             borderRadius: 8,
-            borderColor: 'inherit',
+            minHeight: 44,
           },
         },
       },
@@ -367,470 +237,64 @@ export const lightTheme = createTheme({
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: '#ffffff',
-          color: civicPaletteTokens.neutral[900],
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          borderBottom: `1px solid ${civicPaletteTokens.neutral[200]}`,
+          backgroundColor: '#FFFFFF',
+          color: slate[900],
+          boxShadow: 'none',
+          borderBottom: `1px solid ${slate[200]}`,
         },
       },
     },
     MuiToolbar: {
       styleOverrides: {
-        root: {
-          minHeight: 64,
-        },
+        root: { minHeight: 72 },
       },
     },
     MuiLink: {
       styleOverrides: {
         root: {
           color: civicPaletteTokens.primary.main,
-          fontSize: '1.0625rem',
+          fontFamily: FONT_SANS,
           fontWeight: 500,
           textDecoration: 'none',
-          '&:hover': {
-            textDecoration: 'underline',
-          },
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: (props: any) => {
-          const { theme } = props;
-          return {
-            borderRadius: 12,
-            border: `1px solid ${theme.palette.divider}`,
-          };
-        },
-      },
-    },
-    MuiAccordion: {
-      styleOverrides: {
-        root: (props: any) => {
-          const { theme } = props;
-          return {
-            borderRadius: 12,
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: 'none',
-            '&:before': { display: 'none' },
-          };
-        },
-      },
-    },
-    MuiContainer: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
+          '&:hover': { textDecoration: 'underline' },
         },
       },
     },
     MuiTypography: {
       styleOverrides: {
         root: {
+          // Legacy bill-number classes — kept while callers migrate.
+          // Re-spec to match the new type scale; no text-shadow, cursor: pointer (links, not help).
           '&.bill-number': {
-            color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main,
-            fontWeight: 700,
-            fontSize: '1.1rem',
-            cursor: 'help',
-            textShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 1px 2px rgba(0,0,0,0.3)' : 'none',
-            '&:hover': {
-              color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.main : theme.palette.primary.dark,
-            }
-          },
-          '&.bill-number-small': {
-            color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main,
-            fontWeight: 600,
-            fontSize: '0.75rem',
-            '&:hover': {
-              color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.main : theme.palette.primary.dark,
-            }
+            color: civicPaletteTokens.primary.main,
+            fontFamily: FONT_HEADING,
+            fontWeight: 500,
+            fontSize: '1.375rem', // h4 / 22px
+            cursor: 'pointer',
+            '&:hover': { color: civicPaletteTokens.primary.dark },
           },
           '&.bill-number-medium': {
-            color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main,
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            '&:hover': {
-              color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.main : theme.palette.primary.dark,
-            }
-          }
-        }
-      }
+            color: civicPaletteTokens.primary.main,
+            fontWeight: 500,
+            fontSize: '0.875rem', // body1 / 14px
+            '&:hover': { color: civicPaletteTokens.primary.dark },
+          },
+          '&.bill-number-small': {
+            color: civicPaletteTokens.primary.main,
+            fontWeight: 500,
+            fontSize: '0.8125rem', // body2 / 13px
+            '&:hover': { color: civicPaletteTokens.primary.dark },
+          },
+        },
+      },
     },
   },
 } as ThemeOptions);
 
-// Dark Theme
-export const darkTheme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#1e40af', // Keep consistent with navigation
-      light: '#3b82f6',
-      dark: '#1e3a8a',
-      contrastText: '#ffffff',
-    },
-    secondary: {
-      main: '#81c784',
-      light: '#a5d6a7',
-      dark: '#388e3c',
-      contrastText: '#000000',
-    },
-    success: {
-      main: '#66bb6a',
-      light: '#81c784',
-      dark: '#388e3c',
-    },
-    warning: {
-      main: '#ffa726',
-      light: '#ffb74d',
-      dark: '#f57c00',
-    },
-    error: {
-      main: '#f44336',
-      light: '#e57373',
-      dark: '#d32f2f',
-    },
-    info: {
-      main: '#29b6f6',
-      light: '#4fc3f7',
-      dark: '#0288d1',
-    },
-    background: {
-      default: '#000000',
-      paper: '#1a1a1a',
-    },
-    text: {
-      primary: '#ffffff',
-      secondary: 'rgba(255, 255, 255, 0.87)',
-    },
-    divider: 'rgba(255, 255, 255, 0.12)',
-    action: {
-      active: 'rgba(255, 255, 255, 0.54)',
-      hover: 'rgba(255, 255, 255, 0.08)',
-      selected: 'rgba(255, 255, 255, 0.16)',
-      disabled: 'rgba(255, 255, 255, 0.3)',
-      disabledBackground: 'rgba(255, 255, 255, 0.12)',
-    },
-  },
-  typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '2.5rem',
-      lineHeight: 1.2,
-      letterSpacing: '-0.02em',
-    },
-    h2: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '2rem',
-      lineHeight: 1.3,
-      letterSpacing: '-0.01em',
-    },
-    h3: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '1.5rem',
-      lineHeight: 1.4,
-    },
-    h4: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '1.25rem',
-      lineHeight: 1.4,
-    },
-    h5: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '1.125rem',
-      lineHeight: 1.4,
-    },
-    h6: {
-      fontFamily: FONT_HEADING,
-      fontWeight: 700,
-      fontSize: '1rem',
-      lineHeight: 1.4,
-    },
-    body1: {
-      fontSize: '1rem',
-      lineHeight: 1.6,
-    },
-    body2: {
-      fontSize: '0.875rem',
-      lineHeight: 1.5,
-    },
-    subtitle1: {
-      fontSize: '1rem',
-      lineHeight: 1.5,
-      fontWeight: 500,
-    },
-    subtitle2: {
-      fontSize: '0.875rem',
-      lineHeight: 1.4,
-      fontWeight: 500,
-    },
-    caption: {
-      fontSize: '0.75rem',
-      lineHeight: 1.3,
-    },
-    overline: {
-      fontSize: '0.75rem',
-      lineHeight: 1.3,
-      fontWeight: 600,
-      textTransform: 'uppercase',
-      letterSpacing: '0.1em',
-    },
-  },
-  shape: {
-    borderRadius: 8,
-  },
-  components: {
-    ...muiModalAccessibilityPortal,
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          fontWeight: 500,
-          borderRadius: 8,
-          padding: '8px 16px',
-          minHeight: 40,
-        },
-        contained: {
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-          '&:hover': {
-            boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-          },
-        },
-        outlined: (props: any) => {
-          const { theme } = props;
-          return {
-            borderRadius: 8,
-            borderWidth: 1.5,
-            borderColor: theme.palette.divider,
-            '&.MuiButton-outlinedPrimary': {
-              color: theme.palette.primary.light,
-              borderColor: theme.palette.primary.light,
-              '& .MuiButton-startIcon, & .MuiButton-endIcon': {
-                color: theme.palette.primary.light,
-              },
-            },
-            '&:hover': {
-              borderWidth: 1.5,
-              borderColor: theme.palette.primary.light,
-              backgroundColor: 'rgba(96,165,250,0.12)',
-            },
-          };
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: (props: any) => {
-          const { theme } = props;
-          return {
-            borderRadius: 12,
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            backgroundColor: '#1a1a1a',
-          };
-        },
-      },
-    },
-    MuiChip: {
-      styleOverrides: {
-        root: (props: any) => {
-          const { theme, ownerState } = props;
-          // Only target outlined chips with color default in dark mode
-          if (
-            ownerState.variant === 'outlined' &&
-            (!ownerState.color || ownerState.color === 'default') &&
-            theme.palette.mode === 'dark'
-          ) {
-            return {
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: theme.palette.primary.light,
-              color: theme.palette.primary.light,
-              backgroundColor: 'rgba(30,64,175,0.10)',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              height: 24,
-              '&.MuiChip-sizeSmall': {
-                fontSize: '0.7rem',
-                height: 20,
-              },
-              '&.MuiChip-sizeLarge': {
-                fontSize: '0.875rem',
-                height: 32,
-              },
-            };
-          }
-          // Existing root styles for all other chips
-          return {
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: 'rgba(0, 0, 0, 0.12)',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            height: 24,
-            '&.MuiChip-sizeSmall': {
-              fontSize: '0.7rem',
-              height: 20,
-            },
-            '&.MuiChip-sizeLarge': {
-              fontSize: '0.875rem',
-              height: 32,
-            },
-          };
-        },
-        label: {
-          color: 'inherit',
-        },
-        outlined: (props: any) => {
-          const { theme, ownerState } = props;
-          // Outlined chip with color default in dark mode
-          if (theme.palette.mode === 'dark' && (!ownerState.color || ownerState.color === 'default')) {
-            return {
-              borderColor: theme.palette.primary.light,
-              color: theme.palette.primary.light,
-              backgroundColor: 'rgba(30,64,175,0.10)',
-            };
-          }
-          // Default for other cases
-          return {
-            borderColor: 'rgba(0, 0, 0, 0.12)',
-            color: theme.palette.text.primary,
-            backgroundColor: 'transparent',
-          };
-        },
-      },
-    },
-    MuiTextField: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          '& .MuiOutlinedInput-root': {
-            borderRadius: 8,
-            borderColor: (theme: any) => theme.palette.divider,
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            },
-          },
-        },
-      },
-    },
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          backgroundColor: '#1a1a1a',
-          color: '#ffffff',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        },
-      },
-    },
-    MuiToolbar: {
-      styleOverrides: {
-        root: {
-          minHeight: 64,
-        },
-      },
-    },
-    MuiLink: {
-      styleOverrides: {
-        root: {
-          color: '#64b5f6',
-          fontSize: '1.0625rem',
-          fontWeight: 500,
-          textDecoration: 'none',
-          '&:hover': {
-            textDecoration: 'underline',
-            color: '#90caf9',
-          },
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: (props: any) => {
-          const { theme } = props;
-          return {
-            borderRadius: 12,
-            border: `1px solid ${theme.palette.divider}`,
-          };
-        },
-      },
-    },
-    MuiAccordion: {
-      styleOverrides: {
-        root: (props: any) => {
-          const { theme } = props;
-          return {
-            borderRadius: 12,
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: 'none',
-            '&:before': { display: 'none' },
-          };
-        },
-      },
-    },
-    MuiContainer: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-        },
-      },
-    },
-    MuiTypography: {
-      styleOverrides: {
-        root: {
-          '&.bill-number': {
-            color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main,
-            fontWeight: 700,
-            fontSize: '1.1rem',
-            cursor: 'help',
-            textShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 1px 2px rgba(0,0,0,0.3)' : 'none',
-            '&:hover': {
-              color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.main : theme.palette.primary.dark,
-            }
-          },
-          '&.bill-number-small': {
-            color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main,
-            fontWeight: 600,
-            fontSize: '0.75rem',
-            '&:hover': {
-              color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.main : theme.palette.primary.dark,
-            }
-          },
-          '&.bill-number-medium': {
-            color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main,
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            '&:hover': {
-              color: (theme: any) => theme.palette.mode === 'dark' ? theme.palette.primary.main : theme.palette.primary.dark,
-            }
-          }
-        }
-      }
-    },
-  },
-} as ThemeOptions);
+// Dark mode is out of scope (guidelines §14). Keep `darkTheme` as a light-theme
+// alias so any unmigrated import keeps working without a second palette to maintain.
+export const darkTheme = lightTheme;
 
-// Theme context and provider
 export type ThemeMode = 'light' | 'dark' | 'system';
 
-export const getTheme = (mode: ThemeMode) => {
-  if (mode === 'dark') return darkTheme;
-  if (mode === 'light') return lightTheme;
-  
-  // System theme
-  if (typeof window !== 'undefined') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return prefersDark ? darkTheme : lightTheme;
-  }
-  
-  return lightTheme;
-}; 
+export const getTheme = (_mode?: ThemeMode) => lightTheme;

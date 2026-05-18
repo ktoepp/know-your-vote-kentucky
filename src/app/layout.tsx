@@ -1,7 +1,15 @@
 import React from 'react';
 import './globals.css';
 import type { Metadata } from 'next';
+import { Instrument_Sans } from 'next/font/google';
 import ClientThemeProvider from './components/ClientThemeProvider';
+
+const instrumentSans = Instrument_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-instrument-sans',
+  display: 'swap',
+});
 import Navigation from "./components/Navigation";
 import SiteFooter from "./components/SiteFooter";
 import { TooltipProvider } from '@/lib/TooltipContext';
@@ -68,7 +76,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={instrumentSans.variable} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://use.typekit.net" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://p.typekit.net" crossOrigin="anonymous" />
