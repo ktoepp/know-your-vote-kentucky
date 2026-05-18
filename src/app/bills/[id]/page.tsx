@@ -24,11 +24,8 @@ import {
   Gavel,
   Person,
   History,
-  Description,
   HowToVote,
   Check,
-  CheckCircle,
-  RadioButtonUnchecked,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@mui/material/styles';
@@ -719,75 +716,61 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
                 </Typography>
               </Box>
             )}
+
+            {/* Full text + official source links */}
+            {(officialTextForAi || legiscanBillDocHref || showOfficialKyBillLink) && (
+              <Box sx={{ mt: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                {officialTextForAi && (
+                  <MuiButton
+                    href={officialTextForAi}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    endIcon={<OpenInNew sx={{ fontSize: '0.9rem !important' }} />}
+                    sx={{ fontWeight: 600, pl: 0, pr: 0.5, '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' } }}
+                  >
+                    Read the full text →
+                  </MuiButton>
+                )}
+                {showOfficialKyBillLink && (
+                  <MuiButton
+                    variant="text"
+                    size="small"
+                    href={kyLegBillHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    endIcon={<OpenInNew sx={{ fontSize: '0.85rem !important' }} />}
+                    sx={{ color: 'text.secondary', fontWeight: 500 }}
+                  >
+                    Kentucky Legislature
+                  </MuiButton>
+                )}
+                {legiscanBillDocHref && (
+                  <MuiButton
+                    variant="text"
+                    size="small"
+                    href={legiscanBillDocHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    endIcon={<OpenInNew sx={{ fontSize: '0.85rem !important' }} />}
+                    sx={{ color: 'text.secondary', fontWeight: 500 }}
+                  >
+                    LegiScan
+                  </MuiButton>
+                )}
+              </Box>
+            )}
           </MuiCardContent>
         </MuiCard>
 
         <MuiGrid container spacing={3}>
-          {/* Left column */}
-          <MuiGrid item xs={12} md={8}>
+          {/* Left column — History */}
+          <MuiGrid item xs={12} md={6}>
             {bill.ai_summary && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
                   <AiGeneratedBlock officialHref={officialTextForAi} officialLabel="Open official bill text (PDF)">
                     {bill.ai_summary}
                   </AiGeneratedBlock>
-                </MuiCardContent>
-              </MuiCard>
-            )}
-
-            {/* Bill Text */}
-            {texts.length > 0 && (
-              <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
-                <MuiCardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Description color="primary" sx={{ fontSize: ICON_REM.section }} />
-                    <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>Bill Text</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: latestText?.state_link ? 2 : 0 }}>
-                    {latestText?.state_link && (
-                      <MuiButton
-                        variant="contained"
-                        href={latestText.state_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                        sx={{ fontSize: '1rem', py: 1, px: 2 }}
-                      >
-                        {latestText.type} Version (PDF)
-                      </MuiButton>
-                    )}
-                    {originalText?.state_link && latestText?.doc_id !== originalText?.doc_id && (
-                      <MuiButton
-                        variant="outlined"
-                        href={originalText.state_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                        sx={{ fontSize: '1rem', py: 1, px: 2 }}
-                      >
-                        Introduced Version (PDF)
-                      </MuiButton>
-                    )}
-                  </Box>
-                  {/* All versions */}
-                  {texts.length > 1 && (
-                    <Box sx={{ mt: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        All versions: {texts.map(t => (
-                          <MuiButton
-                            key={t.doc_id}
-                            href={t.state_link || t.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            size="small"
-                            sx={{ fontSize: '0.875rem', minWidth: 0, px: 1, py: 0.35, ml: 0.5 }}
-                          >
-                            {t.type}
-                          </MuiButton>
-                        ))}
-                      </Typography>
-                    </Box>
-                  )}
                 </MuiCardContent>
               </MuiCard>
             )}
@@ -807,18 +790,8 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
             )}
           </MuiGrid>
 
-          {/* Right column */}
-          <MuiGrid
-            item
-            xs={12}
-            md={4}
-            sx={{
-              '& > .MuiCard:nth-of-type(2) .MuiCardContent': {
-                py: 1,
-                px: 2,
-              },
-            }}
-          >
+          {/* Right column — Sponsors + Votes */}
+          <MuiGrid item xs={12} md={6}>
             {/* Sponsors */}
             {primarySponsors.length > 0 && (
               <MuiCard elevation={0} sx={{ mb: 3, borderRadius: 3, boxShadow: 'none', border: 'none' }}>
@@ -992,44 +965,6 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               </MuiCard>
             )}
 
-            {/* Official links */}
-            {(legiscanBillDocHref || showOfficialKyBillLink) && (
-              <MuiCard sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
-                <MuiCardContent>
-                  <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>Official Sources</Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    {legiscanBillDocHref && (
-                      <MuiButton
-                        variant="outlined"
-                        fullWidth
-                        href={legiscanBillDocHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                        size="medium"
-                        sx={{ color: 'primary.main', borderColor: 'primary.main', fontSize: '1rem', py: 1.25 }}
-                      >
-                        View on LegiScan
-                      </MuiButton>
-                    )}
-                    {showOfficialKyBillLink && (
-                      <MuiButton
-                        variant="outlined"
-                        fullWidth
-                        href={kyLegBillHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                        size="medium"
-                        sx={{ color: 'primary.main', borderColor: 'primary.main', fontSize: '1rem', py: 1.25 }}
-                      >
-                        Kentucky Legislature
-                      </MuiButton>
-                    )}
-                  </Box>
-                </MuiCardContent>
-              </MuiCard>
-            )}
           </MuiGrid>
         </MuiGrid>
       </MuiContainer>

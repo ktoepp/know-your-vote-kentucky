@@ -2,99 +2,72 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== GLOBAL STYLES - CONSOLIDATED & SIMPLIFIED ===== */
+/* ===== DESIGN SYSTEM TOKENS ===== */
+/* Source of truth. All values derived from the approved Framer design.
+   Tailwind reads from these via tailwind.config.js theme.extend.colors.
+   MUI reads from these via src/lib/theme.ts.
+   Do not use raw hex anywhere outside this file. */
 
-/* Base setup */
 :root {
-  /* Core colors - WCAG AA compliant */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --bg-surface: #ffffff;
-  
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-tertiary: #475569;
-  --text-muted: #64748b;
-  
-  /* Brand colors */
-  --blue-primary: #1e40af;
-  --blue-secondary: #2563eb;
-  --blue-light: #3b82f6;
-  --green-primary: #15803d;
-  --red-primary: #b91c1c;
-  --yellow-primary: #a16207;
-  
-  /* Navigation - consolidated */
-  --nav-bg: #1e40af;
-  --nav-text: #ffffff;
-  --nav-hover: #1e3a8a;
-  --nav-active: #1e3a8a;
-  --nav-border: #1e3a8a;
-  
-  /* Interactive states */
-  --hover-bg: #f1f5f9;
-  --focus-ring: #1e40af;
-  --border: #cbd5e1;
-  --border-light: #e2e8f0;
-  
-  /* Status colors */
-  --success: #15803d;
-  --warning: #a16207;
-  --error: #b91c1c;
-  --info: #1e40af;
+  /* --- Brand --- */
+  --primary:       #1E40AF;   /* Primary blue: buttons, links, focus ring */
+  --primary-dark:  #1E3A8A;   /* Hero gradient start, pressed state */
+  --primary-light: #2563EB;   /* Hero gradient end, hover state */
+  --primary-50:    #EFF6FF;   /* Selected pill bg, info banner bg */
 
-  /* Adobe Typekit (layout `<link>`) — matches `FONT_HEADING` in `src/lib/theme.ts` */
-  --font-heading: "aesthet-nova", serif;
+  /* --- Neutrals (cool Slate scale) --- */
+  --bg-surface:    #FFFFFF;   /* Card, input fill, hero text */
+  --bg-page:       #F8FAFC;   /* Page background */
+  --bg-tertiary:   #F1F5F9;   /* Subtle banner, striped row, muted surface */
+  --border-light:  #E2E8F0;   /* Hairline borders, dividers, input border */
+  --border:        #CBD5E1;   /* Disabled border, chip border, hover border */
+  --text-muted:    #94A3B8;   /* Placeholder text, tertiary metadata */
+  --text-tertiary: #64748B;   /* Muted body, footer copy, italic disclaimers */
+  --text-secondary:#334155;   /* Secondary body text, card descriptions */
+  --text-primary:  #0F172A;   /* Headings, dark CTA bg, primary body text */
+
+  /* --- Semantic --- */
+  --success:       #16A34A;   /* House badge, Passed, Signed, Yea pill */
+  --success-tint:  #F0FDF4;   /* Success badge bg (light variant) */
+  --error:         #DC2626;   /* Nay vote, destructive actions, error state */
+  --error-tint:    #FEF2F2;   /* Error banner bg */
+  --warning:       #D97706;   /* Independent party, in-committee / pending */
+
+  /* --- Chamber & party (own tokens to prevent semantic drift) --- */
+  --chamber-senate: #6B21A8;  /* Senate badge fill */
+  --chamber-house:  #16A34A;  /* House badge fill */
+  --party-r:        #DC2626;  /* Republican avatar dot */
+  --party-d:        #2563EB;  /* Democrat avatar dot */
+  --party-i:        #D97706;  /* Independent avatar dot */
+  --party-fg:       #FFFFFF;  /* Text on top of any party dot */
+
+  /* --- Elevation --- */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+
+  /* --- Typography --- */
+  --font-heading: "aesthet-nova", Georgia, "Times New Roman", serif;
+  --font-sans:    "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* --- Legacy aliases (keep for one release, then delete) --- */
+  --bg-primary:    var(--bg-surface);
+  --bg-secondary:  var(--bg-page);
+  --blue-primary:  var(--primary);
+  --focus-ring:    var(--primary);
 }
 
-/* Dark mode - simplified */
-[data-theme="dark"] {
-  --bg-primary: #000000;
-  --bg-secondary: #111111;
-  --bg-tertiary: #1a1a1a;
-  --bg-surface: #222222;
-  
-  --text-primary: #ffffff;
-  --text-secondary: #e5e5e5;
-  --text-tertiary: #cccccc;
-  --text-muted: #999999;
-  
-  --blue-primary: #60a5fa;
-  --blue-secondary: #93c5fd;
-  --blue-light: #bfdbfe;
-  --green-primary: #4ade80;
-  --red-primary: #f87171;
-  --yellow-primary: #fbbf24;
-  
-  --nav-bg: #1e40af;
-  --nav-text: #ffffff;
-  --nav-hover: #1e3a8a;
-  --nav-active: #1e3a8a;
-  --nav-border: #1e3a8a;
-  
-  --hover-bg: #333333;
-  --focus-ring: #60a5fa;
-  --border: #333333;
-  --border-light: #444444;
-  
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --info: #3b82f6;
-  
-  color-scheme: dark;
-}
+/* ===== BASE STYLES ===== */
 
-/* Base styles */
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;   /* 14px — text-body */
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-  background-color: var(--bg-primary);
+  background-color: var(--bg-page);
   color: var(--text-primary);
 }
 
@@ -102,328 +75,75 @@ body {
   box-sizing: border-box;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
-}
-
-/* ===== COMPONENT STYLES - CONSOLIDATED ===== */
-
-/* Skeleton Loading Animation */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-/* Navigation - enhanced modern styling with higher specificity */
-nav.nav-container {
-  background: linear-gradient(135deg, var(--nav-bg) 0%, var(--nav-hover) 50%, var(--nav-bg) 100%) !important;
-  color: var(--nav-text) !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  position: relative;
-}
-
-nav.nav-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, 
-    rgba(255,255,255,0.05) 0%, 
-    rgba(255,255,255,0.02) 50%, 
-    rgba(255,255,255,0.05) 100%);
-  pointer-events: none;
-}
-
-/* Navigation links styling */
-nav.nav-container .nav-link,
-nav.nav-container a[href] {
-  color: var(--nav-text) !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-  text-decoration: none;
-}
-
-nav.nav-container .nav-link::before,
-nav.nav-container a[href]::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-  transition: left 0.5s ease;
-}
-
-nav.nav-container .nav-link:hover::before,
-nav.nav-container a[href]:hover::before {
-  left: 100%;
-}
-
-nav.nav-container .nav-link:hover,
-nav.nav-container a[href]:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-nav.nav-container .nav-link.active,
-nav.nav-container a[href][aria-current="page"] {
-  background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1)) !important;
-  box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* Navigation button styling */
-nav.nav-container .nav-button,
-nav.nav-container button {
-  color: var(--nav-text) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-nav.nav-container .nav-button:hover,
-nav.nav-container button:hover {
-  background: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Navigation text colors */
-nav.nav-container span,
-nav.nav-container div {
-  color: var(--nav-text) !important;
-}
-
-nav.nav-container .text-white {
-  color: var(--nav-text) !important;
-}
-
-nav.nav-container .text-blue-100 {
-  color: var(--nav-text) !important;
-}
-
-nav.nav-container .text-blue-200 {
-  color: var(--nav-text) !important;
-}
-
-nav.nav-container .text-gray-400 {
-  color: var(--nav-text) !important;
-}
-
-.border-nav-border {
-  border-color: var(--nav-border) !important;
-}
-
-/* Search input styling */
-nav.nav-container .search-input,
-nav.nav-container input[type="text"],
-nav.nav-container input[type="search"] {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  color: var(--nav-text) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-}
-
-nav.nav-container .search-input:focus,
-nav.nav-container input[type="text"]:focus,
-nav.nav-container input[type="search"]:focus {
-  background-color: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1) !important;
-}
-
-nav.nav-container .search-input::placeholder,
-nav.nav-container input[type="text"]::placeholder,
-nav.nav-container input[type="search"]::placeholder {
-  color: rgba(255, 255, 255, 0.7) !important;
-}
-
-/* Dark mode navigation overrides */
-[data-theme="dark"] nav.nav-container {
-  background: linear-gradient(135deg, var(--nav-bg) 0%, var(--nav-hover) 50%, var(--nav-bg) 100%) !important;
-}
-
-[data-theme="dark"] nav.nav-container::before {
-  background: linear-gradient(90deg, 
-    rgba(255,255,255,0.03) 0%, 
-    rgba(255,255,255,0.01) 50%, 
-    rgba(255,255,255,0.03) 100%);
-}
-
-[data-theme="dark"] nav.nav-container .nav-link:hover,
-[data-theme="dark"] nav.nav-container a[href]:hover {
-  background-color: rgba(255, 255, 255, 0.08) !important;
-}
-
-[data-theme="dark"] nav.nav-container .nav-link.active,
-[data-theme="dark"] nav.nav-container a[href][aria-current="page"] {
-  background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.08)) !important;
-}
-
-[data-theme="dark"] nav.nav-container .nav-button,
-[data-theme="dark"] nav.nav-container button {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-[data-theme="dark"] nav.nav-container .nav-button:hover,
-[data-theme="dark"] nav.nav-container button:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-}
-
-[data-theme="dark"] nav.nav-container .search-input,
-[data-theme="dark"] nav.nav-container input[type="text"],
-[data-theme="dark"] nav.nav-container input[type="search"] {
-  background-color: rgba(255, 255, 255, 0.08) !important;
-}
-
-[data-theme="dark"] nav.nav-container .search-input:focus,
-[data-theme="dark"] nav.nav-container input[type="text"]:focus,
-[data-theme="dark"] nav.nav-container input[type="search"]:focus {
-  background-color: rgba(255, 255, 255, 0.12) !important;
-}
-
-[data-theme="dark"] nav.nav-container .search-input::placeholder,
-[data-theme="dark"] nav.nav-container input[type="text"]::placeholder,
-[data-theme="dark"] nav.nav-container input[type="search"]::placeholder {
-  color: rgba(255, 255, 255, 0.6) !important;
-}
-
-/* Card styling */
-.card {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.card-title {
-  color: var(--text-primary);
-}
-
-.card-meta {
-  color: var(--text-secondary);
-}
-
-/* Status indicators */
-.status {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.875rem;
   font-weight: 500;
+  text-wrap: balance;
 }
 
-.status-committee {
-  background-color: var(--blue-primary);
-  color: white;
-}
+/* ===== FOCUS (mandatory on every interactive element) ===== */
 
-.status-floor {
-  background-color: var(--green-primary);
-  color: white;
-}
-
-.status-urgent {
-  background-color: var(--red-primary);
-  color: white;
-}
-
-[data-theme="dark"] .status-committee {
-  background-color: var(--blue-primary);
-}
-
-[data-theme="dark"] .status-floor {
-  background-color: var(--green-primary);
-}
-
-[data-theme="dark"] .status-urgent {
-  background-color: var(--red-primary);
-}
-
-/* Button styling */
-.btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.btn-primary {
-  background-color: var(--blue-primary);
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: var(--nav-hover);
-}
-
-.btn-secondary {
-  background-color: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-}
-
-.btn-secondary:hover {
-  background-color: var(--hover-bg);
-  border-color: var(--border-light);
-}
-
-/* Focus styles */
-.focusable:focus-visible {
-  outline: 2px solid var(--focus-ring);
+:focus-visible {
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
+  border-radius: inherit;
 }
 
-/* Skip link for accessibility */
+/* ===== NAVIGATION ===== */
+
+nav.nav-container {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+  height: 72px;
+  box-shadow: var(--shadow-sm);
+}
+
+nav.nav-container a {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 0.8125rem;   /* text-body-sm */
+  font-weight: 500;
+  transition: color 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+nav.nav-container a[aria-current="page"] {
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+nav.nav-container a:hover {
+  color: var(--primary);
+}
+
+/* ===== SKELETON LOADING ===== */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ===== SKIP LINK (accessibility) ===== */
+
 .skip-link {
   position: absolute;
   top: -40px;
   left: 6px;
-  background: var(--blue-primary);
-  color: white;
+  background: var(--primary);
+  color: var(--bg-surface);
   padding: 8px;
   text-decoration: none;
   border-radius: 4px;
   z-index: 1000;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .skip-link:focus {
   top: 6px;
 }
 
-.skip-link:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
+/* ===== SCREEN READER ONLY ===== */
 
-/* Touch target sizing */
-.touch-target {
-  min-height: 44px;
-  min-width: 44px;
-}
-
-/* Screen reader only */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -436,42 +156,70 @@ nav.nav-container input[type="search"]::placeholder {
   border: 0;
 }
 
-/* High contrast mode support */
+/* ===== TOUCH TARGETS ===== */
+
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* ===== TOOLTIP ===== */
+
+.tooltip-container {
+  position: relative;
+  display: inline;
+}
+
+/* Portaled floating layer (Tooltip.tsx) */
+.ky-tooltip-surface {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--text-primary);
+  color: var(--bg-surface);
+  transition: opacity 120ms, visibility 120ms;
+  box-sizing: border-box;
+  box-shadow: var(--shadow-md);
+  max-width: min(28rem, calc(100vw - 1rem));
+}
+
+.tooltip-trigger {
+  cursor: help;
+}
+
+/* ===== ANIMATION ===== */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ===== ACCESSIBILITY MEDIA QUERIES ===== */
+
 @media (prefers-contrast: high) {
-  .nav-container {
+  nav.nav-container,
+  .card,
+  button {
     border: 2px solid;
   }
-  
-  .btn {
-    border: 2px solid;
-  }
-  
-  .card {
-    border: 2px solid;
-  }
-  
-  .focusable:focus-visible {
-    outline: 3px solid;
+
+  :focus-visible {
+    outline-width: 3px;
   }
 }
 
-/* Forced colors mode support */
 @media (forced-colors: active) {
   .gradient-text {
     background: none;
     color: CanvasText;
   }
-  
-  .btn {
-    border: 1px solid;
-  }
-  
-  .focusable:focus-visible {
-    outline: 2px solid;
-  }
 }
 
-/* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -481,101 +229,4 @@ nav.nav-container input[type="search"]::placeholder {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* Tooltip styles — trigger wrapper; popover is portaled to body (see Tooltip.tsx) */
-.tooltip-container {
-  position: relative;
-  display: inline;
-}
-
-/* Portaled floating layer (class used by src/components/ui/Tooltip.tsx) */
-.ky-tooltip-surface {
-  font-size: 0.875rem;
-  line-height: 1.4;
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: opacity 0.2s, visibility 0.2s;
-  box-sizing: border-box;
-}
-
-.tooltip-content {
-  position: absolute;
-  bottom: 125%;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--text-primary);
-  color: var(--bg-primary);
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  max-width: min(28rem, calc(100vw - 1rem));
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s, visibility 0.3s;
-  z-index: 1000;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.tooltip-content.show {
-  opacity: 1;
-  visibility: visible;
-}
-
-.tooltip-trigger {
-  cursor: help;
-}
-
-.tooltip-trigger:focus {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-/* Animation keyframes */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
-}
-
-/* MUI Theme overrides for dark mode */
-[data-theme="dark"] .MuiCssBaseline-root {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-[data-theme="dark"] .MuiPaper-root {
-  background-color: var(--bg-surface);
-}
-
-[data-theme="dark"] .MuiCard-root {
-  background-color: var(--bg-surface);
-}
-
-[data-theme="dark"] .MuiTextField-root .MuiOutlinedInput-root {
-  background-color: var(--bg-surface);
-}
-
-[data-theme="dark"] .MuiTextField-root .MuiOutlinedInput-root fieldset {
-  border-color: var(--border);
-}
-
-[data-theme="dark"] .MuiTextField-root .MuiOutlinedInput-root:hover fieldset {
-  border-color: var(--border-light);
-}
-
-[data-theme="dark"] .MuiTextField-root .MuiOutlinedInput-root.Mui-focused fieldset {
-  border-color: var(--focus-ring);
 }

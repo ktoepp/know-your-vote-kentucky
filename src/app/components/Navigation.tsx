@@ -34,7 +34,6 @@ import {
   Description,
   Groups,
   AccountCircle,
-  KeyboardArrowDown,
 } from '@mui/icons-material';
 import { KentuckyStateIcon } from '@/components/icons/KentuckyStateIcon';
 import { useThemeUtils } from '@/components/ui/ThemeUtils';
@@ -46,14 +45,11 @@ import { canonicalizeKyBillSearchInput } from '@/lib/ky-search-bills';
 /** Served from `public/branding/` so deploys include it (`/branding/` is gitignored for source exports). */
 const NAV_WORDMARK_SRC = '/branding/Logo-03.png';
 
-type NavSubLink = { href: string; label: string };
-
 type NavLinkConfig = {
   href: string;
   label: string;
   icon: React.ReactElement<{ sx?: SxProps<Theme> }>;
   priority: 'primary';
-  subLinks?: NavSubLink[];
 };
 
 // Primary navigation links - Kentucky civic engagement
@@ -63,10 +59,6 @@ const navLinks: NavLinkConfig[] = [
     label: 'Bills',
     icon: <Description />,
     priority: 'primary',
-    subLinks: [
-      { href: '/bills/senate', label: 'Senate' },
-      { href: '/bills/house', label: 'House' },
-    ],
   },
   {
     href: '/members',
@@ -100,135 +92,6 @@ function isNavPathActive(path: string, pathname: string): boolean {
   return pathname === path;
 }
 
-function BillsNavDropdown({
-  item,
-  theme,
-  pathname,
-  getHoverBackground,
-}: {
-  item: NavLinkConfig;
-  theme: Theme;
-  pathname: string;
-  getHoverBackground: () => string;
-}) {
-  const [billsAnchorEl, setBillsAnchorEl] = useState<null | HTMLElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [menuMinWidth, setMenuMinWidth] = useState(240);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  const clearCloseTimer = () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-  };
-
-  const openMenu = (anchor: HTMLElement) => {
-    clearCloseTimer();
-    setBillsAnchorEl(anchor);
-    const w = anchor.offsetWidth;
-    setMenuMinWidth(Math.max(240, w));
-    setMenuOpen(true);
-  };
-
-  const scheduleCloseMenu = () => {
-    clearCloseTimer();
-    closeTimerRef.current = setTimeout(() => setMenuOpen(false), 280);
-  };
-
-  useEffect(() => () => clearCloseTimer(), []);
-
-  const groupActive = isNavPathActive(item.href, pathname);
-
-  return (
-    <Box
-      onMouseEnter={(e) => openMenu(e.currentTarget)}
-      onMouseLeave={scheduleCloseMenu}
-      sx={{ position: 'relative', display: 'inline-flex', alignItems: 'stretch' }}
-    >
-      <Button
-        component={Link}
-        href={item.href}
-        endIcon={
-          <KeyboardArrowDown
-            sx={{
-              fontSize: '1rem',
-              opacity: 0.6,
-              transition: 'transform 0.2s ease',
-              transform: menuOpen ? 'rotate(-180deg)' : 'none',
-            }}
-          />
-        }
-        aria-haspopup="true"
-        aria-expanded={menuOpen}
-        sx={{
-          color: groupActive ? 'primary.main' : 'text.primary',
-          backgroundColor: groupActive ? 'rgba(0,0,0,0.06)' : 'transparent',
-          borderRadius: 1.5,
-          px: 2,
-          py: 1,
-          textTransform: 'none',
-          fontSize: '0.9375rem',
-          fontWeight: groupActive ? 600 : 500,
-          '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
-        }}
-      >
-        {item.label}
-      </Button>
-      <Menu
-        anchorEl={billsAnchorEl}
-        open={menuOpen && Boolean(billsAnchorEl)}
-        onClose={() => setMenuOpen(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        disableAutoFocus
-        disableScrollLock
-        sx={{ zIndex: (t) => t.zIndex.modal + 10 }}
-        MenuListProps={{
-          autoFocus: false,
-          sx: {
-            py: 1.25,
-            minWidth: menuMinWidth,
-            bgcolor: 'background.paper',
-          },
-        }}
-        PaperProps={{
-          onMouseEnter: () => billsAnchorEl && openMenu(billsAnchorEl),
-          onMouseLeave: scheduleCloseMenu,
-          elevation: 8,
-          sx: {
-            mt: 0.75,
-            minWidth: menuMinWidth,
-            borderRadius: 2,
-            overflow: 'visible',
-            bgcolor: 'background.paper',
-            border: `1px solid ${theme.palette.divider}`,
-          },
-        }}
-      >
-        {item.subLinks?.map((sub) => (
-          <MenuItem
-            key={sub.href}
-            component={Link}
-            href={sub.href}
-            selected={pathname === sub.href}
-            onClick={() => setMenuOpen(false)}
-            sx={{
-              py: 1.5,
-              px: 2.25,
-              minHeight: 52,
-              fontSize: '1.0625rem',
-              fontWeight: 500,
-              color: 'text.primary',
-              '&.Mui-selected': {
-                bgcolor: 'action.selected',
-              },
-            }}
-          >
-            {sub.label}
-          </MenuItem>
-        ))}
-      </Menu>
-    </Box>
-  );
-}
 
 const SEARCH_FIELD_SENTINEL = 'Search';
 
@@ -550,36 +413,26 @@ export default function Navigation() {
             aria-label="Primary"
             sx={{ display: { xs: 'none', lg: 'flex' }, gap: 1, alignItems: 'center' }}
           >
-            {navLinks.map((item) =>
-              item.subLinks?.length ? (
-                <BillsNavDropdown
-                  key={item.href}
-                  item={item}
-                  theme={theme}
-                  pathname={pathname}
-                  getHoverBackground={getHoverBackground}
-                />
-              ) : (
-                <Button
-                  key={item.href}
-                  component={Link}
-                  href={item.href}
-                  sx={{
-                    color: isActive(item.href) ? 'primary.main' : 'text.primary',
-                    backgroundColor: isActive(item.href) ? 'rgba(0,0,0,0.06)' : 'transparent',
-                    borderRadius: 1.5,
-                    px: 2,
-                    py: 1,
-                    textTransform: 'none',
-                    fontSize: '0.9375rem',
-                    fontWeight: isActive(item.href) ? 600 : 500,
-                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
-                  }}
-                >
-                  {item.label}
-                </Button>
-              ),
-            )}
+            {navLinks.map((item) => (
+              <Button
+                key={item.href}
+                component={Link}
+                href={item.href}
+                sx={{
+                  color: isActive(item.href) ? 'primary.main' : 'text.primary',
+                  backgroundColor: isActive(item.href) ? 'rgba(0,0,0,0.06)' : 'transparent',
+                  borderRadius: 1.5,
+                  px: 2,
+                  py: 1,
+                  textTransform: 'none',
+                  fontSize: '0.9375rem',
+                  fontWeight: isActive(item.href) ? 600 : 500,
+                  '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
+                }}
+              >
+                {item.label}
+              </Button>
+            ))}
           </Box>
           
           {/* Spacer */}
@@ -653,95 +506,27 @@ export default function Navigation() {
         >
           <Container maxWidth="xl">
             <List sx={{ py: 0 }}>
-              {navLinks.map((item) =>
-                item.subLinks?.length ? (
-                  <React.Fragment key={item.href}>
-                    <ListItem sx={{ px: 2, py: 0 }}>
-                      <ListItemButton
-                        component={Link}
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        sx={{
-                          borderRadius: 2,
-                          mb: 0.5,
-                          color: isActive(item.href) ? mobileNav.colorActive : mobileNav.color,
-                          backgroundColor: isActive(item.href) ? mobileNav.activeBg : 'transparent',
-                          '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
-                        }}
-                      >
-                        <ListItemText
-                          primary={item.label}
-                          sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem', color: 'inherit' } }}
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                    {item.subLinks.map((sub) => (
-                      <ListItem key={sub.href} sx={{ px: 2, py: 0, pl: 5 }}>
-                        <ListItemButton
-                          component={Link}
-                          href={sub.href}
-                          onClick={() => setMobileMenuOpen(false)}
-                          sx={{
-                            borderRadius: 2,
-                            mb: 0.5,
-                            color: pathname === sub.href ? mobileNav.colorActive : mobileNav.color,
-                            backgroundColor: pathname === sub.href ? mobileNav.activeBg : 'transparent',
-                            borderLeft:
-                              pathname === sub.href
-                                ? `4px solid ${theme.palette.primary.main}`
-                                : '4px solid transparent',
-                            '&:hover': {
-                              backgroundColor: mobileNav.hover,
-                            },
-                          }}
-                        >
-                          <ListItemText
-                            primary={sub.label}
-                            sx={{
-                              '& .MuiListItemText-primary': {
-                                fontWeight: 600,
-                                fontSize: '1.0625rem',
-                                color: 'inherit',
-                              },
-                            }}
-                          />
-                          {pathname === sub.href && (
-                            <Box
-                              sx={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: '50%',
-                                backgroundColor: theme.palette.primary.main,
-                                ml: 'auto',
-                              }}
-                            />
-                          )}
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
-                  </React.Fragment>
-                ) : (
-                  <ListItem key={item.href} sx={{ px: 2, py: 0 }}>
-                    <ListItemButton
-                      component={Link}
-                      href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      sx={{
-                        borderRadius: 2,
-                        mb: 0.5,
-                        color: isActive(item.href) ? mobileNav.colorActive : mobileNav.color,
-                        backgroundColor: isActive(item.href) ? mobileNav.activeBg : 'transparent',
-                        '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
-                      }}
-                    >
-                      <ListItemText
-                        primary={item.label}
-                        sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem', color: 'inherit' } }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ),
-              )}
+              {navLinks.map((item) => (
+                <ListItem key={item.href} sx={{ px: 2, py: 0 }}>
+                  <ListItemButton
+                    component={Link}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    sx={{
+                      borderRadius: 2,
+                      mb: 0.5,
+                      color: isActive(item.href) ? mobileNav.colorActive : mobileNav.color,
+                      backgroundColor: isActive(item.href) ? mobileNav.activeBg : 'transparent',
+                      '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
+                    }}
+                  >
+                    <ListItemText
+                      primary={item.label}
+                      sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem', color: 'inherit' } }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
             </List>
           </Container>
         </Box>
