@@ -12,7 +12,8 @@
 #   NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL
 #   SUPABASE_SERVICE_ROLE_KEY
 #
-# Schedule runs on default branch only (same as other cron workflows).
+# Optional Slack (same Incoming Webhooks as Vercel — see env-template.txt):
+#   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_SYNC_NOTIFY_CLI=true
 name: Sync KY bill statuses
 
 on:
@@ -23,8 +24,8 @@ on:
         type: string
         default: '1'
   schedule:
-    # Weekly — Tuesdays 07:30 UTC (offset from outbound-links workflow)
-    - cron: '30 7 * * 2'
+    # Hourly — conservative hash-gated sync (~2 LegiScan key requests per run: session list + master list raw)
+    - cron: '0 * * * *'
 
 permissions:
   contents: read
@@ -57,6 +58,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+          SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+          SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+          SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_SYNC_NOTIFY_CLI: 'true'
         run: |
           set -euo pipefail
           EXTRA=""
@@ -64,3 +70,16 @@ jobs:
             EXTRA="--historic-sessions=${{ inputs.historic_sessions }}"
           fi
           npm run sync:ky:bills:status -- ${EXTRA}
+
+      - name: Slack notify on workflow failure
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+        run: |
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
+            exit 0
+          fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"*KY Vote — hourly bills sync workflow failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$WEBHOOK"

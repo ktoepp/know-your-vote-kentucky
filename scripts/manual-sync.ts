@@ -24,9 +24,13 @@
  *   npm run sync:ky -- bills --quota-backfill
  *   npm run sync:ky -- bills --quota-backfill --quota-backfill-sessions-per-run=1 --sponsor-budget=20
  *   npm run sync:ky -- bills --quota-backfill --dry-run
+ *
+ * Slack (optional): set SLACK_WEBHOOK_STATUS_REPORTS (+ SLACK_WEBHOOK_ERRORS) and SLACK_SYNC_NOTIFY_CLI=true
+ * for CLI/GitHub Actions digests (includes LegiScan quota + ky_sources snapshot).
  */
 
 import './load-env';
+import { notifySyncExceptionSlack, notifySyncSlack } from '../src/lib/slack-webhook';
 import { syncAll, SYNC_SOURCES, type SyncResult } from '../src/lib/ky-sync-pipeline';
 
 const args = process.argv.slice(2);
@@ -133,10 +137,24 @@ async function main() {
       useChangeHash: useChangeHash || undefined,
     });
     printResults(results);
+    await notifySyncSlack({
+      results,
+      source: sourceArg,
+      dryRun,
+      isVercelCron: false,
+      fromCli: true,
+    }).catch((e) => console.error('[Slack] sync notify failed:', e));
     const failed = results.filter(r => r.status === 'error');
     process.exit(failed.length > 0 ? 1 : 0);
   } catch (err: any) {
     console.error(`\n❌ Fatal error: ${err.message}`);
+    await notifySyncExceptionSlack({
+      error: err,
+      source: sourceArg,
+      dryRun,
+      isVercelCron: false,
+      fromCli: true,
+    }).catch((e) => console.error('[Slack] sync exception notify failed:', e));
     process.exit(1);
   }
 }
