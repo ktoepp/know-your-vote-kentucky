@@ -8,17 +8,17 @@ function page(title: string, body: string, ok: boolean) {
 
 type Ctx = { params: Promise<{ token: string }> };
 
-/**
- * One-click unsubscribe from digest emails (no login). Sets digest to off and marks unsubscribed_all_at.
- */
-export async function GET(_req: NextRequest, { params }: Ctx) {
-  const { token: raw } = await params;
-  const token = decodeURIComponent(raw || '').trim();
+async function unsubscribe(token: string): Promise<{ ok: boolean; status: number; body: string }> {
   if (!token || !supabaseAdmin) {
-    return new NextResponse(page('Invalid link', 'This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at hello@kyvky.com.', false), {
+    return {
+      ok: false,
       status: 400,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
+      body: page(
+        'Invalid link',
+        'This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at hello@kyvky.com.',
+        false,
+      ),
+    };
   }
 
   const { data: row, error: selErr } = await supabaseAdmin
@@ -28,10 +28,15 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     .maybeSingle();
 
   if (selErr || !row?.user_id) {
-    return new NextResponse(page('Link not found', 'No subscription was found for this link. You may have already unsubscribed, or the link may have expired.', false), {
+    return {
+      ok: false,
       status: 404,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
+      body: page(
+        'Link not found',
+        'No subscription was found for this link. You may have already unsubscribed, or the link may have expired.',
+        false,
+      ),
+    };
   }
 
   const { error: upErr } = await supabaseAdmin
@@ -43,18 +48,43 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     .eq('unsubscribe_token', token);
 
   if (upErr) {
-    return new NextResponse(page('Something went wrong', 'Your preference could not be saved. Please try again, or update your digest settings from your profile page.', false), {
+    return {
+      ok: false,
       status: 500,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
+      body: page(
+        'Something went wrong',
+        'Your preference could not be saved. Please try again, or update your digest settings from your profile page.',
+        false,
+      ),
+    };
   }
 
-  return new NextResponse(
-    page(
+  return {
+    ok: true,
+    status: 200,
+    body: page(
       'Digest emails stopped',
       'You will not receive further bill digest emails from Know Your Vote Kentucky. You can re-enable digests at any time from your profile.',
       true,
     ),
-    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-  );
+  };
+}
+
+/** Browser click → friendly HTML page. */
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  const { token: raw } = await params;
+  const token = decodeURIComponent(raw || '').trim();
+  const result = await unsubscribe(token);
+  return new NextResponse(result.body, {
+    status: result.status,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
+}
+
+/** RFC 8058 one-click (List-Unsubscribe-Post). Mail clients POST here without user interaction. */
+export async function POST(_req: NextRequest, { params }: Ctx) {
+  const { token: raw } = await params;
+  const token = decodeURIComponent(raw || '').trim();
+  const result = await unsubscribe(token);
+  return NextResponse.json({ ok: result.ok }, { status: result.status });
 }

@@ -58,3 +58,13 @@ next-env.d.ts
 
 # Sentry build plugin auth token (never commit)
 .env.sentry-build-plugin
+
+# Local digest preview output (npm run preview:digest)
+digest-preview.html
+
+# Local welcome email preview output (npm run preview:welcome)
+welcome-preview.html
+
+# Local diagnostic output
+diagnose-out.txt
+diagnose-after.txt

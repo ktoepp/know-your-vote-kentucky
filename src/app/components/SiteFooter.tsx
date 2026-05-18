@@ -135,7 +135,7 @@ export default function SiteFooter() {
           <Typography variant="caption" color="text.secondary">
             v{APP_VERSION}
           </Typography>
-          {footerLegalLinks.map(({ href, label }, i) => (
+          {footerLegalLinks.map(({ href, label }) => (
             <React.Fragment key={href}>
               <Typography variant="caption" color="text.disabled" aria-hidden>·</Typography>
               <MuiLink

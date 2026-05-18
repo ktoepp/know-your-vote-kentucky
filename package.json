@@ -26,7 +26,15 @@
     "slack:smoke-test": "tsx scripts/slack-smoke-test.ts",
     "verify:votes": "tsx scripts/verify-legiscan-vote-counts.ts",
     "verify:legislator-links": "tsx scripts/verify-legislator-external-links.ts",
-    "spot-check:bill-links": "tsx scripts/spot-check-bill-external-links.ts"
+    "spot-check:bill-links": "tsx scripts/spot-check-bill-external-links.ts",
+    "preview:digest": "tsx scripts/preview-bill-digest.ts",
+    "verify:digest-state": "tsx scripts/verify-digest-state.ts",
+    "preview:welcome": "tsx scripts/preview-welcome-email.tsx",
+    "audit:legiscan-subjects": "tsx scripts/audit-legiscan-subjects.ts",
+    "diagnose:legislators": "tsx scripts/diagnose-legislators.ts",
+    "cleanup:stale-legislators": "tsx scripts/cleanup-stale-legislators.ts",
+    "debug:openstates-roster": "tsx scripts/debug-openstates-roster.ts",
+    "normalize:legislator-districts": "tsx scripts/normalize-legislator-districts.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

@@ -8,8 +8,20 @@
 
 ## In Progress
 
-- **Legislator outbound links** — Run **`npm run verify:legislator-links`** locally or in CI to catch broken outbound URLs; tune timeouts if LRC is slow. Re-run **`sync:ky:legislators`** on a cadence that fits ops so URLs and **`committee_memberships`** stay current (requires **`OPENSTATES_API_KEY`** in env).
-- **Follow bills — launch hardening (M8)** — Bounce handling, copy review, end-to-end test of digest after a real bill change; optional **Welcome** React Email on first verification (spec M6) still not in repo. See [docs/specs/follow-bills.md](./docs/specs/follow-bills.md).
+- (none — feature set "auth + profile + follow + email" is shipped and launch-blockers cleared, see Recently completed 2026-05-13)
+
+## Maintained on autopilot
+
+- **Legislator outbound links** — `.github/workflows/legislator-links-weekly.yml` runs Mondays 12:00 UTC: `sync:ky:legislators` → `verify:legislator-links --json` → `audit:legiscan-subjects --json`, uploading `reports/` as artifacts. Manual fallback: `npm run verify:legislator-links`. Required GH secrets: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENSTATES_API_KEY`, `LEGISCAN_API_KEY` (last optional).
+- **Email digest** — `/api/cron/notify` runs daily 11:00 UTC via Vercel Cron (weekly users batched on Mondays). Suppressed users skipped. Failures + per-user-error spikes captured in Sentry (tags `route:cron/notify` and `route:webhooks/resend`).
+- **Outbound mail policy** — `From: alerts@kyvky.com` (transactional only, do not reply); `Reply-To: hello@kyvky.com` (real inbox). All inbound contact / vulnerability reports go to `hello@kyvky.com`. Webhook deliveries from Resend → `https://www.kyvky.com/api/webhooks/resend` (apex 307s break POST). Plain-text fallback included on every transactional send.
+
+## Operator follow-ups (not blocking, but recommended before public launch)
+
+- **Resend → Domains → kyvky.com** — confirm SPF / DKIM / DMARC are all green. Cold-start sends to Gmail otherwise land in Junk.
+- **Sentry → Alerts** — add two rules: (1) any event tagged `route:cron/notify` → notify; (2) ≥5 events tagged `route:webhooks/resend` in 5 min → notify.
+- **Inbox routing** — confirm `hello@kyvky.com` lands somewhere a human reads (privacy/terms pages and email Reply-To all point there).
+- **Legal review** — `/privacy` and `/terms` are honest practical drafts (`src/app/privacy/page.tsx` + `src/app/terms/page.tsx`); a lawyer should review before scaling beyond a small audience.
 
 ---
 
@@ -26,9 +38,16 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ### Ops / env
 
-- Apply **019** + **020** on any environment that does not have them yet (`npm run db:apply-sql` or SQL editor). **020** adds `INSERT` RLS on `ky_notification_preferences` for the preferences API / follow helper. **Operator checklist** order: **016 → 017 → 018 → 019 → 020** (match your branch’s migrations).
+- Apply **019**, **020**, **021**, **022**, **023** on any environment that does not have them yet (`npm run db:apply-sql` or SQL editor). **020** adds `INSERT` RLS on `ky_notification_preferences`. **021** adds bounce / complaint / suppression columns powering Resend webhook handling. **022** adds `welcome_email_sent_at` for one-time welcome email idempotency. **023** adds `external_links` JSONB on `ky_legislators` (full Open States links + grouped Social/Other UI). **Operator checklist** order: **016 → 017 → 018 → 019 → 020 → 021 → 022 → 023** (match your branch's migrations). Also set Vercel env vars `RESEND_WEBHOOK_SECRET` (Production + Preview), and ensure `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` use the canonical `www.kyvky.com` host (apex 307-redirects to www, which breaks webhook POST and one-click unsubscribe POST).
+- After applying **023** for the first time on a database with legacy data: run `npm run normalize:legislator-districts -- --apply` then `npm run cleanup:stale-legislators -- --apply`, then `npm run diagnose:legislators` to confirm active count is ~141 (100 House + 38 Senate + 3 statewide). Future syncs handle this automatically.
 - **`env-template.txt`** — SMTP notes, rate limits, CAPTCHA troubleshooting (“For security purposes…”).
 - **`npm run test:supabase-auth`** — smoke reachability for Auth API (no mail send).
+
+### Digest E2E validation harness
+
+- **`npm run preview:digest -- --email <addr>`** renders the digest for one user (no send) and writes `digest-preview.html`. Add **`--inject HB1`** to insert a synthetic `ky_bill_status_history` row (cleaned up on exit) so you can drive the full path even when no real bill movement is in the window. Add **`--send`** to actually send via Resend, and **`--ignore-last-sent`** to bypass the prior-window cutoff.
+- Bounce / complaint events update `ky_notifications_log.delivery_status` and flip `ky_notification_preferences.bounce_state` / `suppressed_at` via **`POST /api/webhooks/resend`** (requires **`RESEND_WEBHOOK_SECRET`** + Resend webhook configured for `email.delivered`, `email.bounced`, `email.complained`, `email.delivery_delayed`).
+- One-click unsubscribe: digest emails now set **`List-Unsubscribe`** + **`List-Unsubscribe-Post: List-Unsubscribe=One-Click`**; the unsubscribe route accepts both **`GET`** (HTML page) and **`POST`** (RFC 8058).
 
 ### Suggested next implementation order (align with spec milestones)
 
@@ -56,6 +75,14 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Recently completed
 
+- **Digest history on `/profile` (2026-05-13)** — New `ProfileDigestHistorySection` shows the user's last 10 sent digests with the bills + event labels included, so anyone who lost the email can still see what was sent. Backed by `GET /api/me/digest-history`: queries `ky_notifications_log` under the user's JWT (RLS-scoped), then uses `supabaseAdmin` to expand `event_ids` against the service-role-only `ky_bill_status_history` and join to `ky_bills` for labels. Dedupes bills per digest and caps to 10 with "…and N more" overflow.
+- **Launch blockers — Sentry alerts + privacy + terms + email polish (2026-05-13)** — `/api/cron/notify` and `/api/webhooks/resend` now `Sentry.captureException` on thrown errors and `Sentry.captureMessage` on silent partial-failure 200s, tagged `route:*` for alert-rule scoping. New `/privacy` and `/terms` pages cover what we collect, who we share with, retention, user controls, and acceptable use; both linked from `SiteFooter`, the register page (acknowledgment line), and email footers. Outbound mail policy: `From: alerts@kyvky.com` (transactional only); `Reply-To: hello@kyvky.com` (real inbox, also used in privacy/terms contact). Plain-text fallback (`render(el, { plainText: true })`) included on every transactional send for deliverability + a11y. Per-user rate limits on `/api/bills/[id]/follow` (60/min) and `/api/me/preferences` (30/min) keyed by user id with 429 + Retry-After. `/profile` followed-bills now shows a CTA empty-state card (browse bills / find your legislators) when no follows.
+- **Legislator stale row cleanup + Senate district format (2026-05-13)** — Members page was showing 381 active legislators when the General Assembly has 138 seats. Two fixes: `syncKyLegislators` now runs a second deactivation pass for active LegiScan-only rows at seats covered by a current Open States row (predecessors and alias dupes); `scripts/normalize-legislator-districts.ts` rewrites legacy Senate `SD-0XX` to canonical `SD-XX` so the seat-key compare actually matches. New `npm run cleanup:stale-legislators`, `npm run normalize:legislator-districts`, `npm run diagnose:legislators`, and `npm run debug:openstates-roster`. After running cleanup + normalize the live count drops to ~141 active (100 House + 38 Senate + 3 statewide).
+- **Email copy / structure pass (2026-05-13)** — `BillDigest` subject line is count-led ("Your KY bill digest — N updates"); preview text names bills + updates; new footer adds "Change frequency or topics" alongside unsubscribe and a one-line "why am I getting this" attribution. `WelcomeEmail` lead clarifies cadence ("we'll only email when followed bills change — no marketing"); marked one-time so users don't expect repeats; topic-follow card mentions automatic matching.
+- **Topic taxonomy — hybrid digest matching (2026-05-13)** — Added `src/lib/ky-topic-legiscan-mapping.ts` translating LegiScan subject patterns to KY_TOPIC tags so the digest cron matches a user's `topic_filters` against EITHER `ky_bills.topics` (heuristic) OR `legiscan_subjects` (official) — closes the silent-miss path where a bill's correct LegiScan subject didn't earn a heuristic topic tag. `BillTopicMatchHint` reflects the same union so UI agrees with the digest. New `npm run audit:legiscan-subjects` and a workflow step on the weekly job report unmapped subjects sorted by frequency so the mapping stays current.
+- **Legislator links — full fidelity + weekly verifier (2026-05-13)** — Migration **023** adds `external_links` JSONB on `ky_legislators`. Sync persists the full Open States `links[]` (URL + note + category + host); `MemberProfileView` renders a "Connect & follow" section grouped Social / Other (hidden when empty). Verifier now probes `external_links` (skips social by default, `--probe-social` to opt in) and emits JSON with `--output`. New `.github/workflows/legislator-links-weekly.yml` runs Mondays 12:00 UTC: `sync:ky:legislators` → `verify:legislator-links` → `audit:legiscan-subjects`, uploading reports as artifacts.
+- **Follow Bills — M3 polish (2026-05-13)** — `BillTopicMatchHint` on bill detail: when a signed-in user has digest enabled and the bill's topics intersect their `topic_filters` but they aren't individually following, an inline alert names the matching topic so users understand updates are already in their digest.
+- **Follow Bills — M8 bounce + welcome (2026-05-13)** — Resend webhook (`/api/webhooks/resend`) verifies Svix signatures and updates `ky_notifications_log.delivery_status` + `ky_notification_preferences.{bounce_state,bounce_count,suppressed_at}` (migration **021**). Digest cron filters `suppressed_at` users; emails set `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click`; `/api/unsubscribe/[token]` accepts both GET (HTML) and POST (RFC 8058). One-time welcome email after first verification: `WelcomeEmail` template + `/api/me/welcome-email` (idempotent stamp-then-send) fired from `/auth/verify` (migration **022**). New harness scripts: `npm run preview:digest`, `npm run verify:digest-state`, `npm run preview:welcome`. `scripts/load-env.ts` now falls back to the main repo when running inside a `.claude/worktrees/*` worktree and stubs `WebSocket` so supabase-js works on Node < 22.
 - **Follow Bills — M5–M7 (2026-05-12)** — `ky_bill_status_history` with **pre-upsert** snapshots + **`recordBillStatusHistoryForBuiltBatch`** on all **`syncKyBills`** code paths; digest cron + Resend + unsubscribe route (`decisions.md` § 2026-05-12).
 - **Follow Bills — M1 auth & profile foundation** — Migration `016_ky_user_profiles` + Auth sync triggers; MUI auth pages (`login`, `register`, `forgot`, `reset`, `verify`, `logout`); `/profile` **Account** + **Security** (password, email change, resend verification, typed-email delete); `DELETE /api/me/account`; post-login `/profile`; nav user menu Profile-first. Apply migration (`npm run db:apply-sql` or Supabase SQL) and configure redirect URLs for `/auth/verify` and `/auth/reset`. See `decisions.md` § 2026-05-11.
 - **Sentry** — Example page and `/api/sentry-example-api` removed; production monitoring remains via `@sentry/nextjs` configs and `/monitoring`.
@@ -76,27 +103,36 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Up Next
 
-- **Follow bills (M8 + optional welcome email)** — Production validation of digest + unsubscribe; bounce/failure handling; **`WelcomeEmail`** on verify if desired.
+The auth + profile + follow + email feature set is shipped and launch-blockers are cleared. Pick from these "should-haves" when picking the work back up:
+
+- **GDPR-style data export** (~2 hr) — `GET /api/me/export` returns JSON of profile + follows + prefs + log. Pairs with the existing `DELETE /api/me/account`.
+- **Resend "Send welcome again" button on `/profile`** (~1 hr) — manual recovery if a user lost the original.
+- **Email rendering QA across Gmail / Outlook / Apple Mail** (~2 hr, manual) — best done after the plain-text fallback shipped.
+- **Per-user time-zone preference for digest send** (~4–6 hr) — revisit after first DST transition (Nov 2026) or when open-rate data exists.
+- **In-app notification badge** (~4–8 hr) — needs a viewed_at cursor on `ky_notifications_log` or a separate read receipt.
+- **Snooze / mute individual bills** (~2–3 hr) — boolean column on `ky_bill_follows`; digest skips snoozed.
+- **Address autocomplete on the district map** (~3 hr).
+- **"How to contact your rep" content expansion** (~2 hr).
 - **Regression cadence** — After large syncs or schema changes, re-run **`npm run verify:legislator-links`** (optional **`--limit`**) and **`npm run spot-check:bill-links`**.
 
 ---
 
 ## Backlog
 
-- **Legislator links — full fidelity** — Add JSON storage (e.g. `ky_legislators.external_links` or `link_manifest` jsonb) for **all** Open States `links` entries including **social** (with `note`), not only LRC + single campaign URL. Backfill via legislator sync + optional one-off migration from current rows. UI: group **Official** vs **Social** (accessibility labels, external icons).
-- **Legislator links — verifier in CI** — Add scheduled or release-gated workflow running **`npm run verify:legislator-links`** with Supabase secrets; fail or upload artifact on 4xx; allowlist known flaky endpoints if necessary.
+- ~~**Legislator links — full fidelity**~~ — **Shipped 2026-05-13** (migration 023, sync, profile UI).
+- ~~**Legislator links — verifier in CI**~~ — **Shipped 2026-05-13** (`.github/workflows/legislator-links-weekly.yml`).
 - **LRC vs structured APIs (legislator data strategy)** — Kentucky LRC / `legislature.ky.gov` is the **canonical public-facing** source, but it does **not** provide a stable, documented **bulk API** for the full chamber roster the way Open States does. The app **syncs** from Open States into `ky_legislators` and **points users to the LRC** with stored profile URLs and official House/Senate directory fallbacks (`kyLegislaturePublicUrl` in `src/lib/ky-member-utils.ts`). **Revisit** if the state publishes **machine-readable bulk data** (CSV, API) with clear reuse terms.
 - **"Follow this bill" — email alerts** — Full spec: [docs/specs/follow-bills.md](./docs/specs/follow-bills.md). Login-only follows, daily digest default, factual content (no AI summaries in v1), Resend + canonical site **`kyvky.com`**. Phased milestones:
   - **M1 — Auth polish & profile foundation:** **Complete.** `ky_user_profiles` migration `016`, Supabase sync triggers, auth/forgot/reset/verify flows, `/profile` Account + Security, account deletion API, login → `/profile`, Profile-first nav. Cookie-session middleware + auth layout/register polish. See Recently completed and `decisions.md` § 2026-05-11.
   - **M2 — Data model for follows:** **In repo** — migration [`019_ky_follow_bills_schema.sql`](./supabase/migrations/019_ky_follow_bills_schema.sql) (`ky_bill_follows`, `ky_notification_preferences`, `ky_bill_status_history`, `ky_notifications_log` + RLS). **Apply 019** on all deployed DBs.
-  - **M3 — Follow UX (inline, no dashboard):** **Largely in repo** — detail **Follow** button; **`?follows=me`** + **Following** filter on browse (all/house/senate); **`KYBillCard`** bookmark + followed topic chips (tooltip + home chips); profile lists. **Remaining:** optional bill-detail line when bill matches a followed topic but isn’t individually followed; any bill-detail **LegiScan subject** vs **KY_TOPICS** mapping from **`decisions.md`** pre-build notes.
+  - **M3 — Follow UX (inline, no dashboard):** **Complete.** Follow button; `?follows=me` + Following filter on browse; `KYBillCard` bookmark + topic chips; profile lists. `BillTopicMatchHint` shown on bill detail when topics match user filters but bill isn't individually followed. KY_TOPICS ↔ LegiScan subject hybrid mapping (`src/lib/ky-topic-legiscan-mapping.ts`) used by both digest filter and the hint so they agree.
   - **M4 — Preferences UI:** **Partial —** notification panel on `/profile` (frequency, event presets/checkboxes, topic grid + list, followed bills list). **`GET/PATCH /api/me/preferences`** wired.
   - **M5 — Diff capture in sync:** **`recordBillStatusHistoryForBuiltBatch`** after bill upserts with **pre-upsert** `fetchBillHistorySnapshots` (hash-gated + legacy **`syncKyBills`**). Dedupe via **`legiscan_change_hash`** + unique index.
   - **M6 — Email plumbing:** **`RESEND_*`** + **`BillDigest`** template + **`/api/unsubscribe/[token]`**. Domain verification / **`WelcomeEmail`** optional follow-ups.
   - **M7 — Digest cron:** **`/api/cron/notify`** (Bearer cron secret); Vercel **`0 11 * * *`**; **`ky_notifications_log`** idempotency.
-  - **M8 — Launch hardening:** Bounce / failure handling; digest cap (10 events with "and N more"); copy review; List-Unsubscribe headers verified; end-to-end test of a real bill state change.
+  - **M8 — Launch hardening:** **Complete.** Bounce / complaint webhook + suppression (migration 021); digest cap (10 events + "and N more"); copy review (subject line, footer); `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers; one-time welcome email after verification (migration 022). End-to-end harness: `npm run preview:digest`, `npm run verify:digest-state`, `npm run preview:welcome`.
   - **Follow-up — verify digest send time:** After first DST transition (Nov 2026) or once open-rate data exists, evaluate whether `0 11 * * *` UTC is still the right hour. Consider open rates by hour, user feedback, and whether to add a per-user time-zone preference.
-  - **Investigation — official vs. inferred topic taxonomy:** Audit how `ky_bills.topics` (project keyword/AI classifier) and `legiscan_subjects` (official LegiScan taxonomy from migration `015`) currently surface in the frontend (browse filters, search, suggestion chips, bill detail). Outputs: (a) which taxonomy users actually see and where, (b) user-visible cost of an untagged bill, (c) recommendation on whether the follow-bills preferences UI should expose project topics, LegiScan subjects, or both, (d) revisit decision on AI-fallback tagging for untagged bills.
+  - ~~**Investigation — official vs. inferred topic taxonomy:**~~ **Resolved 2026-05-13.** Outcome: Option A (hybrid digest match) shipped via `src/lib/ky-topic-legiscan-mapping.ts`. Preferences UI keeps the 20 KY_TOPICS (no LegiScan-subject picker — rejected as power-user feature). AI-fallback tagging deferred unless `npm run audit:legiscan-subjects` shows bills missing from BOTH taxonomies. Coverage maintained via the audit step on the weekly workflow.
 - **Address search UX on map** — Street address lookup exists (`mapbox-geocode.ts`). Optional improvements: autocomplete/typeahead, clearer empty states.
 - **"How to contact your rep"** — District map accordion covers basics; expand with capitol workflows, hearings, testimony links to LRC as product needs evolve.
 

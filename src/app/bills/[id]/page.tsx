@@ -68,6 +68,7 @@ import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-toke
 import { useTooltips } from '@/lib/TooltipContext';
 import { BillHistoryActionText } from '@/components/bills/BillHistoryActionText';
 import { FollowBillButton } from '@/components/bills/FollowBillButton';
+import { BillTopicMatchHint } from '@/components/bills/BillTopicMatchHint';
 import { LegislativeStageTooltip } from '@/components/ui/LegislativeStageTooltip';
 
 /* ------------------------------------------------------------------ */
@@ -89,6 +90,7 @@ interface KYBill {
   topics: string[] | null;
   sponsors: any;
   legiscan_id: number | null;
+  legiscan_subjects?: Array<{ subject_id?: number; subject_name?: string }> | null;
 }
 
 interface LegiScanSponsor {
@@ -648,6 +650,7 @@ export default function BillDetailPage({ params }: { params: Promise<{ id: strin
               </Typography>
               <FollowBillButton billId={bill.id} />
             </Box>
+            <BillTopicMatchHint billId={bill.id} topics={bill.topics} legiScanSubjects={bill.legiscan_subjects ?? null} />
             <Typography
               component="h1"
               variant="h4"

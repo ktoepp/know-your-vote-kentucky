@@ -36,7 +36,11 @@ import {
   openStatesLegislatorNames,
 } from './ky-openstates-client';
 import { normalizeBallotpediaForStorage } from './external-legislative-links';
-import { normalizeHttpsUrl, sanitizeLegislatorCampaignWebsiteUrl } from './legislator-link-normalize';
+import {
+  buildLegislatorExternalLinks,
+  normalizeHttpsUrl,
+  sanitizeLegislatorCampaignWebsiteUrl,
+} from './legislator-link-normalize';
 import { normalizeKyLegislatorDistrictForDb } from './ky-district-geo';
 import { normalizeLegislatorPhotoUrl, normalizeSponsorNameForMatch } from './ky-member-utils';
 import type { KYSource } from '../types/kentucky';
@@ -261,6 +265,10 @@ function isMissingLrcProfileUrlColumn(err: { message?: string } | null): boolean
 function isMissingCommitteeMembershipsColumn(err: { message?: string } | null): boolean {
   const m = (err?.message || '').toLowerCase();
   return m.includes('committee_memberships');
+}
+
+function isMissingExternalLinksColumn(err: { message?: string } | null): boolean {
+  return (err?.message || '').toLowerCase().includes('external_links');
 }
 
 function getSupabase() {
@@ -1097,6 +1105,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       const { first_name, last_name } = openStatesLegislatorNames(leg);
       const { email, phone } = extractOpenStatesContactDetails(leg);
       const committee_memberships = extractCommitteeMembershipSlugsFromOpenStatesPerson(leg);
+      const external_links = buildLegislatorExternalLinks(leg.links);
       return {
         openstates_id: leg.id,
         name: leg.name,
@@ -1113,16 +1122,29 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         website: sanitizeLegislatorCampaignWebsiteUrl(otherWebsiteUrl, chamber, districtRaw),
         active: true,
         committee_memberships,
+        external_links,
       };
     });
     let { error } = await db.from('ky_legislators').upsert(rows, { onConflict: 'openstates_id' });
+    if (error && isMissingExternalLinksColumn(error)) {
+      log(
+        source,
+        'Retrying legislator upsert without external_links (run supabase/migrations/023_ky_legislators_external_links.sql)',
+      );
+      const rowsLegacy = rows.map((r) => {
+        const { external_links: _e, ...rest } = r;
+        return rest;
+      });
+      const retryEl = await db.from('ky_legislators').upsert(rowsLegacy, { onConflict: 'openstates_id' });
+      error = retryEl.error;
+    }
     if (error && isMissingCommitteeMembershipsColumn(error)) {
       log(
         source,
         'Retrying legislator upsert without committee_memberships (run supabase/migrations/017_search_members_discovery.sql)',
       );
       const rowsLegacy = rows.map((r) => {
-        const { committee_memberships: _c, ...rest } = r;
+        const { committee_memberships: _c, external_links: _e, ...rest } = r;
         return rest;
       });
       const retryCm = await db.from('ky_legislators').upsert(rowsLegacy, { onConflict: 'openstates_id' });
@@ -1134,7 +1156,7 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         'Retrying without lrc_profile_url (run supabase/migrations/004_ky_legislators_lrc_profile_url.sql for split LRC vs campaign URLs)',
       );
       const rowsLegacy = rows.map((r) => {
-        const { lrc_profile_url: lrc, website: w, ...rest } = r;
+        const { lrc_profile_url: lrc, website: w, external_links: _e, ...rest } = r;
         return {
           ...rest,
           website: w || lrc || null,
@@ -1179,6 +1201,50 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         }
         if (staleIds.length) {
           log(source, `Marked ${staleIds.length} legislator row(s) inactive (Open States id not in current chamber list)`);
+        }
+      }
+    }
+
+    // Second pass: deactivate LegiScan-only rows (no openstates_id) at seats
+    // where this sync just produced a current Open States row. Those legacy
+    // rows are predecessors or alias dupes (e.g. "Matthew Lehman" alongside
+    // the canonical "Matt Lehman" with openstates_id). Conservative: only
+    // deactivate at seats Open States covers; never at seats it doesn't.
+    {
+      const activeSeats = new Set<string>();
+      for (const r of rows) {
+        if (!r.openstates_id || !r.chamber || !r.district) continue;
+        activeSeats.add(`${r.chamber}|${r.district}`);
+      }
+      if (activeSeats.size > 0) {
+        const { data: legacyRows, error: legacyErr } = await db
+          .from('ky_legislators')
+          .select('id, chamber, district')
+          .is('openstates_id', null)
+          .eq('active', true);
+        if (legacyErr) {
+          logError(source, `Could not read LegiScan-only rows for cleanup: ${legacyErr.message}`);
+        } else {
+          const stale = (legacyRows || []).filter((r) => {
+            const ch = r.chamber as string | null;
+            const d = r.district as string | null;
+            return Boolean(ch && d && activeSeats.has(`${ch}|${d}`));
+          });
+          const CHUNK = 100;
+          for (let i = 0; i < stale.length; i += CHUNK) {
+            const ids = stale.slice(i, i + CHUNK).map((r) => r.id as string);
+            const { error: deactErr } = await db
+              .from('ky_legislators')
+              .update({ active: false, updated_at: nowIso })
+              .in('id', ids);
+            if (deactErr) logError(source, `Legacy deactivate chunk failed: ${deactErr.message}`);
+          }
+          if (stale.length) {
+            log(
+              source,
+              `Marked ${stale.length} LegiScan-only row(s) inactive (seat covered by current Open States legislator)`,
+            );
+          }
         }
       }
     }

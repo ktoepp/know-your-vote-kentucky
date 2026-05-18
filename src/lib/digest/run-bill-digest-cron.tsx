@@ -8,15 +8,10 @@ import {
   KY_DIGEST_MAJOR_MILESTONE_SET,
   type KyDigestEventType,
 } from '@/lib/ky-notification-preferences';
+import { billMatchesTopicFilters } from '@/lib/ky-topic-legiscan-mapping';
 import { publicSiteOrigin } from '@/lib/site-canonical';
 
 const DIGEST_CAP = 10;
-
-function topicsMatch(billTopics: string[] | null | undefined, filters: string[]): boolean {
-  if (!filters.length) return false;
-  const f = new Set(filters);
-  return (billTopics ?? []).some((t) => f.has(t));
-}
 
 function milestoneScore(eventType: string): number {
   return KY_DIGEST_MAJOR_MILESTONE_SET.has(eventType as KyDigestEventType) ? 1 : 0;
@@ -49,6 +44,7 @@ type BillRow = {
   bill_number: string | null;
   title: string | null;
   topics: string[] | null;
+  legiscan_subjects: Array<{ subject_id?: number; subject_name?: string }> | null;
 };
 
 export type DigestCronResult = {
@@ -58,11 +54,23 @@ export type DigestCronResult = {
   emailsSent: number;
   skippedNoEvents: number;
   errors: string[];
-  samples?: { email: string; eventCount: number }[];
+  samples?: { email: string; eventCount: number; previewHtml?: string; previewSubject?: string }[];
 };
 
-export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promise<DigestCronResult> {
+export type RunBillDigestCronOptions = {
+  dryRun?: boolean;
+  /** Limit to specific user ids (E2E preview). */
+  onlyUserIds?: string[];
+  /** When true (and dryRun), include rendered HTML in samples. */
+  renderPreview?: boolean;
+  /** Override the "force send" filter so we ignore prior-window logs (preview only). */
+  ignoreLastSentWindow?: boolean;
+};
+
+export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Promise<DigestCronResult> {
   const dryRun = opts.dryRun === true || process.env.DIGEST_DRY_RUN === 'true';
+  const onlyUserIds = opts.onlyUserIds && opts.onlyUserIds.length ? new Set(opts.onlyUserIds) : null;
+  const renderPreview = dryRun && opts.renderPreview === true;
   const errors: string[] = [];
   let usersConsidered = 0;
   let emailsSent = 0;
@@ -92,7 +100,8 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
     .from('ky_notification_preferences')
     .select('user_id, digest_frequency, event_types, topic_filters, unsubscribe_token')
     .neq('digest_frequency', 'off')
-    .is('unsubscribed_all_at', null);
+    .is('unsubscribed_all_at', null)
+    .is('suppressed_at', null);
 
   if (prefsErr) {
     return {
@@ -106,6 +115,8 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
   }
 
   const prefs = (prefsRows ?? []).filter((p) => {
+    if (onlyUserIds && !onlyUserIds.has(p.user_id as string)) return false;
+    if (onlyUserIds) return true; // bypass weekly-day gate in targeted preview
     if (p.digest_frequency === 'weekly') return dow === 1;
     return p.digest_frequency === 'daily';
   });
@@ -158,7 +169,7 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
     const chunk = billIds.slice(i, i + CHUNK);
     const { data: bills } = await supabaseAdmin
       .from('ky_bills')
-      .select('id, bill_number, title, topics')
+      .select('id, bill_number, title, topics, legiscan_subjects')
       .in('id', chunk);
     for (const b of bills ?? []) {
       billById.set(String(b.id), b as BillRow);
@@ -185,7 +196,7 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
       .limit(1)
       .maybeSingle();
 
-    if (lastLog?.digest_window_end) {
+    if (lastLog?.digest_window_end && !opts.ignoreLastSentWindow) {
       const le = new Date(lastLog.digest_window_end as string).getTime();
       if (!Number.isNaN(le) && le > new Date(windowStart).getTime()) {
         windowStart = new Date(le).toISOString();
@@ -204,7 +215,7 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
       const bill = billById.get(String(h.bill_id));
       if (!bill) return false;
       if (followedSet.has(String(h.bill_id))) return true;
-      return topicsMatch(bill.topics, topicFilters);
+      return billMatchesTopicFilters(bill.topics, bill.legiscan_subjects, topicFilters);
     });
 
     if (!candidates.length) {
@@ -253,32 +264,52 @@ export async function runBillDigestCron(opts: { dryRun?: boolean } = {}): Promis
     const unsubscribeToken = pref.unsubscribe_token as string;
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
     const followedBillsHref = `${origin}/bills?follows=me`;
+    const preferencesHref = `${origin}/profile#notifications`;
+    const privacyHref = `${origin}/privacy`;
+    const termsHref = `${origin}/terms`;
 
-    const previewText = `${groups.length} bill${groups.length === 1 ? '' : 's'} with new activity`;
+    const eventTotal = top.length + overflow;
+    const previewText = `${eventTotal} update${eventTotal === 1 ? '' : 's'} on ${groups.length} bill${groups.length === 1 ? '' : 's'} you follow`;
+    const subject = `Your KY bill digest — ${eventTotal} update${eventTotal === 1 ? '' : 's'}`;
 
-    if (dryRun || !resend) {
-      if (samples.length < 3) samples.push({ email, eventCount: top.length });
-      continue;
-    }
-
-    const html = await render(
+    const needsHtml = renderPreview || !(dryRun || !resend);
+    const emailEl = (
       <BillDigestEmail
         previewText={previewText}
         groups={groups}
         moreCount={overflow}
         followedBillsHref={followedBillsHref}
+        preferencesHref={preferencesHref}
         unsubscribeHref={unsubscribeHref}
-      />,
+        privacyHref={privacyHref}
+        termsHref={termsHref}
+      />
     );
+    const html = needsHtml ? await render(emailEl) : '';
+    const text = needsHtml ? await render(emailEl, { plainText: true }) : '';
+
+    if (dryRun || !resend) {
+      if (samples.length < 3) {
+        samples.push({
+          email,
+          eventCount: top.length,
+          ...(renderPreview ? { previewHtml: html, previewSubject: subject } : {}),
+        });
+      }
+      continue;
+    }
 
     try {
       const { data: sendData, error: sendErr } = await resend.emails.send({
         from: fromEmail,
         to: email,
-        subject: `Kentucky bill digest — ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium' }).format(now)}`,
+        replyTo: 'hello@kyvky.com',
+        subject,
         html,
+        text,
         headers: {
           'List-Unsubscribe': `<${unsubscribeHref}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         },
       });
       if (sendErr) {

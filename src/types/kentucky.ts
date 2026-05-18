@@ -37,6 +37,17 @@ export interface KYLegislator {
    * Tokens align with {@link committeeSlugFromName} / bill committee filters.
    */
   committee_memberships?: string[] | null;
+  /**
+   * Full-fidelity Open States `links[]` (migration 023). Each entry preserves
+   * the canonical URL, original `note`, derived category, and host. Used by
+   * the profile view to render grouped Social / Other link sections.
+   */
+  external_links?: Array<{
+    url: string;
+    note?: string;
+    category: 'official' | 'social' | 'other';
+    host: string;
+  }> | null;
   active: boolean;
   created_at: string;
   updated_at: string;

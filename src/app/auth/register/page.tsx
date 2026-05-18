@@ -123,6 +123,12 @@ export default function RegisterPage() {
         <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 3 }} disabled={loading || success}>
           {loading ? 'Creating…' : 'Create account'}
         </Button>
+        <Typography variant="caption" color="text.secondary" align="center" display="block" sx={{ mt: 1.5, lineHeight: 1.5 }}>
+          By creating an account you agree to our{' '}
+          <MuiLink component={Link} href="/terms" underline="hover">terms</MuiLink>
+          {' '}and{' '}
+          <MuiLink component={Link} href="/privacy" underline="hover">privacy policy</MuiLink>.
+        </Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 3 }}>
         Already registered?{' '}

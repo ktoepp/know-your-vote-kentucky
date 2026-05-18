@@ -186,3 +186,91 @@ export function extractOpenStatesLegislatorWebLinksFromRaw(
     otherWebsiteUrl: others[0]?.url ?? null,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Full-fidelity link storage (migration 023)                          */
+/* ------------------------------------------------------------------ */
+
+export type LegislatorLinkCategory = 'official' | 'social' | 'other';
+
+export type LegislatorExternalLink = {
+  url: string;
+  note?: string;
+  category: LegislatorLinkCategory;
+  host: string;
+};
+
+function classifyLinkHost(host: string): LegislatorLinkCategory {
+  if (isKentuckyLegislatureHost(host)) return 'official';
+  if (isSocialMediaHost(host)) return 'social';
+  return 'other';
+}
+
+/**
+ * Build the JSONB `external_links` array from Open States raw `links[]`.
+ * Normalizes URLs to HTTPS, drops obsolete LRC hosts, preserves `note`,
+ * dedupes by canonical URL.
+ */
+export function buildLegislatorExternalLinks(
+  rawLinks: Array<{ url?: string; note?: string }> | null | undefined,
+): LegislatorExternalLink[] {
+  if (!Array.isArray(rawLinks)) return [];
+  const seen = new Set<string>();
+  const out: LegislatorExternalLink[] = [];
+  for (const item of rawLinks) {
+    const url = normalizeHttpsUrl(typeof item?.url === 'string' ? item.url : null);
+    if (!url) continue;
+    const host = hostnameOf(url);
+    if (!host || isObsoleteKyLrcHostname(host)) continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const note = typeof item?.note === 'string' ? item.note.trim() : '';
+    out.push({
+      url,
+      ...(note ? { note } : {}),
+      category: classifyLinkHost(host),
+      host,
+    });
+  }
+  return out;
+}
+
+const SOCIAL_HOST_LABELS: Record<string, string> = {
+  'twitter.com': 'X (Twitter)',
+  'x.com': 'X (Twitter)',
+  'facebook.com': 'Facebook',
+  'fb.com': 'Facebook',
+  'instagram.com': 'Instagram',
+  'youtube.com': 'YouTube',
+  'youtu.be': 'YouTube',
+  'tiktok.com': 'TikTok',
+  'linkedin.com': 'LinkedIn',
+  'threads.net': 'Threads',
+  'truth.social': 'Truth Social',
+  'pinterest.com': 'Pinterest',
+  'flickr.com': 'Flickr',
+};
+
+/** Human-friendly label for a link's host, used in UI buttons / aria-labels. */
+export function labelForLinkHost(host: string): string {
+  const h = host.replace(/^www\./i, '').toLowerCase();
+  if (SOCIAL_HOST_LABELS[h]) return SOCIAL_HOST_LABELS[h]!;
+  for (const root of Object.keys(SOCIAL_HOST_LABELS)) {
+    if (h.endsWith(`.${root}`)) return SOCIAL_HOST_LABELS[root]!;
+  }
+  return h;
+}
+
+/** Group an external_links array for UI rendering. */
+export function groupLegislatorExternalLinks(links: LegislatorExternalLink[] | null | undefined): {
+  social: LegislatorExternalLink[];
+  other: LegislatorExternalLink[];
+} {
+  const social: LegislatorExternalLink[] = [];
+  const other: LegislatorExternalLink[] = [];
+  for (const link of links ?? []) {
+    if (link.category === 'social') social.push(link);
+    else if (link.category === 'other') other.push(link);
+  }
+  return { social, other };
+}
