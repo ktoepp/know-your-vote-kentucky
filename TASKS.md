@@ -8,7 +8,113 @@
 
 ## In Progress
 
-- (none — feature set "auth + profile + follow + email" is shipped and launch-blockers cleared, see Recently completed 2026-05-13)
+### Local browser review (2026-05-19)
+
+**Dev server:** `http://localhost:3002` (`npm run dev -- -p 3002`)
+
+**Prereq:** Migration **`025_ky_saved_searches_snooze.sql`** applied locally (saved searches + snooze fail without it).
+
+**Mode:** Signed-out + signed-in test account. Tag findings **P0** (broken) / **P1** (should fix soon) / **P2** (nice-to-have).
+
+| Area | Route(s) | Signed in? | Check | Finding (P0/P1/P2) |
+|------|----------|------------|-------|---------------------|
+| Home | `/` | optional | Hero CTAs, topic chips; bill rails if `KYBillCard` | **[P1]** No tooltip/hover overlay on grid bill cards; **[P1]** Party badge on primary sponsor avatar |
+| Bills browse | `/bills` | optional | Filters, sort, **Copy link** / **Save search** when filters on | **[P1]** Remove tooltip/hover overlay on bill cards; **[P1]** Party badge on sponsor avatar; **[P2]** Checkmark on “Passed” status chip; **[P2]** Remove gavel on count row |
+| Search | `/search` | optional | Bill results grid uses `KYBillCard` | **[P1]** Same bill-card items (tooltip + party badge on avatar) |
+| Feed | `/feed` | optional | Bill tiles in feed | **[P1]** Same bill-card items (tooltip + party badge on avatar) |
+| Bill detail | `/bills/[id]` | yes | Follow, hearings block, topic hint | Tooltips on detail page OK (not grid cards); **[P1]** Party badge on sponsor avatars; **[P1]** Bill number larger (`h5` → `h2`) |
+| Members | `/members`, `/members/[slug]` | optional | Roster cards + profile header avatar | **[P1]** Party badge overlay on legislator portrait |
+| District map | `/members/map` | optional | Sidebar / map tooltip member card | **[P1]** Party badge on tooltip avatar |
+| Profile | `/profile` | **yes** | Section chips, notifications groups, saved searches, activity filters, snooze, export, welcome resend | |
+| Activity API | `/profile#activity` | yes | All / Bill updates / Hearings chips + empty states | |
+| Meetings | `/meetings` | optional | Search, chamber/when filters | |
+| Committees | `/committees`, `/committees/[slug]` | optional | List + member section | **[P1]** Browse cards + detail redesign; **[P2]** Meeting card: drop “Synced”; click to show agenda |
+| Members | `/members` | optional | Governor section + House/Senate grids | **[P1]** Merge statewide officials; fix `Lt_governor`; hide generic phone; district minimap on cards; **[P2]** Remove LegiScan footer link |
+| Member profile | `/members/[slug]` | optional | Sponsored bills + voting history | **[P1]** Backfill `legiscan_id`; district minimap; hide generic phone |
+| District map | `/members/map` | optional | Tooltip contact | **[P1]** Same phone rule in map tooltip |
+| District map | `/members/map` | optional | Address autocomplete, contact accordion | |
+| Resources | `/legislature/resources` | optional | Bill Watch card + outbound links | **[P2]** Simplify layout (no per-resource cards); remove KYVKY self-links |
+| About | `/about` | optional | Copy, footer link | |
+| Dashboard redirect | `/dashboard` | optional | Lands on `#activity` | |
+| Auth | `/auth/login` → profile | yes | Post-login destination | |
+
+**How to send findings (browser design selector):** Paste each `browser_element` block (screenshot optional). I will log to **Browser review — logged findings** and the checklist table above — **no code until you ask to implement.**
+
+**Capture format** (one line per item is fine):
+
+```text
+[P1] /bills — Remove tooltip/hover overlay from all bill cards (KYBillCard + CivicCard)
+[P1] /bills/[id] — Bill number larger (h5 → h2 on detail; cards/lists too)
+[P2] /bills — “Passed” status chip: add Check icon like Signed by Governor (KYBillCard)
+[P2] /bills — Remove gavel icon from results count row (BillsBrowse.tsx)
+[P1] /committees — Card: remove “View meetings & agendas”; add chairs + KY_TOPICS chips (KYCommitteeCard)
+[P1] /committees/[slug] — Redesign like bill detail; LRC reference: jurisdiction, members (S)/(H)/role, calendar, materials, minutes, staff
+[P2] /committees/[slug] — Meeting card: remove “Synced …”; click card/header to expand agenda
+[P2] /legislature/resources — Remove intro paragraph; list layout; no per-link cards; drop KYVKY links
+[P1] /members — Merge Other statewide officials into Governor’s office; fix Lt_governor → Lieutenant Governor
+[P1] /members — Hide generic capitol phone 502-564-8100 on MemberCard (Open States switchboard)
+[P2] /members — Remove LegiScan footer link from MemberCard
+[P1] /members/[slug] — Sponsored bills + voting history (legiscan_id backfill / fallbacks)
+[P1] /members — District minimap on every MemberCard + member profile page
+[P1] /profile#notifications — hearing_scheduled help text unclear when …
+[P0] /bills — Save search returns 500 (migration 025 not applied)
+```
+
+**Already logged (2026-05-19):** P1 bill card tooltip/hover overlay; P1 party badge; P1 larger bill number; P1 committee browse cards + detail redesign; P1 district minimap; P1 members executive + role labels; P1 generic capitol phone; P1 member profile data; P2 committee meeting card agenda UX (no “Synced”); P2 remove LegiScan link; P2 “Passed” checkmark; P2 gavel; P2 Frankfort resources simplification.
+
+**After review:** Move rows into **Up Next** or **Recently completed** when fixed.
+
+**Ready for more** — send the next selector node(s) anytime.
+
+### Browser review — logged findings (2026-05-19)
+
+Do **not** implement until prioritized; captured from local build review.
+
+| Priority | Area | Task |
+|----------|------|------|
+| **P1** | Bill cards (all grids) | **Remove tooltip / hover overlay from all bill cards** — (1) Remove MUI `Tooltip` wrapper on `KYBillCard` (hover popup with status, bill type, next step, co-sponsors, topics). (2) Remove hover overlay on the card shell: no lift, shadow jump, or primary border flash on hover for `CivicCard` `variant="bill"`. Click-through to bill detail unchanged; keep `:focus-visible` ring. Surfaces: `/bills`, `/bills/house`, `/bills/senate`, `/search`, `/feed`, any home grid using `KYBillCard`. Files: [`src/components/bills/KYBillCard.tsx`](./src/components/bills/KYBillCard.tsx), [`src/components/ui/CivicCard.tsx`](./src/components/ui/CivicCard.tsx). |
+| **P2** | Bill cards (grid) | **Keep educational tooltips on bill detail only** — Status/type/chamber tooltips stay on `/bills/[id]`; do not remove global `tooltipContent` or detail-page chips. |
+| **P2** | Member cards | **Remove LegiScan footer link from all member cards** — Selector: Josh Calloway card `CardActions` “LegiScan” button → `https://legiscan.com/people/id/…` ([`MemberCard.tsx`](./src/components/members/MemberCard.tsx) ~463–484, `legiscanMemberPersonUrl`). Drop button and remove `legiscanHref` from `hasFooterActions` (~108–116). Keep KY Legislature, Website, Ballotpedia, governor office link as applicable. **Scope:** browse grid cards only (user request); bill detail LegiScan links unchanged. `legiscan_id` / `legiscan_image_url` data sync unchanged. |
+| **P2** | Committee meeting cards | **Remove “Synced …” caption; click meeting to show agenda** — Selector: [`CommitteeDetailView.tsx`](./src/components/committees/CommitteeDetailView.tsx) meeting card `Typography caption` “Synced 5/19/26, 8:46 AM” (~219–227, `meeting.scraped_at`). **Remove** synced timestamp from user-facing UI (keep `scraped_at` in DB; optional `DataFreshnessNote` at page level only). **Interaction:** Clicking the meeting card (date/time/location header area) **expands/collapses agenda** — reuse existing `MeetingAgendaBlock` + `expandedAgenda` state (~214–217). Default: collapsed with clear affordance (“Show agenda” / chevron) when `items.length > 0`; expand on card click. If no agenda items, no-op or disabled state. **Also check** [`CommitteeMeetingCard.tsx`](./src/components/committees/CommitteeMeetingCard.tsx) and `/meetings` browse for the same “Synced” pattern. |
+| **P2** | Frankfort resources | **Simplify `/legislature/resources` layout** — [`src/app/legislature/resources/page.tsx`](./src/app/legislature/resources/page.tsx). **Remove** hero subtitle paragraph (selector): *“Official and civic sources for following the Kentucky General Assembly. Know Your Vote Kentucky compiles data for easier browse and follow; always verify critical details with the Legislature.”* — keep **`h1` “Frankfort resources”** only (or one shorter line if needed later). **Do not** use one outlined `Card` per link. **Remove** internal KYVKY entries: “Know Your Vote — Committees” (`/committees`) and “Know Your Vote — Meetings” (`/meetings`). **Replace UI** with compact external-only list (optional section headings; title + blurb + “Visit site” per row). Keep capitol phone footer + `DataFreshnessNote`. |
+| **P2** | Bill status chips | **Add checkmark to “Passed” status chip** (match “Signed by Governor”) — Selector: `MetaChip` “Passed” on bill grid card (`KYBillCard` ~lines 189–198) is plain outlined default; **Signed** already uses `icon={<Check />}` + `tone="success"` + outlined. Give **Passed** the same treatment: MUI `Check` icon, success outlined styling. Add helper in [`bill-display.ts`](./src/lib/bill-display.ts) (e.g. `isPassedBillStatusForChip`) aligned with browse bucket **`passed`** from `classifyKyBillBrowseBucket` (`st === 'passed'` without chamber, `enrolled`, “delivered to the governor” in last action) but **exclude** signed/chaptered/veto-override (those keep existing signed chip). Apply on [`KYBillCard.tsx`](./src/components/bills/KYBillCard.tsx) and [`BillDetailView.tsx`](./src/components/bills/BillDetailView.tsx) status chip branch (~502–525). Optional: extract shared `BillStatusMetaChip` so card + detail stay in sync. **Out of scope unless requested:** “Passed Chamber” / engrossed labels (different stage). |
+| **P2** | Bills browse | **Remove gavel icon from results summary row** — The “N bills match your filters · Showing X of Y” line includes a decorative `Gavel` icon before the text; drop icon, keep text-only status. File: [`src/components/bills/BillsBrowse.tsx`](./src/components/bills/BillsBrowse.tsx) (~line 557). |
+| **P1** | Bill number typography (all) | **Make bill number larger on every surface** — Selector: `/bills/[id]` header (`SR57`) is `Typography variant="h5"` (~25px); bump to **`h2`** (or `h1` only where it is the page’s primary heading). **Detail:** [`BillDetailView.tsx`](./src/components/bills/BillDetailView.tsx) ~line 574 — bill number is `h5` while bill **title** is already `component="h1"` / `variant="h4"`; use **`h2`** for the number so outline stays one `h1` (title). **Grids:** [`KYBillCard.tsx`](./src/components/bills/KYBillCard.tsx) — currently `variant="h6"` + `fontSize: 1.1rem`; raise to **`h4`** or **`h3`** (proportional to card). **Also audit:** [`BillsListTable.tsx`](./src/components/bills/BillsListTable.tsx) (link, no variant), [`HomeCuratedBillList.tsx`](./src/components/home/HomeCuratedBillList.tsx) (`caption`), profile followed-bills / activity lines, committee agenda hits, member sponsored-bill lists. Prefer one shared `BillNumber` / token if sizes differ by context (`detail` \| `card` \| `compact`). |
+| **P1** | Member district minimap | **District minimap on every member card and profile** — Selector: Gex Williams `MemberCard` stretch link (`/members/gex-williams`, Senate District 20). **Goal:** Small non-interactive map of Kentucky with **only that legislator’s district** highlighted (house `HD-###` or senate `SD-##`). **Surfaces:** all [`MemberCard`](./src/components/members/MemberCard.tsx) instances (`/members` grid, committee `CommitteeMembersSection` when linked, etc.) and [`MemberProfileView`](./src/components/members/MemberProfileView.tsx) / `/members/[slug]`. **Reuse:** Public GeoJSON [`/geo/ky-sldl.geojson`](./public/geo/ky-sldl.geojson), [`/geo/ky-sldu.geojson`](./public/geo/ky-sldu.geojson), district join via [`parseKyDistrictNumber`](./src/lib/ky-district-geo.ts) + Census `GEOID`/`NAME` (same as [`DistrictMapExplorer`](./src/components/members/DistrictMapExplorer.tsx)); colors from [`district-map-tokens.ts`](./src/components/members/district-map-tokens.ts); Mapbox token `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`. **Implementation:** New shared `LegislatorDistrictMinimap` (dynamic import like [`LandingDistrictMapPreview`](./src/components/home/LandingDistrictMapPreview.tsx)) — `fitBounds` to district, dim rest of state or mask outside KY; `interactive={false}`; fixed aspect (~120–160px wide on cards, larger on profile). **Omit** when no `chamber`+`district` (statewide exec, governor). Optional: link minimap to `/members/map` with district pre-selected (later). **A11y:** `aria-label` “Map highlighting {chamber} district {n} in Kentucky”. |
+| **P1** | Member profile data | **Sponsored bills + voting history — resolve “not available yet”** — Selector: `/members/[slug]` info `Alert` when member lacks LegiScan match ([`MemberProfileView.tsx`](./src/components/members/MemberProfileView.tsx) ~138–141: gated on `legiscanMemberPersonUrl(leg.legiscan_id)`). UI already supports both sections when `legiscan_id` exists ([`fetchSponsoredBillsForLegislator`](./src/lib/member-profile-data.ts) — `ky_bills.sponsors` JSON `people_id`; [`fetchMemberVoteRecord`](./src/lib/member-profile-data.ts) — RPC **`get_votes_for_legislator`** from migration **`012_get_votes_for_legislator.sql`**). **Work:** (1) **Backfill `ky_legislators.legiscan_id`** for active members missing it (e.g. Josh Calloway) — `sync:ky:legislators` + LegiScan `getPerson` enrichment; run dedupe merge scripts if Open States row won without `legiscan_id` ([`supabase/scripts/dedupe_ky_legislators_active.sql`](./supabase/scripts/dedupe_ky_legislators_active.sql)). (2) Confirm migration **012** applied in env. (3) **Optional fallbacks** if ID still missing: match sponsors by normalized name in `ky_bills.sponsors`; show partial voting via name in roll JSON. (4) Replace blanket alert with per-section empty states once `legiscan_id` coverage is high. **Do not** remove LegiScan data pipeline — fix roster linkage. |
+| **P1** | Member contact (cards) | **Generic capitol phone `502-564-8100` — hide or use real direct lines** — Selector: Josh Calloway `MemberCard` `tel:5025648100` ([`MemberCard.tsx`](./src/components/members/MemberCard.tsx) ~336–356). Open States capitol `voice` is often the **LRC main switchboard** ([`extractOpenStatesContactDetails`](./src/lib/ky-openstates-client.ts)), duplicated on many legislators — not a useful per-member `tel:` link. **Preferred (v1):** Add `isGenericCapitolPhone(phone)` in [`ky-member-utils.ts`](./src/lib/ky-member-utils.ts) (normalize digits; match `5025648100` and optionally toll-free `8003727181`); **do not render** phone row when generic — keep email + LRC directory / profile links. **Alternative (later):** Scrape or map legislator-specific extensions from LRC profile URLs into `ky_legislators.phone`. Apply on [`MemberCard`](./src/components/members/MemberCard.tsx), [`DistrictMapMemberTooltip`](./src/components/members/DistrictMapMemberTooltip.tsx), member profile view. Optional: strip generic values at sync in [`ky-sync-pipeline.ts`](./src/lib/ky-sync-pipeline.ts) so DB stays clean. |
+| **P1** | Members browse | **Combine “Other statewide officials” with Governor section** — Selector: `/members` grid “Other statewide officials” (Jacqueline Coleman, Russell Coleman) separate from top “Governor” section ([`MembersBrowse.tsx`](./src/components/members/MembersBrowse.tsx) ~lines 255–279). **Merge** `otherStatewideLegislators` (`chamber == null` && not `isKentuckyGovernor`) into one executive block at top — e.g. rename section **“Governor’s office”** or **“Executive branch”** (Governor featured card + Lt. Gov + AG in same `ChamberSection` / grid). Remove standalone “Other statewide officials” heading when empty. **Fix role label** `Lt_governor` → **“Lieutenant Governor”** — Open States `role_title` slug; normalize in [`kyMemberTitleShort`](./src/lib/ky-member-utils.ts) (underscore → space, map known slugs: `lt_governor`, `attorney_general`, etc.) before/alongside `formatBillLabelText`. Applies on `MemberCard` subtitle everywhere. |
+| **P1** | Committee detail page | **Redesign `/committees/[slug]` to mirror bill detail + LRC committee profile** — Selector: committee header (`Joint` chip + `h1`) on [`CommitteeDetailView.tsx`](./src/components/committees/CommitteeDetailView.tsx). **Goal:** Bill-detail-like layout ([`BillDetailView.tsx`](./src/components/bills/BillDetailView.tsx)) with content parity to **LRC “Committee Details”** (browser reference 2026-05-19 — e.g. *Statutory Committee Information Technology Oversight Committee* on legislature.ky.gov). **LRC reference — include or link:** (1) **Breadcrumbs** — Committees → detail (KYVKY: back link + optional breadcrumb). (2) **Full committee name** + chamber/type chip (Joint / House / Senate). (3) **Jurisdiction** — prose scope paragraph (LRC has dedicated heading; **not in `ky_committees` today** — scrape/cache from `profile_url` or new column). (4) **Legislative members** — list: name → `/members/[slug]`, chamber **(S)** / **(H)**, role (**Co-Chair**, etc.); align [`CommitteeMembersSection`](./src/components/committees/CommitteeMembersSection.tsx) + calendar `member_refs` / Open States memberships. (5) **Primary actions** (LRC sidebar gold buttons) — **Legislative calendar** (have), **Meeting materials** (link to LRC tab until Wave 3 [`ky_committee_materials`](./docs/specs/committee-calendar.md)), **Minutes** (outbound LRC URL if stable pattern). (6) **Staff** — name + title list (LRC sidebar; **not synced today** — scrape profile or defer with “View on LRC” only). (7) **KYVKY-added:** next meeting + parsed **agendas** (calendar sync), **related bills** in committee, Bill Watch–aligned alerts context. **Phase 0 audit:** Compare LRC page + Bill Watch ([`docs/reference/bill-watch/`](./docs/reference/bill-watch/README.md)) → `docs/specs/committee-detail-ux-audit.md` with must-have vs link-out vs later data work. **Phase 1 UI sections:** At a glance · Jurisdiction · Legislative members · Meetings & agendas (click-to-expand, no “Synced”) · Related bills · Official sources · Staff (or link-out). **Data gaps to spike:** jurisdiction text, staff roster, minutes URL from LRC HTML. |
+| **P1** | Committee browse cards | **Replace “View meetings & agendas” with committee heads + topic tags** — Selector: [`KYCommitteeCard.tsx`](./src/components/committees/KYCommitteeCard.tsx) body (~lines 36–41) — gavel + “View meetings & agendas” placeholder (card already links to `/committees/[slug]`). **Remove** that row entirely. **Add instead:** (1) **Committee heads** — show Chair / Co-Chair / Vice Chair names (compact line or small avatars), reusing logic from [`buildCommitteeMemberDisplay`](./src/lib/ky-committee-members.ts) / [`CommitteeMembersSection`](./src/components/committees/CommitteeMembersSection.tsx) (`roleSortKey` for leadership roles). (2) **Tags/subjects** — `MetaChip` row using existing **`KY_TOPICS`** taxonomy ([`ky-topic-classifier.ts`](./src/lib/ky-topic-classifier.ts)): e.g. `classifyTopics(committee.name, '')` on committee name (IT Oversight → likely none or inferred tags); cap chips (2–3). **Data:** `/committees` currently passes only `KYCommittee[]` from [`fetchKyCommitteesBrowseList`](./src/lib/ky-ga-browse-server.ts) — extend server browse payload or batch-fetch recent `member_refs` per committee + roster so list cards don’t N+1. Fallback: Open States `committee_memberships` on roster when calendar refs empty (roles may be missing). Detail page meetings section unchanged. |
+| **P1** | Legislator portraits (all) | **Party indicator badge on every legislator profile photo** — Circular **D**, **R**, or **I** badge overlaying the avatar (top-right or bottom-right edge; pick one and use consistently). Reuse design tokens: `formatPartyLetterAbbrev` + `partyBadgeBackgroundColor` from [`src/lib/bill-display.ts`](./src/lib/bill-display.ts) (same colors as party chips). Prefer a shared wrapper (e.g. `LegislatorAvatar` / `PartyAvatarBadge`) used everywhere instead of one-off `sx` per screen; add example to [`/design-system`](./src/app/design-system/page.tsx). **Surfaces:** primary sponsor avatar on [`KYBillCard`](./src/components/bills/KYBillCard.tsx) (~line 245, selector hit Lisa Willner on `/bills` grid); [`MemberCard`](./src/components/members/MemberCard.tsx); [`DistrictMapMemberTooltip`](./src/components/members/DistrictMapMemberTooltip.tsx); sponsor/co-sponsor avatars in [`BillDetailView`](./src/components/bills/BillDetailView.tsx); avatar inside [`SponsorAvatarChip`](./src/components/civic/SponsorAvatarChip.tsx) when `party` is set. Skip non-legislator avatars (nav user, generic event placeholders). `aria-label` or visually hidden text for party when badge is decorative. |
+
+**Acceptance (P1 bill cards):** Hovering any `KYBillCard` in browse/search/feed does not show a tooltip popup or hover overlay/lift; click still opens bill detail. Keyboard `:focus-visible` ring remains on the card link.
+
+**Acceptance (P1 party badge):** Every legislator portrait listed above shows a small circular D/R/I badge on the avatar rim when `party` is known; unknown/missing party omits badge (no empty circle). Badge scales with avatar size (32px vs 40px on bill cards). Existing inline party **chips** beside names may remain unless product wants chips removed after badge ships.
+
+**Acceptance (P1 bill number):** On `/bills/[id]`, designation (e.g. `SR57`) reads clearly larger than today and below the title in visual hierarchy (`h2` under title `h1`). Grid cards and list/table bill numbers are visibly larger than body text without breaking card layout. Document outline: one `h1` per bill detail page (title, not number).
+
+**Acceptance (P1 committee card):** On `/committees` grid, each card shows committee name + chamber chip + leadership names (when known) + up to ~3 topic chips from `KY_TOPICS`; no gavel / “View meetings & agendas” line. Whole card still navigates to committee detail.
+
+**Acceptance (P1 committee detail):** Audit doc maps LRC fields (jurisdiction, members w/ (S)/(H)/role, calendar, materials, minutes, staff) to KYVKY sections and notes data source (synced vs link-out). `/committees/[slug]` shows jurisdiction (or clear LRC link if not scraped), scannable member list with roles, action row for calendar + materials + minutes, staff block or LRC fallback; KYVKY meetings/agendas + related bills below fold; bill-detail-like typography/sections.
+
+**Acceptance (P2 meeting agenda click):** Committee detail meeting cards do not show “Synced …” line. Clicking a meeting with agenda items toggles agenda list; keyboard-accessible control (button or `aria-expanded`). Empty meetings show no false “show agenda” if zero items.
+
+**Acceptance (P1 members executive):** `/members` shows one top section with Governor + Lt. Gov + AG (no separate “Other statewide officials” block). Coleman card shows **Lieutenant Governor**, not `Lt_governor`. House/Senate sections unchanged below.
+
+**Acceptance (P1 district minimap):** House/Senate `MemberCard` rows and `/members/[slug]` show a minimap with the correct district filled/highlighted inside Kentucky; no map for statewide-only roles without a district. Map does not break card stretch-link navigation (pointer-events / z-index). Graceful placeholder if Mapbox token or GeoJSON missing.
+
+**Acceptance (P1 member phone):** Member cards/tooltips do not show clickable `502-564-8100` (or normalized equivalent) as if it were the legislator’s direct line. Cards with a distinct `phone` value still show `tel:` link. Capitol directory fallback copy remains when email is missing.
+
+**Acceptance (P1 member profile data):** Active House/Senate members with bills/votes in LegiScan show **Sponsored bills** and **Voting history** on `/members/[slug]` (no info alert). Spot-check: member with known sponsorship (e.g. Josh Calloway) shows list or session-empty copy, not “not available for this member yet.” `npm run diagnose:legislators` (or equivalent) reports near-zero active rows missing `legiscan_id`.
+
+**Acceptance (P2 LegiScan on cards):** No “LegiScan” text button in `MemberCard` footer on `/members` (or map if it reuses the same component). Other outbound links still render when data exists.
+
+**Acceptance (P2 passed chip):** Bills whose status maps to the **passed** stage (chip label “Passed”, “Enrolled”, etc. per helper) show a green outlined chip with check icon, visually consistent with “Signed by Governor”. Signed/chaptered bills still use the signed chip only (no double icons).
+
+**Acceptance (P2 resources page):** `/legislature/resources` shows `h1` without the long intro paragraph; no stacked resource cards and no “Open in KYVKY” buttons; external links remain (LRC calendar, committees index, KET, Bill Watch, KRC, bill status). Page is scannable in one viewport-ish on desktop.
+
+**Acceptance (P2 gavel):** Results count row shows only typography (no gavel); layout/spacing still aligned with filter bar above.
 
 ## Maintained on autopilot
 
@@ -38,7 +144,7 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ### Ops / env
 
-- Apply **019**, **020**, **021**, **022**, **023** on any environment that does not have them yet (`npm run db:apply-sql` or SQL editor). **020** adds `INSERT` RLS on `ky_notification_preferences`. **021** adds bounce / complaint / suppression columns powering Resend webhook handling. **022** adds `welcome_email_sent_at` for one-time welcome email idempotency. **023** adds `external_links` JSONB on `ky_legislators` (full Open States links + grouped Social/Other UI). **Operator checklist** order: **016 → 017 → 018 → 019 → 020 → 021 → 022 → 023** (match your branch's migrations). Also set Vercel env vars `RESEND_WEBHOOK_SECRET` (Production + Preview), and ensure `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` use the canonical `www.kyvky.com` host (apex 307-redirects to www, which breaks webhook POST and one-click unsubscribe POST).
+- Apply **019**, **020**, **021**, **022**, **023**, **025** on any environment that does not have them yet (`npm run db:apply-sql` or SQL editor). **020** adds `INSERT` RLS on `ky_notification_preferences`. **021** adds bounce / complaint / suppression columns powering Resend webhook handling. **022** adds `welcome_email_sent_at` for one-time welcome email idempotency. **023** adds `external_links` JSONB on `ky_legislators` (full Open States links + grouped Social/Other UI). **Operator checklist** order: **016 → 017 → 018 → 019 → 020 → 021 → 022 → 023** (match your branch's migrations). Also set Vercel env vars `RESEND_WEBHOOK_SECRET` (Production + Preview), and ensure `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` use the canonical `www.kyvky.com` host (apex 307-redirects to www, which breaks webhook POST and one-click unsubscribe POST).
 - After applying **023** for the first time on a database with legacy data: run `npm run normalize:legislator-districts -- --apply` then `npm run cleanup:stale-legislators -- --apply`, then `npm run diagnose:legislators` to confirm active count is ~141 (100 House + 38 Senate + 3 statewide). Future syncs handle this automatically.
 - **`env-template.txt`** — SMTP notes, rate limits, CAPTCHA troubleshooting (“For security purposes…”).
 - **`npm run test:supabase-auth`** — smoke reachability for Auth API (no mail send).
@@ -67,7 +173,7 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Operator checklist
 
-- **Database migrations** — **Primary environment:** migrations **016–017** applied (2026-05-11); **`sync:ky:legislators`** run successfully after fixing [`scripts/load-env.ts`](./scripts/load-env.ts) (repo-root `.env.local`, `override: true`). **New Supabase projects / restores:** apply in order **`016_ky_user_profiles`** → **`017_search_members_discovery`** → **`018_ky_bills_plain_search_hardening`** → **`019_ky_follow_bills_schema`** → **`020_ky_notification_preferences_insert_policy`** (`npm run db:apply-sql` or SQL editor); after **017**, run **`npm run sync:ky:legislators`** so `committee_memberships` can populate from Open States `roles` when present.
+- **Database migrations** — Apply **`024_ky_committee_calendar.sql`** before first `npm run sync:ky:lrc-calendar` (committee calendar Phase 1). Apply **`025_ky_saved_searches_snooze.sql`** for saved searches + bill snooze (Wave 1–2). **Primary environment:** migrations **016–017** applied (2026-05-11); **`sync:ky:legislators`** run successfully after fixing [`scripts/load-env.ts`](./scripts/load-env.ts) (repo-root `.env.local`, `override: true`). **New Supabase projects / restores:** apply in order **`016_ky_user_profiles`** → **`017_search_members_discovery`** → **`018_ky_bills_plain_search_hardening`** → **`019_ky_follow_bills_schema`** → **`020_ky_notification_preferences_insert_policy`** (`npm run db:apply-sql` or SQL editor); after **017**, run **`npm run sync:ky:legislators`** so `committee_memberships` can populate from Open States `roles` when present.
 - **Remove `SENTRY_ENABLE_EXAMPLE_PAGE`** from Vercel (and `.env.local` if set). The `/sentry-example-page` routes were removed from the repo; stale env vars are harmless but should be cleared.
 - **Legacy npm stacks** (puppeteer, GCS, pdf-parse, `three`, etc.) are **not** in root `package.json`. If you need them for a one-off script, use [`docs/legacy-npm-deps/`](./docs/legacy-npm-deps/README.md) and install into gitignored `optional/legacy-npm-deps/`.
 
@@ -75,6 +181,20 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Recently completed
 
+- **Roadmap Wave 1–2 (2026-05-19)** — TASKS reorg (Bill Watch / launch polish / committee Wave 3). Activity feed filters; notification groups + Bill Watch copy; saved searches (`025`); snooze, export, welcome resend, `/about`, map autocomplete, contact accordion; `/dashboard` → `/profile#activity`. See `docs/email-client-qa.md`, `docs/spikes/committee-materials-sync.md`.
+- **Bill detail — server-rendered shell (2026-05-19)** — `/bills/[id]` loads bill + LegiScan enrichment on the server (`ky-bill-detail-server.ts`, `revalidate=300`, `generateMetadata`). Client `BillDetailView` handles follow, tooltips, roster match, deferred LRC link + hearings; no full-page spinner on first paint.
+- **Performance — members roster + LegiScan cache (2026-05-19)** — `GET /api/roster/members` (cached, slim columns); members/map stop `select('*')` and chamber refetch. Bill detail LegiScan cached 5m; search uses slim bill columns; hearings lazy-loaded.
+- **Bills browse sort UI (2026-05-19)** — `/bills` filter bar: Sort by dropdown + asc/desc toggle; `?sort=` / `?dir=` URL state (`ky-bills-browse-url.ts`); active chip + clear-all reset. Non-default sort uses the in-memory browse cap path (same as status/follows filters).
+- **Committee calendar Phase 4 — hearing digest events (2026-05-19)** — LRC calendar sync writes `hearing_scheduled` to `ky_bill_status_history` when a followed bill is newly listed on a committee agenda (`ky-calendar-hearing-history.ts`, deduped by meeting + bill + agenda hash). Digest + profile activity use `formatDigestEventDetail` for calendar lines; `/legislature/resources` notes Bill Watch comparison. Opt in via **Hearing scheduled** on `/profile` (not in the default “Major milestones” preset).
+- **Performance — browse server prefetch (2026-05-19)** — `/members`, `/bills` (+ house/senate), `/committees`, `/meetings` load list data on the server (`unstable_cache`, `revalidate` 60–300s). Bills browse skips client fetch when URL matches server prefetch; meetings omit `member_refs` on browse. `ky-ga-browse-server.ts`, `BillsBrowsePage.tsx`, `MembersBrowse.tsx`.
+- **Performance — homepage + profile (2026-05-19)** — `/` is a Server Component shell (`LandingHero`, `LandingFeatures`, `LandingTopics`, `SessionBannerServer`); client islands: `HomeAuthGate`, `LandingMapSection` (dynamic Mapbox). Profile `ky_user_profiles` uses explicit column select (`KY_USER_PROFILE_SELECT`).
+- **Performance — feed + search + committee detail (2026-05-19)** — `/feed` server-prefetches recent House/Senate bills (`KY_BILL_BROWSE_SELECT`, 120 rows cached) + slim roster; followed bills use slim select client-side. `/search` passes cached roster from server (no `/api/roster/active` on load). Committee detail: slim meeting/agenda selects, `unstable_cache` on slug/meetings/agenda batch (`ky-committee-data.ts`, `ky-ga-browse-select.ts`).
+- **Performance — browse, search, middleware, homepage (2026-05-19)** — `GET /api/bills/browse` with SQL pagination + slim columns (default browse); in-memory cap 2,000 when status/follows/sort filters apply. Bill search: FTS-first via `ky_bills_plain_search`, supplemental legs only when FTS is thin or unavailable (replaces always-on 9-query fan-out). Middleware skips Supabase `getUser()` on anonymous public routes (`session-middleware.ts`). Homepage Mapbox moved to `dynamic()` (`LandingDistrictMapPreview`). See `decisions.md` § 2026-05-19 performance.
+- **Performance — roster cache & committee batching (2026-05-19)** — `ky-legislator-roster-server.ts` (`unstable_cache` 1h): active slim roster for browse/search, active committee columns for `/committees/[slug]`, full roster for member profiles (historical rows preserved). `GET /api/roster/active` + `useKyActiveLegislatorRoster` (bills browse, search, feed, bill detail). Committee detail: batched agenda `IN` query (no N+1), `getKyCommitteeBySlug` + `revalidate=300`. Member profile: `React.cache` dedupes metadata + page roster fetch; `revalidate=300`. Bill detail API: roll-call enrichment cap 12; `Cache-Control` 5m.
+- **Committee detail — members section (2026-05-19)** — `/committees/[slug]` lists members from LRC calendar `member_refs` + Open States `committee_memberships` fallback (`CommitteeMembersSection`, `ky-committee-members.ts`).
+- **Committee calendar Phase 1 (2026-05-18)** — `024_ky_committee_calendar.sql`; `syncKyLrcCalendar` + `?source=lrc-calendar`; Vercel cron 12:00/18:00 UTC; CLI `npm run sync:ky:lrc-calendar`.
+- **Committee calendar Phase 0 (2026-05-18)** — LRC calendar fixtures + HTML parser + bill-reference extractor; `spike:lrc:calendar` / `audit:lrc:bill-refs`; [phase0 report](./docs/specs/committee-calendar-phase0-report.md); Bill Watch reference at `docs/reference/bill-watch/`.
+- **GA-only product scope + paused local crons (2026-05-18)** — Removed ordinances / school-boards / county-actions from `vercel.json`; `SYNC_SOURCES_DEFAULT` limits autopilot sync; [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) + `decisions.md` § 2026-05-18.
 - **Digest history on `/profile` (2026-05-13)** — New `ProfileDigestHistorySection` shows the user's last 10 sent digests with the bills + event labels included, so anyone who lost the email can still see what was sent. Backed by `GET /api/me/digest-history`: queries `ky_notifications_log` under the user's JWT (RLS-scoped), then uses `supabaseAdmin` to expand `event_ids` against the service-role-only `ky_bill_status_history` and join to `ky_bills` for labels. Dedupes bills per digest and caps to 10 with "…and N more" overflow.
 - **Launch blockers — Sentry alerts + privacy + terms + email polish (2026-05-13)** — `/api/cron/notify` and `/api/webhooks/resend` now `Sentry.captureException` on thrown errors and `Sentry.captureMessage` on silent partial-failure 200s, tagged `route:*` for alert-rule scoping. New `/privacy` and `/terms` pages cover what we collect, who we share with, retention, user controls, and acceptable use; both linked from `SiteFooter`, the register page (acknowledgment line), and email footers. Outbound mail policy: `From: alerts@kyvky.com` (transactional only); `Reply-To: hello@kyvky.com` (real inbox, also used in privacy/terms contact). Plain-text fallback (`render(el, { plainText: true })`) included on every transactional send for deliverability + a11y. Per-user rate limits on `/api/bills/[id]/follow` (60/min) and `/api/me/preferences` (30/min) keyed by user id with 429 + Retry-After. `/profile` followed-bills now shows a CTA empty-state card (browse bills / find your legislators) when no follows.
 - **Legislator stale row cleanup + Senate district format (2026-05-13)** — Members page was showing 381 active legislators when the General Assembly has 138 seats. Two fixes: `syncKyLegislators` now runs a second deactivation pass for active LegiScan-only rows at seats covered by a current Open States row (predecessors and alias dupes); `scripts/normalize-legislator-districts.ts` rewrites legacy Senate `SD-0XX` to canonical `SD-XX` so the seat-key compare actually matches. New `npm run cleanup:stale-legislators`, `npm run normalize:legislator-districts`, `npm run diagnose:legislators`, and `npm run debug:openstates-roster`. After running cleanup + normalize the live count drops to ~141 active (100 House + 38 Senate + 3 statewide).
@@ -103,21 +223,59 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Up Next
 
-The auth + profile + follow + email feature set is shipped and launch-blockers are cleared. Pick from these "should-haves" when picking the work back up:
+Roadmap priority (2026-05-19): **Wave 1 Bill Watch parity** → **Wave 2 launch polish** → **Wave 3 committee/data**. See `decisions.md` § 2026-05-19 roadmap.
 
-- **GDPR-style data export** (~2 hr) — `GET /api/me/export` returns JSON of profile + follows + prefs + log. Pairs with the existing `DELETE /api/me/account`.
-- **Resend "Send welcome again" button on `/profile`** (~1 hr) — manual recovery if a user lost the original.
-- **Email rendering QA across Gmail / Outlook / Apple Mail** (~2 hr, manual) — best done after the plain-text fallback shipped.
-- **Per-user time-zone preference for digest send** (~4–6 hr) — revisit after first DST transition (Nov 2026) or when open-rate data exists.
-- **In-app notification badge** (~4–8 hr) — needs a viewed_at cursor on `ky_notifications_log` or a separate read receipt.
-- **Snooze / mute individual bills** (~2–3 hr) — boolean column on `ky_bill_follows`; digest skips snoozed.
-- **Address autocomplete on the district map** (~3 hr).
-- **"How to contact your rep" content expansion** (~2 hr).
-- **Regression cadence** — After large syncs or schema changes, re-run **`npm run verify:legislator-links`** (optional **`--limit`**) and **`npm run spot-check:bill-links`**.
+### Wave 1 — Bill Watch parity (shipped 2026-05-19 — verify in browser)
+
+Reference: [docs/reference/bill-watch/](./docs/reference/bill-watch/README.md). Mapping: [bill-tracking.md](./docs/reference/bill-watch/bill-tracking.md).
+
+**Blocked (product):** Add PNG captures to [`docs/reference/bill-watch/screenshots/`](./docs/reference/bill-watch/screenshots/INDEX.md) per INDEX before pixel-polish passes.
+
+- ~~**Activity feed filters**~~ — Shipped; verify chips + `?kind=` + empty states.
+- ~~**Alert settings UX**~~ — Shipped; verify groups + Bill Watch link on `/legislature/resources`.
+- ~~**Saved searches MVP**~~ — Shipped; verify copy/save on `/bills` + `/profile#saved-searches` (needs migration **025**).
+- ~~**Bill tracking polish**~~ — Shipped; “Track another bill”, `/dashboard` redirect.
+- **Design backlog (open)** — Home hero CTA contrast (axe); member profile section order; returning-user hero test; optional **Topics** activity filter (v1.1 in plan).
+- **Bill card hover UX (browser review)** — **[P1]** Remove tooltip / hover overlay from all bill cards (`KYBillCard` + `CivicCard` bill variant). See **Browser review — logged findings**.
+
+**Wave 1 non-goals:** Kentucky.gov auth, rules wizard, mobile quiet hours, per-bill alert overrides, premium “new bill match” email blast.
+
+### Wave 2 — Launch polish (shipped 2026-05-19 — verify in browser)
+
+- ~~**GDPR-style data export**~~ — `GET /api/me/export` on `/profile` Security.
+- ~~**Resend "Send welcome again"**~~ — `POST /api/me/welcome-email?force=1`.
+- **Email rendering QA** (~2 hr, manual) — [docs/email-client-qa.md](./docs/email-client-qa.md); run after copy tweaks from review.
+- ~~**Snooze on follows**~~ — Profile toggle; digest skips snoozed (needs **025**).
+- ~~**Map address autocomplete**~~ — `/members/map`.
+- ~~**About page**~~ — `/about` + footer link.
+- ~~**"How to contact your rep"**~~ — Map accordion + resources links.
+- **In-app notification badge** (~4–8 hr, lower priority) — not shipped.
+- **Per-user digest timezone** (~4–6 hr) — deferred (Nov 2026 / open-rate data).
+- **Regression cadence** — After large syncs or schema changes, re-run **`npm run verify:legislator-links`** and **`npm run spot-check:bill-links`**.
+
+### Wave 3 — Committee / data (deferred)
+
+From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § Phase 5+:
+
+- **`ky_committee_materials` + `sync:lrc:committee-materials`** — Meeting Materials tab (metadata URLs only).
+- **Session record spike** — `fixtures/lrc/legislative-record-26rs-live.html`; floor vs committee event split.
+- **Interim period + session milestones** — `ky-sessions.ts` concurrence / veto recess banners.
+- **LRC bulk API** — revisit if state publishes machine-readable roster (see Backlog below).
 
 ---
 
 ## Backlog
+
+### Committee calendar (GA) — from [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md)
+
+- ~~**Phase 0**~~ — **Done 2026-05-18.** Fixtures, parsers, spike + audit scripts, [phase0 report](./docs/specs/committee-calendar-phase0-report.md).
+- ~~**Phase 1**~~ — **Done 2026-05-18.** Migration `024`, `src/lib/ky-lrc-calendar-sync.ts`, `npm run sync:ky:lrc-calendar`, cron `lrc-calendar` 12:00/18:00 UTC.
+- ~~**Phase 2**~~ — **Done 2026-05-18.** `/committees`, `/meetings`, bill detail “Hearings & agendas”, `/legislature/resources`, nav + footer links.
+- ~~**Phase 3**~~ — **Done 2026-05-18.** Profile activity feed (`ProfileActivitySection`, `GET /api/me/activity`); agenda search (`/meetings?q=`); saved filters via URL (`?chamber=`, `?when=`).
+- ~~**Phase 4**~~ — **Done 2026-05-19.** `hearing_scheduled` events from LRC calendar sync; resources page Bill Watch note.
+- **Phase 5+** — See Wave 3 above (materials, session record, milestones).
+
+### Other
 
 - ~~**Legislator links — full fidelity**~~ — **Shipped 2026-05-13** (migration 023, sync, profile UI).
 - ~~**Legislator links — verifier in CI**~~ — **Shipped 2026-05-13** (`.github/workflows/legislator-links-weekly.yml`).
@@ -153,21 +311,19 @@ Done:
 
 Blocked:
 
-- (none)
+- **Bill Watch screenshots** — Product to add PNGs under `docs/reference/bill-watch/screenshots/` (INDEX ready). Unblocks visual polish only; Wave 1 features can ship without them.
 
 Notes:
 
 - Designer-assisted UI/UX work follows user-provided Operating Principles (clarity before cleverness; explicit hierarchy; IA before layout; WCAG AA baseline; friction intentional; defaults and states explicit). Modes: Generative vs Critique per request. Conflict resolution: hierarchy accessibility > clarity > safety > consistency > efficiency > aesthetic refinement; state trade-offs and decision questions when ambiguous. Log substantive design decisions to `decisions.md` (append-only). See also `README.md` (Local maintenance scripts) for current `npm run` tooling.
 
-Open decisions / questions (not resolved — pick when ready):
-
-- **Home hero vs returning bill trackers** — Orientation-first hero makes map the primary CTA. If analytics show heavy repeat bill traffic: consider nothing (scroll habits), segmented messaging, or test alternate hero emphasis. Trade-off: comprehension for new users vs immediacy for power users.
-- **Member profile content order** — Sponsored bills before voting record is the default; validate with research or A/B test later (identity/contact vs legislative activity first).
-- **Home hero contrast** — Outlined white CTAs on photo hero should be verified against WCAG non-text / focus visibility requirements for default state (not only hover). Automated check recommended (e.g. axe on deployed build).
+Open design questions moved to **Wave 1 — Design backlog** (Up Next).
 
 ---
 
 ## Deferred / Decided Against
 
+- **Local government sync (product surface)** — **Paused 2026-05-18.** Ordinances (Louisville/Lexington Legistar), school boards (JCPS/FCPS), and county/city council calendars (Jefferson/Fayette) are out of scope until GA committee work ships. Code remains; re-enable crons in `vercel.json` (schedules in committee-calendar spec). Manual: `GET /api/sync?source=ordinances` etc.
+- **`/events` as mixed local meetings hub** — Hidden from nav; repurpose for GA committee meetings or replace with `/meetings` in Phase 2.
 - **Executive orders sync** — Deferred. `governor.ky.gov` listings are unreliable for automated sync (404s, client-only rendering). Scraper exists in `src/lib/ky-executive-orders.ts` but is excluded from product surface and cron. Revisit when a stable feed/API exists.
 - **Filibuster / cloture / budget reconciliation tooltips** — Removed. Federal Congress concepts only; do not re-add.
