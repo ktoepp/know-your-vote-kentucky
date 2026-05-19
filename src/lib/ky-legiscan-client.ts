@@ -45,8 +45,20 @@ export interface LegiScanPerson {
   party: string;
   role: string;
   district: string;
-  bio?: { social?: LegiScanPersonSocial };
+  /** LegiScan sometimes returns `[]` when extended bio is unavailable — see {@link legiscanPersonBioSocial}. */
+  bio?: { social?: LegiScanPersonSocial } | unknown;
   ballotpedia?: string;
+}
+
+/**
+ * `getPerson` may return `bio: []` instead of an object; only read `social` when `bio` is a plain object.
+ */
+export function legiscanPersonBioSocial(person: LegiScanPerson | null | undefined): LegiScanPersonSocial | undefined {
+  const raw = person?.bio as unknown;
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const social = (raw as { social?: LegiScanPersonSocial }).social;
+  if (social == null || typeof social !== 'object') return undefined;
+  return social;
 }
 
 /** Record from `getSessionPeople` (same core fields as getPerson for matching). */

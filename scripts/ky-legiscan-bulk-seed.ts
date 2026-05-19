@@ -21,6 +21,7 @@ import { getKyLegiScanClient } from '../src/lib/ky-data-sources';
 import { classifyTopics } from '../src/lib/ky-topic-classifier';
 import { legiscanSubjectColumnsFromRawPayload } from '../src/lib/ky-legiscan-subjects';
 import type { LegiScanDatasetListEntry } from '../src/lib/ky-legiscan-client';
+import { mapLegiScanBillStatus } from '../src/lib/map-legiscan-bill-status';
 
 const args = process.argv.slice(2);
 const stateFlag = args.find((a) => a.startsWith('--state='))?.split('=')[1];
@@ -36,25 +37,6 @@ if (!ALLOWED_STATES.has(state)) {
     `Pass --state=KY to import Kentucky data.`
   );
   process.exit(1);
-}
-
-const LEGISCAN_STATUS_MAP: Record<number, string> = {
-  1: 'Introduced', 2: 'Engrossed', 3: 'Enrolled', 4: 'Passed', 5: 'Vetoed',
-  6: 'Failed', 7: 'Veto Override', 8: 'Chaptered', 9: 'Referred', 10: 'Reported',
-  11: 'Failed in Committee', 12: 'Draft',
-};
-
-function mapStatus(code: number, lastAction: string): string {
-  const a = (lastAction || '').toLowerCase();
-  if (a.includes('signed by governor')) return 'Signed';
-  if (a.includes('delivered to secretary of state')) return 'Signed';
-  if (a.includes('vetoed by governor') || a.includes('veto')) return 'Vetoed';
-  if (a.includes('veto override')) return 'Veto Override';
-  if (a.includes('died') || a.includes('failed')) return 'Failed';
-  if (a.includes('third reading, passed') || (a.includes('passed') && a.includes('third reading'))) return 'Passed Chamber';
-  if (a.includes('committee') || a.includes('referred to')) return 'In Committee';
-  if (a.includes('introduced') || a.includes('filed')) return 'Introduced';
-  return LEGISCAN_STATUS_MAP[code] || 'Introduced';
 }
 
 function chamberFromBillNumber(n: string): 'house' | 'senate' | null {
@@ -191,7 +173,7 @@ function buildBillRow(bill: any, sessionName: string, sessionId: number): Record
     title: bill?.title || '',
     description: bill?.description || null,
     session: sessionName,
-    status: mapStatus(Number(bill?.status) || 0, lastAction || ''),
+    status: mapLegiScanBillStatus(Number(bill?.status) || 0, lastAction || ''),
     chamber: chamberFromBillNumber(bill?.number || ''),
     last_action: lastAction,
     last_action_date: lastActionDate,

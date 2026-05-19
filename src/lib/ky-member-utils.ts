@@ -91,6 +91,27 @@ export function normalizeLegislatorPhotoUrl(url: string | null | undefined): str
 }
 
 /**
+ * Kentucky LRC headshot URL pattern when LegiScan omits `bio.social.image` (often `bio: []`).
+ * Senate filenames use 100 + district number (e.g. SD-009 → senate109.jpg).
+ */
+export function kyLegislatureHeadshotUrlFromLegiscanDistrict(district: string | null | undefined): string | null {
+  const d = (district || '').trim();
+  const hm = /^HD-(\d+)$/i.exec(d);
+  if (hm) {
+    const n = parseInt(hm[1], 10);
+    if (!Number.isFinite(n) || n < 1) return null;
+    return `https://legislature.ky.gov/Legislator%20Head%20shots/house${n}.jpg`;
+  }
+  const sm = /^SD-(\d+)$/i.exec(d);
+  if (sm) {
+    const n = parseInt(sm[1], 10);
+    if (!Number.isFinite(n) || n < 1) return null;
+    return `https://legislature.ky.gov/Legislator%20Head%20shots/senate${100 + n}.jpg`;
+  }
+  return null;
+}
+
+/**
  * Match by LegiScan `people_id` (stored on `ky_legislators.legiscan_id`) — reliable for bill sponsor photos.
  */
 export function matchLegislatorByLegiscanId(

@@ -156,7 +156,7 @@ export default function DesignSystemPage() {
                   ['success.main', civicPaletteTokens.success.main],
                   ['warning.main', civicPaletteTokens.warning.main],
                   ['error.main', civicPaletteTokens.error.main],
-                  ['info.main', civicPaletteTokens.info.main],
+                  /* info token removed — primary carries informational colour */
                 ] as const
               ).map(([label, value]) => (
                 <Grid item xs={6} sm={4} md={3} key={label}>

@@ -4,6 +4,8 @@
 #   SUPABASE_SERVICE_ROLE_KEY — service_role JWT (not anon)
 # Optional but recommended:
 #   LEGISCAN_API_KEY — validates LegiScan via getPerson (public HTML often 403 for bots)
+# Optional Slack on verify failure:
+#   SLACK_WEBHOOK_ERRORS — Incoming Webhook for failure notifications
 #
 # Node: opt into Actions’ Node 24 for JS-based actions (checkout/setup-node/upload-artifact)
 # before Node 20 is removed from runners. See:
@@ -43,3 +45,16 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
         run: npm run verify:legislator-links
+
+      - name: Slack notify on verify failure
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+        run: |
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
+            exit 0
+          fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"*KY Vote — outbound links verify failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$WEBHOOK"

@@ -6,7 +6,7 @@ import { BillsBrowse } from '@/components/bills/BillsBrowse';
 function SenateBillsInner() {
   return (
     <BillsBrowse
-      title="Kentucky Senate Bills"
+      title="Senate Bills"
       subtitle="Senate bills and resolutions (SB, SR, SJR, SCR, etc.) from the Kentucky General Assembly."
       chamberMode="senate"
     />

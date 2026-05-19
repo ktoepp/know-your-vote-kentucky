@@ -162,8 +162,14 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # SLACK_WEBHOOK_URL (fallback for digest then errors chain).
 #
 # Digest posts for Vercel Cron syncs; set SLACK_SYNC_NOTIFY_MANUAL=true to also post manual runs.
+# CLI / GitHub Actions (`tsx scripts/manual-sync.ts`): set SLACK_SYNC_NOTIFY_CLI=true (see workflows).
 # By default, status-reports digest only when something synced (itemsSynced > 0) or there were errors/skips.
-# Set SLACK_SYNC_DIGEST_ALWAYS=true for a digest on every cron run (heartbeat).
+# Set SLACK_SYNC_DIGEST_ALWAYS=true for a digest on every Vercel cron run (all sources — noisy).
+# Vercel hourly bills cron (`source=bills`) sends a digest every run by default (LegiScan quota + ky_sources);
+# set SLACK_SYNC_BILLS_DIGEST_ALWAYS=false to bill digest only on changes/errors.
+# SLACK_SYNC_SKIP_METADATA=true — omit LegiScan quota + ky_sources lines from digests.
+# SLACK_LEGISCAN_QUOTA_ALERT_PCT=90 — also posts SLACK_WEBHOOK_ERRORS when monthly usage crosses this %.
+# LEGISCAN_MONTHLY_QUERY_LIMIT=30000 — label for quota math (match your LegiScan plan).
 # Smoke-test webhooks: npm run slack:smoke-test — or GET /api/cron/slack-test with Bearer auth.
 #
 # GitHub → Slack (commits / PRs / merges): add repo secret SLACK_WEBHOOK_GITHUB (Incoming Webhook URL).
@@ -177,7 +183,12 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # SLACK_WEBHOOK_ALERTS=https://hooks.slack.com/services/T.../B.../xxx
 # SLACK_WEBHOOK_SYNC=https://hooks.slack.com/services/T.../B.../xxx
 # SLACK_SYNC_NOTIFY_MANUAL=false
+# SLACK_SYNC_NOTIFY_CLI=false
 # SLACK_SYNC_DIGEST_ALWAYS=false
+# SLACK_SYNC_BILLS_DIGEST_ALWAYS=
+# SLACK_SYNC_SKIP_METADATA=false
+# SLACK_LEGISCAN_QUOTA_ALERT_PCT=90
+# LEGISCAN_MONTHLY_QUERY_LIMIT=30000
 
 # Note: Replace all "your_*_here" placeholders with actual values.
 # Keep this file secure and never commit it to version control.

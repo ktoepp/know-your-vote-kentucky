@@ -110,7 +110,7 @@ export type KyBillBrowseStatusFilterKey =
   | 'vetoed';
 
 /**
- * Coarse stage for `ky_bills` rows from `mapLegiScanStatus` (see `ky-sync-pipeline.ts`).
+ * Coarse stage for `ky_bills` rows from `mapLegiScanBillStatus` (see `map-legiscan-bill-status.ts`).
  * Used for client-side status filters: DB has "Engrossed", "Passed Chamber", "In Committee", not `passed_one_chamber`.
  */
 export type KyBillBrowseBucket = Exclude<KyBillBrowseStatusFilterKey, 'all'> | 'other';
@@ -131,7 +131,7 @@ export function classifyKyBillBrowseBucket(bill: KYBill): KyBillBrowseBucket {
   const st = (bill.status || '').trim().toLowerCase();
   const act = (bill.last_action || '').trim().toLowerCase();
 
-  if (isSignedByGovernorBillStatus(bill.status) || st.includes('chaptered')) {
+  if (isSignedByGovernorBillStatus(bill.status) || st.includes('chaptered') || st.includes('veto override')) {
     return 'signed';
   }
   if (st.includes('vetoed') && !st.includes('override')) {
@@ -165,7 +165,7 @@ export function classifyKyBillBrowseBucket(bill: KYBill): KyBillBrowseBucket {
   if (st === 'introduced' || st === 'draft' || st.includes('prefiled')) {
     return 'introduced';
   }
-  if (st.includes('failed') || st.includes('died') || st.includes('veto override')) {
+  if (st.includes('failed') || st.includes('died')) {
     return 'other';
   }
   return 'other';
@@ -323,7 +323,7 @@ export interface KyBillNextAction {
 
 /**
  * Infer a concise "next action" for KY GA cards when full LegiScan history is not loaded.
- * Uses mapped `status` and `last_action` text from sync (see ky-sync-pipeline mapLegiScanStatus).
+ * Uses mapped `status` and `last_action` text from sync (see `mapLegiScanBillStatus` in `map-legiscan-bill-status.ts`).
  * Returns null when the bill has finished the legislative process (nothing to show on the card).
  */
 export function getKyBillNextAction(bill: {
