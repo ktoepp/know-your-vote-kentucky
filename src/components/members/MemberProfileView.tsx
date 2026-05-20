@@ -3,7 +3,6 @@
 import React from 'react';
 import Link from 'next/link';
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -23,7 +22,9 @@ import { MemberCard } from '@/components/members/MemberCard';
 import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
 import { groupLegislatorExternalLinks, labelForLinkHost } from '@/lib/legislator-link-normalize';
 import { ICON_REM, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
-import { billStatusChipLabel, formatKyBillNumberDisplay, formatKyIsoDateShort } from '@/lib/bill-display';
+import { BillNumber } from '@/components/bills/BillNumber';
+import { LegislatorDistrictMinimapLazy } from '@/components/members/LegislatorDistrictMinimapLazy';
+import { billStatusChipLabel, formatKyIsoDateShort } from '@/lib/bill-display';
 import type { MemberVoteRecord } from '@/lib/member-profile-data';
 import type { VoteBucket } from '@/lib/legiscan-vote-tally';
 
@@ -57,6 +58,7 @@ export function MemberProfileView({
   voteRecord?: MemberVoteRecord;
 }) {
   const hasLegiscan = legiscanMemberPersonUrl(leg.legiscan_id) != null;
+  const showLegislativeSections = leg.chamber === 'house' || leg.chamber === 'senate' || hasLegiscan;
   const tally = voteRecord?.tally;
   const { social: socialLinks, other: otherLinks } = groupLegislatorExternalLinks(leg.external_links);
   const hasConnectLinks = socialLinks.length > 0 || otherLinks.length > 0;
@@ -73,7 +75,19 @@ export function MemberProfileView({
           All members
         </Button>
 
-        <MemberCard leg={leg} featured={false} profileNameHeading="h1" legislatorRoster={legislatorRoster} />
+        <MemberCard
+          leg={leg}
+          featured={false}
+          profileNameHeading="h1"
+          legislatorRoster={legislatorRoster}
+          showDistrictMinimap={false}
+        />
+
+        {(leg.chamber === 'house' || leg.chamber === 'senate') && (
+          <Box sx={{ mt: 2, maxWidth: 420 }}>
+            <LegislatorDistrictMinimapLazy leg={leg} size="profile" />
+          </Box>
+        )}
 
         {hasConnectLinks && (
           <Box sx={{ mt: 3 }}>
@@ -135,13 +149,7 @@ export function MemberProfileView({
           </Box>
         )}
 
-        {!hasLegiscan && (
-          <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
-            Sponsored bills and voting history are not available for this member yet.
-          </Alert>
-        )}
-
-        {hasLegiscan && (
+        {showLegislativeSections && (
           <>
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
@@ -161,7 +169,9 @@ export function MemberProfileView({
 
             {sponsoredBills.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                No sponsored bills found for this session yet.
+                {hasLegiscan
+                  ? 'No sponsored bills found for this session yet.'
+                  : 'No sponsored bills matched for this session. Voting history requires a LegiScan profile link on this member.'}
               </Typography>
             ) : (
               <Card variant="outlined" sx={{ borderRadius: 2, mb: 1 }}>
@@ -175,15 +185,14 @@ export function MemberProfileView({
                           <ListItemText
                             primary={
                               <Box component="span" sx={{ display: 'block' }}>
-                                <Link
-                                  href={`/bills/${b.id}`}
-                                  style={{ textDecoration: 'underline', textUnderlineOffset: 2, fontWeight: 600 }}
-                                >
-                                  <Typography component="span" color="primary.main" variant="body1">
-                                    {formatKyBillNumberDisplay(b.bill_number)}
-                                    {b.title ? ` — ${b.title}` : ''}
-                                  </Typography>
-                                </Link>
+                                <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.5 }}>
+                                  <BillNumber billNumber={b.bill_number} size="compact" href={`/bills/${b.id}`} />
+                                  {b.title ? (
+                                    <Typography component="span" color="text.secondary" variant="body2">
+                                      — {b.title}
+                                    </Typography>
+                                  ) : null}
+                                </Box>
                               </Box>
                             }
                             secondary={
@@ -206,6 +215,8 @@ export function MemberProfileView({
               </Card>
             )}
 
+            {hasLegiscan ? (
+              <>
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <HowToVote sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
               <Typography
@@ -264,15 +275,18 @@ export function MemberProfileView({
                                   <ListItemText
                                     primary={
                                       r.bill ? (
-                                        <Link
-                                          href={`/bills/${r.bill.id}`}
-                                          style={{ textDecoration: 'underline', textUnderlineOffset: 2 }}
-                                        >
-                                          <Typography component="span" color="primary.main" fontWeight={600} variant="body1">
-                                            {formatKyBillNumberDisplay(r.bill.bill_number)}
-                                            {r.bill.title ? ` — ${r.bill.title}` : ''}
-                                          </Typography>
-                                        </Link>
+                                        <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.5 }}>
+                                          <BillNumber
+                                            billNumber={r.bill.bill_number}
+                                            size="compact"
+                                            href={`/bills/${r.bill.id}`}
+                                          />
+                                          {r.bill.title ? (
+                                            <Typography component="span" color="text.secondary" variant="body2">
+                                              — {r.bill.title}
+                                            </Typography>
+                                          ) : null}
+                                        </Box>
                                       ) : (
                                         <Typography variant="body2" color="text.secondary">
                                           Bill
@@ -311,6 +325,12 @@ export function MemberProfileView({
                   )}
                 </CardContent>
               </Card>
+            )}
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
+                Voting history will appear here once this member is linked to LegiScan roll-call data.
+              </Typography>
             )}
           </>
         )}

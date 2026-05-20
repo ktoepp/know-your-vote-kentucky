@@ -8,8 +8,10 @@ import { supabase } from '@/app/lib/supabaseClient';
 import type { KYSource } from '@/types/kentucky';
 
 interface DataFreshnessNoteProps {
-  /** 'hero' = under hero on home; 'page' = under page titles */
+  /** 'hero' = under hero on home; 'page' = standard civic browse pages */
   variant?: 'hero' | 'page';
+  /** `footer` = below main page content (default for `page`); `header` = under the page title */
+  placement?: 'header' | 'footer';
   /** Optional `ky_sources.source_name` filter (e.g., 'bills', 'legislators', 'ordinances'). */
   source?: string;
 }
@@ -21,7 +23,12 @@ const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
  * When `source` is set, scopes the query to that single `source_name`.
  * Renders nothing if Supabase is missing, table is unreadable, or no timestamps exist.
  */
-export default function DataFreshnessNote({ variant = 'page', source }: DataFreshnessNoteProps) {
+export default function DataFreshnessNote({
+  variant = 'page',
+  placement,
+  source,
+}: DataFreshnessNoteProps) {
+  const resolvedPlacement = placement ?? (variant === 'hero' ? 'header' : 'footer');
   const theme = useTheme();
   const [lastUpdatedWhen, setLastUpdatedWhen] = useState<string | null>(null);
   const [staleHours, setStaleHours] = useState<number | null>(null);
@@ -60,12 +67,20 @@ export default function DataFreshnessNote({ variant = 'page', source }: DataFres
 
   return (
     <Box
+      component="footer"
+      aria-label="Data freshness and disclaimer"
       sx={{
-        mt: variant === 'hero' ? 2 : 0,
-        mb: variant === 'page' ? 2 : 0,
+        mt: resolvedPlacement === 'footer' ? 4 : variant === 'hero' ? 2 : 0,
+        mb: 0,
+        pt: resolvedPlacement === 'footer' ? 3 : 0,
         maxWidth: 720,
+        mx: resolvedPlacement === 'footer' ? 'auto' : undefined,
+        textAlign: resolvedPlacement === 'footer' ? 'center' : 'left',
+        borderTop: resolvedPlacement === 'footer' ? '1px solid' : 'none',
+        borderColor: 'divider',
         display: 'flex',
         alignItems: 'flex-start',
+        justifyContent: resolvedPlacement === 'footer' ? 'center' : 'flex-start',
         gap: 0.75,
       }}
     >

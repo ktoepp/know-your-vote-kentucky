@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -18,66 +18,48 @@ import {
   Select,
   MenuItem,
   Button,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
 } from '@mui/material';
-import { Cancel, Search, Gavel } from '@mui/icons-material';
+import { Cancel, Search, ArrowDownward, ArrowUpward, ContentCopy, BookmarkAdd } from '@mui/icons-material';
+import { publicSiteOrigin } from '@/lib/site-canonical';
+import { SaveSearchDialogFields } from '@/components/profile/ProfileSavedSearchesSection';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
+import type { KyBillsBrowseChamberMode } from '@/lib/ky-bills-browse-server';
+import { kyBillsBrowseQueryKey } from '@/lib/ky-bills-browse-query';
 import { KYBillCard } from '@/components/bills/KYBillCard';
+import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
+import { gaChamberFilterLabel, type GaChamberFilter } from '@/lib/ky-committee-display';
+import type { KyBillSortKey } from '@/lib/bill-display';
 import {
-  billMatchesBrowseStatusFilter,
-  compareKyBills,
-  effectiveBillChamber,
-  type KyBillSortKey,
-} from '@/lib/bill-display';
+  defaultDirForKyBillSort,
+  isDefaultKyBillSort,
+  KY_BILL_SORT_OPTIONS,
+  kyBillSortLabel,
+  parseKyBillSortDirParam,
+  parseKyBillSortParam,
+} from '@/lib/ky-bills-browse-url';
 import { withTimeout } from '@/lib/async-utils';
-import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
 import { KY_TOPICS } from '@/lib/ky-topic-classifier';
+import { useUser } from '@/app/lib/UserContext';
 
-/**
- * One query loads up to this many rows; client filters/sorts, then `PaginatedSection` paginates 25/50/100.
- * Dense sessions can exceed this cap; when no client filters run, the banner uses an exact chamber-scoped count query.
- */
-const BROWSE_QUERY_ROW_LIMIT = 1000;
+export type BillsBrowseChamberMode = KyBillsBrowseChamberMode;
 
-
-export type BillsBrowseChamberMode = 'all' | 'house' | 'senate';
-
-const KY_BILLS_COUNT_SELECT = 'id';
-
-/** Chamber-scoped row query for browse + refresh (house/senate include prefix fallback when `chamber` is null). Status is never filtered in SQL; use `billMatchesBrowseStatusFilter` in the client. */
-function applyKyBillsRowQuery(
-  chamberMode: BillsBrowseChamberMode,
-  chamberFilter: 'all' | 'house' | 'senate',
-) {
-  if (!supabase) return null;
-  let query = supabase.from('ky_bills').select('*').order('session', { ascending: false }).order('last_action_date', { ascending: false });
-  const effectiveChamber = chamberMode === 'all' ? chamberFilter : chamberMode;
-  if (effectiveChamber === 'house') {
-    query = query.or('chamber.eq.house,bill_number.ilike.H%');
-  } else if (effectiveChamber === 'senate') {
-    query = query.or('chamber.eq.senate,bill_number.ilike.S%');
-  }
-  return query.limit(BROWSE_QUERY_ROW_LIMIT);
-}
-
-/** Exact chamber-scoped bill count (matches {@link applyKyBillsRowQuery} predicates, no limit). */
-function applyKyBillsCountQuery(
-  chamberMode: BillsBrowseChamberMode,
-  chamberFilter: 'all' | 'house' | 'senate',
-) {
-  if (!supabase) return null;
-  let query = supabase.from('ky_bills').select(KY_BILLS_COUNT_SELECT, { count: 'exact', head: true });
-  const effectiveChamber = chamberMode === 'all' ? chamberFilter : chamberMode;
-  if (effectiveChamber === 'house') {
-    query = query.or('chamber.eq.house,bill_number.ilike.H%');
-  } else if (effectiveChamber === 'senate') {
-    query = query.or('chamber.eq.senate,bill_number.ilike.S%');
-  }
-  return query;
-}
+export type BillsBrowseInitial = {
+  queryKey: string;
+  bills: KYBill[];
+  total: number;
+  capped: boolean;
+};
 
 export interface BillsBrowseProps {
   title: string;
@@ -85,13 +67,23 @@ export interface BillsBrowseProps {
   chamberMode: BillsBrowseChamberMode;
   /** Pre-select a topic filter on mount (e.g. from ?topic= URL param). */
   initialTopic?: string;
+  legislatorRoster: KYLegislatorRoster[];
+  initialBrowse?: BillsBrowseInitial;
 }
 
-export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: BillsBrowseProps) {
+export function BillsBrowse({
+  title,
+  subtitle,
+  chamberMode,
+  initialTopic,
+  legislatorRoster,
+  initialBrowse,
+}: BillsBrowseProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const followsParam = searchParams.get('follows') === 'me';
+  const { session } = useUser();
   const { followedBillIds, followedTopics, ready: followsReady, authed } = useFollowedBillsAndTopics();
   const effectiveFollowsMe = authed && followsParam;
   const followsAwaiting = effectiveFollowsMe && !followsReady;
@@ -109,64 +101,132 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
     [pathname, router, searchParams],
   );
 
-  const [bills, setBills] = useState<KYBill[]>([]);
-  /** Exact rows matching chamber scope in DB (ignores client-only filters). */
-  const [chamberBillTotal, setChamberBillTotal] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const skipInitialBrowseRef = useRef(Boolean(initialBrowse));
+  const [bills, setBills] = useState<KYBill[]>(initialBrowse?.bills ?? []);
+  const [browseTotal, setBrowseTotal] = useState(initialBrowse?.total ?? 0);
+  const [browseCapped, setBrowseCapped] = useState(initialBrowse?.capped ?? false);
+  const [loading, setLoading] = useState(!initialBrowse);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [chamberFilter, setChamberFilter] = useState<'all' | 'house' | 'senate'>(
-    chamberMode === 'all' ? 'all' : chamberMode,
+  const [chamberFilter, setChamberFilter] = useState<GaChamberFilter>(
+    chamberMode === 'all' ? '' : chamberMode,
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [topicFilter, setTopicFilter] = useState<string>(initialTopic ?? '');
-  const [legislators, setLegislators] = useState<KYLegislatorRoster[]>([]);
-  const [sortBy, setSortBy] = useState<KyBillSortKey>('last_action_date');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const { pageSize, setPageSize } = usePersistedPageSize('bills', 25);
+  const legislators = legislatorRoster;
+  const sortBy = parseKyBillSortParam(searchParams.get('sort'));
+  const sortDir = parseKyBillSortDirParam(searchParams.get('dir'));
+  const { pageSize } = usePersistedPageSize('bills', 25);
+
+  const [copyToast, setCopyToast] = useState<string | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveLabel, setSaveLabel] = useState('');
+  const [saveBusy, setSaveBusy] = useState(false);
+
+  const followIdsKey = useMemo(() => {
+    if (!effectiveFollowsMe || !followsReady) return '';
+    return Array.from(followedBillIds).sort().join(',');
+  }, [effectiveFollowsMe, followsReady, followedBillIds]);
+
+  const setSortInUrl = useCallback(
+    (nextBy: KyBillSortKey, nextDir: 'asc' | 'desc') => {
+      const p = new URLSearchParams(searchParams.toString());
+      if (isDefaultKyBillSort(nextBy, nextDir)) {
+        p.delete('sort');
+        p.delete('dir');
+      } else {
+        p.set('sort', nextBy);
+        p.set('dir', nextDir);
+      }
+      const qs = p.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const buildBrowseQuery = useCallback(
+    (page: number) => {
+      const p = new URLSearchParams();
+      p.set('chamberMode', chamberMode);
+      p.set('chamberFilter', chamberFilter);
+      p.set('status', statusFilter);
+      if (topicFilter) p.set('topic', topicFilter);
+      p.set('sortBy', sortBy);
+      p.set('sortDir', sortDir);
+      p.set('page', String(page));
+      p.set('pageSize', String(pageSize));
+      if (followIdsKey) {
+        p.set('followIds', followIdsKey);
+      }
+      return p;
+    },
+    [
+      chamberMode,
+      chamberFilter,
+      statusFilter,
+      topicFilter,
+      sortBy,
+      sortDir,
+      pageSize,
+      followIdsKey,
+    ],
+  );
+
+  const currentBrowseQueryKey = useMemo(
+    () =>
+      kyBillsBrowseQueryKey({
+        chamberMode,
+        chamberFilter,
+        statusFilter,
+        topicFilter,
+        followIds: [],
+        sortBy,
+        sortDir,
+        page: 1,
+        pageSize,
+      }),
+    [chamberMode, chamberFilter, statusFilter, topicFilter, sortBy, sortDir, pageSize],
+  );
 
   useEffect(() => {
-    if (!supabase) return;
+    if (effectiveFollowsMe && !followsReady) return;
+    if (
+      skipInitialBrowseRef.current &&
+      initialBrowse &&
+      !followIdsKey &&
+      currentBrowseQueryKey === initialBrowse.queryKey
+    ) {
+      skipInitialBrowseRef.current = false;
+      setBills(initialBrowse.bills);
+      setBrowseTotal(initialBrowse.total);
+      setBrowseCapped(initialBrowse.capped);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
-    supabase
-      .from('ky_legislators')
-      .select('id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url,ballotpedia,legiscan_image_url')
-      .eq('active', true)
-      .then(({ data }) => {
-        if (!cancelled) setLegislators(data || []);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const rowQuery = applyKyBillsRowQuery(chamberMode, chamberFilter);
-        const countQuery = applyKyBillsCountQuery(chamberMode, chamberFilter);
-        if (!rowQuery) {
-          if (!cancelled) setLoading(false);
-          return;
+        const res = await withTimeout(
+          fetch(`/api/bills/browse?${buildBrowseQuery(1)}`, { signal: controller.signal }),
+          30_000,
+          'Loading bills timed out. Check your network.',
+        );
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Failed to load bills');
         }
-        const [rowRes, countRes] = await Promise.all([
-          withTimeout(rowQuery, 30_000, 'Loading bills timed out. Check Supabase or your network.'),
-          countQuery
-            ? withTimeout(countQuery, 30_000, 'Loading bill count timed out. Check Supabase or your network.')
-            : Promise.resolve({ count: null as number | null, error: null }),
-        ]);
-        if (rowRes.error) throw rowRes.error;
-        if (countRes.error) {
-          console.warn('ky_bills count:', countRes.error);
-          if (!cancelled) setChamberBillTotal(null);
-        } else if (!cancelled) {
-          setChamberBillTotal(countRes.count ?? null);
-        }
-        if (!cancelled) setBills(rowRes.data || []);
-      } catch (err: any) {
-        if (!cancelled) setError(err.message || 'Failed to load bills');
+        const json = (await res.json()) as { bills?: KYBill[]; total?: number; capped?: boolean };
+        if (cancelled) return;
+        setBills(json.bills ?? []);
+        setBrowseTotal(json.total ?? 0);
+        setBrowseCapped(Boolean(json.capped));
+      } catch (err: unknown) {
+        if (cancelled) return;
+        if (err instanceof Error && err.name === 'AbortError') return;
+        setError(err instanceof Error ? err.message : 'Failed to load bills');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -174,36 +234,32 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
     load();
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [chamberMode, chamberFilter]);
+  }, [
+    buildBrowseQuery,
+    currentBrowseQueryKey,
+    effectiveFollowsMe,
+    followIdsKey,
+    followsReady,
+    initialBrowse,
+  ]);
 
-  const filteredBills = bills.filter((bill) => {
-    if (chamberMode === 'all' && chamberFilter !== 'all') {
-      if (effectiveBillChamber(bill) !== chamberFilter) return false;
+  const loadMoreBills = useCallback(async () => {
+    if (loadingMore || bills.length >= browseTotal) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = Math.floor(bills.length / pageSize) + 1;
+      const res = await fetch(`/api/bills/browse?${buildBrowseQuery(nextPage)}`);
+      if (!res.ok) return;
+      const json = (await res.json()) as { bills?: KYBill[] };
+      setBills((prev) => [...prev, ...(json.bills ?? [])]);
+    } finally {
+      setLoadingMore(false);
     }
-    if (!billMatchesBrowseStatusFilter(bill, statusFilter)) {
-      return false;
-    }
-    if (topicFilter && !bill.topics?.includes(topicFilter)) {
-      return false;
-    }
-    if (effectiveFollowsMe) {
-      if (!followsReady) return false;
-      if (!followedBillIds.has(bill.id)) return false;
-    }
-    return true;
-  });
+  }, [loadingMore, bills.length, browseTotal, pageSize, buildBrowseQuery]);
 
-  const sortedBills = useMemo(() => {
-    const next = [...filteredBills];
-    next.sort((a, b) => {
-      const c = compareKyBills(a, b, sortBy);
-      return sortDir === 'asc' ? c : -c;
-    });
-    return next;
-  }, [filteredBills, sortBy, sortDir]);
-
-  const browsePagerResetKey = `${followsParam}|${chamberFilter}|${statusFilter}|${topicFilter}|${sortBy}|${sortDir}|${pageSize}|${sortedBills.length}|${sortedBills[0]?.id ?? ''}`;
+  const browsePagerResetKey = `${followsParam}|${chamberFilter}|${statusFilter}|${topicFilter}|${sortBy}|${sortDir}|${pageSize}`;
 
   const showChamberSelect = chamberMode === 'all';
 
@@ -215,48 +271,78 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
     return canonical;
   }, [topicFilter]);
 
+  const nonDefaultSort = !isDefaultKyBillSort(sortBy, sortDir);
+
+  const currentSearchHref = useMemo(() => {
+    const qs = searchParams.toString();
+    return qs ? `${browseBaseHref}?${qs}` : browseBaseHref;
+  }, [browseBaseHref, searchParams]);
+
   const hasActiveClientFilters = useMemo(
     () =>
       statusFilter !== 'all' ||
       Boolean(topicFilter) ||
       effectiveFollowsMe ||
-      (chamberMode === 'all' && chamberFilter !== 'all'),
-    [statusFilter, topicFilter, effectiveFollowsMe, chamberMode, chamberFilter],
+      (chamberMode === 'all' && Boolean(chamberFilter)) ||
+      nonDefaultSort,
+    [statusFilter, topicFilter, effectiveFollowsMe, chamberMode, chamberFilter, nonDefaultSort],
   );
 
-  const hitFetchCap = bills.length >= BROWSE_QUERY_ROW_LIMIT;
+  const copySearchLink = useCallback(async () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : publicSiteOrigin();
+    const url = `${origin}${currentSearchHref}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyToast('Link copied to clipboard.');
+    } catch {
+      setCopyToast('Could not copy — copy the URL from your browser bar.');
+    }
+  }, [currentSearchHref]);
+
+  const saveSearch = useCallback(async () => {
+    if (!session?.access_token || !saveLabel.trim()) return;
+    setSaveBusy(true);
+    try {
+      const res = await fetch('/api/me/saved-searches', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: saveLabel.trim(), href: currentSearchHref }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Save failed');
+      setSaveOpen(false);
+      setSaveLabel('');
+      setCopyToast('Search saved to your profile.');
+    } catch (e) {
+      setCopyToast(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaveBusy(false);
+    }
+  }, [session?.access_token, saveLabel, currentSearchHref]);
 
   const billsFoundSummary = useMemo(() => {
-    const n = sortedBills.length;
-    const billsWord = n === 1 ? 'bill' : 'bills';
-    if (!hasActiveClientFilters && chamberBillTotal != null) {
-      const total = chamberBillTotal;
-      const totalWord = total === 1 ? 'bill' : 'bills';
-      if (total > bills.length && hitFetchCap) {
-        return `${total.toLocaleString()} ${totalWord} · Showing ${bills.length.toLocaleString()} with the most recent activity`;
+    const loaded = bills.length;
+    const total = browseTotal;
+    const billsWord = total === 1 ? 'bill' : 'bills';
+    if (!hasActiveClientFilters) {
+      if (browseCapped && total > loaded) {
+        return `${total.toLocaleString()} ${billsWord} · Showing ${loaded.toLocaleString()} with the most recent activity`;
       }
-      return `${total.toLocaleString()} ${totalWord}`;
+      return `${total.toLocaleString()} ${billsWord}`;
     }
-    if (!hasActiveClientFilters && chamberBillTotal == null) {
-      let s = `${n.toLocaleString()} ${billsWord} loaded`;
-      if (hitFetchCap) {
-        s += ` · Only the ${BROWSE_QUERY_ROW_LIMIT.toLocaleString()} most recently updated bills are loaded; full total unavailable`;
-      }
-      return s;
+    const verb = total === 1 ? 'matches' : 'match';
+    let s = `${total.toLocaleString()} ${billsWord} ${verb} your filters`;
+    if (browseCapped) {
+      s += ' · Based on the 2,000 most recently updated bills in this view; more may match';
     }
-    const verb = n === 1 ? 'matches' : 'match';
-    let s = `${n.toLocaleString()} ${billsWord} ${verb} your filters`;
-    if (hitFetchCap) {
-      s += ` · Based on the ${BROWSE_QUERY_ROW_LIMIT.toLocaleString()} most recently updated bills in this view; more may match`;
+    if (loaded < total) {
+      s += ` · Showing ${loaded.toLocaleString()} of ${total.toLocaleString()}`;
     }
     return s;
-  }, [
-    hasActiveClientFilters,
-    chamberBillTotal,
-    sortedBills.length,
-    bills.length,
-    hitFetchCap,
-  ]);
+  }, [hasActiveClientFilters, browseTotal, bills.length, browseCapped]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -269,7 +355,6 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
           <Typography variant="body1" color="text.secondary">
             {subtitle}
           </Typography>
-          <DataFreshnessNote variant="page" source="bills" />
         </Box>
 
         {!supabase && (
@@ -296,17 +381,7 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
         >
           {/* Left: Chamber pills */}
           {showChamberSelect && (
-            <ToggleButtonGroup
-              value={chamberFilter}
-              exclusive
-              size="small"
-              onChange={(_, v) => { if (v !== null) setChamberFilter(v); }}
-              aria-label="Filter by chamber"
-            >
-              <ToggleButton value="house">House</ToggleButton>
-              <ToggleButton value="senate">Senate</ToggleButton>
-              <ToggleButton value="all">All</ToggleButton>
-            </ToggleButtonGroup>
+            <GaChamberFilterBar value={chamberFilter} onChange={setChamberFilter} />
           )}
 
           {/* Right: Topic + Status dropdowns */}
@@ -342,11 +417,41 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                 <MenuItem value="vetoed">Vetoed</MenuItem>
               </Select>
             </FormControl>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel id="browse-sort-label">Sort by</InputLabel>
+                <Select
+                  labelId="browse-sort-label"
+                  label="Sort by"
+                  value={sortBy}
+                  onChange={(e) => {
+                    const key = e.target.value as KyBillSortKey;
+                    setSortInUrl(key, defaultDirForKyBillSort(key));
+                  }}
+                >
+                  {KY_BILL_SORT_OPTIONS.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Tooltip title={sortDir === 'desc' ? 'Descending — switch to ascending' : 'Ascending — switch to descending'}>
+                <IconButton
+                  size="small"
+                  aria-label={sortDir === 'desc' ? 'Sort descending' : 'Sort ascending'}
+                  onClick={() => setSortInUrl(sortBy, sortDir === 'desc' ? 'asc' : 'desc')}
+                  sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+                >
+                  {sortDir === 'desc' ? <ArrowDownward fontSize="small" /> : <ArrowUpward fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
         </Box>
 
         {/* Active filter chips */}
-        {(chamberFilter !== 'all' || statusFilter !== 'all' || topicFilter || effectiveFollowsMe) && (
+        {hasActiveClientFilters && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
             <Typography variant="caption" sx={{ fontWeight: 700, mr: 0.5, color: 'text.primary' }}>
               Active filters:
@@ -361,11 +466,11 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                 variant="outlined"
               />
             )}
-            {showChamberSelect && chamberFilter !== 'all' && (
+            {showChamberSelect && chamberFilter && (
               <Chip
-                label={chamberFilter === 'house' ? 'House' : 'Senate'}
+                label={gaChamberFilterLabel(chamberFilter)}
                 size="small"
-                onDelete={() => setChamberFilter('all')}
+                onDelete={() => setChamberFilter('')}
                 deleteIcon={<Cancel />}
                 color="primary"
                 variant="outlined"
@@ -391,15 +496,54 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
                 variant="outlined"
               />
             )}
+            {nonDefaultSort && (
+              <Chip
+                label={kyBillSortLabel(sortBy, sortDir)}
+                size="small"
+                onDelete={() => setSortInUrl('last_action_date', 'desc')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<ContentCopy fontSize="small" />}
+              onClick={() => void copySearchLink()}
+              sx={{ textTransform: 'none' }}
+            >
+              Copy link to this search
+            </Button>
+            {authed && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<BookmarkAdd fontSize="small" />}
+                onClick={() => {
+                  setSaveLabel(
+                    topicFilter ||
+                      (statusFilter !== 'all' ? statusFilter.replace(/_/g, ' ') : '') ||
+                      'My bill search',
+                  );
+                  setSaveOpen(true);
+                }}
+                sx={{ textTransform: 'none' }}
+              >
+                Save search
+              </Button>
+            )}
             <Chip
               label="Clear all"
               size="small"
               onClick={() => {
-                setChamberFilter('all');
+                setChamberFilter('');
                 setStatusFilter('all');
                 setTopicFilter('');
                 const p = new URLSearchParams(searchParams.toString());
                 p.delete('follows');
+                p.delete('sort');
+                p.delete('dir');
                 const qs = p.toString();
                 router.replace(qs ? `${pathname}?${qs}` : pathname);
               }}
@@ -410,7 +554,6 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
         )}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Gavel sx={{ fontSize: '1.2rem', color: 'primary.main' }} />
           <Typography variant="body2" fontWeight={600} component="p" sx={{ m: 0 }}>
             {billsFoundSummary}
           </Typography>
@@ -438,7 +581,7 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
           </Box>
         )}
 
-        {!loading && !followsAwaiting && sortedBills.length === 0 ? (
+        {!loading && !followsAwaiting && bills.length === 0 ? (
           <Box sx={{ p: 6, textAlign: 'center', borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
             <Search sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -458,28 +601,59 @@ export function BillsBrowse({ title, subtitle, chamberMode, initialTopic }: Bill
             )}
           </Box>
         ) : !followsAwaiting ? (
-          <PaginatedSection
-            items={sortedBills}
-            pageSize={pageSize}
-            resetKey={browsePagerResetKey}
-            variant="loadmore"
-          >
-            {(pageBills) => (
-              <Grid container spacing={3}>
-                {pageBills.map((bill) => (
-                  <Grid item xs={12} sm={6} md={4} key={bill.id}>
-                    <KYBillCard
-                      bill={bill}
-                      legislators={legislators}
-                      followedBillIds={authed ? followedBillIds : null}
-                      followedTopics={authed ? followedTopics : null}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
-            )}
-          </PaginatedSection>
+          <Box key={browsePagerResetKey}>
+            <Grid container spacing={3}>
+              {bills.map((bill) => (
+                <Grid item xs={12} sm={6} md={4} key={bill.id}>
+                  <KYBillCard
+                    bill={bill}
+                    legislators={legislators}
+                    followedBillIds={authed ? followedBillIds : null}
+                    followedTopics={authed ? followedTopics : null}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+            <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Showing {bills.length.toLocaleString()} of {browseTotal.toLocaleString()}
+              </Typography>
+              {bills.length < browseTotal && (
+                <Button variant="outlined" onClick={loadMoreBills} disabled={loadingMore}>
+                  {loadingMore ? 'Loading…' : 'Load more bills'}
+                </Button>
+              )}
+            </Box>
+          </Box>
         ) : null}
+
+        <DataFreshnessNote variant="page" source="bills" />
+
+        <Snackbar
+          open={Boolean(copyToast)}
+          autoHideDuration={5000}
+          onClose={() => setCopyToast(null)}
+          message={copyToast}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        />
+
+        <Dialog open={saveOpen} onClose={() => !saveBusy && setSaveOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Save this search</DialogTitle>
+          <DialogContent>
+            <SaveSearchDialogFields label={saveLabel} onLabelChange={setSaveLabel} />
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
+              {currentSearchHref}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSaveOpen(false)} disabled={saveBusy}>
+              Cancel
+            </Button>
+            <Button variant="contained" disabled={saveBusy || !saveLabel.trim()} onClick={() => void saveSearch()}>
+              {saveBusy ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </Box>
   );

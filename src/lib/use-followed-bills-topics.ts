@@ -26,8 +26,8 @@ export function useFollowedBillsAndTopics(): {
 
   useEffect(() => {
     if (!authed || !token) {
-      setFollowedBillIds(new Set());
-      setFollowedTopics(new Set());
+      setFollowedBillIds((prev) => (prev.size === 0 ? prev : new Set()));
+      setFollowedTopics((prev) => (prev.size === 0 ? prev : new Set()));
       setReady(true);
       return;
     }
@@ -35,7 +35,13 @@ export function useFollowedBillsAndTopics(): {
     let cancelled = false;
     setReady(false);
 
-    fetch('/api/me/follows', { headers: { Authorization: `Bearer ${token}` } })
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
+
+    fetch('/api/me/follows', {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
       .then((r) => r.json().then((body) => ({ ok: r.ok, body })))
       .then(({ ok, body }) => {
         if (cancelled) return;
@@ -57,11 +63,14 @@ export function useFollowedBillsAndTopics(): {
         }
       })
       .finally(() => {
+        window.clearTimeout(timeoutId);
         if (!cancelled) setReady(true);
       });
 
     return () => {
       cancelled = true;
+      controller.abort();
+      window.clearTimeout(timeoutId);
     };
   }, [authed, token, user?.id]);
 

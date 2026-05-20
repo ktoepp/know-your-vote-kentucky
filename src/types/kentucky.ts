@@ -104,6 +104,74 @@ export interface KYVote {
   created_at: string;
 }
 
+/** LRC committee directory row (migration 024). */
+export interface KYCommittee {
+  id: string;
+  lrc_rsn: number;
+  committee_type: string;
+  name: string;
+  chamber: 'house' | 'senate' | 'joint' | 'unknown';
+  slug: string;
+  profile_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KYCommitteeMeeting {
+  id: string;
+  committee_id: string;
+  meeting_date: string;
+  time_and_location: string | null;
+  status: 'scheduled' | 'cancelled';
+  member_refs: Array<{
+    displayName?: string;
+    profileUrl?: string | null;
+    districtNumber?: number | null;
+  }>;
+  agenda_content_hash: string | null;
+  source_url: string;
+  scraped_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KYCommitteeAgendaItem {
+  id: string;
+  meeting_id: string;
+  sort_order: number;
+  raw_text: string;
+  item_kind: 'bill' | 'resolution' | 'minutes' | 'report' | 'action_item' | 'other';
+  bill_number: string | null;
+  bill_session_label: string | null;
+  ky_bill_id: string | null;
+  created_at: string;
+}
+
+export type KYCommitteeMeetingWithCommittee = KYCommitteeMeeting & {
+  ky_committees: Pick<KYCommittee, 'id' | 'name' | 'slug' | 'chamber' | 'profile_url'> | null;
+};
+
+/** Meetings browse grid — omits heavy `member_refs` / agenda fields. */
+export type KYCommitteeMeetingBrowse = Pick<
+  KYCommitteeMeeting,
+  | 'id'
+  | 'committee_id'
+  | 'meeting_date'
+  | 'time_and_location'
+  | 'status'
+  | 'source_url'
+  | 'created_at'
+  | 'updated_at'
+> & {
+  ky_committees: Pick<KYCommittee, 'id' | 'name' | 'slug' | 'chamber' | 'profile_url'> | null;
+};
+
+export type KYCommitteeAgendaItemWithMeeting = KYCommitteeAgendaItem & {
+  ky_committee_meetings: (KYCommitteeMeeting & {
+    ky_committees: Pick<KYCommittee, 'id' | 'name' | 'slug' | 'chamber' | 'profile_url'> | null;
+  }) | null;
+};
+
 export interface KYMeeting {
   id: string;
   jurisdiction: string;

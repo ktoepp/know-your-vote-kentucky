@@ -17,6 +17,7 @@ import { classifyTopics } from './ky-topic-classifier';
 import { extractCommitteeMembershipSlugsFromOpenStatesPerson } from './ky-committee-utils';
 import { legiscanSubjectColumnsFromDetail } from './ky-legiscan-subjects';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
+import { syncKyLrcCalendar } from './ky-lrc-calendar-sync';
 import {
   fetchBillHistorySnapshots,
   recordBillStatusHistoryForBuiltBatch,
@@ -1627,6 +1628,17 @@ export async function syncCountyActions(options: SyncOptions = {}): Promise<Sync
 
 
 // --- Source map for per-source sync ---
+
+/**
+ * Sources run when `syncAll()` is called without `?source=` (CLI `npm run sync:ky`, POST /api/sync).
+ * Local-government sources are implemented but paused from product scope — use explicit `?source=`.
+ * @see docs/specs/committee-calendar.md
+ */
+export const SYNC_SOURCES_DEFAULT = ['bills', 'legislators', 'votes'] as const;
+
+/** Removed from Vercel Cron 2026-05-18; manual sync still supported. */
+export const SYNC_SOURCES_PAUSED_FROM_CRON = ['ordinances', 'school-boards', 'county-actions'] as const;
+
 export const SYNC_SOURCES: Record<string, (options: SyncOptions) => Promise<SyncResult>> = {
   bills: syncKyBills,
   legislators: syncKyLegislators,
@@ -1645,6 +1657,34 @@ export const SYNC_SOURCES: Record<string, (options: SyncOptions) => Promise<Sync
   },
   'school-boards': syncSchoolBoardItems,
   'county-actions': syncCountyActions,
+  'lrc-calendar': async (opts) => {
+    const start = Date.now();
+    const source = 'lrc-calendar';
+    try {
+      const db = getSupabase();
+      const result = await syncKyLrcCalendar(db, opts);
+      if (!opts.dryRun) {
+        await updateSourceStatus(
+          source,
+          result.status === 'error' ? 'error' : 'success',
+          result.itemsSynced,
+          result.error,
+        );
+      }
+      return result;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      logError(source, message);
+      if (!opts.dryRun) await updateSourceStatus(source, 'error', 0, message);
+      return {
+        source,
+        status: 'error',
+        itemsSynced: 0,
+        error: message,
+        duration: Date.now() - start,
+      };
+    }
+  },
 };
 
 // --- Sync All ---
@@ -1654,7 +1694,7 @@ export async function syncAll(options: SyncOptions = {}): Promise<SyncResult[]> 
 
   const sources = options.source
     ? [options.source]
-    : Object.keys(SYNC_SOURCES);
+    : [...SYNC_SOURCES_DEFAULT];
 
   for (const sourceName of sources) {
     const syncFn = SYNC_SOURCES[sourceName];

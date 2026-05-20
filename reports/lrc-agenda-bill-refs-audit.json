@@ -1,0 +1,48 @@
+{
+  "fixture": "/Users/katietoepp/Projects/Active/know-your-vote-kentucky/fixtures/lrc/legislative-calendar-live.html",
+  "stats": {
+    "dayCount": 5,
+    "meetingCount": 2,
+    "agendaItemCount": 80,
+    "billReferenceCount": 5
+  },
+  "uniqueBillReferences": [
+    "HB 1|2022 Regular Session",
+    "HB 6|2024 Regular Session",
+    "HJR 81|2026 Regular Session",
+    "SB 36|2021 Regular Session"
+  ],
+  "linesWithBills": [
+    {
+      "line": "House Bill 6 (2024 Regular Session) Reporting - Kentucky Communications Network Authority Capital Projects",
+      "refs": [
+        "HB 6 (2024 Regular Session)"
+      ]
+    },
+    {
+      "line": "Round One (Senate Bill 36 - 2021 Regular Session) - Water (Two - County Pool)",
+      "refs": [
+        "SB 36 (2021 Regular Session)"
+      ]
+    },
+    {
+      "line": "Round Two (House Bill 1 - 2022 Regular Session) - Water (Three - County Pool)",
+      "refs": [
+        "HB 1 (2022 Regular Session)"
+      ]
+    },
+    {
+      "line": "House Bill 1 (2022 Regular Session) Line-Item Water Grants (Regional Water Supply Improvements)",
+      "refs": [
+        "HB 1 (2022 Regular Session)"
+      ]
+    },
+    {
+      "line": "House Joint Resolution 81 (2026 Regular Session) Kentucky Water and Wastewater Assistance for Troubled or Economically R",
+      "refs": [
+        "HJR 81 (2026 Regular Session)"
+      ]
+    }
+  ],
+  "possibleMissedLines": []
+}

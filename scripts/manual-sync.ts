@@ -3,7 +3,7 @@
  * Manual Sync CLI — Know Your Vote Kentucky
  *
  * Usage:
- *   npx tsx scripts/manual-sync.ts              # sync all sources
+ *   npx tsx scripts/manual-sync.ts              # sync GA default sources (bills, legislators, votes)
  *   npx tsx scripts/manual-sync.ts bills        # sync specific source
  *   npx tsx scripts/manual-sync.ts --dry-run    # dry run (no DB writes)
  *   npx tsx scripts/manual-sync.ts bills --dry-run
@@ -31,7 +31,13 @@
 
 import './load-env';
 import { notifySyncExceptionSlack, notifySyncSlack } from '../src/lib/slack-webhook';
-import { syncAll, SYNC_SOURCES, type SyncResult } from '../src/lib/ky-sync-pipeline';
+import {
+  syncAll,
+  SYNC_SOURCES,
+  SYNC_SOURCES_DEFAULT,
+  SYNC_SOURCES_PAUSED_FROM_CRON,
+  type SyncResult,
+} from '../src/lib/ky-sync-pipeline';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -68,7 +74,12 @@ function printHeader() {
   console.log('');
   if (dryRun) console.log('🔍 DRY RUN MODE — No data will be written to the database\n');
   if (sourceArg) console.log(`📌 Syncing source: ${sourceArg}\n`);
-  else console.log('📌 Syncing all sources\n');
+  else {
+    console.log(`📌 Syncing GA default: ${SYNC_SOURCES_DEFAULT.join(', ')}\n`);
+    console.log(
+      `   (Paused from autopilot: ${SYNC_SOURCES_PAUSED_FROM_CRON.join(', ')} — pass source name to run manually)\n`,
+    );
+  }
 }
 
 function printResults(results: SyncResult[]) {
@@ -96,7 +107,7 @@ async function main() {
     process.exit(1);
   }
 
-  const sourcesToRun = sourceArg ? [sourceArg] : Object.keys(SYNC_SOURCES);
+  const sourcesToRun = sourceArg ? [sourceArg] : [...SYNC_SOURCES_DEFAULT];
   const needsOpenStatesKey = sourcesToRun.includes('legislators');
   const openStatesKey = (process.env.OPENSTATES_API_KEY || '').trim();
   if (needsOpenStatesKey && !openStatesKey) {

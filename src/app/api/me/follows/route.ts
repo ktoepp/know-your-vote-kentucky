@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
       .from('ky_bill_follows')
       .select(
         `created_at,
+         snoozed,
          bill:ky_bills (
            id, bill_number, title, status, chamber,
            last_action, last_action_date, topics
@@ -41,4 +42,42 @@ export async function GET(request: NextRequest) {
     bills: followsRes.data ?? [],
     topics: prefsRes.data?.topic_filters ?? [],
   });
+}
+
+/** PATCH — snooze or unsnooze a followed bill (digest skips snoozed). */
+export async function PATCH(request: NextRequest) {
+  const auth = await getAuthedUser(request);
+  if ('error' in auth) return auth.error;
+
+  let body: { bill_id?: string; snoozed?: boolean };
+  try {
+    body = (await request.json()) as { bill_id?: string; snoozed?: boolean };
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 });
+  }
+
+  const billId = typeof body.bill_id === 'string' ? body.bill_id.trim() : '';
+  if (!billId) {
+    return NextResponse.json({ error: 'bill_id is required.' }, { status: 400 });
+  }
+  if (typeof body.snoozed !== 'boolean') {
+    return NextResponse.json({ error: 'snoozed must be a boolean.' }, { status: 400 });
+  }
+
+  const { data, error } = await auth.supabase
+    .from('ky_bill_follows')
+    .update({ snoozed: body.snoozed })
+    .eq('user_id', auth.userId)
+    .eq('bill_id', billId)
+    .select('bill_id, snoozed')
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (!data) {
+    return NextResponse.json({ error: 'Follow not found.' }, { status: 404 });
+  }
+
+  return NextResponse.json({ bill_id: data.bill_id, snoozed: data.snoozed });
 }

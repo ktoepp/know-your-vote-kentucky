@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/app/lib/supabaseClient';
+import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
 import { committeeSlugFromName, KY_STATIC_COMMITTEES } from '@/lib/ky-committee-utils';
 
 export type KyCommitteeOption = { slug: string; label: string; chamber?: 'house' | 'senate' | 'joint' };
@@ -14,7 +15,7 @@ function staticOptions(): KyCommitteeOption[] {
     const slug = committeeSlugFromName(c.name);
     if (seen.has(slug)) continue;
     seen.add(slug);
-    out.push({ slug, label: c.name, chamber: c.chamber });
+    out.push({ slug, label: normalizeKyGaDisplayName(c.name), chamber: c.chamber });
   }
   return out;
 }
@@ -50,7 +51,7 @@ export function useKyBillCommittees(): { committees: KyCommitteeOption[]; loadin
           .filter((n): n is string => Boolean(n?.trim()));
 
         for (const name of dbNames) {
-          const label = name.trim();
+          const label = normalizeKyGaDisplayName(name.trim());
           const slug = committeeSlugFromName(label);
           if (seen.has(slug)) continue;
           seen.add(slug);

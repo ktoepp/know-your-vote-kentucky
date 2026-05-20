@@ -34,7 +34,14 @@
     "diagnose:legislators": "tsx scripts/diagnose-legislators.ts",
     "cleanup:stale-legislators": "tsx scripts/cleanup-stale-legislators.ts",
     "debug:openstates-roster": "tsx scripts/debug-openstates-roster.ts",
-    "normalize:legislator-districts": "tsx scripts/normalize-legislator-districts.ts"
+    "normalize:legislator-districts": "tsx scripts/normalize-legislator-districts.ts",
+    "spike:lrc:calendar": "tsx scripts/lrc-calendar-spike.ts",
+    "audit:lrc:bill-refs": "tsx scripts/audit-lrc-agenda-bill-refs.ts",
+    "verify:recent-ship": "tsx scripts/verify-recent-ship.ts",
+    "sync:ky:lrc-calendar": "tsx scripts/manual-sync.ts lrc-calendar",
+    "sync:ky:lrc-calendar:dry": "tsx scripts/manual-sync.ts lrc-calendar --dry-run",
+    "backfill:lrc:calendar": "tsx scripts/backfill-lrc-calendar-wayback.ts",
+    "backfill:lrc:calendar:dry": "tsx scripts/backfill-lrc-calendar-wayback.ts --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

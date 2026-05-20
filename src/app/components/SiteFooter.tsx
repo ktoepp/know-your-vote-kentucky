@@ -10,8 +10,11 @@ const NAV_WORDMARK_SRC = '/branding/Logo-03.png';
 
 const footerNavLinks = [
   { href: '/bills', label: 'Bills' },
+  { href: '/committees', label: 'Committees' },
+  { href: '/meetings', label: 'Meetings' },
   { href: '/members', label: 'Members' },
   { href: '/search', label: 'Search' },
+  { href: '/legislature/resources', label: 'Frankfort resources' },
 ];
 
 const footerAuthLinks = [
@@ -20,6 +23,7 @@ const footerAuthLinks = [
 ];
 
 const footerLegalLinks = [
+  { href: '/about', label: 'About' },
   { href: '/privacy', label: 'Privacy' },
   { href: '/terms', label: 'Terms' },
   { href: '/licenses', label: 'Licenses' },

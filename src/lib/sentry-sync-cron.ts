@@ -28,21 +28,12 @@ const VERCEL_SYNC_CRON_MONITORS: Record<
     maxRuntime: 8,
     checkinMargin: 5,
   },
-  ordinances: {
-    schedule: { type: "crontab", value: "0 7 * * *" },
-    maxRuntime: 8,
+  "lrc-calendar": {
+    schedule: { type: "crontab", value: "0 12,18 * * *" },
+    maxRuntime: 5,
     checkinMargin: 5,
   },
-  "school-boards": {
-    schedule: { type: "crontab", value: "0 10 * * 1" },
-    maxRuntime: 8,
-    checkinMargin: 15,
-  },
-  "county-actions": {
-    schedule: { type: "crontab", value: "0 11 * * 1" },
-    maxRuntime: 8,
-    checkinMargin: 15,
-  },
+  // Local-government crons paused 2026-05-18 — see docs/specs/committee-calendar.md
 };
 
 function monitorSlugForSource(source: string): string {

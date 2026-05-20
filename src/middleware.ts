@@ -1,8 +1,11 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
+import { shouldRefreshSupabaseSession } from '@/lib/supabase/session-middleware';
 
 export async function middleware(request: NextRequest) {
-  const sessionResponse = await updateSession(request);
+  const sessionResponse = shouldRefreshSupabaseSession(request)
+    ? await updateSession(request)
+    : NextResponse.next({ request });
 
   if (request.nextUrl.pathname.startsWith('/admin')) {
     const adminToken = process.env.ADMIN_TOKEN;

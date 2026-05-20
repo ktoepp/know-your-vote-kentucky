@@ -36,7 +36,9 @@ import {
   ChamberChip,
   BillNumberChip,
 } from '@/components/ui/Chip';
+import { BillNumber } from '@/components/bills/BillNumber';
 import { KYBillCard } from '@/components/bills/KYBillCard';
+import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
 import { CivicCard } from '@/components/ui/CivicCard';
 import StatsGrid from '@/components/bills/StatsGrid';
 import type { KYBill } from '@/types/kentucky';
@@ -242,9 +244,27 @@ export default function DesignSystemPage() {
               Bill number utilities (MUI <Typography component="span" sx={{ fontFamily: 'monospace' }}>Typography</Typography> class names)
             </Typography>
             <Stack direction="row" gap={2} flexWrap="wrap" alignItems="center">
-              <Typography className="bill-number">HB 1</Typography>
-              <Typography className="bill-number-medium">SB 12</Typography>
-              <Typography className="bill-number-small">HCR 3</Typography>
+              <BillNumber billNumber="HB 1" size="detail" />
+              <BillNumber billNumber="SB 12" size="card" />
+              <BillNumber billNumber="HCR 3" size="compact" />
+              <BillNumber billNumber="HR 55" size="inline" />
+            </Stack>
+            <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
+              Legislator avatar with party badge
+            </Typography>
+            <Stack direction="row" gap={2} alignItems="center">
+              <LegislatorAvatar
+                party="Democratic"
+                initials="LW"
+                sx={{ width: 40, height: 40 }}
+                alt="Lisa Willner portrait"
+              />
+              <LegislatorAvatar
+                party="Republican"
+                initials="JC"
+                sx={{ width: 48, height: 48, fontSize: '1rem' }}
+                alt="Josh Calloway portrait"
+              />
             </Stack>
           </section>
 
@@ -338,7 +358,7 @@ export default function DesignSystemPage() {
                         <Typography component="span" sx={{ fontFamily: 'monospace' }}>DataFreshnessNote</Typography> reads{' '}
                         <Typography component="span" sx={{ fontFamily: 'monospace' }}>ky_sources</Typography> when Supabase is configured.
                       </Typography>
-                      <DataFreshnessNote variant="page" />
+                      <DataFreshnessNote variant="page" placement="footer" />
                     </CardContent>
                   </Card>
                 </Grid>

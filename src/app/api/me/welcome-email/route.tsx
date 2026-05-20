@@ -40,29 +40,36 @@ export async function POST(request: NextRequest) {
   if (!profile.email_verified_at) {
     return NextResponse.json({ sent: false, reason: 'unverified' }, { status: 200 });
   }
-  if (profile.welcome_email_sent_at) {
+  const force = new URL(request.url).searchParams.get('force') === '1';
+
+  if (profile.welcome_email_sent_at && !force) {
     return NextResponse.json({ sent: false, reason: 'already_sent' }, { status: 200 });
   }
   if (!profile.email || !String(profile.email).includes('@')) {
     return NextResponse.json({ sent: false, reason: 'no_email' }, { status: 200 });
   }
 
-  // Stamp first to make the send idempotent under concurrent verify-page loads.
-  // Conditional update: only stamp when the field is still null. If another
-  // request already stamped, our update affects 0 rows and we skip the send.
   const stampedAt = new Date().toISOString();
-  const { data: stamped, error: stampErr } = await supabaseAdmin
-    .from('ky_user_profiles')
-    .update({ welcome_email_sent_at: stampedAt })
-    .eq('user_id', auth.userId)
-    .is('welcome_email_sent_at', null)
-    .select('user_id');
+  if (!force) {
+    // Stamp first to make the send idempotent under concurrent verify-page loads.
+    const { data: stamped, error: stampErr } = await supabaseAdmin
+      .from('ky_user_profiles')
+      .update({ welcome_email_sent_at: stampedAt })
+      .eq('user_id', auth.userId)
+      .is('welcome_email_sent_at', null)
+      .select('user_id');
 
-  if (stampErr) {
-    return NextResponse.json({ error: stampErr.message }, { status: 500 });
-  }
-  if (!stamped || stamped.length === 0) {
-    return NextResponse.json({ sent: false, reason: 'already_sent' }, { status: 200 });
+    if (stampErr) {
+      return NextResponse.json({ error: stampErr.message }, { status: 500 });
+    }
+    if (!stamped || stamped.length === 0) {
+      return NextResponse.json({ sent: false, reason: 'already_sent' }, { status: 200 });
+    }
+  } else {
+    await supabaseAdmin
+      .from('ky_user_profiles')
+      .update({ welcome_email_sent_at: stampedAt })
+      .eq('user_id', auth.userId);
   }
 
   const resendKey = process.env.RESEND_API_KEY?.trim();

@@ -3,10 +3,12 @@ import type { KYBill, KYOrdinance, KYSchoolBoardItem } from '@/types/kentucky';
 import {
   billMatchesBrowseStatusFilter,
   effectiveBillChamber,
+  isKyJointResolutionBill,
   kyBillNumericPartEquals,
   normalizeKyBillDesignation,
 } from '@/lib/bill-display';
 import { billMatchesCommitteeFilter } from '@/lib/ky-committee-utils';
+import { KY_BILL_SEARCH_SELECT } from '@/lib/ky-bill-search-select';
 
 /**
  * Set after PostgREST reports `legiscan_subjects_search` missing (migration 015 not applied or schema stale).
@@ -31,7 +33,7 @@ function isMissingKyBillsPlainSearchRpc(err: { message?: string; details?: strin
 
 /** Optional filters (URL: chamber, dateRange, status, committee). */
 export type KyBillSearchFilters = {
-  chamber?: 'house' | 'senate';
+  chamber?: 'house' | 'senate' | 'joint';
   dateRange?: string;
   /**
    * Status bucket: `introduced` | `in_committee` | `passed_one_chamber` | `passed` | `signed` | `vetoed` | `all`.
@@ -55,7 +57,7 @@ export function buildKyBillSearchFiltersFromUrlSearch(
   const ch = sp.get('chamber');
   const st = sp.get('status');
   return {
-    chamber: ch === 'house' || ch === 'senate' ? ch : undefined,
+    chamber: ch === 'house' || ch === 'senate' || ch === 'joint' ? ch : undefined,
     dateRange: sp.get('dateRange') || undefined,
     status: st && st !== 'all' ? st : undefined,
     committee: sp.get('committee') || undefined,
@@ -82,11 +84,15 @@ export function isDigitsOnlyBillSearchQuery(raw: string): boolean {
 }
 
 function kyBillsSearchSelect(supabase: SupabaseClient, filters: KyBillSearchFilters) {
-  let q = supabase.from('ky_bills').select('*');
+  let q = supabase.from('ky_bills').select(KY_BILL_SEARCH_SELECT);
   if (filters.chamber === 'house') {
     q = q.or('chamber.eq.house,bill_number.ilike.H%');
   } else if (filters.chamber === 'senate') {
     q = q.or('chamber.eq.senate,bill_number.ilike.S%');
+  } else if (filters.chamber === 'joint') {
+    q = q.or(
+      'bill_number.ilike.HJR%,bill_number.ilike.HCR%,bill_number.ilike.SJR%,bill_number.ilike.SCR%',
+    );
   }
   return q;
 }
@@ -124,9 +130,12 @@ export function filterKyBillsByDateRange(bills: KYBill[], dateRange: string | un
 /** When DB `chamber` is null, infer from bill number so filters still work. */
 export function filterKyBillsByChamberClient(
   bills: KYBill[],
-  chamber: 'house' | 'senate' | undefined,
+  chamber: 'house' | 'senate' | 'joint' | undefined,
 ): KYBill[] {
   if (!chamber) return bills;
+  if (chamber === 'joint') {
+    return bills.filter((b) => isKyJointResolutionBill(b));
+  }
   return bills.filter((b) => effectiveBillChamber(b) === chamber);
 }
 
@@ -313,135 +322,130 @@ export async function fetchKyBillsMatchingSearch(
   const subjectsFrag = sanitizeIlikeFragment(safe.toLowerCase());
   const queryLegiscanSubjects = subjectsFrag !== '' && !omitLegiscanSubjectSearchFilter;
 
-  const ftsPromise = (async () => {
-    if (numericOnlyQuery || safe.length < 2 || omitKyBillsPlainSearchRpc) {
-      return { data: [] as KYBill[] | null, error: null };
-    }
-    const { data, error } = await supabase.rpc('ky_bills_plain_search', {
-      search_query: safe,
-      max_rows: mergeCap,
-    });
-    return { data: data as KYBill[] | null, error };
-  })();
+  let merged: KYBill[] = [];
 
-  const [
-    digitsOnlyNumberRes,
-    billNumberCompactRes,
-    ftsRes,
-    legiscanSubjectsRes,
-    titleRes,
-    descRes,
-    summaryRes,
-    topicRes,
-    lastActionRes,
-    sessionRes,
-  ] = await Promise.all([
-    numericOnlyQuery
-      ? base().or(digitBillOrClause).order('session', { ascending: false }).limit(mergeCap)
-      : Promise.resolve({ data: [] as KYBill[] | null, error: null }),
-    numericOnlyQuery
-      ? Promise.resolve({ data: [] as KYBill[] | null, error: null })
-      : compactDesignation
-        ? base()
-            .ilike('bill_number', `%${compactDesignation}%`)
-            .order('session', { ascending: false })
-            .limit(mergeCap)
-        : Promise.resolve({ data: [] as KYBill[] | null, error: null }),
-    ftsPromise,
-    queryLegiscanSubjects
-      ? base()
+  if (numericOnlyQuery) {
+    const digitsOnlyNumberRes = await base()
+      .or(digitBillOrClause)
+      .order('session', { ascending: false })
+      .limit(mergeCap);
+    if (digitsOnlyNumberRes.error) throw digitsOnlyNumberRes.error;
+    merged = (digitsOnlyNumberRes.data as KYBill[] | null) ?? [];
+  } else {
+    let ftsRows: KYBill[] | null = null;
+    if (safe.length >= 2 && !omitKyBillsPlainSearchRpc) {
+      const ftsRes = await supabase.rpc('ky_bills_plain_search', {
+        search_query: safe,
+        max_rows: mergeCap,
+      });
+      if (ftsRes.error) {
+        if (isMissingKyBillsPlainSearchRpc(ftsRes.error)) {
+          omitKyBillsPlainSearchRpc = true;
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(
+              '[ky-search-bills] ky_bills_plain_search RPC unavailable (run migrations 017+018 or reload schema). Falling back to ilike legs only until restart.',
+            );
+          }
+        } else if (process.env.NODE_ENV === 'development') {
+          console.warn(
+            '[ky-search-bills] ky_bills_plain_search RPC failed (FTS leg skipped); ilike legs still apply.',
+            ftsRes.error.message ?? ftsRes.error,
+          );
+        }
+      } else {
+        ftsRows = (ftsRes.data as KYBill[] | null) ?? null;
+      }
+    }
+
+    const supplemental: Array<PromiseLike<{ data: KYBill[] | null; error: unknown }>> = [];
+    if (compactDesignation) {
+      supplemental.push(
+        base()
+          .ilike('bill_number', `%${compactDesignation}%`)
+          .order('session', { ascending: false })
+          .limit(mergeCap),
+      );
+    }
+    if (queryLegiscanSubjects) {
+      supplemental.push(
+        base()
           .ilike('legiscan_subjects_search', `%${subjectsFrag}%`)
           .order('session', { ascending: false })
-          .limit(mergeCap)
-      : Promise.resolve({ data: [] as KYBill[] | null, error: null }),
-    base().ilike('title', likePattern).order('session', { ascending: false }).limit(mergeCap),
-    base().ilike('description', likePattern).order('session', { ascending: false }).limit(mergeCap),
-    base().ilike('ai_summary', likePattern).order('session', { ascending: false }).limit(mergeCap),
-    base().contains('topics', [safe]).order('session', { ascending: false }).limit(mergeCap),
-    base().ilike('last_action', likePattern).order('session', { ascending: false }).limit(mergeCap),
-    safe.length >= 3
-      ? base().ilike('session', likePattern).order('session', { ascending: false }).limit(mergeCap)
-      : Promise.resolve({ data: [] as KYBill[] | null, error: null }),
-  ]);
-
-  if (
-    queryLegiscanSubjects &&
-    legiscanSubjectsRes.error &&
-    !isMissingLegiscanSubjectsSearchColumn(legiscanSubjectsRes.error)
-  ) {
-    throw legiscanSubjectsRes.error;
-  }
-
-  if (
-    queryLegiscanSubjects &&
-    legiscanSubjectsRes.error &&
-    isMissingLegiscanSubjectsSearchColumn(legiscanSubjectsRes.error)
-  ) {
-    omitLegiscanSubjectSearchFilter = true;
-    if (process.env.NODE_ENV === 'development') {
-      console.warn(
-        '[ky-search-bills] legiscan_subjects_search unavailable (run migration 015 or reload PostgREST schema). Skipping LegiScan subject filter on subsequent searches until restart.',
+          .limit(mergeCap),
       );
     }
-  }
+    supplemental.push(
+      base().contains('topics', [safe]).order('session', { ascending: false }).limit(mergeCap),
+    );
 
-  if (ftsRes.error) {
-    if (isMissingKyBillsPlainSearchRpc(ftsRes.error)) {
-      omitKyBillsPlainSearchRpc = true;
-      if (process.env.NODE_ENV === 'development') {
-        console.warn(
-          '[ky-search-bills] ky_bills_plain_search RPC unavailable (run migrations 017+018 or reload schema). Falling back to ilike legs only until restart.',
+    const ftsCount = ftsRows?.length ?? 0;
+    const useIlikeFallback = omitKyBillsPlainSearchRpc || ftsCount < Math.min(limit, 15);
+    if (useIlikeFallback) {
+      supplemental.push(
+        base().ilike('title', likePattern).order('session', { ascending: false }).limit(mergeCap),
+        base().ilike('description', likePattern).order('session', { ascending: false }).limit(mergeCap),
+        base().ilike('ai_summary', likePattern).order('session', { ascending: false }).limit(mergeCap),
+        base().ilike('last_action', likePattern).order('session', { ascending: false }).limit(mergeCap),
+      );
+      if (safe.length >= 3) {
+        supplemental.push(
+          base().ilike('session', likePattern).order('session', { ascending: false }).limit(mergeCap),
         );
       }
-    } else if (process.env.NODE_ENV === 'development') {
-      console.warn(
-        '[ky-search-bills] ky_bills_plain_search RPC failed (FTS leg skipped); ilike legs still apply.',
-        ftsRes.error.message ?? ftsRes.error,
-      );
     }
+
+    const supplementResults = await Promise.all(supplemental);
+
+    let legiscanSubjectRows: KYBill[] | null = null;
+    let topicRows: KYBill[] | null = null;
+    let billNumberCompactRows: KYBill[] | null = null;
+    const ilikeFallbackRows: (KYBill[] | null)[] = [];
+
+    let idx = 0;
+    if (compactDesignation) {
+      const res = supplementResults[idx++]!;
+      if (res.error) throw res.error;
+      billNumberCompactRows = res.data;
+    }
+    if (queryLegiscanSubjects) {
+      const res = supplementResults[idx++]!;
+      if (res.error && !isMissingLegiscanSubjectsSearchColumn(res.error)) throw res.error;
+      if (res.error && isMissingLegiscanSubjectsSearchColumn(res.error)) {
+        omitLegiscanSubjectSearchFilter = true;
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(
+            '[ky-search-bills] legiscan_subjects_search unavailable (run migration 015 or reload PostgREST schema). Skipping LegiScan subject filter on subsequent searches until restart.',
+          );
+        }
+      } else {
+        legiscanSubjectRows = res.data;
+      }
+    }
+    {
+      const res = supplementResults[idx++]!;
+      if (res.error) throw res.error;
+      topicRows = res.data;
+    }
+    while (idx < supplementResults.length) {
+      const res = supplementResults[idx++]!;
+      if (res.error) throw res.error;
+      ilikeFallbackRows.push(res.data);
+    }
+
+    merged = mergeUniqueByIdAllChunks<KYBill>(
+      billNumberCompactRows,
+      ftsRows,
+      legiscanSubjectRows,
+      topicRows,
+      ...ilikeFallbackRows,
+    );
   }
-
-  const legiscanSubjectRows =
-    queryLegiscanSubjects && !legiscanSubjectsRes.error
-      ? (legiscanSubjectsRes.data as KYBill[] | null)
-      : null;
-
-  const ftsRows = !ftsRes.error ? (ftsRes.data as KYBill[] | null) : null;
-
-  const staticResChecks = [
-    digitsOnlyNumberRes,
-    billNumberCompactRes,
-    titleRes,
-    descRes,
-    summaryRes,
-    topicRes,
-    lastActionRes,
-    sessionRes,
-  ];
-  for (const res of staticResChecks) {
-    if (res.error) throw res.error;
-  }
-
-  const topicRows = !topicRes.error ? (topicRes.data as KYBill[] | null) : null;
-
-  /** Bill-number matches must rank ahead of titles so busy keyword sessions do not bury them. */
-  let merged = mergeUniqueByIdAllChunks<KYBill>(
-    numericOnlyQuery ? (digitsOnlyNumberRes.data as KYBill[] | null) : (billNumberCompactRes.data as KYBill[] | null),
-    ftsRows,
-    legiscanSubjectRows,
-    topicRows,
-    titleRes.data as KYBill[] | null,
-    descRes.data as KYBill[] | null,
-    summaryRes.data as KYBill[] | null,
-    lastActionRes.data as KYBill[] | null,
-    sessionRes.data as KYBill[] | null,
-  );
 
   merged = filterKyBillsByDateRange(merged, filters.dateRange);
   if (filters.committee) {
     merged = merged.filter((b) => billMatchesCommitteeFilter(b, filters.committee));
   }
-  if (filters.chamber === 'house' || filters.chamber === 'senate') {
+  if (filters.chamber === 'house' || filters.chamber === 'senate' || filters.chamber === 'joint') {
     merged = filterKyBillsByChamberClient(merged, filters.chamber);
   }
   if (filters.status && filters.status !== 'all') {

@@ -97,14 +97,18 @@ export function ChamberChip({
       ? 'House'
       : normalized === 'senate'
         ? 'Senate'
-        : String(chamber));
+        : normalized === 'joint'
+          ? 'Joint'
+          : String(chamber));
   const inferredTone: ChipTone =
     tone ??
     (normalized === 'senate'
       ? 'secondary'
       : normalized === 'house'
         ? 'primary'
-        : 'default');
+        : normalized === 'joint'
+          ? 'info'
+          : 'default');
   return (
     <MetaChip
       label={displayLabel}

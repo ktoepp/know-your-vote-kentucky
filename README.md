@@ -1,6 +1,8 @@
 # Know Your Vote Kentucky (KYVK)
 
-A civic transparency platform focused on the **Kentucky General Assembly**: browse and search bills, read plain-language AI summaries where enabled, and explore the legislative roster with profiles and an interactive district map. Vercel cron and manual sync also load **local civic datasets** (ordinances, school boards, county meeting calendars) into the database for pipelines and future product surfaces; those sources do **not** yet have first-class browse pages in the public navigation.
+A civic transparency platform focused on the **Kentucky General Assembly**: browse and search bills, read plain-language AI summaries where enabled, and explore the legislative roster with profiles and an interactive district map.
+
+**Product scope (2026-05):** Frankfort / GA only in active development. Sync code for Louisville/Lexington ordinances, school boards, and county Legistar calendars remains for optional manual runs but is **off Vercel Cron** and excluded from default `npm run sync:ky`. See [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md).
 
 **Deferred — executive orders:** Not part of the MVP while governor.ky.gov listings are unreliable for automated sync (404s, client-only rendering). Revisit when there is a stable index URL, an official feed/API, or a maintainable headless fetch path. The scraper (`src/lib/ky-executive-orders.ts`), DB table, `syncExecutiveOrders()`, and `generateEOSummary()` remain in the codebase for a future re-enable; they are omitted from the product surface, search, intelligence API, automated sync map, and Vercel cron until then.
 
@@ -8,7 +10,7 @@ A civic transparency platform focused on the **Kentucky General Assembly**: brow
 
 **Start here if you're an AI picking up this project.**
 
-- **Current tasks and roadmap:** `[TASKS.md](./TASKS.md)` — always check this first
+- **Current tasks and roadmap:** `[TASKS.md](./TASKS.md)` — always check this first. **Wave 1 (Bill Watch parity)** lists saved-search and alert UI work — read before implementing those features.
 - **CLI scripts:** see **Local maintenance scripts** under [Quick Start](#local-maintenance-scripts) (`npm run sync:ky`, verify scripts, geo build, etc.)
 - **Optional dormant npm deps:** [`docs/legacy-npm-deps/`](./docs/legacy-npm-deps/README.md) — install into gitignored `optional/legacy-npm-deps/`, not the root app
 - **This is a Kentucky state legislature app**, not a federal Congress app. All terminology, chamber sizes, and process descriptions must refer to the Kentucky General Assembly (100 House members, 38 Senators, Governor not President, 3/5 veto override threshold)
@@ -33,6 +35,13 @@ A civic transparency platform focused on the **Kentucky General Assembly**: brow
 | Member profile page               | `src/app/members/[slug]/page.tsx`                                                  |
 | Bill stage definitions            | `src/lib/billStages.ts`                                                            |
 | Data sync pipeline                | `src/lib/ky-sync-pipeline.ts`                                                      |
+| Committee calendar spec (GA)    | `docs/specs/committee-calendar.md`                                                 |
+| Committees / meetings browse    | `src/app/committees/`, `src/components/committees/MeetingsBrowse.tsx`              |
+| Bill hearings on detail         | `src/components/bills/BillHearingsSection.tsx`                                     |
+| Profile activity feed           | `src/components/profile/ProfileActivitySection.tsx`, `GET /api/me/activity`        |
+| Legislature resources hub       | `src/app/legislature/resources/page.tsx`                                           |
+| LRC calendar parser (Phase 0)   | `src/lib/lrc-legislative-calendar-parser.ts` — `npm run spike:lrc:calendar`        |
+| Bill Watch UI reference         | `docs/reference/bill-watch/` (screenshots: add PNGs per `screenshots/INDEX.md`)    |
 | App layout / providers            | `src/app/layout.tsx`                                                               |
 
 
@@ -114,9 +123,11 @@ Heavy dependencies removed from the root app (puppeteer, pdf tooling, GCS client
 
 ## MVP scope (public story)
 
-**In the app bar:** **Bills** (with House/Senate shortcuts), **Members**, **District map**, plus a global **Search** field (bill designation or keywords; results on `/search`).
+**In the app bar:** **Bills** (with House/Senate shortcuts), **Members**, **Committees**, **Meetings**, **District map**, plus a global **Search** field (bill designation or keywords; results on `/search`).
 
-**Footer:** **About** (placeholder `ComingSoonPage` today), **Licenses**.
+**Also public:** `/legislature/resources` (official LRC/KET/Bill Watch links), signed-in **`/profile`** (follows, notifications, activity timeline, digest history).
+
+**Footer:** **About** (substantive page when Wave 2 ships; was placeholder), **Licenses**.
 
 `/about` is not yet substantive editorial content; treat it as a stub until real copy ships.
 
@@ -129,23 +140,24 @@ Legacy or experimental areas (**`/events`**, explore, live content, table/activi
 - **District map** — Mapbox-backed House/Senate layers and address lookup (Kentucky-biased geocoding)
 - **Bill search** — Filtered search UI on `/search`; `GET /api/search` serves bill results for programmatic use
 
-**Backend and APIs (not primary nav):** The **`GET /api/intelligence`** endpoint exposes multi-factor relevance scoring and related helpers from `src/lib/ky-intelligence.ts`. Ordinance, school-board, and county-action sync populate Postgres for operators and future UI; there is no dedicated ordinances/meetings browse route in the App Router today.
+**Backend and APIs (not primary nav):** The **`GET /api/intelligence`** endpoint exposes multi-factor relevance scoring and related helpers from `src/lib/ky-intelligence.ts`. Paused local-government sync (ordinances, school boards, county actions) can still be triggered manually via `GET /api/sync?source=…` when needed.
 
 ## Data Sync
 
 Scheduled jobs are listed in `vercel.json`. The table below is **pipeline** status (data landing in Supabase), not a map of every public page.
 
 
-| Source         | Status  | Notes                                                                                                                                             |
-| -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| bills          | Working | LegiScan                                                                                                                                          |
-| legislators    | Working | OpenStates                                                                                                                                        |
-| votes          | Working | Requires bills synced first                                                                                                                       |
-| ordinances     | Working | Louisville + Lexington via Legistar                                                                                                               |
-| school-boards  | Working | JCPS + FCPS via KSBA portal                                                                                                                       |
-| county-actions | Working | Jefferson & Fayette **Legistar** public calendars (`louisville.legistar.com`, `lexington.legistar.com`); meeting rows sync to `ky_county_actions` |
+| Source         | Cron (Vercel) | Notes |
+| -------------- | ------------- | ----- |
+| bills          | Daily 05:00 UTC | LegiScan; `useChangeHash` + `skipBillSponsorDetails` |
+| legislators    | Daily 06:00 UTC | Open States |
+| votes          | Daily 06:15 UTC | LegiScan; `limit=5` per run |
+| ordinances     | **Paused** | Louisville + Lexington Legistar — manual `?source=ordinances` only |
+| school-boards  | **Paused** | JCPS + FCPS — manual `?source=school-boards` only |
+| county-actions | **Paused** | Jefferson/Fayette Legistar — manual `?source=county-actions` only |
+| lrc-calendar   | Cron 12:00/18:00 UTC | LRC legislative calendar HTML — `npm run sync:ky:lrc-calendar` after migration **024** |
 
-Only **bills**, **legislators** (roster/profiles), and **district geometry** are wired into the main navigation experience today; other rows are consumed by sync, reporting, or future features.
+Only **bills**, **legislators** (roster/profiles), and **district geometry** are in the main navigation today.
 
 
 ## API Endpoints
@@ -191,9 +203,10 @@ These counters feed the **`/admin/sync-status`** operator dashboard (requires `A
 
 Set `CRON_SECRET` in Vercel (16+ random characters). Vercel Cron invokes `/api/sync?source=…` with `Authorization: Bearer <CRON_SECRET>`. The sync route also accepts `SYNC_API_KEY` for manual runs. Configure at least one of `CRON_SECRET` or `SYNC_API_KEY`.
 
-Configured for Vercel with automatic cron jobs for data sync (see `vercel.json` for exact schedules):
+Configured for Vercel with automatic cron jobs for data sync (see `vercel.json`):
 
-- Bills, legislators, votes, ordinances, school boards, county actions
+- **Scheduled:** bills, legislators, votes, **lrc-calendar**, bill digest (`/api/cron/notify`), health-check
+- **Paused:** ordinances, school-boards, county-actions (see [committee-calendar spec](./docs/specs/committee-calendar.md))
 
 Executive-order sync is not scheduled (deferred); see the note at the top of this file.
 

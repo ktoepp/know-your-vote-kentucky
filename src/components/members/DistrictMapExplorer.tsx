@@ -6,11 +6,16 @@ import MapGL, { Layer, Marker, NavigationControl, Popup, Source, type MapRef } f
 import mapboxgl, { type MapMouseEvent } from 'mapbox-gl';
 import bbox from '@turf/bbox';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
+  Autocomplete,
   Box,
   Button,
   CircularProgress,
   InputAdornment,
+  Link as MuiLink,
   Paper,
   Stack,
   TextField,
@@ -18,11 +23,13 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import NextLink from 'next/link';
 import { Search as SearchIcon } from '@mui/icons-material';
 import { MapPin } from 'lucide-react';
 import type { Feature, FeatureCollection } from 'geojson';
 import type { KYLegislator } from '@/types/kentucky';
-import { supabase } from '@/app/lib/supabaseClient';
+import { useKyMembersBrowseRoster } from '@/lib/use-ky-members-browse-roster';
 import { withTimeout } from '@/lib/async-utils';
 import {
   districtNameFromCensusFeature,
@@ -30,7 +37,7 @@ import {
   parseKyDistrictNumber,
 } from '@/lib/ky-district-geo';
 import { MemberCard } from '@/components/members/MemberCard';
-import { dedupeKyLegislators, memberProfilePath } from '@/lib/ky-member-utils';
+import { memberProfilePath } from '@/lib/ky-member-utils';
 import {
   DistrictMapMemberTooltip,
   type DistrictMapTooltipModel,
@@ -47,7 +54,7 @@ import {
   SENATE_OUTLINE,
 } from '@/components/members/district-map-tokens';
 import { KY_DISTRICT_MAPBOX_STYLE } from '@/lib/ky-district-mapbox-style';
-import { mapboxGeocodeAddress } from '@/lib/mapbox-geocode';
+import { mapboxGeocodeAddress, mapboxGeocodeSuggest, type MapboxGeocodeSuggestion } from '@/lib/mapbox-geocode';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -122,9 +129,7 @@ export default function DistrictMapExplorer() {
   const mapRef = useRef<MapRef>(null);
   const hoverHouseGeoidRef = useRef<string | null>(null);
   const hoverSenateGeoidRef = useRef<string | null>(null);
-  const [legislators, setLegislators] = useState<KYLegislator[]>([]);
-  const [legLoading, setLegLoading] = useState(true);
-  const [legError, setLegError] = useState<string | null>(null);
+  const { roster: legislators, loading: legLoading, error: legError } = useKyMembersBrowseRoster();
 
   const [houseFc, setHouseFc] = useState<FeatureCollection | null>(null);
   const [senateFc, setSenateFc] = useState<FeatureCollection | null>(null);
@@ -145,6 +150,8 @@ export default function DistrictMapExplorer() {
   const searchParams = useSearchParams();
   const [marker, setMarker] = useState<{ lng: number; lat: number } | null>(null);
   const [searchInput, setSearchInput] = useState('');
+  const [suggestions, setSuggestions] = useState<MapboxGeocodeSuggestion[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [resolvedLabel, setResolvedLabel] = useState<string | null>(null);
@@ -154,33 +161,6 @@ export default function DistrictMapExplorer() {
     lat: number;
     model: DistrictMapTooltipModel;
   } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!supabase) {
-        setLegLoading(false);
-        return;
-      }
-      setLegError(null);
-      try {
-        const { data, error } = await withTimeout(
-          supabase.from('ky_legislators').select('*'),
-          30_000,
-          'Loading legislators timed out.',
-        );
-        if (error) throw error;
-        if (!cancelled) setLegislators(dedupeKyLegislators(data || []));
-      } catch (e) {
-        if (!cancelled) setLegError(e instanceof Error ? e.message : 'Failed to load legislators');
-      } finally {
-        if (!cancelled) setLegLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -449,6 +429,20 @@ export default function DistrictMapExplorer() {
   const busy = legLoading || geoLoading;
   const mapReady = Boolean(houseFc && senateFc && !geoError && MAPBOX_TOKEN);
 
+  useEffect(() => {
+    if (!MAPBOX_TOKEN || searchInput.trim().length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      setSuggestLoading(true);
+      void mapboxGeocodeSuggest(searchInput, MAPBOX_TOKEN, { limit: 5 })
+        .then(setSuggestions)
+        .finally(() => setSuggestLoading(false));
+    }, 280);
+    return () => window.clearTimeout(handle);
+  }, [searchInput]);
+
   // Auto-search from ?address= URL param (e.g. from the landing page search)
   useEffect(() => {
     const addr = searchParams.get('address');
@@ -472,20 +466,42 @@ export default function DistrictMapExplorer() {
           flexWrap: 'wrap',
         }}
       >
-        <TextField
-          size="small"
-          placeholder="Enter your address or ZIP code"
-          value={searchInput}
-          onChange={(e) => { setSearchInput(e.target.value); setSearchError(null); }}
+        <Autocomplete
+          freeSolo
+          options={suggestions}
+          getOptionLabel={(o) => (typeof o === 'string' ? o : o.placeName)}
+          inputValue={searchInput}
+          onInputChange={(_e, v) => {
+            setSearchInput(v);
+            setSearchError(null);
+          }}
+          onChange={(_e, v) => {
+            if (v && typeof v !== 'string') {
+              setSearchInput(v.placeName);
+              void onSearch(v.placeName);
+            }
+          }}
+          loading={suggestLoading}
           disabled={searchLoading || !mapReady}
           sx={{ flex: '1 1 260px', maxWidth: 480 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-              </InputAdornment>
-            ),
-          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              size="small"
+              placeholder="Enter your address or ZIP code"
+              InputProps={{
+                ...params.InputProps,
+                startAdornment: (
+                  <>
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                    </InputAdornment>
+                    {params.InputProps.startAdornment}
+                  </>
+                ),
+              }}
+            />
+          )}
         />
         <Button
           type="submit"
@@ -830,6 +846,32 @@ export default function DistrictMapExplorer() {
               legislatorRoster={legislators}
             />
           )}
+
+          <Accordion elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, '&:before': { display: 'none' } }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                How to contact your legislators
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, mb: 1.5 }}>
+                During session, call the Legislative Message Line at{' '}
+                <strong>1-800-372-7181</strong> to leave a message for your representative, senator, or a
+                committee. For meeting schedules and agendas, see our{' '}
+                <MuiLink component={NextLink} href="/meetings" fontWeight={600}>
+                  committee meetings
+                </MuiLink>{' '}
+                page (synced from the LRC calendar).
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                More official channels — KET livestreams, Bill Watch, and capitol phone numbers — are on{' '}
+                <MuiLink component={NextLink} href="/legislature/resources" fontWeight={600}>
+                  Frankfort resources
+                </MuiLink>
+                .
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
         </Stack>
       </Box>
     </Stack>
