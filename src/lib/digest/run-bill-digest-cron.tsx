@@ -2,13 +2,17 @@ import * as React from 'react';
 import { render } from '@react-email/render';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
-import { BillDigestEmail, type BillDigestGroup } from '@/lib/email/bill-digest-email';
 import {
-  KY_DIGEST_EVENT_LABELS,
+  BillDigestEmail,
+  type BillDigestGroup,
+  type BillDigestLine,
+  type BillDigestSection,
+} from '@/lib/email/bill-digest-email';
+import {
   KY_DIGEST_MAJOR_MILESTONE_SET,
   type KyDigestEventType,
 } from '@/lib/ky-notification-preferences';
-import { billMatchesTopicFilters } from '@/lib/ky-topic-legiscan-mapping';
+import { billMatchesTopicFilters, matchedTopicFilters } from '@/lib/ky-topic-legiscan-mapping';
 import { formatDigestEventDetail } from '@/lib/digest/format-digest-event-detail';
 import { publicSiteOrigin } from '@/lib/site-canonical';
 
@@ -29,6 +33,19 @@ function formatObserved(iso: string): string {
     });
   } catch {
     return iso;
+  }
+}
+
+function formatDigestDate(d: Date): string {
+  try {
+    return d.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'America/New_York',
+    });
+  } catch {
+    return d.toISOString().slice(0, 10);
   }
 }
 
@@ -244,31 +261,50 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     }
 
     const origin = publicSiteOrigin();
-    const groups: BillDigestGroup[] = [];
+    const followedGroups: BillDigestGroup[] = [];
+    const topicGroups: BillDigestGroup[] = [];
     for (const [billId, evs] of byBill) {
       const bill = billById.get(billId);
       if (!bill) continue;
-      const lines = evs.map((h) => ({
-        eventLabel: KY_DIGEST_EVENT_LABELS[h.event_type as KyDigestEventType] ?? h.event_type,
-        detail: formatDigestEventDetail(
+      // Lead each line with the raw last-action text; dedupe identical actions
+      // (one transition can emit several event rows, e.g. passed_chamber + floor_vote).
+      const seenDetails = new Set<string>();
+      const lines: BillDigestLine[] = [];
+      for (const h of evs) {
+        const detail = formatDigestEventDetail(
           h.event_type,
           h.event_payload as Record<string, unknown>,
           bill.title,
-        ),
-        observedAt: formatObserved(h.observed_at),
-      }));
-      groups.push({
+        );
+        const key = detail.trim().toLowerCase();
+        if (!key || seenDetails.has(key)) continue;
+        seenDetails.add(key);
+        lines.push({ detail, observedAt: formatObserved(h.observed_at) });
+      }
+      const group: BillDigestGroup = {
         billNumber: bill.bill_number || 'Bill',
         billTitle: bill.title || '',
         billHref: `${origin}/bills/${billId}`,
         lines,
-      });
+      };
+      if (followedSet.has(billId)) {
+        followedGroups.push(group);
+      } else {
+        group.matchedTopics = matchedTopicFilters(bill.topics, bill.legiscan_subjects, topicFilters);
+        topicGroups.push(group);
+      }
     }
 
-    if (!groups.length) {
+    const sections: BillDigestSection[] = [
+      { heading: 'Bills you follow', groups: followedGroups },
+      { heading: 'From topics you follow', groups: topicGroups },
+    ].filter((s) => s.groups.length > 0);
+
+    if (!sections.length) {
       skippedNoEvents++;
       continue;
     }
+    const totalBills = followedGroups.length + topicGroups.length;
 
     const unsubscribeToken = pref.unsubscribe_token as string;
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
@@ -277,15 +313,14 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const privacyHref = `${origin}/privacy`;
     const termsHref = `${origin}/terms`;
 
-    const eventTotal = top.length + overflow;
-    const previewText = `${eventTotal} update${eventTotal === 1 ? '' : 's'} on ${groups.length} bill${groups.length === 1 ? '' : 's'} you follow`;
-    const subject = `Your KY bill digest — ${eventTotal} update${eventTotal === 1 ? '' : 's'}`;
+    const previewText = `${totalBills} bill${totalBills === 1 ? '' : 's'} with new activity`;
+    const subject = `Kentucky bill digest — ${formatDigestDate(now)}`;
 
     const needsHtml = renderPreview || !(dryRun || !resend);
     const emailEl = (
       <BillDigestEmail
         previewText={previewText}
-        groups={groups}
+        sections={sections}
         moreCount={overflow}
         followedBillsHref={followedBillsHref}
         preferencesHref={preferencesHref}

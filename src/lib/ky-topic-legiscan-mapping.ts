@@ -230,19 +230,34 @@ export function topicsForLegiScanSubjects(
   return Array.from(out);
 }
 
+/**
+ * Return which of the user's topic filters a bill matches (via its KY topics OR its
+ * LegiScan subjects). Used to tell digest readers *why* a topic-followed bill is included.
+ */
+export function matchedTopicFilters(
+  billTopics: string[] | null | undefined,
+  legiScanSubjects: LegiScanSubjectLike[] | null | undefined,
+  userTopicFilters: string[],
+): string[] {
+  if (!userTopicFilters.length) return [];
+  const filterSet = new Set(userTopicFilters);
+  const matched = new Set<string>();
+  for (const t of billTopics ?? []) {
+    if (filterSet.has(t)) matched.add(t);
+  }
+  for (const t of topicsForLegiScanSubjects(legiScanSubjects)) {
+    if (filterSet.has(t)) matched.add(t);
+  }
+  return Array.from(matched);
+}
+
 /** True when a bill (via its KY topics OR its LegiScan subjects) matches any of the user's topic filters. */
 export function billMatchesTopicFilters(
   billTopics: string[] | null | undefined,
   legiScanSubjects: LegiScanSubjectLike[] | null | undefined,
   userTopicFilters: string[],
 ): boolean {
-  if (!userTopicFilters.length) return false;
-  const filterSet = new Set(userTopicFilters);
-  if ((billTopics ?? []).some((t) => filterSet.has(t))) return true;
-  for (const t of topicsForLegiScanSubjects(legiScanSubjects)) {
-    if (filterSet.has(t)) return true;
-  }
-  return false;
+  return matchedTopicFilters(billTopics, legiScanSubjects, userTopicFilters).length > 0;
 }
 
 /** True when the supplied subject name matches at least one mapped topic. Used by the audit script. */
