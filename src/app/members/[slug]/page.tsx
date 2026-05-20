@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { getMemberProfilePageContext } from '@/lib/member-profile';
 import { getCivicDataSessionName } from '@/lib/ky-sessions';
 import { fetchSponsoredBillsForLegislator, fetchMemberVoteRecord } from '@/lib/member-profile-data';
+import { fetchCommitteeAssignmentsForLegislator } from '@/lib/ky-member-committees';
+import { fetchKyCommittees } from '@/lib/ky-committee-data';
 import { MemberProfileView } from '@/components/members/MemberProfileView';
 import { kyMemberTitleShort } from '@/lib/ky-member-utils';
 import { formatKyLegislatorDistrict } from '@/lib/bill-display';
@@ -37,9 +39,11 @@ export default async function MemberProfilePage({ params }: PageProps) {
   if (!ctx) notFound();
   const { leg, roster } = ctx;
   const sessionName = getCivicDataSessionName();
-  const [sponsoredBills, voteRecord] = await Promise.all([
+  const committees = await fetchKyCommittees();
+  const [sponsoredBills, voteRecord, committeeAssignments] = await Promise.all([
     fetchSponsoredBillsForLegislator(leg, { sessionName, limit: 30 }),
     fetchMemberVoteRecord(leg, { sessionName, maxRows: 200, recentLimit: 8 }),
+    fetchCommitteeAssignmentsForLegislator(leg, committees),
   ]);
   return (
     <MemberProfileView
@@ -48,6 +52,7 @@ export default async function MemberProfilePage({ params }: PageProps) {
       sessionName={sessionName}
       sponsoredBills={sponsoredBills}
       voteRecord={voteRecord}
+      committeeAssignments={committeeAssignments}
     />
   );
 }

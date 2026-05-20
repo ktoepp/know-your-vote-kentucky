@@ -16,7 +16,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { ArrowBack, Description, HowToVote, OpenInNew } from '@mui/icons-material';
+import { ArrowBack, Description, Groups, HowToVote, OpenInNew } from '@mui/icons-material';
 import type { KYBill, KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
@@ -26,6 +26,7 @@ import { BillNumber } from '@/components/bills/BillNumber';
 import { LegislatorDistrictMinimapLazy } from '@/components/members/LegislatorDistrictMinimapLazy';
 import { billStatusChipLabel, formatKyIsoDateShort } from '@/lib/bill-display';
 import type { MemberVoteRecord } from '@/lib/member-profile-data';
+import type { MemberCommitteeAssignment } from '@/lib/ky-member-committees';
 import type { VoteBucket } from '@/lib/legiscan-vote-tally';
 
 function rollVoteChipColor(bucket: VoteBucket): 'success' | 'error' | 'warning' | 'default' {
@@ -50,15 +51,18 @@ export function MemberProfileView({
   sessionName,
   sponsoredBills = [],
   voteRecord,
+  committeeAssignments = [],
 }: {
   leg: KYLegislator;
   legislatorRoster: KYLegislator[];
   sessionName: string;
   sponsoredBills?: KYBill[];
   voteRecord?: MemberVoteRecord;
+  committeeAssignments?: MemberCommitteeAssignment[];
 }) {
   const hasLegiscan = legiscanMemberPersonUrl(leg.legiscan_id) != null;
-  const showLegislativeSections = leg.chamber === 'house' || leg.chamber === 'senate' || hasLegiscan;
+  const isChamberMember = leg.chamber === 'house' || leg.chamber === 'senate';
+  const showLegislativeSections = isChamberMember || hasLegiscan;
   const tally = voteRecord?.tally;
   const { social: socialLinks, other: otherLinks } = groupLegislatorExternalLinks(leg.external_links);
   const hasConnectLinks = socialLinks.length > 0 || otherLinks.length > 0;
@@ -151,6 +155,47 @@ export function MemberProfileView({
 
         {showLegislativeSections && (
           <>
+            {isChamberMember && (
+              <>
+                <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Groups sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
+                  <Typography
+                    component="h2"
+                    variant={TYPE.sectionTitle.variant}
+                    fontWeight={TYPE.sectionTitle.fontWeight}
+                    color="text.primary"
+                    sx={SECTION_TITLE_DISPLAY_SX}
+                  >
+                    Committee assignments
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Standing and interim committees from the LRC legislative calendar and roster data.
+                </Typography>
+                {committeeAssignments.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    No committee assignments on file for this member yet.
+                  </Typography>
+                ) : (
+                  <Stack direction="row" flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: 2 }}>
+                    {committeeAssignments.map((c) => (
+                      <Chip
+                        key={c.slug}
+                        component={Link}
+                        href={`/committees/${c.slug}`}
+                        clickable
+                        label={
+                          c.roleLabel ? `${c.name} (${c.roleLabel})` : c.name
+                        }
+                        variant="outlined"
+                        sx={{ textDecoration: 'none' }}
+                      />
+                    ))}
+                  </Stack>
+                )}
+              </>
+            )}
+
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
               <Typography
@@ -169,9 +214,8 @@ export function MemberProfileView({
 
             {sponsoredBills.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {hasLegiscan
-                  ? 'No sponsored bills found for this session yet.'
-                  : 'No sponsored bills matched for this session. Voting history requires a LegiScan profile link on this member.'}
+                No sponsored bills found for this session yet. If this member should have bills listed,
+                run a bills sync so sponsor data is populated.
               </Typography>
             ) : (
               <Card variant="outlined" sx={{ borderRadius: 2, mb: 1 }}>
@@ -215,7 +259,7 @@ export function MemberProfileView({
               </Card>
             )}
 
-            {hasLegiscan ? (
+            {isChamberMember ? (
               <>
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <HowToVote sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
@@ -327,11 +371,7 @@ export function MemberProfileView({
               </Card>
             )}
               </>
-            ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-                Voting history will appear here once this member is linked to LegiScan roll-call data.
-              </Typography>
-            )}
+            ) : null}
           </>
         )}
       </Container>
