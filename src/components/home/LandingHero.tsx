@@ -36,13 +36,13 @@ export function LandingHero() {
             href="/members/map"
             variant="contained"
             size="large"
-            startIcon={<Place sx={{ fontSize: 20 }} />}
+            startIcon={<Place sx={{ fontSize: 20 }} aria-hidden />}
             sx={{
-              bgcolor: 'rgba(255,255,255,0.15)',
-              color: 'common.white',
-              border: '1px solid rgba(255,255,255,0.4)',
-              backdropFilter: 'blur(8px)',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+              bgcolor: 'common.white',
+              color: '#0f172a',
+              fontWeight: 700,
+              boxShadow: '0 1px 3px rgba(15,23,42,0.2)',
+              '&:hover': { bgcolor: '#f1f5f9' },
             }}
           >
             Find my legislators
@@ -55,6 +55,8 @@ export function LandingHero() {
             sx={{
               bgcolor: '#0f172a',
               color: 'common.white',
+              fontWeight: 600,
+              border: '1px solid rgba(255,255,255,0.35)',
               '&:hover': { bgcolor: '#1e293b' },
             }}
           >

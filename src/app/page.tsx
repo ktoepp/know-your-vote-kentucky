@@ -1,11 +1,7 @@
 import type { Metadata } from 'next';
-import { Box, Container } from '@mui/material';
-import { HomeAuthGate } from '@/components/home/HomeAuthGate';
+import { Box } from '@mui/material';
+import { HomePageContent } from '@/components/home/HomePageContent';
 import { SessionBannerServer } from '@/components/home/SessionBannerServer';
-import { LandingHero } from '@/components/home/LandingHero';
-import { LandingFeatures } from '@/components/home/LandingFeatures';
-import { LandingMapSection } from '@/components/home/LandingMapSection';
-import { LandingTopics } from '@/components/home/LandingTopics';
 
 export const metadata: Metadata = {
   title: 'Know Your Vote Kentucky — Track KY legislation',
@@ -15,16 +11,9 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <HomeAuthGate>
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-        <SessionBannerServer />
-        <LandingHero />
-        <Container maxWidth="lg">
-          <LandingFeatures />
-          <LandingMapSection />
-          <LandingTopics />
-        </Container>
-      </Box>
-    </HomeAuthGate>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <SessionBannerServer />
+      <HomePageContent />
+    </Box>
   );
 }
