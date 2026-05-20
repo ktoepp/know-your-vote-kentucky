@@ -16,6 +16,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Bookmark } from '@mui/icons-material';
+import { BillNumber } from '@/components/bills/BillNumber';
 import type { KYBill } from '@/types/kentucky';
 import type { KyBillSortKey } from '@/lib/bill-display';
 import {
@@ -92,13 +93,12 @@ export function BillsListTable({ bills, sortBy, sortDir, onRequestSort, followed
                       <Bookmark sx={{ fontSize: '1.05rem' }} aria-hidden />
                     </Box>
                   ) : null}
-                  <Typography
-                    component={Link}
+                  <BillNumber
+                    billNumber={bill.bill_number}
+                    size="compact"
                     href={billHref(bill)}
-                    sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                  >
-                    {bill.bill_number}
-                  </Typography>
+                    sx={{ '&:hover': { textDecoration: 'underline' } }}
+                  />
                 </Box>
               </TableCell>
               <TableCell>

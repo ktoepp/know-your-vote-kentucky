@@ -1,7 +1,8 @@
 'use client';
 
 import NextLink from 'next/link';
-import { Avatar, Box, Button, Card, Chip, Divider, Link as MuiLink, Stack, Typography } from '@mui/material';
+import { Box, Button, Card, Chip, Divider, Link as MuiLink, Stack, Typography } from '@mui/material';
+import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
 import type { KYLegislator } from '@/types/kentucky';
 import { formatKyLegislatorDistrict, formatRepresentativePartyChipLabel, partyBadgeBackgroundColor } from '@/lib/bill-display';
 import { CHIP } from '@/lib/ui-tokens';
@@ -11,6 +12,7 @@ import {
   kyLegislatorPortraitAlt,
   kyLegislaturePublicUrl,
   kyMemberTitleShort,
+  legislatorDisplayPhone,
   memberProfilePath,
   normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
@@ -94,7 +96,7 @@ function DistrictMapTooltipSectionView({
 
       {leg && (
         <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mb: 1.25 }}>
-          <Avatar
+          <LegislatorAvatar
             src={
               normalizeLegislatorPhotoUrl(leg.photo_url) ||
               normalizeLegislatorPhotoUrl(leg.legiscan_image_url) ||
@@ -102,10 +104,10 @@ function DistrictMapTooltipSectionView({
             }
             alt={kyLegislatorPortraitAlt(leg)}
             imgProps={{ referrerPolicy: 'no-referrer' }}
+            party={leg.party}
+            initials={kyLegislatorAvatarInitials(leg)}
             sx={{ width: 48, height: 48, flexShrink: 0, fontWeight: 700, fontSize: '1rem' }}
-          >
-            {kyLegislatorAvatarInitials(leg)}
-          </Avatar>
+          />
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="subtitle1" fontWeight={800} color="text.primary" sx={{ lineHeight: 1.25 }} gutterBottom>
               <MemberName member={leg} variant="primary" />
@@ -116,7 +118,9 @@ function DistrictMapTooltipSectionView({
             {leg.party && (
               <Chip label={formatRepresentativePartyChipLabel(leg.party)} size="small" sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(leg.party), color: '#fff' }} />
             )}
-            {(leg.email || leg.phone || (leg.chamber && kyLegislaturePublicUrl(leg, legislatorRoster))) && (
+            {(leg.email ||
+              legislatorDisplayPhone(leg.phone) ||
+              (leg.chamber && kyLegislaturePublicUrl(leg, legislatorRoster))) && (
               <Box
                 component="div"
                 sx={{ mt: 1, pointerEvents: 'auto' }}
@@ -128,28 +132,36 @@ function DistrictMapTooltipSectionView({
                     <CopyableEmail email={leg.email} variant="body2" display="block" />
                   </Box>
                 )}
-                {leg.phone && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
-                    <Phone sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
-                    <Typography
-                      component="a"
-                      href={`tel:${leg.phone.replace(/[^\d+]/g, '')}`}
-                      variant="body2"
-                      color="primary"
-                      fontWeight={600}
-                      sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                    >
-                      {leg.phone}
-                    </Typography>
-                  </Box>
-                )}
+                {(() => {
+                  const mapPhone = legislatorDisplayPhone(leg.phone);
+                  if (!mapPhone) return null;
+                  return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                      <Phone sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
+                      <Typography
+                        component="a"
+                        href={`tel:${mapPhone.replace(/[^\d+]/g, '')}`}
+                        variant="body2"
+                        color="primary"
+                        fontWeight={600}
+                        sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                      >
+                        {mapPhone}
+                      </Typography>
+                    </Box>
+                  );
+                })()}
                 {!leg.email && leg.chamber && (
                   <MuiLink
                     href={kyLegislaturePublicUrl(leg, legislatorRoster) || 'https://legislature.ky.gov/Legislators'}
                     target="_blank"
                     rel="noopener noreferrer"
                     variant="caption"
-                    sx={{ display: 'inline-block', mt: leg.phone ? 0.5 : 0, fontWeight: 600 }}
+                    sx={{
+                      display: 'inline-block',
+                      mt: legislatorDisplayPhone(leg.phone) ? 0.5 : 0,
+                      fontWeight: 600,
+                    }}
                   >
                     Capitol: Kentucky LRC
                   </MuiLink>

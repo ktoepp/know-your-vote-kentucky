@@ -89,11 +89,13 @@ export function CivicCard({
         transition: CARD.hoverTransition,
         ...(isInteractive && {
           cursor: 'pointer',
-          '&:hover': {
-            boxShadow: CARD.elevation.hover,
-            transform: CARD.hoverTransform,
-            borderColor: theme.palette.primary.main,
-          },
+          ...(variant !== 'bill' && {
+            '&:hover': {
+              boxShadow: CARD.elevation.hover,
+              transform: CARD.hoverTransform,
+              borderColor: theme.palette.primary.main,
+            },
+          }),
           '&:focus-visible': {
             outline: 'none',
             boxShadow: `0 0 0 3px ${theme.palette.primary.main}66`,

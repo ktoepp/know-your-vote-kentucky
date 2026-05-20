@@ -24,20 +24,71 @@ export const KY_DIGEST_EVENT_TYPES = [
 
 export type KyDigestEventType = (typeof KY_DIGEST_EVENT_TYPES)[number];
 
-/** UI labels aligned with docs/specs/follow-bills.md event list. */
+/** UI labels aligned with docs/specs/follow-bills.md and Bill Watch checkboxes. */
 export const KY_DIGEST_EVENT_LABELS: Record<KyDigestEventType, string> = {
-  introduced: 'Introduced',
-  committee_action: 'Committee action (referred / reported / amended)',
-  hearing_scheduled: 'Hearing scheduled',
-  floor_vote: 'Floor vote recorded',
-  passed_chamber: 'Passed chamber',
+  introduced: 'Introduction',
+  committee_action: 'Committee action',
+  hearing_scheduled: 'Agenda / hearing scheduled',
+  floor_vote: 'Floor action',
+  passed_chamber: 'Enrolled / passed chamber',
   sent_to_governor: 'Sent to Governor',
-  signed_or_vetoed: 'Signed into law / Vetoed',
+  signed_or_vetoed: 'Signed or vetoed',
   veto_override_attempt: 'Veto override attempt',
   amendment_filed: 'Amendment filed',
-  new_cosponsor: 'New cosponsor added',
+  new_cosponsor: 'New cosponsor',
   dead: 'Dead / failed',
 };
+
+/** Short help text for notification checkboxes (Bill Watch–aligned). */
+export const KY_DIGEST_EVENT_DESCRIPTIONS: Record<KyDigestEventType, string> = {
+  introduced: 'Bill is newly introduced in a chamber.',
+  committee_action: 'Referred, reported, or amended in committee (LegiScan).',
+  hearing_scheduled: 'Listed on an upcoming LRC committee agenda — see Meetings.',
+  floor_vote: 'Roll-call or floor vote recorded.',
+  passed_chamber: 'Passed one chamber or enrolled.',
+  sent_to_governor: 'Sent to the Governor for action.',
+  signed_or_vetoed: 'Signed into law or vetoed.',
+  veto_override_attempt: 'Override of a gubernatorial veto attempted.',
+  amendment_filed: 'New amendment filed on the bill.',
+  new_cosponsor: 'Additional sponsor added.',
+  dead: 'Bill failed or is otherwise inactive.',
+};
+
+export type KyDigestEventGroupId = 'committee_interim' | 'floor_milestones' | 'other';
+
+export const KY_DIGEST_EVENT_GROUPS: {
+  id: KyDigestEventGroupId;
+  title: string;
+  description: string;
+  types: KyDigestEventType[];
+}[] = [
+  {
+    id: 'committee_interim',
+    title: 'Committee & interim',
+    description: 'Hearings and committee steps — includes Bill Watch “Agenda” and interim activity.',
+    types: ['committee_action', 'hearing_scheduled'],
+  },
+  {
+    id: 'floor_milestones',
+    title: 'Floor & passage',
+    description: 'Introduction through enrollment, governor, and final disposition.',
+    types: [
+      'introduced',
+      'floor_vote',
+      'passed_chamber',
+      'sent_to_governor',
+      'signed_or_vetoed',
+      'veto_override_attempt',
+      'dead',
+    ],
+  },
+  {
+    id: 'other',
+    title: 'Amendments & sponsors',
+    description: 'Optional detail alerts.',
+    types: ['amendment_filed', 'new_cosponsor'],
+  },
+];
 
 /** Spec default — "Major milestones only" (★ in follow-bills.md). */
 export const KY_DIGEST_MAJOR_MILESTONES: KyDigestEventType[] = [

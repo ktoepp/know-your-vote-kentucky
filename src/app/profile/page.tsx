@@ -27,9 +27,12 @@ import {
 import { useUser } from '../lib/UserContext';
 import { supabase } from '../lib/supabaseClient';
 import type { KyUserProfileRow } from '@/types/user-profile';
+import { KY_USER_PROFILE_SELECT } from '@/lib/ky-user-profile-select';
 import { ProfileNotificationsSection } from '@/components/profile/ProfileNotificationsSection';
 import { ProfileFollowedBillsSection } from '@/components/profile/ProfileFollowedBillsSection';
+import { ProfileActivitySection } from '@/components/profile/ProfileActivitySection';
 import { ProfileDigestHistorySection } from '@/components/profile/ProfileDigestHistorySection';
+import { ProfileSavedSearchesSection } from '@/components/profile/ProfileSavedSearchesSection';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
 
 function SectionCard({
@@ -86,6 +89,11 @@ export default function ProfilePage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [welcomeBusy, setWelcomeBusy] = useState(false);
+  const [welcomeMsg, setWelcomeMsg] = useState<string | null>(null);
+
   const emailVerified = Boolean(user?.email_confirmed_at);
 
   const loadProfile = useCallback(async () => {
@@ -98,7 +106,7 @@ export default function ProfilePage() {
     setProfileError(null);
     const { data, error } = await supabase
       .from('ky_user_profiles')
-      .select('*')
+      .select(KY_USER_PROFILE_SELECT)
       .eq('user_id', user.id)
       .maybeSingle();
     setProfileLoading(false);
@@ -277,9 +285,35 @@ export default function ProfilePage() {
       <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
         Profile
       </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
         Manage your account, email digest preferences, followed bills, and sign-in security.
       </Typography>
+
+      <Box
+        component="nav"
+        aria-label="Profile sections"
+        sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}
+      >
+        {[
+          { href: '#account', label: 'Account' },
+          { href: '#notifications', label: 'Notifications' },
+          { href: '#followed-bills', label: 'Followed bills' },
+          { href: '#saved-searches', label: 'Saved searches' },
+          { href: '#activity', label: 'Activity' },
+          { href: '#digest-history', label: 'Digest history' },
+          { href: '#security', label: 'Security' },
+        ].map((item) => (
+          <Chip
+            key={item.href}
+            component="a"
+            href={item.href}
+            label={item.label}
+            size="small"
+            clickable
+            variant="outlined"
+          />
+        ))}
+      </Box>
 
       {!emailVerified && (
         <Alert
@@ -358,12 +392,104 @@ export default function ProfilePage() {
         <ProfileFollowedBillsSection />
       </Paper>
 
+      <Paper component="section" id="saved-searches" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+        <ProfileSavedSearchesSection />
+      </Paper>
+
+      <Paper component="section" id="activity" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+        <ProfileActivitySection />
+      </Paper>
+
       <Paper component="section" id="digest-history" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
         <ProfileDigestHistorySection />
       </Paper>
 
       <SectionCard id="security" icon={<ShieldOutlined sx={{ fontSize: 28 }} />} title="Security">
-        <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 1 }}>
+        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+          Your data
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Download a JSON copy of your profile, follows, notification preferences, and recent digest log.
+        </Typography>
+        <Button
+          variant="outlined"
+          size="small"
+          disabled={exportBusy || !session?.access_token}
+          sx={{ mb: 1 }}
+          onClick={async () => {
+            if (!session?.access_token) return;
+            setExportBusy(true);
+            setExportMsg(null);
+            try {
+              const res = await fetch('/api/me/export', {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+              if (!res.ok) throw new Error('Export failed');
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'kyvky-export.json';
+              a.click();
+              URL.revokeObjectURL(url);
+              setExportMsg('Download started.');
+            } catch {
+              setExportMsg('Could not export data. Try again later.');
+            } finally {
+              setExportBusy(false);
+            }
+          }}
+        >
+          {exportBusy ? 'Preparing…' : 'Download my data'}
+        </Button>
+        {exportMsg && (
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+            {exportMsg}
+          </Typography>
+        )}
+
+        {emailVerified && (
+          <>
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
+              Welcome email
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Resend the one-time setup email if you lost the original.
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={welcomeBusy}
+              onClick={async () => {
+                if (!session?.access_token) return;
+                setWelcomeBusy(true);
+                setWelcomeMsg(null);
+                try {
+                  const res = await fetch('/api/me/welcome-email?force=1', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                  });
+                  const body = (await res.json().catch(() => ({}))) as { sent?: boolean; error?: string };
+                  if (!res.ok) throw new Error(body.error || 'Send failed');
+                  setWelcomeMsg(body.sent ? 'Welcome email sent.' : 'Could not send — check Resend configuration.');
+                } catch (e) {
+                  setWelcomeMsg(e instanceof Error ? e.message : 'Send failed');
+                } finally {
+                  setWelcomeBusy(false);
+                }
+              }}
+            >
+              {welcomeBusy ? 'Sending…' : 'Send welcome email again'}
+            </Button>
+            {welcomeMsg && (
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, mb: 2 }}>
+                {welcomeMsg}
+              </Typography>
+            )}
+          </>
+        )}
+
+        <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
           Change password
         </Typography>
         <Box component="form" onSubmit={handleChangePassword} sx={{ maxWidth: 440 }}>

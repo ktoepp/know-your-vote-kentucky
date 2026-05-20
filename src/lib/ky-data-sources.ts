@@ -8,10 +8,13 @@
  *   OPENSTATES_API_KEY   — Open States API key (openstates.org)
  *
  * No API keys needed for:
- *   - Legistar (Louisville/Lexington)
- *   - Governor Executive Orders (web scraper)
- *   - School Boards (web scraper)
- *   - County meetings (Jefferson / Fayette via Legistar public calendars)
+ *   - LRC Legislative Calendar (planned — docs/specs/committee-calendar.md)
+ *
+ * Paused from Vercel Cron / default syncAll (2026-05-18); manual ?source= still works:
+ *   - Legistar (Louisville/Lexington ordinances)
+ *   - School Boards (JCPS/FCPS scraper)
+ *   - County meetings (Jefferson / Fayette Legistar calendars)
+ *   - Governor Executive Orders (unreliable listing; not in SYNC_SOURCES)
  */
 
 import { getKyCountyCourtsClient } from './ky-county-courts';

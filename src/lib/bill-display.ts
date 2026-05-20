@@ -15,6 +15,12 @@ export function effectiveBillChamber(bill: {
   return null;
 }
 
+/** Joint / concurrent resolutions (HJR, SJR, HCR, SCR) — not standard HB/SB bills. */
+export function isKyJointResolutionBill(bill: { bill_number?: string | null }): boolean {
+  const n = normalizeKyBillDesignation(bill.bill_number);
+  return /^(HJR|HCR|SJR|SCR)\d/.test(n);
+}
+
 /** Collapse spaces and punctuation so "HB 23", "H.B.23", and "HB23" compare equal for search. */
 export function normalizeKyBillDesignation(input: string | null | undefined): string {
   return String(input ?? '')

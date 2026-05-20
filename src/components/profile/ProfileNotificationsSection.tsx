@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Link as MuiLink,
   CircularProgress,
   FormControl,
   FormControlLabel,
@@ -23,7 +24,10 @@ import { Close as CloseIcon, NotificationsOutlined } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import { useUser } from '@/app/lib/UserContext';
 import { KY_TOPICS } from '@/lib/ky-topic-classifier';
+import Link from 'next/link';
 import {
+  KY_DIGEST_EVENT_DESCRIPTIONS,
+  KY_DIGEST_EVENT_GROUPS,
   KY_DIGEST_EVENT_LABELS,
   KY_DIGEST_EVENT_TYPES,
   KY_DIGEST_MAJOR_MILESTONE_SET,
@@ -224,6 +228,14 @@ export function ProfileNotificationsSection() {
       <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
         Email about these event types
       </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+        Aligned with Kentucky{' '}
+        <MuiLink component={Link} href="/legislature/resources" underline="hover" fontWeight={600}>
+          Bill Watch
+        </MuiLink>{' '}
+        alert types — without a separate state login. Hearings use our LRC calendar sync; enable{' '}
+        <strong>Agenda / hearing scheduled</strong> for committee agenda lines.
+      </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
         <Button size="small" variant="outlined" onClick={applyPresetMilestones}>
           Major milestones only
@@ -232,33 +244,49 @@ export function ProfileNotificationsSection() {
           Everything
         </Button>
       </Box>
-      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
         Types marked with * are included in the &quot;Major milestones only&quot; preset.
       </Typography>
-      <FormGroup sx={{ mb: 2 }}>
-        {KY_DIGEST_EVENT_TYPES.map((slug) => {
-          const checked = eventTypes.includes(slug);
-          const star = KY_DIGEST_MAJOR_MILESTONE_SET.has(slug);
-          return (
-            <FormControlLabel
-              key={slug}
-              control={
-                <Checkbox
-                  checked={checked}
-                  onChange={(e) => toggleEvent(slug, e.target.checked)}
-                  size="small"
+      {KY_DIGEST_EVENT_GROUPS.map((group) => (
+        <Box key={group.id} sx={{ mb: 2.5 }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.25 }}>
+            {group.title}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+            {group.description}
+          </Typography>
+          <FormGroup>
+            {group.types.map((slug) => {
+              const checked = eventTypes.includes(slug);
+              const star = KY_DIGEST_MAJOR_MILESTONE_SET.has(slug);
+              return (
+                <FormControlLabel
+                  key={slug}
+                  control={
+                    <Checkbox
+                      checked={checked}
+                      onChange={(e) => toggleEvent(slug, e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography component="span" variant="body2" display="block">
+                        {star ? '* ' : ''}
+                        {KY_DIGEST_EVENT_LABELS[slug]}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {KY_DIGEST_EVENT_DESCRIPTIONS[slug]}
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ alignItems: 'flex-start', mb: 0.5 }}
                 />
-              }
-              label={
-                <Typography component="span" variant="body2">
-                  {star ? '* ' : ''}
-                  {KY_DIGEST_EVENT_LABELS[slug]}
-                </Typography>
-              }
-            />
-          );
-        })}
-      </FormGroup>
+              );
+            })}
+          </FormGroup>
+        </Box>
+      ))}
 
       <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>
         Topic alerts

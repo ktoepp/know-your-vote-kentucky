@@ -5,6 +5,7 @@ import { alpha } from '@mui/material/styles';
 import Link from 'next/link';
 import { CheckCircle2, Eye, ChevronRight } from 'lucide-react';
 import type { KYBill } from '@/types/kentucky';
+import { BillNumber } from '@/components/bills/BillNumber';
 import { billStatusChipLabel, formatBillLabelText } from '@/lib/bill-display';
 
 const ROW_ICON_BOX = 32;
@@ -120,15 +121,12 @@ export function HomeCuratedBillList({ title, caption, bills, line, emptyMessage,
                     '&:hover .home-curated-see-more': { textDecoration: 'underline' },
                   }}
                 >
-                  <Typography
-                    component="div"
-                    variant="caption"
+                  <BillNumber
+                    billNumber={bill.bill_number}
+                    size="compact"
                     color="primary"
-                    fontWeight={700}
                     sx={{ display: 'block', letterSpacing: 0.02, mb: 0.25 }}
-                  >
-                    {bill.bill_number}
-                  </Typography>
+                  />
                   <Typography
                     variant="body2"
                     sx={{

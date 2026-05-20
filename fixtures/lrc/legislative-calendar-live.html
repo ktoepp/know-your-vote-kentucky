@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+
+<html lang="en-us">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Legislative Calendar</title>
+    <link href="/LegislativeCalendar/Content/WebRecordStyle.css" rel="stylesheet" type="text/css" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <!--JH--><!--RW16--><!-- Version 2.3 -->
+
+    <link rel="stylesheet" href="/sharedresources/font-awesome/4.7.0/css/font-awesome.min.css" type="text/css">
+    <link rel="stylesheet" href="/sharedresources/css/headerBrandStyle.css" type="text/css">
+    <link rel="stylesheet" href="/sharedresources/css/HeaderNavStyle.css" type="text/css">
+    <link rel="stylesheet" href="/sharedresources/css/footerStyle.css" type="text/css">
+    <link rel="stylesheet" href="/sharedresources/smartmenus-1.1.0/css/sm-core-css.css" type="text/css">
+    <link rel="stylesheet" href="/sharedresources/smartmenus-1.1.0/css/sm-simple/sm-simple.css" type="text/css">
+    <link rel="stylesheet" href="/SharedResources/bootstrap/css/bootstrap.css" type="text/css" />
+
+</head>
+<body>
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-10594997-62"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+ 
+  gtag('config', 'UA-10594997-62');
+</script>
+
+<!-- Google GA4 tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-95CQX7G1DN"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+    gtag('js', new Date());
+    gtag('config', 'G-95CQX7G1DN');
+</script>
+
+<header class="headerRow">
+  <div class="container">
+    <div class="branding">
+      <a href="https://legislature.ky.gov">
+        <h1 class="header-title-description">
+          Kentucky
+          <br>
+          <small>General Assembly</small>
+        </h1>
+      </a>
+    </div>
+
+    <div class="search">
+      <div class="search_button">
+        <a href="https://apps.legislature.ky.gov/lrcsearch">Search</a>
+      </div>
+    </div>
+
+  </div>
+</header>
+
+<nav>
+  <div class="container">
+          <input id="main-menu-state" type="checkbox" />
+          <label class="main-menu-btn" for="main-menu-state">
+            <span class="main-menu-btn-icon"></span> 
+          </label>
+    <ul id="main-menu" class="sm sm-lrc">
+        <li><a>Legislators <i class="fa fa-caret-down" aria-hidden="true"></i></a>
+          <ul>
+            <li><a href="https://legislature.ky.gov/Legislators/Pages/default.aspx">Legislators</a></li>
+            <li><a href="https://legislature.ky.gov/Legislators/senate">Senate Members</a></li>
+            <li><a href="https://legislature.ky.gov/Legislators/house-of-representatives">House Members</a></li>
+            <li><a href="https://apps.legislature.ky.gov/findyourlegislator/findyourlegislator.html">Who's My Legislator</a></li>
+            <li><a href="https://apps.legislature.ky.gov/Legislators/contact_legislator.html">Contact a Member</a></li>
+          </ul>
+        </li>
+      <li><a>Committees <i class="fa fa-caret-down sub-arrow-align" aria-hidden="true"></i></a>
+        <ul>
+          <li><a href="https://legislature.ky.gov/Committees/Pages/default.aspx">Committees</a></li>
+          <li><a href="https://legislature.ky.gov/Committees/house-standing-committee">House Standing Committees</a></li>
+          <li><a href="https://legislature.ky.gov/Committees/senate-standing-committee">Senate Standing Committees</a></li>
+          <li><a href="https://legislature.ky.gov/Committees/interim-joint-committee">Interim Joint Committees</a></li>
+          <li><a href="https://legislature.ky.gov/Committees/special-committee">Special Committees</a></li>
+          <li><a href="https://legislature.ky.gov/Committees/statutory-committee">Statutory Committees</a></li>
+          <li><a href="https://legislature.ky.gov/Committees/Caucuses">Caucuses</a></li>
+          <li><a href="https://legislature.ky.gov/Committees/Pages/PriorCommittees.aspx">Prior Committee Information</a></li>
+        </ul>
+      </li>
+      <li><a href="https://legislature.ky.gov/Legislation/Pages/default.aspx">Bills</a></li>
+      <li><a>Kentucky Law <i class="fa fa-caret-down" aria-hidden="true"></i></a>
+        <ul>
+          <li><a href="https://legislature.ky.gov/Law/Pages/default.aspx">Kentucky Law</a></li>
+          <li><a>Kentucky Administrative Regulations <i class="fa fa-caret-right" aria-hidden="true"></i></a>
+            <ul>
+              <li><a href="https://legislature.ky.gov/Law/kar/Pages/default.aspx">Kentucky Administrative Regulations</a></li>
+              <li><a href="https://apps.legislature.ky.gov/law/kar/titles.htm">KAR List by Title</a></li>
+              <li><a href="https://legislature.ky.gov/Law/kar/Pages/Registers.aspx">Registers</a></li>
+              <li><a href="https://legislature.ky.gov/Law/kar/Pages/KarFaqs.aspx">KAR FAQs</a></li>
+              <li><a href="https://legislature.ky.gov/Law/kar/Pages/Certification.aspx">Last Effective Dates, Expirations, and Certifications</a></li>
+	      <li><a href="https://legislature.ky.gov/Law/kar/Pages/EmergencyRegs.aspx">Current Emergency Regulations by Number</a></li>
+            </ul>
+          </li>
+          <li><a>Kentucky Revised Statutes <i class="fa fa-caret-right" aria-hidden="true"></i></a>
+            <ul>
+              <li><a href="https://legislature.ky.gov/Law/Statutes/Pages/default.aspx">Kentucky Revised Statutes</a></li>
+              <li><a href="https://legislature.ky.gov/Law/Statutes/Pages/StatRevInfo.aspx">Statute Revision Information</a></li>
+              <li><a href="https://apps.legislature.ky.gov/law/statutes/">KRS Title Page</a></li>
+              <li><a href="https://legislature.ky.gov/Law/Statutes/Pages/KRSEDS.aspx">Certified Versions</a></li>
+              <li><a href="https://legislature.ky.gov/Law/Statutes/Pages/KRSHistory.aspx">History & Functions</a></li>
+              <li><a href="https://legislature.ky.gov/Law/Statutes/Pages/KrsEffDates.aspx">Normal Effective Dates</a></li>
+              <li><a href="https://legislature.ky.gov/Law/Statutes/Pages/KrsExtraOrdList.aspx">Extraordinary Session since 1940</a></li>
+            </ul>
+          </li>
+          <li><a href="https://legislature.ky.gov/Law/Pages/KyActs.aspx">Acts of the Kentucky General Assembly</a></li>
+          <li><a href="https://apps.legislature.ky.gov/law/constitution">Kentucky Constitution</a></li>
+        </ul>
+      </li>
+      <li><a>Public Services <i class="fa fa-caret-down" aria-hidden="true"></i></a>
+        <ul>
+          <li><a href="https://legislature.ky.gov/Public%20Services/Pages/default.aspx">Public Services</a></li>
+          <li><a class="has-submenu">Geographic Information Systems <i class="fa fa-caret-right" aria-hidden="true"></i></a>
+            <ul>
+              <li><a href="https://legislature.ky.gov/Public%20Services/GIS/Pages/default.aspx">Geographic Information Systems (GIS)</a></li>
+              <li><a href="https://legislature.ky.gov/Public%20Services/GIS/Maps/Pages/default.aspx">Maps</a></li>
+              <li><a href="https://legislature.ky.gov/Public%20Services/GIS/Pages/Redistricting-Information.aspx">Redistricting Information</a></li>
+              <li><a href="https://legislature.ky.gov/Public%20Services/GIS/Pages/GIS-Data.aspx">GIS Data</a></li>
+              <li><a href="https://legislature.ky.gov/Public%20Services/GIS/Pages/Map-Requests.aspx">Map Requests</a></li>
+            </ul>
+          </li>
+          <li><a>Public Information Office <i class="fa fa-caret-right" aria-hidden="true"></i></a>
+            <ul>
+              <li><a href="https://legislature.ky.gov/Public%20Services/PIO/Pages/default.aspx">Public Information Office</a></li>
+              <li><a href="https://legislature.ky.gov/Public%20Services/PIO/Pages/Radio.aspx">Radio News Releases</a></li>
+              <li><a href="https://apps.legislature.ky.gov/publicservices/pio/release.html">News Releases</a></li>
+              <li><a href="https://apps.legislature.ky.gov/publicservices/pio/photo.html">News Photos</a></li>
+              <li><a href="https://legislature.ky.gov/Public%20Services/PIO/Pages/Videos.aspx">Video Productions</a></li>
+              <li><a href="https://legislature.ky.gov/Public%20Services/PIO/Pages/CapMedia.aspx">Capitol Campus Identification Badges</a></li>
+              <li><a href="https://legislature.ky.gov/Public%20Services/PIO/Pages/default.aspx">School Group Tours</a></li>
+	      <li><a href="https://legislature.ky.gov/Public%20Services/PIO/Pages/Live-Streams.aspx">Live Streams</a></li>
+            </ul>
+          </li>
+          <li><a href="https://legislature.ky.gov/Public%20Services/Pages/Public-Bill-Room.aspx">Public Bill Room</a></li>
+          <li><a href="https://legislature.ky.gov/Public%20Services/Pages/Legislative-Reference-Library.aspx">Peggy King Legislative Reference Library</a></li>
+        </ul>
+      </li>
+
+      <li><a>Legislative Research Commission <i class="fa fa-caret-down" aria-hidden="true"></i></a>
+        <ul>
+          <li><a href="https://legislature.ky.gov/LRC/Pages/default.aspx">Legislative Research Commission</a></li>
+          <li><a href="https://legislature.ky.gov/LRC/Documents/LRC%20Organizational%20Chart.pdf">LRC Organizational Chart</a></li>
+          <li><a href="https://legislature.ky.gov/LRC/Pages/Glossary-of-Legislative-Terms.aspx">Glossary of Legislative Terms</a></li>
+          <li><a class="has-submenu">LRC Publications <i class="fa fa-caret-right" aria-hidden="true"></i></a>
+            <ul>
+                <li><a href="https://legislature.ky.gov/LRC/Publications/Pages/default.aspx">LRC Publications</a></li>
+                <li><a href="https://apps.legislature.ky.gov/lrc/publications/research_reports.html">LRC Research Reports</a></li>
+                <li><a href="https://legislature.ky.gov/LRC/Publications/Pages/Informational-Bulletins.aspx">LRC Informational Bulletins</a></li>
+                <li><a href="https://legislature.ky.gov/LRC/Publications/Pages/Research-Memoranda.aspx">LRC Research Memoranda</a></li>
+				<li><a href="https://apps.legislature.ky.gov/lrc/publications/Interactive_Home.html">LRC Interactive Features</a></li>
+            </ul>
+          </li>
+          <li><a class="has-submenu">Office of Education Accountability <i class="fa fa-caret-right" aria-hidden="true"></i></a>
+            <ul>
+                <li><a href="https://legislature.ky.gov/LRC/OEA/Pages/default.aspx">Office of Education Accountability</a></li>
+                <li><a href="https://legislature.ky.gov/LRC/OEA/Pages/OEA-Hotline.aspx">OEA Hotline</a></li>
+                <li><a href="https://legislature.ky.gov/LRC/OEA/Pages/OEA-Publications.aspx">OEA Publications</a></li>
+                <li><a href="https://legislature.ky.gov/LRC/OEA/Pages/OEA-Staff.aspx">OEA Staff</a></li>
+            </ul>
+          </li>
+		  <li><a href="https://legislature.ky.gov/LRC/EconomistOffice/Pages/default.aspx">Office of Economic Analysis</a></li>
+		  <li><a href="https://legislature.ky.gov/LRC/HealthData/Pages/default.aspx">Office of Health Data Analytics</a></li>	 
+          <li><a href="https://apps.legislature.ky.gov/AgencyReports/">Agency Reports</a></li>
+          <li><a href="https://legislature.ky.gov/LRC/Pages/Career-Opportunities.aspx">Career Opportunities</a></li>
+        </ul>
+      </li>
+      
+      
+      <li><a>Visitors & Education <i class="fa fa-caret-down" aria-hidden="true"></i></a>
+        <ul>
+          <li><a href="https://legislature.ky.gov/Visitors/Pages/default.aspx">Visitors & Education</a></li>
+          <li><a href="https://legislature.ky.gov/Visitors/Pages/Educational-Resources.aspx">Educational Resources for Teachers</a></li>
+          <li><a href="https://legislature.ky.gov/Visitors/Pages/Directions.aspx">Directions and Local Maps</a></li>
+          <li><a href="https://legislature.ky.gov/Visitors/Pages/Postsecondary-Internship.aspx">Postsecondary Internship Opportunities</a></li>
+          <li><a href="https://legislature.ky.gov/Visitors/Pages/RoomReservations.aspx">Annex Committee Room Reservations</a></li>
+          <li><a href="https://legislature.ky.gov/Public Services/PIO/Pages/CapMedia.aspx">Capitol Campus Identification Badges</a></li>
+          <li><a href="https://legislature.ky.gov/Visitors/Pages/Presentations.aspx">Presenting to the Legislative Committees</a></li>
+        </ul>
+      </li>
+      
+    </ul>
+  </div>
+
+
+</nav>
+
+
+    <div class="main">
+
+        <div class="container body-content">
+            <div class="">
+                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h2>Weekly Legislative Calendar</h2>
+
+<!-- <div class="hrReplacement"></div>
+
+<div class="TwitterMessage">
+    To receive notice when the Legislative Calendar is updated follow @LRCTweetBot. <iframe id="twitter-widget-0" scrolling="no" frameborder="0" allowtransparency="true" class="twitter-follow-button twitter-follow-button-rendered" style="position: static; visibility: visible; width: 145px; height: 20px;" title="Twitter Follow Button" src="https://platform.twitter.com/widgets/follow_button.2e9f365dae390394eb8d923cba8c5b11.en.html#dnt=false&amp;id=twitter-widget-0&amp;lang=en&amp;screen_name=LRCTweetBot&amp;show_count=false&amp;show_screen_name=true&amp;size=m&amp;time=1552915937604" data-screen-name="LRCTweetBot"></iframe>
+    <script async="" src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+</div> -->
+
+
+<div class="panel.style1">
+
+    
+
+
+    
+                    <div class="hrReplacement"></div>
+                <div class="DateHeading">
+                    Monday, May 18, 2026 <br />
+                </div>
+                <br />
+                <div class="CommitteeName">No Meetings Scheduled<br /></div>
+<br />
+                <div class="hrReplacement"></div>
+                <div class="DateHeading">
+                    Tuesday, May 19, 2026 <br />
+                </div>
+                <br />
+                <div class="CommitteeName">No Meetings Scheduled<br /></div>
+<br />
+                <div class="hrReplacement"></div>
+                <div class="DateHeading">
+                    Wednesday, May 20, 2026 <br />
+                </div>
+                <br />
+                <div class="CommitteeName">No Meetings Scheduled<br /></div>
+<br />
+                <div class="hrReplacement"></div>
+                <div class="DateHeading">
+                    Thursday, May 21, 2026 <br />
+                </div>
+                <br />
+                <div class="TimeAndLocation">9:00 am ET / 8:00 am CT, Annex Room 149</div>
+                <div class="CommitteeName"><a href="https://legislature.ky.gov/Committees/Pages/Committee-Details.aspx?CommitteeRSN=431&CommitteeType=Statutory Committee">INFORMATION TECHNOLOGY OVERSIGHT COMMITTEE</a><br /></div>
+ <br /><div class="Members"><div class="MembersHeading">Members: </div><a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=120">Sen. Gex Williams (Co-Chair)</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=39">Rep. Matt Lockett (Co-Chair)</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=135">Sen. Keturah J. Herron</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=138">Sen. Michael J. Nemes</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=79">Rep. Chad Aull</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=36">Rep. John Hodgson</a></div> <br />
+                <div class="TimeAndLocation">1:00 pm ET / 12:00 pm CT, Annex Room 131</div>
+                <div class="CommitteeName"><a href="https://legislature.ky.gov/Committees/Pages/Committee-Details.aspx?CommitteeRSN=13&CommitteeType=Statutory Committee">CAPITAL PROJECTS AND BOND OVERSIGHT COMMITTEE</a><br /></div>
+ <div class="Agenda"><div class="AgendaHeading">Agenda: </div> Approval of Minutes (April 27, 2026)
+
+Information Items
+
+	KRS 45.760(5) Postsecondary Medical Equipment Purchases - University of Kentucky
+
+	KRS 45.760(6) Postsecondary Fund Source Revision (No Aggregate Appropriation Increase) - University of Kentucky - Utilities Infrastructure Improvements
+
+	KRS 45.812(1) School District Debt Issues - New Projects/Tax and Revenue Anticipation Notes
+
+		Clark County
+
+		Fayette County TRANs
+
+		Hardin County
+
+		Lawrence County
+
+		Mercer County
+
+		Nicholas County
+
+		Spencer County
+
+		Walton-Verona Independent (Boone County)
+
+	KRS 45A.180(2) Postsecondary Notices of Intent to Use Alternative Construction Contracting Project Delivery Method - University of Kentucky - Construction Management-At-Risk
+
+		Improve Medical Facility 1 - King's Daughters Medical Center (Various Projects – Main Campus)
+
+		Construct West End Zone Club Space
+
+		Improve Clinical/Ambulatory Services Facilities (Pediatric ENT Clinic)
+
+		Improve Willard Medical Education/Science Building (Replace Mechanical Equipment)
+
+		Improve UK HealthCare Facilities - UK Chandler Hospital (Maternal Fetal Medicine Clinic)
+
+	House Bill 6 (2024 Regular Session) Reporting - Kentucky Communications Network Authority Capital Projects
+
+	Postsecondary Lump Sum Leased Property Improvements - University of Kentucky
+
+Action Item - Report from the Postsecondary Institutions - University of Kentucky
+
+	Project Report - Public-Private Partnership - Utilities Infrastructure Improvements
+			• Craig Collins, Senior Vice President/Chief Financial Officer, UK HealthCare
+			• Shannan Stamper, Deputy General Counsel for Academics, Finance, Students, and Athletics, University of Kentucky
+			• Rob Edwards, Vice President and Chief Strategy and Government Affairs Officer, University of Kentucky/UK HealthCare
+			• Elizabeth Baker, Senior Director, Strategic Capital Planning and Legislative Analysis, University Budget Office, University of Kentucky
+
+	Lease Report - Lease Renewal - UK College of Medicine, Warren County, PR-8399
+			• Elizabeth Baker, Senior Director, Strategic Capital Planning and Legislative Analysis, University Budget Office, University of Kentucky
+
+Project Report from the Finance and Administration Cabinet
+		• Kevin Cardwell, Deputy State Budget Director, Office of State Budget Director
+
+	Action Item - New Project - Transportation Cabinet, Department of Aviation - Two Medium Box Hangars Capital City Airport
+
+	Pool Allocations - Finance and Administration Cabinet, Department for Facilities and Support Services
+
+		(Roof Pool) - Libraries and Archives Roof Replacement
+
+		(Maintenance Pools - 2018-2020, 2022-2024, and 2024-2026) - Exterior Repairs Various Buildings
+
+Report from the Office of Financial Management
+
+	Kentucky Infrastructure Authority
+			• Sandy Williams, Executive Director, Kentucky Infrastructure Authority
+
+		Action Item - Clean Water State Revolving Fund (Fund A) Program Loan - Increase - City of Springfield (Washington County), A24-016S
+
+		Action Item - Cleaner Water Program Grant Reallocations
+
+			Round One (Senate Bill 36 - 2021 Regular Session) - Water (Two - County Pool)
+
+			Round Two (House Bill 1 - 2022 Regular Session) - Water (Three - County Pool)
+
+		House Bill 1 (2022 Regular Session) Line-Item Water Grants (Regional Water Supply Improvements)
+
+		House Joint Resolution 81 (2026 Regular Session) Kentucky Water and Wastewater Assistance for Troubled or Economically Restrained Systems Grants
+
+	Action Item - Cabinet for Economic Development - Economic Development Fund Grants
+			• Kylee Palmer, Deputy Commissioner, Department for Financial Services, Cabinet for Economic Development
+
+		Hazard-Perry County Economic Development Alliance
+
+		Kentucky Product Development Initiative - 2024 Round 2
+
+			Pendleton County Fiscal Court on behalf of the Pendleton County Industrial Development Authority
+
+			City of Elizabethtown on behalf of the Elizabethtown-Hardin County Industrial Foundation
+
+			McCreary County Fiscal Court on behalf of the McCreary County Industrial Development Authority
+
+			One East Kentucky on behalf of the Floyd County Fiscal Court
+
+			Marion County Fiscal Court on behalf of Marion County Industrial Foundation
+
+			Fleming County Fiscal Court on behalf of the Flemingsburg-Fleming County Industrial Development Authority
+
+			Graves County Fiscal Court on behalf of the Graves County Economic Development
+
+			City of Eddyville (Lyon County) on behalf of the Eddyville Riverport and Industrial Development Authority
+
+			Caldwell County Fiscal Court on behalf of the Princeton-Caldwell County Industrial Development Authority
+
+			Mercer County Fiscal Court on behalf of the Harrodsburg-Mercer County Industrial Development Authority
+
+			One East Kentucky on behalf of the Johnson County Fiscal Court
+
+	Office of Financial Management
+			• Steve Starkweather, Deputy Executive Director, Debt, Office of Financial Management
+
+		Action Item - New Debt Issues
+
+			Kentucky Housing Corporation Single Family Mortgage Revenue Bonds, 2026 Series C (Non-AMT) and 2026 Series D (Taxable)
+
+			Kentucky Housing Corporation Multifamily Conduit Revenue Bonds (Baunta Apartments), Series 2026
+
+		Previous Debt Issues
+
+			University of Kentucky General Receipts Refunding Bonds, 2026 Series A
+
+			Turnpike Authority of Kentucky Economic  Development Road Revenue Refunding Bonds (Revitalization Projects), 2026 Series A
+
+	Action Item - School District Debt Issues with School Facilities Construction Commission Debt Service Participation - New Projects
+			• Steve Starkweather, Deputy Executive Director, Debt, Office of Financial Management
+
+		Campbell County
+
+		Edmonson County
+
+		Perry County
+
+Remaining Calendar Year 2026 Meeting Dates (Thursdays at 3:00 p.m. in Capitol Annex Room 131)
+	June 18 - Representative McPherson, Chair (Submissions due June 4)
+July 16 - Senator Funke Frommeyer, Chair (Submissions due July 2)
+Aug. 20 - Representative McPherson, Chair (Submissions due Aug. 6)
+Sept. 17 - Senator Funke Frommeyer, Chair (Submissions due Sept. 3)
+Oct. 15 - Representative McPherson, Chair (Submissions due Oct. 1)
+Nov. 19 - Senator Funke Frommeyer, Chair (Submissions due Nov. 5)
+Dec. 17 - Representative McPherson, Chair (Submissions due Dec. 3)
+
+</div>  <br /><div class="Members"><div class="MembersHeading">Members: </div><a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=124">Sen. Shelley Funke Frommeyer (Co-Chair)</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=22">Rep. Shawn McPherson (Co-Chair)</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=115">Sen. Rick Girdler</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=129">Sen. Scott Madon</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=113">Sen. Reginald L. Thomas</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=16">Rep. Jason Petrie</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=34">Rep. Sarah Stalker</a>,  <a href="https://legislature.ky.gov/Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=8">Rep. Walker Thomas</a></div> <br />
+                <div class="hrReplacement"></div>
+                <div class="DateHeading">
+                    Friday, May 22, 2026 <br />
+                </div>
+                <br />
+                <div class="CommitteeName">No Meetings Scheduled<br /></div>
+<br />
+
+        <h3 class="printLink"><a href="/LegislativeCalendar/Calendar/Calendar/Print">Printer Friendly Version</a></h3>
+
+
+</div>
+
+
+
+
+
+
+
+ 
+            </div>
+        </div>
+
+        <script src="/LegislativeCalendar/bundles/jquery?v=FVs3ACwOLIVInrAl5sdzR2jrCDmVOWFbZMY6g6Q0ulE1"></script>
+
+        <script src="/LegislativeCalendar/bundles/bootstrap?v=2Fz3B0iizV2NnnamQFrx-NbYJNTFeBJ2GM05SilbtQU1"></script>
+
+        
+
+        <script>
+            var acc = document.getElementsByClassName("accordion");
+            var i;
+
+            for (i = 0; i < acc.length; i++) {
+                acc[i].onclick = function () {
+                    /* Toggle between adding and removing the "active" class,
+                    to highlight the button that controls the panel */
+                    this.classList.toggle("active");
+
+                    /* Toggle between hiding and showing the active panel */
+                    var panel = this.nextElementSibling;
+                    if (panel.style.display != "none") {
+                        panel.style.display = "none";
+                    } else {
+                        panel.style.display = "block";
+                    }
+                }
+            }
+        </script>
+        <script>
+            var acc = document.getElementsByClassName("accordion.membership");
+            var i;
+
+            for (i = 0; i < acc.length; i++) {
+                acc[i].onclick = function () {
+                    /* Toggle between adding and removing the "active" class,
+                    to highlight the button that controls the panel */
+                    this.classList.toggle("active");
+
+                    /* Toggle between hiding and showing the active panel */
+                    var panel = this.parentNode.nextElementSibling;
+                    if (panel.style.display != "none") {
+                        panel.style.display = "none";
+                    } else {
+                        panel.style.display = "block";
+                    }
+                }
+            }
+        </script>
+    </div>
+
+<footer>
+    <div class="container">
+        <div class="row">
+            <div class="col-sm-3">
+                <div class="icon">
+                    <img src="/sharedresources/images/LRC_Seal.png" alt="Seal of the Legislative Research Commission">
+                </div>
+            </div>
+            <div class="col-sm-3">
+                <h3>About</h3>
+                <ul>
+                    <li><a href="https://legislature.ky.gov/Pages/contactus.aspx">Contact Us</a></li>
+                    <li><a href="https://legislature.ky.gov/Legislative%20Research%20Commission/Pages/Career-Opportunities.aspx">Career
+                            Opportunities</a></li>
+                    <li><a href="https://legislature.ky.gov/Pages/sitemap.aspx">Site Map</a></li>
+                </ul>
+            </div>
+            <div class="col-sm-3">
+                <h3>Calendars</h3>
+                <ul>
+                    <li><a href="https://apps.legislature.ky.gov/legislativecalendar">Legislative Calendar</a></li>
+                    <li><a href="https://legislature.ky.gov/Documents/RS_Calendar.pdf">Regular Session
+                            Calendar</a></li>
+                    <li><a href="https://legislature.ky.gov/Documents/Current%20Interim%20Calendar.pdf">Interim Calendar</a></li>
+                    <li><a href="https://legislature.ky.gov/Documents/Current_Standing_Schedule.pdf">Standing
+                            Committee Schedule</a></li>
+                </ul>
+            </div>
+            <div class="col-sm-3">
+                <h3>Miscellaneous</h3>
+                <ul>
+                    <li><a href="https://www.ket.org/">Kentucky Educational Television </a></li>
+                    <li><a href="https://klec.ky.gov/Pages/default.aspx">Legislative Ethics Commission</a></li>
+                    <li><a href="https://legislature.ky.gov/Legislative%20Research%20Commission/OEA/Pages/default.aspx">Office
+                            of Educational Accountability</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="container bottom">
+        <div class="col-sm-6 col-xs-12">
+            <p>
+                Copyright
+                <script type="text/javascript"> document.write(new Date().getFullYear()); </script> Kentucky
+                Legislative Research Commission
+                <br>
+                All rights Reserved
+            </p>
+        </div>
+        <div class="col-sm-6 col-xs-12">
+            <ul class="unstyled-list policies">
+                <li><a href="https://legislature.ky.gov/policies-security/Pages/default.aspx">Policies</a></li>
+                <li><a href="https://legislature.ky.gov/policies-security/Pages/Security.aspx">Security</a></li>
+                <li><a href="https://legislature.ky.gov/policies-security/Pages/Disclaimers.aspx">Disclaimer</a></li>
+                <li><a href="https://legislature.ky.gov/policies-security/Pages/Accessibility.aspx">Accessibility</a></li>
+            </ul>
+        </div>
+    </div>
+</footer>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js'></script>
+<script src="/sharedresources/js/index.js"></script>
+<script src="/sharedresources/smartmenus-1.1.0/jquery.smartmenus.js"></script>    </body>
+</html>

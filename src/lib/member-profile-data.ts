@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { KYBill, KYLegislator, KYVote } from '@/types/kentucky';
 import { getCivicDataSessionName } from '@/lib/ky-sessions';
 import { bucketLegiscanVoteText, type VoteBucket } from '@/lib/legiscan-vote-tally';
+import { matchLegislatorBySponsorName, normalizeSponsorNameForMatch } from '@/lib/ky-member-utils';
 
 function createAnonClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -12,6 +13,22 @@ function createAnonClient(): SupabaseClient | null {
 
 const BILL_SUMMARY =
   'id, bill_number, title, status, last_action_date, last_action, session, chamber, legiscan_id';
+
+const BILL_SUMMARY_WITH_SPONSORS = `${BILL_SUMMARY}, sponsors`;
+
+function billListsLegislatorAsSponsor(sponsors: unknown, leg: KYLegislator): boolean {
+  if (!Array.isArray(sponsors)) return false;
+  const target = normalizeSponsorNameForMatch(leg.name || '');
+  if (!target) return false;
+  for (const row of sponsors) {
+    if (!row || typeof row !== 'object') continue;
+    const name = (row as { name?: string }).name;
+    if (!name) continue;
+    const hit = matchLegislatorBySponsorName([leg], name);
+    if (hit?.id === leg.id) return true;
+  }
+  return false;
+}
 
 function memberRollVote(
   roll: Array<{ legislator_id: string; vote: string }> | null,
@@ -67,22 +84,43 @@ export async function fetchSponsoredBillsForLegislator(
 ): Promise<KYBill[]> {
   const supabase = createAnonClient();
   if (!supabase) return [];
-  if (leg.legiscan_id == null) return [];
 
   const sessionName = options?.sessionName ?? getCivicDataSessionName();
   const limit = options?.limit ?? 25;
-  const pid = Number(leg.legiscan_id);
+
+  if (leg.legiscan_id != null) {
+    const pid = Number(leg.legiscan_id);
+    const { data, error } = await supabase
+      .from('ky_bills')
+      .select(BILL_SUMMARY)
+      .eq('session', sessionName)
+      .contains('sponsors', [{ people_id: pid }])
+      .order('last_action_date', { ascending: false, nullsFirst: false })
+      .limit(limit);
+
+    if (error || !data) return [];
+    return data as KYBill[];
+  }
+
+  if (!leg.name?.trim()) return [];
 
   const { data, error } = await supabase
     .from('ky_bills')
-    .select(BILL_SUMMARY)
+    .select(BILL_SUMMARY_WITH_SPONSORS)
     .eq('session', sessionName)
-    .contains('sponsors', [{ people_id: pid }])
     .order('last_action_date', { ascending: false, nullsFirst: false })
-    .limit(limit);
+    .limit(350);
 
   if (error || !data) return [];
-  return data as KYBill[];
+
+  const matched: KYBill[] = [];
+  for (const row of data) {
+    if (!billListsLegislatorAsSponsor((row as { sponsors?: unknown }).sponsors, leg)) continue;
+    const { sponsors: _s, ...bill } = row as KYBill & { sponsors?: unknown };
+    matched.push(bill as KYBill);
+    if (matched.length >= limit) break;
+  }
+  return matched;
 }
 
 /**

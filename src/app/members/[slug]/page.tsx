@@ -1,17 +1,20 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getLegislatorByProfileSlug, getMemberProfilePageContext } from '@/lib/member-profile';
+import { getMemberProfilePageContext } from '@/lib/member-profile';
 import { getCivicDataSessionName } from '@/lib/ky-sessions';
 import { fetchSponsoredBillsForLegislator, fetchMemberVoteRecord } from '@/lib/member-profile-data';
 import { MemberProfileView } from '@/components/members/MemberProfileView';
 import { kyMemberTitleShort } from '@/lib/ky-member-utils';
 import { formatKyLegislatorDistrict } from '@/lib/bill-display';
 
+export const revalidate = 300;
+
 type PageProps = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const leg = await getLegislatorByProfileSlug(slug);
+  const ctx = await getMemberProfilePageContext(slug);
+  const leg = ctx?.leg;
   if (!leg) {
     return { title: 'Member not found | Know Your Vote Kentucky' };
   }

@@ -1,5 +1,11 @@
 'use client';
 
+/**
+ * Legacy meetings UI — reads generic `ky_meetings` (mixed jurisdictions).
+ * Hidden from nav. GA committee meetings will use dedicated tables/routes per
+ * docs/specs/committee-calendar.md (local school/county sync paused 2026-05-18).
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   Container,

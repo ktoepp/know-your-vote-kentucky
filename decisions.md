@@ -92,3 +92,51 @@ Follow Bills + Email Digests — spec scope and v1 boundaries. Full spec: [docs/
 - **Digest email + cron (M6–M7)** — React Email `src/lib/email/bill-digest-email.tsx`, `src/lib/digest/run-bill-digest-cron.tsx`, **`GET /api/cron/notify`** (Bearer `SYNC_API_KEY` / `CRON_SECRET`, `dryRun` / `DIGEST_DRY_RUN`), **`GET /api/unsubscribe/[token]`** turns digest off. Vercel cron `0 11 * * *` on `/api/cron/notify`; bills cron uses `useChangeHash=true`. Env: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `APP_PUBLIC_URL` (`env-template.txt`).
 - **Sentry — dev noise** — Server/edge init only reports in production unless `SENTRY_REPORT_DEV=true`; client uses `NEXT_PUBLIC_SENTRY_REPORT_DEV` when `NEXT_PUBLIC_SENTRY_DSN` is set. Cuts local ENOENT/chunk issues from polluting the project.
 - **Canonical site URL — `kyvky.com`** — Default public origin for metadata, sitemap/robots, digest/unsubscribe links (`src/lib/site-canonical.ts`, **`DEFAULT_SITE_ORIGIN`**). Set **`NEXT_PUBLIC_APP_URL=https://kyvky.com`** (and **`APP_PUBLIC_URL`** if needed) on production. **`next.config.ts`** 308-redirects **`www.kyvky.com`** and legacy **`knowyourvotekentucky.*` / `knowyourvoteky.com`** hosts to **`https://kyvky.com`**. Resend: verify **`kyvky.com`** and send from an address on that domain (e.g. **`alerts@kyvky.com`**). **Supabase Auth** redirect URLs and SMTP sender should include **`https://kyvky.com`** (and preview URLs as needed).
+
+---
+
+## 2026-05-18
+
+**Product scope — Kentucky General Assembly only (active).** Pause local-government automation to focus on Frankfort committee meetings, agendas, and interim activity. **Optimization:** engineering attention + cron budget on LRC calendar ingest and GA UX; avoids maintaining Legistar/school scrapers in production until there is a public product surface. **Cost:** LegiScan/Open States unchanged; zero new API spend for LRC HTML scrape in v1.
+
+- **Vercel Cron:** Removed `ordinances`, `school-boards`, `county-actions` from `vercel.json`. **Scheduled:** `bills`, `legislators`, `votes`, `/api/cron/notify`, health-check.
+- **`syncAll()` default:** `SYNC_SOURCES_DEFAULT` = `bills`, `legislators`, `votes` only. Paused sources remain on `SYNC_SOURCES` for manual `?source=` / operator runs.
+- **Spec:** [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) — data model, phases, Bill Watch UX benchmark, cost table, paused-cron restore snippet.
+- **UX benchmark:** Official Kentucky [Bill Watch](https://www.kentucky.gov/services/pages/billwatch.aspx) — learn profiles + tracking alerts + “posted in committee”; KYVKY targets unified modern activity feed + first-class hearings (not legacy three-column dashboard).
+- **Revisit local gov when:** GA committee calendar ships in UI, or explicit product decision to expand beyond Frankfort.
+
+**GA display normalization & chamber vocabulary.**
+
+- **Title case for LRC strings:** Committee names and agenda lines from the legislative calendar are normalized with `normalizeKyGaDisplayName` / `normalizeKyGaAgendaLine` when source text is mostly ALL CAPS. Applied at **sync** (`ky-lrc-calendar-sync`) and again at **render** so existing rows look correct without a one-off migration.
+- **Joint (capital J):** Bicameral, interim, and statutory committees use the label **Joint** in chips, filters, and copy—not lowercase `joint`, and not **All** or **Both** when the meaning is House + Senate together. `ChamberChip` maps `chamber=joint` → **Joint**.
+- **GA chamber filters:** `/committees` and `/meetings` use **House | Senate | Joint** toggles only (`GaChamberFilterBar`). No **All** chamber toggle; **no selection** shows every chamber. Active-filter chips + **Clear all** match bills/members browse.
+- **Scope:** Bills browse **All** still means “all bills” (not Joint). Joint labeling applies to GA committee/meeting surfaces and committee search group headers.
+
+**Performance — roster caching & committee detail batching (2026-05-19).**
+
+- **Historical legislators stay in DB.** Profile pages load the full roster via `unstable_cache` (1h) for slug resolution; browse/search use **active-only** slim roster. No global `active=true` filter that would break bookmarked former members.
+- **Shared roster:** `src/lib/ky-legislator-roster-server.ts` + `GET /api/roster/active` (CDN-cacheable). Client pages use `useKyActiveLegislatorRoster` with in-memory dedupe across mounts.
+- **Committee detail:** Single agenda query (`meeting_id IN (...)`), cached active committee roster (no `external_links`), `revalidate = 300`, `React.cache` on committee slug (metadata + page).
+- **Member profile:** `React.cache` on `getMemberProfilePageContext` so metadata + page share one roster fetch per request.
+- **Bill detail API:** LegiScan roll-call enrichment capped at **12** votes; `Cache-Control` 5 min on JSON response.
+- **Bills browse pagination:** `GET /api/bills/browse` returns one page (slim `KY_BILL_BROWSE_SELECT`) with exact SQL `count` + `range` when filters allow; status/follows/non-default sort use an in-memory cap of 2,000 rows. Client loads additional pages on demand (“Load more”).
+- **Bill search:** `ky_bills_plain_search` runs first; ilike supplement legs (title, description, etc.) run only when FTS is unavailable or returns fewer than ~15 hits. Bill-number and LegiScan subject legs stay as targeted supplements.
+- **Middleware:** `shouldRefreshSupabaseSession` skips `auth.getUser()` on public pages unless the request has a Supabase auth cookie or hits `/auth`, `/profile`, `/feed`, `/api/me`, or bill follow routes.
+- **Homepage:** Mapbox bundle loaded via `next/dynamic` (`LandingDistrictMapPreview`, `ssr: false`).
+
+**Committee calendar Phase 4 — LRC hearing digest events (2026-05-19).**
+
+- **`hearing_scheduled` only (v1):** Spec mentioned `committee_scheduled` / `committee_agenda`; digest prefs already expose `hearing_scheduled`. Calendar sync records that type when a **new** `ky_bill_id` appears on a meeting agenda (agenda hash change + bill not on prior agenda). Dedupe: `UNIQUE (bill_id, event_type, legiscan_change_hash)` with hash `lrc-calendar|hearing_scheduled|{meetingId}|{billId}|{agendaHash}`.
+- **Not in default preset:** “Major milestones only” omits `hearing_scheduled`; users opt in on `/profile` notifications.
+- **Profile activity:** History rows show committee/time detail; agenda-derived hearing rows are skipped when the same bill+meeting_date already came from history (avoids duplicates).
+
+---
+
+## 2026-05-19
+
+**Roadmap priority — Bill Watch parity, then launch polish.**
+
+- **Wave 1:** Activity feed filters, notification grouping aligned with Kentucky Bill Watch checkboxes, saved searches (URL + profile), small bill-tracking polish. Reference pack: `docs/reference/bill-watch/`. **Non-goals:** Kentucky.gov login, rules wizard, per-bill alert overrides, premium new-bill email blast.
+- **Wave 2:** GDPR export, welcome resend, snooze follows, About page, map autocomplete, email client QA.
+- **Wave 3 (deferred):** Committee meeting materials sync, session record spike, interim/milestone copy — see committee-calendar spec Phase 5+.
+- **Optimization:** Ship a unified activity surface and modern alert prefs before expanding LRC ingest surface area.

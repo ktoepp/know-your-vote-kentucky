@@ -9,6 +9,7 @@ import {
   type KyDigestEventType,
 } from '@/lib/ky-notification-preferences';
 import { billMatchesTopicFilters } from '@/lib/ky-topic-legiscan-mapping';
+import { formatDigestEventDetail } from '@/lib/digest/format-digest-event-detail';
 import { publicSiteOrigin } from '@/lib/site-canonical';
 
 const DIGEST_CAP = 10;
@@ -203,7 +204,11 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       }
     }
 
-    const { data: follows } = await supabaseAdmin.from('ky_bill_follows').select('bill_id').eq('user_id', uid);
+    const { data: follows } = await supabaseAdmin
+      .from('ky_bill_follows')
+      .select('bill_id')
+      .eq('user_id', uid)
+      .eq('snoozed', false);
     const followedSet = new Set((follows ?? []).map((f) => String(f.bill_id)));
 
     const allowedTypes = new Set((pref.event_types as string[]) ?? []);
@@ -245,7 +250,11 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       if (!bill) continue;
       const lines = evs.map((h) => ({
         eventLabel: KY_DIGEST_EVENT_LABELS[h.event_type as KyDigestEventType] ?? h.event_type,
-        detail: String((h.event_payload as { last_action?: string }).last_action ?? bill.title ?? ''),
+        detail: formatDigestEventDetail(
+          h.event_type,
+          h.event_payload as Record<string, unknown>,
+          bill.title,
+        ),
         observedAt: formatObserved(h.observed_at),
       }));
       groups.push({

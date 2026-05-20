@@ -34,6 +34,8 @@ import {
   Description,
   Groups,
   AccountCircle,
+  CalendarMonth,
+  Gavel,
 } from '@mui/icons-material';
 import { KentuckyStateIcon } from '@/components/icons/KentuckyStateIcon';
 import { useThemeUtils } from '@/components/ui/ThemeUtils';
@@ -58,6 +60,18 @@ const navLinks: NavLinkConfig[] = [
     href: '/bills',
     label: 'Bills',
     icon: <Description />,
+    priority: 'primary',
+  },
+  {
+    href: '/committees',
+    label: 'Committees',
+    icon: <Gavel />,
+    priority: 'primary',
+  },
+  {
+    href: '/meetings',
+    label: 'Meetings',
+    icon: <CalendarMonth />,
     priority: 'primary',
   },
   {
@@ -88,6 +102,12 @@ function isNavPathActive(path: string, pathname: string): boolean {
   if (path === '/members') {
     if (pathname.startsWith('/members/map')) return false;
     return pathname === '/members' || pathname.startsWith('/members/');
+  }
+  if (path === '/committees') {
+    return pathname === '/committees' || pathname.startsWith('/committees/');
+  }
+  if (path === '/meetings') {
+    return pathname === '/meetings' || pathname.startsWith('/meetings/');
   }
   return pathname === path;
 }

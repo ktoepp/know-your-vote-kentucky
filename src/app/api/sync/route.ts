@@ -1,7 +1,8 @@
 /**
  * /api/sync — Main sync API endpoint
  *
- * POST — Trigger sync for all sources or a specific source
+ * POST — Trigger sync for default GA sources or a specific source
+ *   Default (no source): bills + legislators + votes — see SYNC_SOURCES_DEFAULT in ky-sync-pipeline.ts
  *   Query params: ?source=bills&dryRun=true
  * GET  — Without `source`: return sync status from ky_sources table.
  *        With `source` (and auth): run sync — matches Vercel Cron (GET + ?source=...).

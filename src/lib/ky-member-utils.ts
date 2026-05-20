@@ -446,6 +446,33 @@ function normalizeChamberTitleForDisplay(
   return formatted;
 }
 
+const EXECUTIVE_ROLE_LABELS: Record<string, string> = {
+  lt_governor: 'Lieutenant Governor',
+  lieutenant_governor: 'Lieutenant Governor',
+  attorney_general: 'Attorney General',
+};
+
+function normalizeExecutiveRoleTitle(roleTitle: string): string {
+  const key = roleTitle.trim().toLowerCase().replace(/\s+/g, '_');
+  if (EXECUTIVE_ROLE_LABELS[key]) return EXECUTIVE_ROLE_LABELS[key]!;
+  return formatBillLabelText(roleTitle.replace(/_/g, ' '));
+}
+
+/** Kentucky capitol switchboard numbers shared across many Open States rows — not a direct line. */
+const GENERIC_CAPITOL_PHONE_DIGITS = new Set(['5025648100', '8003727181']);
+
+export function isGenericCapitolPhone(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  return GENERIC_CAPITOL_PHONE_DIGITS.has(digits);
+}
+
+/** Phone safe to show as a legislator direct line; null when missing or generic switchboard. */
+export function legislatorDisplayPhone(phone: string | null | undefined): string | null {
+  if (!phone || isGenericCapitolPhone(phone)) return null;
+  return phone;
+}
+
 /** Short public title for member cards — prefers Open States `role_title` when present. */
 export function kyMemberTitleShort(leg: {
   chamber?: 'house' | 'senate' | null;
@@ -457,7 +484,7 @@ export function kyMemberTitleShort(leg: {
   if (isKentuckyGovernor(leg)) return 'Governor';
   const rt = (leg.role_title || '').trim();
   if (rt) {
-    return normalizeChamberTitleForDisplay(leg, formatBillLabelText(rt));
+    return normalizeChamberTitleForDisplay(leg, normalizeExecutiveRoleTitle(rt));
   }
   if (leg.chamber === 'house') return 'Representative';
   if (leg.chamber === 'senate') return 'Senator';
