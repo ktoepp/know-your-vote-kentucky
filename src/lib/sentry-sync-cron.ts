@@ -29,7 +29,7 @@ const VERCEL_SYNC_CRON_MONITORS: Record<
     checkinMargin: 5,
   },
   "lrc-calendar": {
-    schedule: { type: "crontab", value: "0 12,18 * * *" },
+    schedule: { type: "crontab", value: "0 12 * * *" },
     maxRuntime: 5,
     checkinMargin: 5,
   },
