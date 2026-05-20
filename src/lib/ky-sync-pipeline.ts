@@ -15,6 +15,7 @@ import {
 import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 import { classifyTopics } from './ky-topic-classifier';
 import { extractCommitteeMembershipSlugsFromOpenStatesPerson } from './ky-committee-utils';
+import { legislatorNameMatchesLegiscanSessionPerson } from './ky-member-committees';
 import { legiscanSubjectColumnsFromDetail } from './ky-legiscan-subjects';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
 import { syncKyLrcCalendar } from './ky-lrc-calendar-sync';
@@ -1025,10 +1026,11 @@ async function reconcileKyLegislatorLegiscanIdsFromLatestSession(
       if (ch !== leg.chamber) return false;
       const pDist = normalizeKyLegislatorDistrictForDb(ch, p.district);
       if (!pDist || pDist !== districtNorm) return false;
-      const pName = normalizeSponsorNameForMatch(
-        (p.name || '').trim() || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-      );
-      return pName.length > 0 && pName === legName;
+      const pName = (p.name || '').trim() || `${p.first_name || ''} ${p.last_name || ''}`.trim();
+      if (!pName) return false;
+      const pNorm = normalizeSponsorNameForMatch(pName);
+      if (pNorm.length > 0 && pNorm === legName) return true;
+      return legislatorNameMatchesLegiscanSessionPerson(leg, pName);
     });
 
     if (matches.length !== 1) continue;
