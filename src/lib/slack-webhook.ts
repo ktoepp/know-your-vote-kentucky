@@ -224,9 +224,10 @@ function syncTriggerLabel(isVercelCron: boolean, fromCli: boolean): string {
  *
  * Default: status-reports digest only when new rows were synced (`itemsSynced > 0`), or errors/skips-with-message.
  * Set SLACK_SYNC_DIGEST_ALWAYS=true for a digest on every Vercel cron run (heartbeat).
- * Vercel hourly bills cron (`source=bills`) posts a digest every run by default (quota + ky_sources);
+ * Vercel daily bills cron (`source=bills`) posts a digest every run by default (quota + ky_sources);
  * set SLACK_SYNC_BILLS_DIGEST_ALWAYS=false to only post when something changed or failed.
- * CLI notify implies every-run digest when webhook configured (hourly Actions visibility).
+ * CLI / GitHub Actions (SLACK_SYNC_NOTIFY_CLI=true) posts only on change/error by default;
+ * set SLACK_SYNC_CLI_DIGEST_ALWAYS=true for an every-run heartbeat.
  *
  * Adds LegiScan monthly quota + ky_sources snapshot unless SLACK_SYNC_SKIP_METADATA=true.
  * Posts alerts webhook when LegiScan usage ≥ SLACK_LEGISCAN_QUOTA_ALERT_PCT (default 90).
@@ -263,11 +264,15 @@ export async function notifySyncSlack(params: {
     results.some((r) => r.status === 'success' && r.itemsSynced > 0) ||
     results.some((r) => r.status === 'skipped' && Boolean(r.error));
 
-  const cliHeartbeat = fromCli && cliNotify;
+  // CLI / GitHub Actions runs may post when SLACK_SYNC_NOTIFY_CLI=true.
+  const cliEnabled = fromCli && cliNotify;
+  // Every-run CLI heartbeat is opt-in (SLACK_SYNC_CLI_DIGEST_ALWAYS=true). By default the
+  // CLI path posts only when something changed or failed — avoids hourly "0 items" noise.
+  const cliHeartbeat = cliEnabled && process.env.SLACK_SYNC_CLI_DIGEST_ALWAYS === 'true';
   const worthDigest =
     digestHeartbeat || hasNewOrInteresting || cliHeartbeat || vercelBillsHeartbeat;
 
-  const mayPostDigest = isVercelCron || manualNotify || cliHeartbeat;
+  const mayPostDigest = isVercelCron || manualNotify || cliEnabled;
   const postDigest = Boolean(syncUrl && mayPostDigest && worthDigest);
 
   const extras = postDigest ? await buildDigestExtras(results) : {};

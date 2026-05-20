@@ -164,8 +164,11 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # Digest posts for Vercel Cron syncs; set SLACK_SYNC_NOTIFY_MANUAL=true to also post manual runs.
 # CLI / GitHub Actions (`tsx scripts/manual-sync.ts`): set SLACK_SYNC_NOTIFY_CLI=true (see workflows).
 # By default, status-reports digest only when something synced (itemsSynced > 0) or there were errors/skips.
-# Set SLACK_SYNC_DIGEST_ALWAYS=true for a digest on every Vercel cron run (all sources — noisy).
-# Vercel hourly bills cron (`source=bills`) sends a digest every run by default (LegiScan quota + ky_sources);
+# Set SLACK_SYNC_DIGEST_ALWAYS=true for a digest on every Vercel cron run (all sources). Recommended in Vercel
+#   for once-daily visibility that legislators / votes / lrc-calendar actually ran (they are otherwise silent).
+# SLACK_SYNC_CLI_DIGEST_ALWAYS=true — every-run heartbeat for the CLI / GitHub Actions bills sync. Default off:
+#   the every-6h Actions sync posts only on change/error (avoids hourly "0 items" noise).
+# Vercel daily bills cron (`source=bills`) sends a digest every run by default (LegiScan quota + ky_sources);
 # set SLACK_SYNC_BILLS_DIGEST_ALWAYS=false to bill digest only on changes/errors.
 # SLACK_SYNC_SKIP_METADATA=true — omit LegiScan quota + ky_sources lines from digests.
 # SLACK_LEGISCAN_QUOTA_ALERT_PCT=90 — also posts SLACK_WEBHOOK_ERRORS when monthly usage crosses this %.
@@ -185,6 +188,7 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # SLACK_SYNC_NOTIFY_MANUAL=false
 # SLACK_SYNC_NOTIFY_CLI=false
 # SLACK_SYNC_DIGEST_ALWAYS=false
+# SLACK_SYNC_CLI_DIGEST_ALWAYS=false
 # SLACK_SYNC_BILLS_DIGEST_ALWAYS=
 # SLACK_SYNC_SKIP_METADATA=false
 # SLACK_LEGISCAN_QUOTA_ALERT_PCT=90

@@ -24,8 +24,9 @@ on:
         type: string
         default: '1'
   schedule:
-    # Hourly — conservative hash-gated sync (~2 LegiScan key requests per run: session list + master list raw)
-    - cron: '0 * * * *'
+    # Every 6h — conservative hash-gated sync (~2 LegiScan key requests per run: session list + master list raw).
+    # Vercel Cron owns the guaranteed daily bills sync (0 5 UTC); this adds intra-day freshness with no 05:00 overlap.
+    - cron: '0 */6 * * *'
 
 permissions:
   contents: read
