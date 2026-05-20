@@ -45,7 +45,6 @@ export default async function CommitteeDetailPage({ params }: PageProps) {
       meetings={meetings}
       agendaByMeetingId={agendaByMeetingId}
       members={members}
-      legislatorRoster={legislatorRoster}
     />
   );
 }

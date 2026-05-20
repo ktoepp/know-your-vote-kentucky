@@ -42,7 +42,6 @@ import {
 import { CalendarToday, LocationOn } from '@mui/icons-material';
 import { CommitteeMembersSection } from '@/components/committees/CommitteeMembersSection';
 import type { CommitteeMemberDisplay } from '@/lib/ky-committee-members';
-import type { KYLegislator } from '@/types/kentucky';
 import { classifyTopics } from '@/lib/ky-topic-classifier';
 
 export interface CommitteeDetailViewProps {
@@ -50,7 +49,6 @@ export interface CommitteeDetailViewProps {
   meetings: KYCommitteeMeeting[];
   agendaByMeetingId: Record<string, KYCommitteeAgendaItem[]>;
   members: CommitteeMemberDisplay[];
-  legislatorRoster: KYLegislator[];
 }
 
 function MeetingAgendaBlock({ items, expanded }: { items: KYCommitteeAgendaItem[]; expanded: boolean }) {
@@ -115,7 +113,6 @@ export function CommitteeDetailView({
   meetings,
   agendaByMeetingId,
   members,
-  legislatorRoster,
 }: CommitteeDetailViewProps) {
   const theme = useTheme();
   const displayName = normalizeKyGaDisplayName(committee.name);
@@ -249,12 +246,7 @@ export function CommitteeDetailView({
           </CardContent>
         </Card>
 
-        <CommitteeMembersSection
-          members={members}
-          legislatorRoster={legislatorRoster}
-          committeeProfileUrl={committee.profile_url}
-          layout="list"
-        />
+        <CommitteeMembersSection members={members} committeeProfileUrl={committee.profile_url} />
 
         <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, mt: 1 }}>
           <CalendarMonth sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
