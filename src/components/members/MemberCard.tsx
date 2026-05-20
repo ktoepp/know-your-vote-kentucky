@@ -22,12 +22,8 @@ import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { KENTUCKY_GOVERNOR_OFFICE_URL } from '@/components/civic/GovernorBeshearChip';
 import { MemberName } from '@/components/civic/MemberName';
 import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
-import { LegislatorDistrictMinimapLazy } from '@/components/members/LegislatorDistrictMinimapLazy';
-import {
-  formatKyLegislatorDistrict,
-  formatRepresentativePartyChipLabel,
-  partyBadgeBackgroundColor,
-} from '@/lib/bill-display';
+import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
+import { formatKyLegislatorDistrict } from '@/lib/bill-display';
 import { CHIP } from '@/lib/ui-tokens';
 import {
   isKentuckyGovernor,
@@ -215,30 +211,25 @@ export function MemberCard({
             </Typography>
             {showDistrictMinimap && (leg.chamber === 'house' || leg.chamber === 'senate') && showDistrictInSubtitle && (
               <Box sx={{ mb: 1.25, maxWidth: 200 }}>
-                <LegislatorDistrictMinimapLazy leg={leg} size={featured || governor ? 'profile' : 'card'} />
+                <LegislatorDistrictThumbnail leg={leg} size={featured || governor ? 'profile' : 'card'} />
               </Box>
             )}
-            <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
-              {leg.party && (
-                <Chip
-                  label={formatRepresentativePartyChipLabel(leg.party)}
-                  size="small"
-                  sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(leg.party), color: '#fff' }}
-                />
-              )}
-              {isFormerMember && (
-                <Chip label="Not a current member" size="small" variant="outlined" color="warning" sx={CHIP.compact} />
-              )}
-              {governor && (
-                <Chip
-                  label="Governor"
-                  size="small"
-                  color="success"
-                  variant="outlined"
-                  sx={CHIP.compact}
-                />
-              )}
-            </Stack>
+            {(isFormerMember || governor) && (
+              <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
+                {isFormerMember && (
+                  <Chip label="Not a current member" size="small" variant="outlined" color="warning" sx={CHIP.compact} />
+                )}
+                {governor && (
+                  <Chip
+                    label="Governor"
+                    size="small"
+                    color="success"
+                    variant="outlined"
+                    sx={CHIP.compact}
+                  />
+                )}
+              </Stack>
+            )}
           </Box>
         </Box>
 
