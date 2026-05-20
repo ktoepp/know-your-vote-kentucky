@@ -1,10 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
-import {
-  KY_DIGEST_EVENT_LABELS,
-  type KyDigestEventType,
-} from '@/lib/ky-notification-preferences';
+import { formatDigestEventLabel } from '@/lib/digest/format-digest-event-detail';
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
@@ -75,13 +72,19 @@ export async function GET(request: NextRequest) {
 
   const eventMap = new Map<
     number,
-    { bill_id: string; event_type: string; bill_number: string | null; title: string | null }
+    {
+      bill_id: string;
+      event_type: string;
+      event_payload: Record<string, unknown> | null;
+      bill_number: string | null;
+      title: string | null;
+    }
   >();
 
   if (allEventIds.length > 0) {
     const evRes = await supabaseAdmin
       .from('ky_bill_status_history')
-      .select('id, bill_id, event_type')
+      .select('id, bill_id, event_type, event_payload')
       .in('id', allEventIds);
 
     if (evRes.error) {
@@ -93,6 +96,7 @@ export async function GET(request: NextRequest) {
       id: number;
       bill_id: string;
       event_type: string;
+      event_payload: Record<string, unknown> | null;
     }>;
 
     const billIds = Array.from(new Set(evRows.map((r) => r.bill_id)));
@@ -121,6 +125,7 @@ export async function GET(request: NextRequest) {
       eventMap.set(row.id, {
         bill_id: row.bill_id,
         event_type: row.event_type,
+        event_payload: row.event_payload,
         bill_number: bill?.bill_number ?? null,
         title: bill?.title ?? null,
       });
@@ -142,8 +147,7 @@ export async function GET(request: NextRequest) {
         bill_number: ev.bill_number,
         title: ev.title,
         event_type: ev.event_type,
-        event_label:
-          KY_DIGEST_EVENT_LABELS[ev.event_type as KyDigestEventType] ?? ev.event_type,
+        event_label: formatDigestEventLabel(ev.event_type, ev.event_payload),
       });
     }
     return {

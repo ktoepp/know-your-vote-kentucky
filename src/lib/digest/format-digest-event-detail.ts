@@ -1,3 +1,25 @@
+import {
+  KY_DIGEST_EVENT_LABELS,
+  type KyDigestEventType,
+} from '@/lib/ky-notification-preferences';
+
+/**
+ * Human-readable event label, disambiguating the combined `signed_or_vetoed` event
+ * into "Signed into law" vs "Vetoed" using the captured `event_payload.kind`.
+ * Used by profile activity + digest-history list views (the email shows the raw action instead).
+ */
+export function formatDigestEventLabel(
+  eventType: string,
+  eventPayload: Record<string, unknown> | null | undefined,
+): string {
+  if (eventType === 'signed_or_vetoed') {
+    const kind = (eventPayload ?? {}).kind;
+    if (kind === 'signed') return 'Signed into law';
+    if (kind === 'vetoed') return 'Vetoed';
+  }
+  return KY_DIGEST_EVENT_LABELS[eventType as KyDigestEventType] ?? eventType;
+}
+
 /** Human-readable line for digest email / profile activity from a history payload. */
 export function formatDigestEventDetail(
   eventType: string,

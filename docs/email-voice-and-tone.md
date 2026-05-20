@@ -60,6 +60,14 @@ Sent daily or weekly based on user preference, only when there are events to rep
 
 **Subheading:** `Status updates for bills and topics you follow.`
 
+**Structure — grouped by reason.** Bills are split into up to two sections so the reader sees *why* each bill is included. A section is shown only when it has bills:
+- `Bills you follow` — bills the user follows individually.
+- `From topics you follow` — bills matched by a followed topic. Each such bill is annotated with the matched topic(s): `Matches your {topic} topic` / `Matches your {topicA, topicB} topics`.
+
+A bill the user both follows and matches by topic appears once, under `Bills you follow`.
+
+**Event lines.** Each line states the bill's latest recorded action verbatim (the legislative last-action text), followed by the observed time in parentheses — no event-category label. Identical actions on the same bill are de-duplicated.
+
 **Overflow line (when events are capped):**
 > {n} additional update(s) not shown — [view all followed bills].
 

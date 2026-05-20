@@ -12,7 +12,6 @@ import {
 import * as React from 'react';
 
 export type BillDigestLine = {
-  eventLabel: string;
   detail: string;
   observedAt: string;
 };
@@ -21,12 +20,19 @@ export type BillDigestGroup = {
   billNumber: string;
   billTitle: string;
   billHref: string;
+  /** Topics (from the user's filters) this bill matched — shown in the topic section. */
+  matchedTopics?: string[];
   lines: BillDigestLine[];
+};
+
+export type BillDigestSection = {
+  heading: string;
+  groups: BillDigestGroup[];
 };
 
 export function BillDigestEmail(props: {
   previewText: string;
-  groups: BillDigestGroup[];
+  sections: BillDigestSection[];
   moreCount: number;
   followedBillsHref: string;
   preferencesHref: string;
@@ -36,7 +42,7 @@ export function BillDigestEmail(props: {
 }) {
   const {
     previewText,
-    groups,
+    sections,
     moreCount,
     followedBillsHref,
     preferencesHref,
@@ -51,26 +57,30 @@ export function BillDigestEmail(props: {
       <Preview>{previewText}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={h1}>Your Kentucky bill digest</Heading>
-          <Text style={muted}>
-            Status changes on bills and topics you follow — factual updates pulled from LegiScan.
-          </Text>
-          <Section style={{ marginTop: 24 }}>
-            {groups.map((g) => (
-              <Section key={g.billHref} style={billBlock}>
-                <Link href={g.billHref} style={billLink}>
-                  <strong>{g.billNumber}</strong>
-                </Link>
-                <Text style={title}>{g.billTitle}</Text>
-                {g.lines.map((line, i) => (
-                  <Text key={i} style={lineText}>
-                    <strong>{line.eventLabel}</strong> — {line.detail}{' '}
-                    <span style={mutedSm}>({line.observedAt})</span>
-                  </Text>
-                ))}
-              </Section>
-            ))}
-          </Section>
+          <Heading style={h1}>Kentucky bill digest</Heading>
+          <Text style={muted}>Status updates for bills and topics you follow.</Text>
+          {sections.map((section) => (
+            <Section key={section.heading} style={{ marginTop: 24 }}>
+              <Text style={sectionHeading}>{section.heading}</Text>
+              {section.groups.map((g) => (
+                <Section key={g.billHref} style={billBlock}>
+                  <Link href={g.billHref} style={billLink}>
+                    <strong>{g.billNumber}</strong>
+                  </Link>
+                  <Text style={title}>{g.billTitle}</Text>
+                  {g.matchedTopics && g.matchedTopics.length > 0 && (
+                    <Text style={topicNote}>Matches your {g.matchedTopics.join(', ')} topic{g.matchedTopics.length === 1 ? '' : 's'}</Text>
+                  )}
+                  {g.lines.map((line, i) => (
+                    <Text key={i} style={lineText}>
+                      {line.detail}{' '}
+                      <span style={mutedSm}>({line.observedAt})</span>
+                    </Text>
+                  ))}
+                </Section>
+              ))}
+            </Section>
+          ))}
           {moreCount > 0 && (
             <Text style={{ marginTop: 16 }}>
               {moreCount} additional update{moreCount === 1 ? '' : 's'} not shown —{' '}
@@ -102,6 +112,15 @@ const container = { margin: '0 auto', padding: '24px 16px', maxWidth: 560 };
 const h1 = { fontSize: 22, margin: '0 0 8px' };
 const muted = { color: '#64748b', fontSize: 14, margin: '0 0 8px' };
 const mutedSm = { color: '#64748b', fontSize: 12 };
+const sectionHeading = {
+  fontSize: 13,
+  fontWeight: 600,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.04em',
+  color: '#475569',
+  margin: '0 0 12px',
+};
+const topicNote = { fontSize: 12, color: '#64748b', margin: '0 0 6px' };
 const billBlock = {
   borderBottom: '1px solid #e2e8f0',
   paddingBottom: 16,

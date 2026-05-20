@@ -1,11 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
-import {
-  KY_DIGEST_EVENT_LABELS,
-  type KyDigestEventType,
-} from '@/lib/ky-notification-preferences';
-import { formatDigestEventDetail } from '@/lib/digest/format-digest-event-detail';
+import { formatDigestEventDetail, formatDigestEventLabel } from '@/lib/digest/format-digest-event-detail';
 import { kyTodayIso, normalizeKyGaAgendaLine, normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
 
 const DEFAULT_LIMIT = 40;
@@ -97,10 +93,7 @@ export async function GET(request: NextRequest) {
       const meta = billMeta.get(billId);
       const eventType = row.event_type as string;
       const payload = (row.event_payload ?? {}) as Record<string, unknown>;
-      const label =
-        eventType in KY_DIGEST_EVENT_LABELS
-          ? KY_DIGEST_EVENT_LABELS[eventType as KyDigestEventType]
-          : eventType.replace(/_/g, ' ');
+      const label = formatDigestEventLabel(eventType, payload);
 
       const detail = formatDigestEventDetail(eventType, payload, meta?.title ?? null) || null;
       if (eventType === 'hearing_scheduled' && typeof payload.meeting_date === 'string') {
