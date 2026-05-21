@@ -1,0 +1,169 @@
+# LRC legislative calendar → ky_committees / ky_committee_meetings / agenda items.
+#
+# Live sync (~5 days visible on LRC): npm run sync:ky:lrc-calendar
+# Historical backfill (Internet Archive): npm run backfill:lrc:calendar
+#
+# Vercel Cron also runs lrc-calendar once daily (Hobby plan limit). This workflow adds
+# a second live pass and a weekly Wayback backfill so committee meetings stay current.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#
+# Optional Slack (see env-template.txt):
+#   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_SYNC_NOTIFY_CLI=true
+name: Sync LRC committee calendar
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_live:
+        description: 'Sync live LRC weekly calendar HTML'
+        type: boolean
+        default: true
+      run_backfill:
+        description: 'Backfill session history from Internet Archive (~10–20 min)'
+        type: boolean
+        default: false
+      backfill_from:
+        description: 'Backfill start date (ISO, default 2026 session start)'
+        required: false
+        default: ''
+      backfill_to:
+        description: 'Backfill end date (ISO, default today)'
+        required: false
+        default: ''
+  schedule:
+    # Live calendar — 12:00 and 18:00 UTC (07:00/13:00 ET standard time).
+    - cron: '0 12 * * *'
+    - cron: '0 18 * * *'
+    # Wayback backfill — Sundays 06:00 UTC (after the week’s captures settle).
+    - cron: '0 6 * * 0'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: sync-lrc-calendar
+  cancel-in-progress: false
+
+jobs:
+  live-calendar:
+    name: Live LRC calendar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: |
+      github.event_name == 'schedule' && (github.event.schedule == '0 12 * * *' || github.event.schedule == '0 18 * * *') ||
+      github.event_name == 'workflow_dispatch' && (inputs.run_live == true || inputs.run_live == 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Sync live legislative calendar
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+          SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+          SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_SYNC_NOTIFY_CLI: 'true'
+        run: npm run sync:ky:lrc-calendar
+
+      - name: Slack notify on workflow failure
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+        run: |
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
+            exit 0
+          fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"*KY Vote — LRC live calendar sync failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$WEBHOOK"
+
+  backfill-calendar:
+    name: Wayback calendar backfill
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: |
+      github.event_name == 'schedule' && github.event.schedule == '0 6 * * 0' ||
+      github.event_name == 'workflow_dispatch' && (inputs.run_backfill == true || inputs.run_backfill == 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Backfill historical meetings (Wayback)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+          SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+          SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_SYNC_NOTIFY_CLI: 'true'
+        run: |
+          set -euo pipefail
+          ARGS=""
+          if [ -n "${{ inputs.backfill_from }}" ]; then
+            ARGS="$ARGS --from=${{ inputs.backfill_from }}"
+          fi
+          if [ -n "${{ inputs.backfill_to }}" ]; then
+            ARGS="$ARGS --to=${{ inputs.backfill_to }}"
+          fi
+          for attempt in 1 2 3; do
+            echo "Backfill attempt $attempt/3…"
+            if npm run backfill:lrc:calendar -- $ARGS; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Wayback/CDX may be rate-limited; sleeping 60s before retry…"
+              sleep 60
+            fi
+          done
+          echo "Backfill failed after 3 attempts."
+          exit 1
+
+      - name: Refresh live calendar after backfill
+        if: success()
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+          SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+          SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_SYNC_NOTIFY_CLI: 'true'
+        run: npm run sync:ky:lrc-calendar
+
+      - name: Slack notify on workflow failure
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+        run: |
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
+            exit 0
+          fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"*KY Vote — LRC calendar Wayback backfill failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$WEBHOOK"
