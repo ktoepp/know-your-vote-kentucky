@@ -36,6 +36,7 @@ import {
   AccountCircle,
   CalendarMonth,
   Gavel,
+  Help as HelpIcon,
 } from '@mui/icons-material';
 import { KentuckyStateIcon } from '@/components/icons/KentuckyStateIcon';
 import { useThemeUtils } from '@/components/ui/ThemeUtils';
@@ -248,6 +249,27 @@ function GlobalSearchBar({ tone = 'default' }: { tone?: 'default' | 'onPrimary' 
   );
 }
 
+function TooltipToggleMenuItem({ onClose }: { onClose?: () => void }) {
+  const { tooltipsEnabled, toggleTooltips } = useTooltips();
+  return (
+    <MenuItem
+      onClick={() => {
+        toggleTooltips();
+        onClose?.();
+      }}
+      sx={{ gap: 1 }}
+    >
+      <ListItemIcon sx={{ minWidth: 36 }}>
+        <HelpIcon fontSize="small" sx={{ opacity: tooltipsEnabled ? 1 : 0.5 }} aria-hidden />
+      </ListItemIcon>
+      <ListItemText
+        primary={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
+        secondary="Bill status, process, and hover help"
+      />
+    </MenuItem>
+  );
+}
+
 // UserMenu component
 function UserMenu() {
   const pathname = usePathname();
@@ -292,6 +314,9 @@ function UserMenu() {
           <Divider />
           <MenuItem component={Link} href="/dashboard">Dashboard</MenuItem>
           <MenuItem component={Link} href="/profile">Profile</MenuItem>
+          <Divider />
+          <TooltipToggleMenuItem />
+          <Divider />
           <MenuItem component={Link} href="/auth/logout">Logout</MenuItem>
         </Menu>
       </>
@@ -329,7 +354,7 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const { getHoverBackground } = useThemeUtils();
-  const { tooltipsEnabled } = useTooltips();
+  const { tooltipsEnabled, toggleTooltips } = useTooltips();
   const { user, loading } = useUser();
 
   const isActive = (path: string) => isNavPathActive(path, pathname);
@@ -479,6 +504,27 @@ export default function Navigation() {
 
           {/* Right side items */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+              <MuiTooltip
+                title={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
+                placement="bottom"
+              >
+                <IconButton
+                  onClick={toggleTooltips}
+                  aria-label={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
+                  aria-pressed={tooltipsEnabled}
+                  sx={{
+                    color: 'text.primary',
+                    p: 1.25,
+                    borderRadius: 2,
+                    backgroundColor: tooltipsEnabled ? 'rgba(0,0,0,0.06)' : 'transparent',
+                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.08)' },
+                  }}
+                >
+                  <HelpIcon sx={{ fontSize: ICON_REM.nav, opacity: tooltipsEnabled ? 1 : 0.55 }} aria-hidden />
+                </IconButton>
+              </MuiTooltip>
+            </Box>
             {/* User menu */}
             <UserMenu />
 
@@ -547,6 +593,33 @@ export default function Navigation() {
                   </ListItemButton>
                 </ListItem>
               ))}
+              <Divider sx={{ my: 1 }} />
+              <ListItem sx={{ px: 2, py: 0 }}>
+                <ListItemButton
+                  onClick={() => {
+                    toggleTooltips();
+                    setMobileMenuOpen(false);
+                  }}
+                  sx={{
+                    borderRadius: 2,
+                    color: tooltipsEnabled ? mobileNav.colorActive : mobileNav.color,
+                    backgroundColor: tooltipsEnabled ? mobileNav.activeBg : 'transparent',
+                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                    <HelpIcon aria-hidden />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={tooltipsEnabled ? 'Disable tooltips' : 'Enable tooltips'}
+                    secondary="Educational hover help on bills"
+                    sx={{
+                      '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1rem' },
+                      '& .MuiListItemText-secondary': { fontSize: '0.8125rem' },
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
             </List>
           </Container>
         </Box>
