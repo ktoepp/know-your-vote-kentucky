@@ -88,8 +88,8 @@ export function ProfileSavedSearchesSection() {
         </Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Bookmark bill browse filters from <strong>Copy link to this search</strong> on the bills page. Topic
-        follows and digests still cover most &quot;new bill&quot; alerts without a rules wizard.
+        Bookmark bill browse filters with <strong>Save search</strong> on the bills page. Topic follows and
+        digests still cover most &quot;new bill&quot; alerts without a rules wizard.
       </Typography>
 
       {error && (
@@ -108,7 +108,7 @@ export function ProfileSavedSearchesSection() {
           <MuiLink component={NextLink} href="/bills" fontWeight={600}>
             Browse bills
           </MuiLink>
-          , apply filters, then use <strong>Copy link to this search</strong>.
+          , apply filters, then use <strong>Save search</strong>.
         </Typography>
       ) : (
         <List dense disablePadding>

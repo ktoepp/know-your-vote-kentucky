@@ -26,8 +26,7 @@ import {
   DialogActions,
   Snackbar,
 } from '@mui/material';
-import { Cancel, Search, ArrowDownward, ArrowUpward, ContentCopy, BookmarkAdd } from '@mui/icons-material';
-import { publicSiteOrigin } from '@/lib/site-canonical';
+import { Cancel, Search, ArrowDownward, ArrowUpward, BookmarkAdd } from '@mui/icons-material';
 import { SaveSearchDialogFields } from '@/components/profile/ProfileSavedSearchesSection';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
@@ -288,17 +287,6 @@ export function BillsBrowse({
     [statusFilter, topicFilter, effectiveFollowsMe, chamberMode, chamberFilter, nonDefaultSort],
   );
 
-  const copySearchLink = useCallback(async () => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : publicSiteOrigin();
-    const url = `${origin}${currentSearchHref}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopyToast('Link copied to clipboard.');
-    } catch {
-      setCopyToast('Could not copy — copy the URL from your browser bar.');
-    }
-  }, [currentSearchHref]);
-
   const saveSearch = useCallback(async () => {
     if (!session?.access_token || !saveLabel.trim()) return;
     setSaveBusy(true);
@@ -506,15 +494,6 @@ export function BillsBrowse({
                 variant="outlined"
               />
             )}
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<ContentCopy fontSize="small" />}
-              onClick={() => void copySearchLink()}
-              sx={{ textTransform: 'none' }}
-            >
-              Copy link to this search
-            </Button>
             {authed && (
               <Button
                 size="small"
