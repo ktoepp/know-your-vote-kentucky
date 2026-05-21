@@ -233,7 +233,6 @@ export function KYBillCard({ bill, legislators, followedBillIds, followedTopics 
         header={cardHeader}
         body={cardBody}
         footer={cardFooter}
-        enableHoverEffects={tooltipsEnabled}
       />
     </Box>
   );

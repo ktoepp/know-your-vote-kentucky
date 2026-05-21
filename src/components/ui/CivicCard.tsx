@@ -31,8 +31,6 @@ export interface CivicCardProps {
   className?: string;
   /** Escape hatch for downstream migrations that need additional styles. Merged onto the Card `sx`. */
   sx?: CardProps['sx'];
-  /** When false on interactive bill cards, skips hover lift (e.g. tooltips off). Defaults to true. */
-  enableHoverEffects?: boolean;
 }
 
 /**
@@ -59,11 +57,9 @@ export function CivicCard({
   id,
   className,
   sx,
-  enableHoverEffects = true,
 }: CivicCardProps) {
   const theme = useTheme();
   const isInteractive = Boolean(href) || Boolean(onClick);
-  const useHoverLift = isInteractive && (variant === 'bill' ? enableHoverEffects : true);
 
   const interactiveProps: Record<string, unknown> = href
     ? { component: Link, href }
@@ -93,13 +89,11 @@ export function CivicCard({
         transition: CARD.hoverTransition,
         ...(isInteractive && {
           cursor: 'pointer',
-          ...(useHoverLift && {
-            '&:hover': {
-              boxShadow: CARD.elevation.hover,
-              transform: CARD.hoverTransform,
-              borderColor: theme.palette.primary.main,
-            },
-          }),
+          '&:hover': {
+            boxShadow: CARD.elevation.hover,
+            transform: CARD.hoverTransform,
+            borderColor: theme.palette.primary.main,
+          },
           '&:focus-visible': {
             outline: 'none',
             boxShadow: `0 0 0 3px ${theme.palette.primary.main}66`,
