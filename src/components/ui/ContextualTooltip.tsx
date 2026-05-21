@@ -1,7 +1,7 @@
 'use client';
 
 import { Tooltip } from './Tooltip';
-import { getTooltipContent, TooltipContent } from '@/lib/tooltipContent';
+import { getTooltipContent } from '@/lib/tooltipContent';
 
 interface ContextualTooltipProps {
   term: string;
@@ -44,11 +44,12 @@ export const ContextualTooltip = ({
   ) : children;
   
   return (
-    <Tooltip 
-      content={contextualContent} 
+    <Tooltip
+      content={contextualContent}
       position={position}
       className={className}
       maxWidth="max-w-md"
+      glossaryKey={term}
     >
       {triggerElement}
     </Tooltip>
