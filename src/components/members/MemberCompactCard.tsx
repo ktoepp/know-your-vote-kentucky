@@ -2,18 +2,18 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Box, Card, CardContent, Typography } from '@mui/material';
+import { Card, CardContent } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { OpenInNew } from '@mui/icons-material';
 import type { KYLegislator } from '@/types/kentucky';
+import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBlock';
 import { MemberName } from '@/components/civic/MemberName';
-import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
 import { MetaChip } from '@/components/ui/Chip';
-import { formatKyLegislatorDistrict } from '@/lib/bill-display';
+import { legislatorRoleDistrictLine } from '@/lib/legislator-display';
+import { CARD } from '@/lib/ui-tokens';
 import {
   kyLegislatorAvatarInitials,
   kyLegislatorPortraitAlt,
-  kyMemberTitleShort,
   normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
 
@@ -29,12 +29,6 @@ export interface MemberCompactCardProps {
   roleLabel?: string | null;
   /** Heading level for the member name. @default 'h3' */
   profileNameHeading?: 'h2' | 'h3' | 'h4';
-}
-
-function subtitleFor(leg: KYLegislator): string {
-  const title = kyMemberTitleShort(leg);
-  const district = formatKyLegislatorDistrict(leg);
-  return district ? `${title} · ${district}` : title;
 }
 
 function initialsFromName(name: string): string {
@@ -71,9 +65,9 @@ export function MemberCompactCard({
       sx={{
         height: '100%',
         position: 'relative',
-        borderRadius: 3,
+        borderRadius: CARD.borderRadius,
         border: `1px solid ${theme.palette.divider}`,
-        transition: 'all 0.2s ease',
+        transition: CARD.hoverTransition,
         ...(clickable && {
           cursor: 'pointer',
           '&:has(.member-card-stretch-link:focus-visible)': {
@@ -82,7 +76,7 @@ export function MemberCompactCard({
           },
           '&:hover': {
             boxShadow: 4,
-            transform: 'translateY(-2px)',
+            transform: CARD.hoverTransform,
             borderColor: theme.palette.primary.main,
           },
         }),
@@ -98,7 +92,7 @@ export function MemberCompactCard({
             position: 'absolute',
             inset: 0,
             zIndex: 1,
-            borderRadius: theme.spacing(3),
+            borderRadius: theme.spacing(CARD.borderRadius),
             textDecoration: 'none',
           }}
         >
@@ -107,45 +101,39 @@ export function MemberCompactCard({
       )}
       <CardContent
         sx={{
-          display: 'flex',
-          gap: 2,
-          alignItems: 'center',
-          p: 2,
-          '&:last-child': { pb: 2 },
+          p: CARD.padding,
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
           position: 'relative',
           zIndex: 2,
           pointerEvents: clickable ? 'none' : undefined,
         }}
       >
-        <LegislatorAvatar
-          src={portraitSrc}
-          alt={leg ? kyLegislatorPortraitAlt(leg) : displayName}
-          imgProps={{ referrerPolicy: 'no-referrer' }}
-          party={leg?.party}
-          initials={initials}
-          showPartyBadge={Boolean(leg)}
-          sx={{ width: 56, height: 56, fontSize: '1.1rem', fontWeight: 700 }}
+        <LegislatorIdentityBlock
+          name={
+            leg ? (
+              <>
+                <MemberName member={leg} variant="primary" />
+                {external && (
+                  <OpenInNew sx={{ fontSize: '0.85rem', opacity: 0.55, ml: 0.5, verticalAlign: 'middle' }} aria-hidden />
+                )}
+              </>
+            ) : (
+              displayName
+            )
+          }
+          nameComponent={profileNameHeading}
+          roleLine={leg ? legislatorRoleDistrictLine(leg) : 'LRC legislator profile'}
+          density="compact"
+          avatar={{
+            src: portraitSrc,
+            alt: leg ? kyLegislatorPortraitAlt(leg) : displayName,
+            party: leg?.party,
+            initials,
+            showPartyBadge: Boolean(leg),
+            imgProps: { referrerPolicy: 'no-referrer' },
+          }}
+          chips={roleLabel ? <MetaChip label={roleLabel} size="small" tone="primary" variant="outlined" /> : undefined}
         />
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography
-            component={profileNameHeading}
-            variant="subtitle1"
-            fontWeight={700}
-            color="text.primary"
-            sx={{ lineHeight: 1.3, m: 0 }}
-          >
-            {leg ? <MemberName member={leg} variant="primary" /> : displayName}
-            {external && (
-              <OpenInNew sx={{ fontSize: '0.85rem', opacity: 0.55, ml: 0.5, verticalAlign: 'middle' }} aria-hidden />
-            )}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-            {leg ? subtitleFor(leg) : 'LRC legislator profile'}
-          </Typography>
-          {roleLabel && (
-            <MetaChip label={roleLabel} size="small" tone="primary" variant="outlined" sx={{ mt: 0.75 }} />
-          )}
-        </Box>
       </CardContent>
     </Card>
   );

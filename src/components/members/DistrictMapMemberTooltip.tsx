@@ -1,17 +1,14 @@
 'use client';
 
 import NextLink from 'next/link';
-import { Box, Button, Card, Chip, Divider, Link as MuiLink, Stack, Typography } from '@mui/material';
-import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
+import { Box, Button, Card, Divider, Link as MuiLink, Stack, Typography } from '@mui/material';
+import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBlock';
 import type { KYLegislator } from '@/types/kentucky';
-import { formatKyLegislatorDistrict, formatRepresentativePartyChipLabel, partyBadgeBackgroundColor } from '@/lib/bill-display';
-import { CHIP } from '@/lib/ui-tokens';
+import { legislatorRoleDistrictLine } from '@/lib/legislator-display';
 import {
-  isKentuckyGovernor,
   kyLegislatorAvatarInitials,
   kyLegislatorPortraitAlt,
   kyLegislaturePublicUrl,
-  kyMemberTitleShort,
   legislatorDisplayPhone,
   memberProfilePath,
   normalizeLegislatorPhotoUrl,
@@ -19,14 +16,6 @@ import {
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { MemberName } from '@/components/civic/MemberName';
 import { Phone, Email as EmailIcon } from '@mui/icons-material';
-
-/** Role line for map tooltip: district is already shown above, so omit repeating it. */
-function mapTooltipRoleLine(leg: KYLegislator): string {
-  const title = kyMemberTitleShort(leg);
-  const district = formatKyLegislatorDistrict(leg);
-  if (isKentuckyGovernor(leg) && !district) return `${title} · Statewide`;
-  return title;
-}
 
 export type DistrictMapTooltipSection = {
   chamberLabel: 'House' | 'Senate';
@@ -95,29 +84,23 @@ function DistrictMapTooltipSectionView({
       )}
 
       {leg && (
-        <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mb: 1.25 }}>
-          <LegislatorAvatar
-            src={
-              normalizeLegislatorPhotoUrl(leg.photo_url) ||
-              normalizeLegislatorPhotoUrl(leg.legiscan_image_url) ||
-              undefined
-            }
-            alt={kyLegislatorPortraitAlt(leg)}
-            imgProps={{ referrerPolicy: 'no-referrer' }}
-            party={leg.party}
-            initials={kyLegislatorAvatarInitials(leg)}
-            sx={{ width: 48, height: 48, flexShrink: 0, fontWeight: 700, fontSize: '1rem' }}
+        <Box sx={{ mb: 1.25 }}>
+          <LegislatorIdentityBlock
+            name={<MemberName member={leg} variant="primary" />}
+            roleLine={legislatorRoleDistrictLine(leg, { includeDistrict: false })}
+            density="compact"
+            gap={1.25}
+            avatar={{
+              src:
+                normalizeLegislatorPhotoUrl(leg.photo_url) ||
+                normalizeLegislatorPhotoUrl(leg.legiscan_image_url) ||
+                undefined,
+              alt: kyLegislatorPortraitAlt(leg),
+              party: leg.party,
+              initials: kyLegislatorAvatarInitials(leg),
+              imgProps: { referrerPolicy: 'no-referrer' },
+            }}
           />
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="subtitle1" fontWeight={800} color="text.primary" sx={{ lineHeight: 1.25 }} gutterBottom>
-              <MemberName member={leg} variant="primary" />
-            </Typography>
-            <Typography variant="body2" fontWeight={700} color="primary.main" sx={{ mb: 0.75, lineHeight: 1.35 }}>
-              {mapTooltipRoleLine(leg)}
-            </Typography>
-            {leg.party && (
-              <Chip label={formatRepresentativePartyChipLabel(leg.party)} size="small" sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(leg.party), color: '#fff' }} />
-            )}
             {(leg.email ||
               legislatorDisplayPhone(leg.phone) ||
               (leg.chamber && kyLegislaturePublicUrl(leg, legislatorRoster))) && (
@@ -168,7 +151,6 @@ function DistrictMapTooltipSectionView({
                 )}
               </Box>
             )}
-          </Box>
         </Box>
       )}
 

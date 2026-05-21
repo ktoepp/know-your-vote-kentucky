@@ -47,6 +47,71 @@ export const TYPE = {
   meta: { variant: 'caption' as const },
 } as const;
 
+/**
+ * Legislator identity block on member cards, bill sponsors, and map tooltips.
+ * Name is one step up from role/district (h6 vs subtitle1).
+ */
+export const LEGISLATOR_NAME_SX = {
+  variant: TYPE.cardTitle.variant,
+  fontWeight: TYPE.cardTitle.fontWeight,
+  color: 'text.primary',
+  lineHeight: 1.25,
+  m: 0,
+} as const;
+
+export const LEGISLATOR_ROLE_LINE_SX = {
+  variant: TYPE.subsection.variant,
+  fontWeight: TYPE.subsection.fontWeight,
+  color: 'text.secondary',
+  lineHeight: 1.35,
+  m: 0,
+} as const;
+
+/** Uppercase field labels on dense bill cards (“Primary sponsor”, “Latest action”). */
+export const LEGISLATOR_FIELD_LABEL_SX = {
+  variant: TYPE.meta.variant,
+  display: 'block',
+  color: 'text.secondary',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  fontWeight: 600,
+  fontSize: '0.7rem',
+  mb: 0.5,
+} as const;
+
+/** Avatar diameters (px) by surface density. */
+export const LEGISLATOR_AVATAR = {
+  size: {
+    hero: 88,
+    card: 72,
+    compact: 56,
+    detail: 72,
+    inline: 40,
+    inlineDense: 32,
+  },
+  initialsFontSize: {
+    hero: '1.5rem',
+    card: '1.25rem',
+    compact: '1.1rem',
+    detail: '1.25rem',
+    inline: '0.8rem',
+    inlineDense: '0.7rem',
+  },
+} as const;
+
+/** Text-style external links on legislator cards (KY Legislature, Ballotpedia, …). */
+export const LEGISLATOR_EXTERNAL_LINK = {
+  buttonSx: {
+    color: 'text.secondary',
+    fontWeight: 500,
+    textTransform: 'none',
+    fontSize: '0.8125rem',
+    minHeight: 32,
+    '&:hover': { bgcolor: 'action.hover' },
+  },
+  iconSx: { fontSize: '0.9rem', opacity: 0.65 },
+} as const;
+
 /** Slightly larger than body text — use for MuiLink defaults and prominent text links */
 export const LINK = {
   fontSize: '1.0625rem',

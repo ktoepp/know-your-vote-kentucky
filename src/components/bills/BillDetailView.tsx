@@ -11,7 +11,6 @@ import {
   Chip as MuiChip,
   Divider as MuiDivider,
   Button as MuiButton,
-  Avatar as MuiAvatar,
   Grid as MuiGrid,
   Tooltip as MuiTooltip,
   ToggleButton,
@@ -32,17 +31,16 @@ import { alpha } from '@mui/material/styles';
 import NextLink from 'next/link';
 import { AiGeneratedBlock } from '@/components/civic/AiAttribution';
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
+import { LegislatorExternalLinkButton } from '@/components/civic/LegislatorExternalLinkButton';
+import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBlock';
 import { MemberName } from '@/components/civic/MemberName';
 import { BillNumber } from '@/components/bills/BillNumber';
 import { BillStatusMetaChip } from '@/components/bills/BillStatusMetaChip';
-import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
+import { MetaChip } from '@/components/ui/Chip';
+import { legislatorRoleDistrictLineFromSponsor } from '@/lib/legislator-display';
 import {
   billStatusToTooltipKey,
   formatBillLabelText,
-  formatLegislativeRoleLabel,
-  formatRepresentativePartyChipLabel,
-  formatSponsorDistrictLine,
-  partyBadgeBackgroundColor,
 } from '@/lib/bill-display';
 import { governmentTooltips, voteCountTooltips } from '@/lib/tooltipContent';
 import { getSessionTooltip } from '@/lib/ky-sessions';
@@ -60,7 +58,7 @@ import {
   httpUrlForUiLink,
   kyLrcBillDetailsUrl,
 } from '@/lib/external-legislative-links';
-import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, LINK, TYPE } from '@/lib/ui-tokens';
+import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, TYPE } from '@/lib/ui-tokens';
 import { useTooltips } from '@/lib/TooltipContext';
 import { BillHistoryActionText } from '@/components/bills/BillHistoryActionText';
 import { FollowBillButton } from '@/components/bills/FollowBillButton';
@@ -132,107 +130,58 @@ function fmtDate(d: string | null | undefined, opts?: Intl.DateTimeFormatOptions
 /* ------------------------------------------------------------------ */
 /* Sub-components                                                       */
 /* ------------------------------------------------------------------ */
-function SponsorCard({ sponsor, rosterPhoto }: { sponsor: LegiScanSponsor; rosterPhoto?: string | null }) {
+function SponsorCard({
+  sponsor,
+  rosterPhoto,
+  legislators,
+}: {
+  sponsor: LegiScanSponsor;
+  rosterPhoto?: string | null;
+  legislators: KYLegislatorRoster[];
+}) {
   const theme = useTheme();
   const photo = normalizeLegislatorPhotoUrl(rosterPhoto || sponsor.bio?.social?.image);
   const memberHref = memberProfilePath({ name: sponsor.name, id: sponsor.name });
   const ballotpediaUrl = normalizeBallotpediaHref(sponsor.bio?.social?.ballotpedia ?? sponsor.ballotpedia);
   const officialProfileHref = httpUrlForUiLink(sponsor.bio?.social?.biography);
   const isPrimary = sponsor.sponsor_type_id === 1;
+  const roleLine = legislatorRoleDistrictLineFromSponsor(sponsor, legislators);
 
   return (
     <MuiCard sx={{ borderRadius: 2, border: `1px solid ${theme.palette.divider}`, height: '100%' }}>
       <MuiCardContent>
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', mb: 1.5 }}>
-          <LegislatorAvatar
-            src={photo || undefined}
-            alt={kySponsorPortraitAlt(sponsor.name)}
-            imgProps={{ referrerPolicy: 'no-referrer' }}
-            party={sponsor.party}
-            initials={`${sponsor.first_name?.[0] ?? ''}${sponsor.last_name?.[0] ?? ''}`}
-            sx={{ width: 78, height: 78, flexShrink: 0, fontSize: '1.25rem' }}
-          />
-          <Box sx={{ minWidth: 0 }}>
-            <Typography
-              variant="subtitle2"
-              fontWeight={700}
-              noWrap
-              component={NextLink}
-              href={memberHref}
-              sx={{
-                fontSize: LINK.fontSize,
-                fontWeight: 700,
-                color: 'inherit',
-                textDecoration: 'none',
-                '&:hover': { textDecoration: 'underline' },
-              }}
-            >
-              <MemberName member={sponsor} variant="primary" />
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
-              <MuiChip
-                component={NextLink}
-                href={memberHref}
-                clickable
-                label={formatRepresentativePartyChipLabel(sponsor.party)}
-                size="small"
-                sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(sponsor.party), color: '#fff' }}
-              />
-              {sponsor.role ? (
-                <MuiChip
-                  label={formatLegislativeRoleLabel(sponsor.role)}
-                  size="small"
-                  variant="outlined"
-                  sx={CHIP.compact}
-                />
-              ) : null}
-              {isPrimary && (
-                <MuiChip label="Primary sponsor" size="small" color="primary" sx={CHIP.compact} />
-              )}
-            </Box>
-          </Box>
-        </Box>
+        <LegislatorIdentityBlock
+          name={<MemberName member={sponsor} variant="primary" />}
+          nameHref={memberHref}
+          roleLine={roleLine}
+          density="detail"
+          avatar={{
+            src: photo || undefined,
+            alt: kySponsorPortraitAlt(sponsor.name),
+            party: sponsor.party,
+            initials: `${sponsor.first_name?.[0] ?? ''}${sponsor.last_name?.[0] ?? ''}`,
+            imgProps: { referrerPolicy: 'no-referrer' },
+          }}
+          chips={
+            isPrimary ? (
+              <MetaChip label="Primary sponsor" size="small" tone="primary" variant="filled" />
+            ) : undefined
+          }
+        />
 
-        {sponsor.district && (
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-            {formatSponsorDistrictLine(sponsor.district)}
-          </Typography>
-        )}
         {sponsor.bio?.social?.email && (
-          <Box sx={{ mb: 0.5 }}>
+          <Box sx={{ mt: 1.5, mb: 0.5 }}>
             <CopyableEmail email={sponsor.bio.social.email} />
           </Box>
         )}
 
         {(ballotpediaUrl || officialProfileHref) && (
-        <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
-          {ballotpediaUrl && (
-            <MuiButton
-              size="medium"
-              variant="contained"
-              href={ballotpediaUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-              sx={{ fontSize: '0.9rem', py: 0.75, px: 1.5 }}
-            >
-              Ballotpedia
-            </MuiButton>
-          )}
-          {officialProfileHref && (
-            <MuiButton
-              size="medium"
-              variant="outlined"
-              href={officialProfileHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-              sx={{ fontSize: '0.9rem', py: 0.75, px: 1.5, color: 'primary.main', borderColor: 'primary.main' }}
-            >
-              Official profile
-            </MuiButton>
-          )}
-        </Box>
+          <Box sx={{ display: 'flex', gap: 0.25, mt: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+            {ballotpediaUrl && <LegislatorExternalLinkButton href={ballotpediaUrl}>Ballotpedia</LegislatorExternalLinkButton>}
+            {officialProfileHref && (
+              <LegislatorExternalLinkButton href={officialProfileHref}>Official profile</LegislatorExternalLinkButton>
+            )}
+          </Box>
         )}
       </MuiCardContent>
     </MuiCard>
@@ -288,26 +237,32 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
         return (
           <Box
             key={`${item.date}-${i}-${item.chamber}-${(item.action || '').slice(0, 48)}`}
-            sx={{ display: 'flex', gap: 2, mb: isLast ? 0 : 2 }}
+            sx={{ display: 'flex', gap: 1.5, mb: isLast ? 0 : 1 }}
           >
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
               <Box sx={{
-                width: 10, height: 10, borderRadius: '50%', mt: 0.6,
+                width: 10, height: 10, borderRadius: '50%', mt: 0.35,
                 bgcolor: pinBg,
                 border: `2px solid ${pinBorder}`,
                 boxSizing: 'border-box',
               }} />
-              {!isLast && <Box sx={{ width: 2, flexGrow: 1, bgcolor: theme.palette.divider, mt: 0.5 }} />}
+              {!isLast && <Box sx={{ width: 2, flexGrow: 1, bgcolor: theme.palette.divider, mt: 0.35 }} />}
             </Box>
-            <Box sx={{ pb: isLast ? 0 : 2 }}>
-              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.25 }}>
+            <Box sx={{ pb: 0, minWidth: 0 }}>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.125, lineHeight: 1.3 }}>
                 {fmtDate(item.date, { month: 'short', day: 'numeric', year: 'numeric' })}
                 {' · '}
                 <Box component="span" sx={{ fontWeight: 600 }}>
                   {item.chamber === 'H' ? 'House' : item.chamber === 'S' ? 'Senate' : item.chamber}
                 </Box>
               </Typography>
-              <Typography component="div" variant="body2" color={isImportant ? 'text.primary' : 'text.secondary'} fontWeight={isImportant ? 500 : 400}>
+              <Typography
+                component="div"
+                variant="body2"
+                color={isImportant ? 'text.primary' : 'text.secondary'}
+                fontWeight={isImportant ? 500 : 400}
+                sx={{ lineHeight: 1.35 }}
+              >
                 <BillHistoryActionText text={item.action} />
                 {!isImportant && tooltipsEnabled && (
                   <LegislativeStageTooltip stage="clerical" showIcon={false} position="top">
@@ -700,6 +655,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                       <SponsorCard
                         key={s.people_id}
                         sponsor={s}
+                        legislators={legislators}
                         rosterPhoto={
                           normalizeLegislatorPhotoUrl(
                             matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
@@ -730,57 +686,27 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                           s.bio?.social?.image,
                       );
                       return (
-                      <Box key={s.people_id} sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                        <MuiAvatar
-                          src={coPhoto || undefined}
-                          alt={kySponsorPortraitAlt(s.name)}
-                          imgProps={{ referrerPolicy: 'no-referrer' }}
-                          sx={{ width: 54, height: 54, flexShrink: 0 }}
-                        >
-                          {s.first_name?.[0]}{s.last_name?.[0]}
-                        </MuiAvatar>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography
-                            variant="body2"
-                            fontWeight={600}
-                            component={NextLink}
-                            href={coHref}
-                            sx={{
-                              fontSize: LINK.fontSize,
-                              fontWeight: 600,
-                              color: 'inherit',
-                              textDecoration: 'none',
-                              '&:hover': { textDecoration: 'underline' },
+                        <Box key={s.people_id}>
+                          <LegislatorIdentityBlock
+                            name={<MemberName member={s} variant="primary" />}
+                            nameHref={coHref}
+                            roleLine={legislatorRoleDistrictLineFromSponsor(s, legislators)}
+                            density="compact"
+                            avatar={{
+                              src: coPhoto || undefined,
+                              alt: kySponsorPortraitAlt(s.name),
+                              party: s.party,
+                              initials: `${s.first_name?.[0] ?? ''}${s.last_name?.[0] ?? ''}`,
+                              imgProps: { referrerPolicy: 'no-referrer' },
                             }}
-                            noWrap
-                          >
-                            {s.name}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.5, mt: 0.25, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <MuiChip
-                              component={NextLink}
-                              href={coHref}
-                              clickable
-                              label={formatRepresentativePartyChipLabel(s.party)}
-                              size="small"
-                              sx={{ ...CHIP.compact, bgcolor: partyBadgeBackgroundColor(s.party), color: '#fff' }}
-                            />
-                            <MuiChip label="Co-sponsor" size="small" color="primary" sx={CHIP.compact} />
-                            {coBp && (
-                              <MuiButton
-                                size="small"
-                                href={coBp}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                                sx={{ fontSize: '0.875rem', py: 0.5, px: 1, minWidth: 0, lineHeight: 1.2 }}
-                              >
-                                Ballotpedia
-                              </MuiButton>
-                            )}
-                          </Box>
+                            chips={
+                              <>
+                                <MetaChip label="Co-sponsor" size="small" tone="primary" variant="filled" />
+                                {coBp && <LegislatorExternalLinkButton href={coBp}>Ballotpedia</LegislatorExternalLinkButton>}
+                              </>
+                            }
+                          />
                         </Box>
-                      </Box>
                       );
                     })}
                   </Box>

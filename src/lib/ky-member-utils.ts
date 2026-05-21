@@ -538,7 +538,7 @@ function memberDistrictNumber(district: string | null | undefined): string {
 /**
  * Canonical name renderer from UX normalization spec §2c.
  * - `primary`  → `"Jane Smith"` (card titles, sponsor headers)
- * - `compact`  → `"Jane Smith (D)"` (sponsor chips)
+ * - `compact`  → `"Jane Smith (D)"` (dense inline text only — not used when a portrait party badge is shown)
  * - `long`     → `"Rep. Jane Smith (D-KY-26)"` (dense inline attribution)
  */
 export function formatMemberDisplay(
