@@ -39,7 +39,6 @@ import { BillStatusMetaChip } from '@/components/bills/BillStatusMetaChip';
 import { MetaChip } from '@/components/ui/Chip';
 import { legislatorRoleDistrictLineFromSponsor } from '@/lib/legislator-display';
 import {
-  billStatusToTooltipKey,
   formatBillLabelText,
 } from '@/lib/bill-display';
 import { governmentTooltips, voteCountTooltips } from '@/lib/tooltipContent';
@@ -442,22 +441,9 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                   >{chip}</MuiTooltip>
                 ) : chip;
               })()}
-              {effectiveStatus && (() => {
-                const statusKey = billStatusToTooltipKey(effectiveStatus);
-                const statusTip = statusKey ? governmentTooltips[statusKey] : null;
-                const chip = (
-                  <BillStatusMetaChip bill={bill} statusOverride={effectiveStatus} variant="detail" />
-                );
-                return statusTip ? (
-                  <MuiTooltip
-                    key="status"
-                    title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{statusTip.title}</Typography><Typography variant="body2">{statusTip.content}</Typography></Box>}
-                    arrow
-                    enterDelay={300}
-                    componentsProps={{ tooltip: { sx: { maxWidth: 340, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}
-                  >{chip}</MuiTooltip>
-                ) : chip;
-              })()}
+              {effectiveStatus && (
+                <BillStatusMetaChip key="status" bill={bill} statusOverride={effectiveStatus} variant="detail" />
+              )}
               {bill.session && (() => {
                 const sessionTip = getSessionTooltip(bill.session);
                 const chip = (

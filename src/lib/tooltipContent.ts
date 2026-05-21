@@ -149,7 +149,12 @@ export const governmentTooltips: Record<string, TooltipContent> = {
 
   signed_by_governor: {
     title: "Signed by Governor",
-    content: "The Governor has approved and signed the bill into law."
+    content: "The Governor has approved and signed the bill. It still must be enrolled, delivered to the Secretary of State, and chaptered in the Kentucky Revised Statutes before it is fully on the books as state law."
+  },
+
+  chaptered: {
+    title: "Chaptered",
+    content: "The bill has been assigned a chapter number in the Kentucky Revised Statutes (KRS) and filed with the Secretary of State. Chaptering is the final formal step — the measure is now part of Kentucky law."
   },
 
   vetoed: {
@@ -483,7 +488,8 @@ export const billStatusExplanations: Record<string, string> = {
   engrossed: "Passed one chamber; printed in final form for transmission",
   enrolled: "Passed both chambers; signed by chamber leaders; sent to Governor",
   enacted: "Signed into law by the Governor",
-  signed_by_governor: "Governor has signed the bill into law",
+  signed_by_governor: "Governor has signed the bill; it still must be chaptered in the KRS to become law on the books",
+  chaptered: "Assigned a KRS chapter number and filed with the Secretary of State — now part of Kentucky law",
   vetoed: "Governor has rejected the bill; override requires 3/5 of elected members in each chamber",
   veto_override: "General Assembly voted to override the Governor's veto",
   tabled: "Set aside indefinitely; effectively ends progress this session",
