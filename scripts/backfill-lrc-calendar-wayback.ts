@@ -55,10 +55,21 @@ async function listWaybackSnapshots(fromIso: string, toIso: string): Promise<str
     limit: '200',
   });
 
-  const res = await axios.get<CdxRow[]>(`${CDX_URL}?${params}`, {
+  const requestUrl = `${CDX_URL}?${params}`;
+  const requestOpts = {
     timeout: 120_000,
     headers: { 'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; lrc-calendar-backfill)' },
-  });
+  };
+
+  let res;
+  try {
+    res = await axios.get<CdxRow[]>(requestUrl, requestOpts);
+  } catch (err) {
+    const backoffMs = 5_000 + Math.floor(Math.random() * 5_000);
+    console.warn(`Wayback CDX list failed (${(err as Error).message}); retrying once in ${backoffMs}ms…`);
+    await sleep(backoffMs);
+    res = await axios.get<CdxRow[]>(requestUrl, requestOpts);
+  }
 
   const rows = res.data;
   if (!rows?.length || rows.length < 2) return [];
