@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Chip } from '@mui/material';
 import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
 import { formatMemberDisplay, memberSlug, normalizeLegislatorPhotoUrl, kySponsorPortraitAlt } from '@/lib/ky-member-utils';
-import { formatRepresentativePartyChipLabel } from '@/lib/bill-display';
+import { formatPartyLetterAbbrev } from '@/lib/bill-display';
 import { CHIP } from '@/lib/ui-tokens';
 
 function initials(name: string) {
@@ -30,7 +30,8 @@ export function SponsorAvatarChip({
   const router = useRouter();
   const slug = memberSlug(name);
   const href = `/members/${slug}`;
-  const label = formatMemberDisplay({ name, party }, 'compact');
+  const label = formatMemberDisplay({ name }, 'primary');
+  const partyAbbrev = formatPartyLetterAbbrev(party);
   return (
     <Chip
       clickable
@@ -56,7 +57,7 @@ export function SponsorAvatarChip({
         />
       }
       label={label}
-      title={party ? `${name} · ${formatRepresentativePartyChipLabel(party)}` : name}
+      title={partyAbbrev ? `${name} · ${partyAbbrev}` : name}
       sx={{ ...CHIP.standard, ...CHIP.avatar }}
     />
   );

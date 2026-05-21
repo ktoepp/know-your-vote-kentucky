@@ -231,7 +231,7 @@ export function formatPartyLetterAbbrev(party: string | null | undefined): strin
 }
 
 /**
- * Party text for representative/sponsor chips: full name plus letter, e.g. "Democrat (D)", "Republican (R)".
+ * Full party label (legacy / non-portrait contexts). Legislator UI uses portrait badge only — not separate party chips.
  */
 export function formatRepresentativePartyChipLabel(party: string | null | undefined): string {
   const abbrev = formatPartyLetterAbbrev(party);

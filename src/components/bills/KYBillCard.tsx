@@ -7,7 +7,14 @@ import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
 import { Bookmark } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
-import { memberSlug, normalizeLegislatorPhotoUrl, kySponsorPortraitAlt } from '@/lib/ky-member-utils';
+import {
+  matchLegislatorBySponsorName,
+  memberSlug,
+  normalizeLegislatorPhotoUrl,
+  kySponsorPortraitAlt,
+} from '@/lib/ky-member-utils';
+import { legislatorAvatarSx, legislatorRoleDistrictLine } from '@/lib/legislator-display';
+import { LEGISLATOR_FIELD_LABEL_SX, LEGISLATOR_NAME_SX, LEGISLATOR_ROLE_LINE_SX } from '@/lib/ui-tokens';
 import { BillStatusMetaChip } from '@/components/bills/BillStatusMetaChip';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { ChamberChip } from '@/components/ui/Chip';
@@ -70,6 +77,14 @@ export function KYBillCard({ bill, legislators, followedBillIds, followedTopics 
           .filter(Boolean)
           .join(', ')
       : '';
+  const singlePrimaryRoleLine =
+    sponsorGroups.primary.length === 1
+      ? (() => {
+          const s = sponsorGroups.primary[0]!;
+          const leg = matchLegislatorBySponsorName(legislators, s.name);
+          return leg ? legislatorRoleDistrictLine(leg) : null;
+        })()
+      : null;
 
   const cardHeader = (
     <Box
@@ -141,9 +156,7 @@ export function KYBillCard({ bill, legislators, followedBillIds, followedTopics 
                     }}
                     title={s.name}
                     sx={{
-                      width: compact ? 32 : 40,
-                      height: compact ? 32 : 40,
-                      fontSize: compact ? '0.7rem' : '0.8rem',
+                      ...legislatorAvatarSx(compact ? 'inlineDense' : 'inline'),
                       cursor: 'pointer',
                       border: '1px solid',
                       borderColor: 'divider',
@@ -153,53 +166,25 @@ export function KYBillCard({ bill, legislators, followedBillIds, followedTopics 
               })}
             </Box>
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography
-                variant="caption"
-                display="block"
-                color="text.secondary"
-                sx={{
-                  mb: 0.5,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                }}
-              >
+              <Typography component="span" sx={LEGISLATOR_FIELD_LABEL_SX}>
                 {sponsorGroups.primary.length > 1 ? 'Primary sponsors' : 'Primary sponsor'}
               </Typography>
-              <Typography
-                variant="body2"
-                display="block"
-                color="text.primary"
-                sx={{
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  lineHeight: 1.35,
-                  opacity: 0.9,
-                }}
-              >
+              <Typography component="div" sx={{ ...LEGISLATOR_NAME_SX, fontSize: '0.9375rem' }}>
                 {primarySponsorLine}
               </Typography>
+              {singlePrimaryRoleLine && (
+                <Typography component="p" sx={{ ...LEGISLATOR_ROLE_LINE_SX, fontSize: '0.8125rem', mt: 0.25 }}>
+                  {singlePrimaryRoleLine}
+                </Typography>
+              )}
             </Box>
           </Box>
         )}
         {(bill.last_action_date || bill.last_action) && (
           <Box>
             <Typography
-              variant="caption"
-              display="block"
-              color="text.secondary"
-              sx={{
-                mb: bill.last_action ? 0.5 : 0,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                fontWeight: 600,
-                fontSize: '0.7rem',
-              }}
+              component="span"
+              sx={{ ...LEGISLATOR_FIELD_LABEL_SX, mb: bill.last_action ? 0.5 : 0 }}
             >
               Latest action{actionDateCard ? ` · ${actionDateCard}` : ''}
             </Typography>

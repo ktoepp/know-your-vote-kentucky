@@ -8,23 +8,24 @@ import {
   Card,
   CardActions,
   CardContent,
-  Chip,
   Divider,
   Stack,
   Tooltip,
   Typography,
 } from '@mui/material';
-import { Email, OpenInNew, Phone, Public } from '@mui/icons-material';
+import { Email, Phone, Public } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import type { KYLegislator } from '@/types/kentucky';
 import { useTooltips } from '@/lib/TooltipContext';
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { KENTUCKY_GOVERNOR_OFFICE_URL } from '@/components/civic/GovernorBeshearChip';
+import { LegislatorExternalLinkButton } from '@/components/civic/LegislatorExternalLinkButton';
+import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBlock';
 import { MemberName } from '@/components/civic/MemberName';
-import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
+import { MetaChip } from '@/components/ui/Chip';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
-import { formatKyLegislatorDistrict } from '@/lib/bill-display';
-import { CHIP } from '@/lib/ui-tokens';
+import { legislatorRoleDistrictLine } from '@/lib/legislator-display';
+import { CARD } from '@/lib/ui-tokens';
 import {
   isKentuckyGovernor,
   kyLegislatorAvatarInitials,
@@ -32,29 +33,12 @@ import {
   kyLegislatorPortraitAlt,
   kyLegislatureProfileUrl,
   kyLegislaturePublicUrl,
-  kyMemberTitleShort,
   legislatorDisplayPhone,
   memberSlug,
   normalizeBallotpediaHref,
   normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
 import { ICON_REM } from '@/lib/ui-tokens';
-
-function titleAndDistrictLine(leg: KYLegislator): string {
-  const title = kyMemberTitleShort(leg);
-  const district = formatKyLegislatorDistrict(leg);
-  if (district) return `${title} · ${district}`;
-  if (isKentuckyGovernor(leg)) return `${title} · Statewide`;
-  return title;
-}
-
-/** Role only (no district) — use when district is already shown elsewhere (e.g. map sidebar). */
-function roleOnlySubtitleLine(leg: KYLegislator): string {
-  const title = kyMemberTitleShort(leg);
-  const district = formatKyLegislatorDistrict(leg);
-  if (isKentuckyGovernor(leg) && !district) return `${title} · Statewide`;
-  return title;
-}
 
 export interface MemberCardProps {
   leg: KYLegislator;
@@ -95,7 +79,7 @@ export function MemberCard({
   const governor = isKentuckyGovernor(leg);
   /** Open States marks former members inactive after sync; links to LRC/LegiScan often describe the seat or current session, not this row. */
   const isFormerMember = leg.active === false;
-  const avatarSize = featured || governor ? 88 : 72;
+  const avatarDensity = featured || governor ? 'hero' : 'card';
   const displayPhone = legislatorDisplayPhone(leg.phone);
   const telHref = displayPhone ? `tel:${displayPhone.replace(/[^\d+]/g, '')}` : undefined;
   const lrcProfileOnly = kyLegislatureProfileUrl(leg, legislatorRoster);
@@ -157,81 +141,44 @@ export function MemberCard({
       <CardContent
         sx={{
           flexGrow: 1,
-          p: { xs: 2, sm: 2.5 },
+          p: CARD.padding,
           position: 'relative',
           zIndex: 2,
           ...(pointerPassthrough ? { pointerEvents: 'none' as const } : {}),
         }}
       >
-        <Box
-          sx={{
-            display: 'flex',
-            gap: 2,
-            alignItems: 'flex-start',
-            flexDirection: featured || governor ? { xs: 'column', sm: 'row' } : 'row',
+        <LegislatorIdentityBlock
+          name={<MemberName member={leg} variant="primary" />}
+          nameComponent={profileNameHeading}
+          roleLine={legislatorRoleDistrictLine(leg, { includeDistrict: showDistrictInSubtitle })}
+          density={avatarDensity}
+          avatar={{
+            src:
+              normalizeLegislatorPhotoUrl(leg.photo_url) ||
+              normalizeLegislatorPhotoUrl(leg.legiscan_image_url) ||
+              undefined,
+            alt: kyLegislatorPortraitAlt(leg),
+            party: leg.party,
+            initials: kyLegislatorAvatarInitials(leg),
+            imgProps: { referrerPolicy: 'no-referrer' },
           }}
-        >
-          <LegislatorAvatar
-            src={normalizeLegislatorPhotoUrl(leg.photo_url) || normalizeLegislatorPhotoUrl(leg.legiscan_image_url) || undefined}
-            alt={kyLegislatorPortraitAlt(leg)}
-            imgProps={{ referrerPolicy: 'no-referrer' }}
-            party={leg.party}
-            initials={kyLegislatorAvatarInitials(leg)}
-            sx={{
-              width: avatarSize,
-              height: avatarSize,
-              flexShrink: 0,
-              fontSize: featured || governor ? '1.5rem' : '1.25rem',
-              fontWeight: 700,
-              border: governor ? `2px solid ${theme.palette.success.main}` : undefined,
-            }}
-          />
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography
-              component={profileNameHeading}
-              variant={governor ? 'h5' : 'h6'}
-              fontWeight={800}
-              color="text.primary"
-              gutterBottom
-              sx={{ lineHeight: 1.25 }}
-            >
-              <MemberName member={leg} variant="primary" />
-            </Typography>
-            <Typography
-              variant="subtitle1"
-              component="p"
-              sx={{
-                mb: 1.25,
-                fontWeight: 700,
-                color: 'primary.main',
-                lineHeight: 1.35,
-              }}
-            >
-              {showDistrictInSubtitle ? titleAndDistrictLine(leg) : roleOnlySubtitleLine(leg)}
-            </Typography>
-            {showDistrictMinimap && (leg.chamber === 'house' || leg.chamber === 'senate') && showDistrictInSubtitle && (
-              <Box sx={{ mb: 1.25, maxWidth: 200 }}>
-                <LegislatorDistrictThumbnail leg={leg} size={featured || governor ? 'profile' : 'card'} />
-              </Box>
-            )}
-            {(isFormerMember || governor) && (
-              <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
+          avatarSx={governor ? { border: `2px solid ${theme.palette.success.main}` } : undefined}
+          chips={
+            isFormerMember || governor ? (
+              <>
                 {isFormerMember && (
-                  <Chip label="Not a current member" size="small" variant="outlined" color="warning" sx={CHIP.compact} />
+                  <MetaChip label="Not a current member" size="small" tone="warning" variant="outlined" />
                 )}
-                {governor && (
-                  <Chip
-                    label="Governor"
-                    size="small"
-                    color="success"
-                    variant="outlined"
-                    sx={CHIP.compact}
-                  />
-                )}
-              </Stack>
-            )}
+                {governor && <MetaChip label="Governor" size="small" tone="success" variant="outlined" />}
+              </>
+            ) : undefined
+          }
+        />
+        {showDistrictMinimap && (leg.chamber === 'house' || leg.chamber === 'senate') && showDistrictInSubtitle && (
+          <Box sx={{ mt: 1.25, maxWidth: 200 }}>
+            <LegislatorDistrictThumbnail leg={leg} size={featured || governor ? 'profile' : 'card'} />
           </Box>
-        </Box>
+        )}
 
         <Divider sx={{ my: 2 }} />
 
@@ -363,7 +310,7 @@ export function MemberCard({
       {hasFooterActions && (
       <CardActions
         sx={{
-          px: { xs: 2, sm: 2.5 },
+          px: CARD.padding,
           pb: 2,
           pt: 0,
           gap: 0.25,
@@ -377,48 +324,10 @@ export function MemberCard({
         }}
       >
         {showKyLegislatureButton && lrcPublicUrl && (
-          <Button
-            component="a"
-            size="small"
-            variant="text"
-            color="inherit"
-            href={lrcPublicUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}
-            sx={{
-              color: 'text.secondary',
-              fontWeight: 500,
-              textTransform: 'none',
-              fontSize: '0.8125rem',
-              minHeight: 32,
-              '&:hover': { bgcolor: 'action.hover' },
-            }}
-          >
-            KY Legislature
-          </Button>
+          <LegislatorExternalLinkButton href={lrcPublicUrl}>KY Legislature</LegislatorExternalLinkButton>
         )}
         {campaignUrl && (
-          <Button
-            component="a"
-            size="small"
-            variant="text"
-            color="inherit"
-            href={campaignUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}
-            sx={{
-              color: 'text.secondary',
-              fontWeight: 500,
-              textTransform: 'none',
-              fontSize: '0.8125rem',
-              minHeight: 32,
-              '&:hover': { bgcolor: 'action.hover' },
-            }}
-          >
-            Website
-          </Button>
+          <LegislatorExternalLinkButton href={campaignUrl}>Website</LegislatorExternalLinkButton>
         )}
         {ballotpediaHref && (
           <Tooltip
@@ -433,50 +342,17 @@ export function MemberCard({
             arrow
             enterDelay={400}
           >
-            <Button
-              component="a"
-              size="small"
-              variant="text"
-              color="inherit"
-              href={ballotpediaHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}
-              sx={{
-                color: 'text.secondary',
-                fontWeight: 500,
-                textTransform: 'none',
-                fontSize: '0.8125rem',
-                minHeight: 32,
-                '&:hover': { bgcolor: 'action.hover' },
-              }}
-            >
-              Ballotpedia
-            </Button>
+            <LegislatorExternalLinkButton href={ballotpediaHref}>Ballotpedia</LegislatorExternalLinkButton>
           </Tooltip>
         )}
         {governor && (
-          <Button
-            component="a"
-            size="small"
-            variant="text"
-            color="inherit"
+          <LegislatorExternalLinkButton
             href={KENTUCKY_GOVERNOR_OFFICE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            startIcon={<Public sx={{ fontSize: '0.95rem', opacity: 0.75 }} />}
-            endIcon={<OpenInNew sx={{ fontSize: '0.9rem', opacity: 0.65 }} />}
-            sx={{
-              color: 'success.main',
-              fontWeight: 500,
-              textTransform: 'none',
-              fontSize: '0.8125rem',
-              minHeight: 32,
-              '&:hover': { bgcolor: 'action.hover' },
-            }}
+            startIcon={<Public sx={{ fontSize: '0.95rem', opacity: 0.75 }} aria-hidden />}
+            sx={{ color: 'success.main' }}
           >
             Governor office
-          </Button>
+          </LegislatorExternalLinkButton>
         )}
       </CardActions>
       )}
