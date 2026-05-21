@@ -53,12 +53,15 @@ A civic transparency platform focused on the **Kentucky General Assembly**: brow
 
 ### Tooltip system architecture
 
-The tooltip layer has two parts:
+Tooltips fall into three categories (per the Wave 4 locked decisions in the spec). Only the first two are part of the product; the third is a small set of UI hints.
 
-1. **Custom `Tooltip` component** (`src/components/ui/Tooltip.tsx`) — respects the global `tooltipsEnabled` toggle from `TooltipContext`. Use this for educational jargon tooltips on text/inline elements.
-2. **MUI `Tooltip`** — used throughout for UI affordances (card hovers, button hints). Does **not** automatically respect `tooltipsEnabled` — must be gated manually if needed.
+| Category | What it is | Where it lives | Notes |
+| --- | --- | --- | --- |
+| **Educational** | Defines a civic/legislative term (e.g. "veto", "committee", a status like "Reported"). Always tied to a `TooltipContent` entry. | `src/components/ui/Tooltip.tsx` + `src/components/ui/LegislativeStageTooltip.tsx`; content in `src/lib/tooltipContent.ts` (`governmentTooltips`) and the bill-status records in `src/lib/bill-display.ts` (`billStatusToTooltipKey`, `billPrefixToTooltipKey`). | Respects the global `tooltipsEnabled` toggle (`src/lib/TooltipContext.tsx`). Use for jargon / acronyms / process steps. The `BillStatusMetaChip` tooltip on bill cards is in this category. |
+| **Preview (removed)** | Whole-card hover popovers that previewed row-specific data (title, sponsor, next action, co-sponsors). **Do not re-introduce these.** Row data already lives on the card body and on the detail page. | Formerly `KYBillCardTooltipTitle.tsx`, `BillTooltip.tsx`, `BillNumberTooltip` — all deleted in Wave 4b. | If you find yourself building a hover popover that surfaces information already on the card, stop. Link to the detail page or surface the info on the card itself. |
+| **UI affordance** | Short labels on icon-only buttons / interactive controls (e.g. "Open in new tab" on an external-link icon, MUI `Tooltip title="…"` on an icon button). | MUI `<Tooltip />` inline at the call site. | Plain string, single sentence. Not gated by `tooltipsEnabled`. Don't use this for definitions — that's the Educational bucket. |
 
-Content lives in `src/lib/tooltipContent.ts` (`governmentTooltips` record). Add new terms there; use `getTooltipContent(key)` to retrieve.
+Content for the Educational bucket lives in `src/lib/tooltipContent.ts` (`governmentTooltips` record). Add new terms there; use `getTooltipContent(key)` to retrieve.
 
 ---
 
