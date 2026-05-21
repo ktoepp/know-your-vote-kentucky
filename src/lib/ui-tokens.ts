@@ -101,8 +101,12 @@ export const CARD = {
   elevation: {
     rest: 0,
     featured: 3,
-    hover: 4,
+    /** Legacy MUI elevation index; prefer `hoverBoxShadow` for interactive hover. */
+    hover: 2,
   },
+  /** Soft hover shadow (low-opacity) for CivicCard interactive states. */
+  hoverBoxShadow: '0 2px 10px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04)',
+  hoverBoxShadowDark: '0 2px 10px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.14)',
   /** Hover motion — matches existing KYBillCard / MemberCard. */
   hoverTransform: 'translateY(-2px)',
   hoverTransition: 'all 0.2s ease',
