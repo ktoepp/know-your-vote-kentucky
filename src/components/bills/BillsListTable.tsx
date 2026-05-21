@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { Bookmark } from '@mui/icons-material';
 import { BillNumber } from '@/components/bills/BillNumber';
+import { useTooltips } from '@/lib/TooltipContext';
 import type { KYBill } from '@/types/kentucky';
 import type { KyBillSortKey } from '@/lib/bill-display';
 import {
@@ -56,6 +57,7 @@ function chamberLabel(bill: KYBill): string {
 }
 
 export function BillsListTable({ bills, sortBy, sortDir, onRequestSort, followedBillIds }: BillsListTableProps) {
+  const { tooltipsEnabled } = useTooltips();
   const head = (id: KyBillSortKey, label: string, width?: string) => (
     <TableCell sortDirection={sortBy === id ? sortDir : false} sx={{ fontWeight: 600, width }}>
       <TableSortLabel active={sortBy === id} direction={sortBy === id ? sortDir : 'asc'} onClick={() => onRequestSort(id)}>
@@ -122,7 +124,7 @@ export function BillsListTable({ bills, sortBy, sortDir, onRequestSort, followed
               <TableCell>{chamberLabel(bill)}</TableCell>
               <TableCell>{bill.session ? (() => {
                 const tip = getSessionTooltip(bill.session);
-                return tip ? (
+                return tip && tooltipsEnabled ? (
                   <Tooltip
                     title={<>{tip.content.split('\n\n').map((p, i) => <span key={i} style={{ display: 'block', marginBottom: i === 0 ? 4 : 0 }}>{p}</span>)}</>}
                     arrow
@@ -140,7 +142,7 @@ export function BillsListTable({ bills, sortBy, sortDir, onRequestSort, followed
                   );
                   const key = billStatusToTooltipKey(bill.status);
                   const tip = key ? governmentTooltips[key] : null;
-                  return tip ? (
+                  return tip && tooltipsEnabled ? (
                     <Tooltip
                       title={<><strong>{tip.title}</strong><br />{tip.content}</>}
                       arrow
