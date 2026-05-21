@@ -439,7 +439,9 @@ export function getKyBillNextAction(bill: {
 export function billStatusToTooltipKey(status: string | null | undefined): string | null {
   if (!status) return null;
   const s = status.trim().toLowerCase();
+  if (s.includes('chaptered')) return 'chaptered';
   if (s.includes('signed by governor') || s === 'signed') return 'signed_by_governor';
+  if (s.includes('enacted') || s.includes('became law')) return 'enacted';
   if (s.includes('veto override') || s.includes('veto overridden')) return 'veto_override';
   if (s.includes('vetoed')) return 'vetoed';
   if (s.includes('enrolled')) return 'enrolled';
