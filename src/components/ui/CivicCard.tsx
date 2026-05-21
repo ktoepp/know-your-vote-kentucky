@@ -90,7 +90,8 @@ export function CivicCard({
         ...(isInteractive && {
           cursor: 'pointer',
           '&:hover': {
-            boxShadow: CARD.elevation.hover,
+            boxShadow:
+              theme.palette.mode === 'dark' ? CARD.hoverBoxShadowDark : CARD.hoverBoxShadow,
             transform: CARD.hoverTransform,
             borderColor: theme.palette.primary.main,
           },
