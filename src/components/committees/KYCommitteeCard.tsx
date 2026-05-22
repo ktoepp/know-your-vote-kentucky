@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Avatar, Box, IconButton, Typography } from '@mui/material';
-import { Bookmark } from 'lucide-react';
+import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { ChamberChip, MetaChip } from '@/components/ui/Chip';
 import type { KYCommitteeBrowseCard } from '@/lib/ky-committees-browse-enriched';
@@ -10,10 +10,12 @@ import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
 
 export interface KYCommitteeCardProps {
   committee: KYCommitteeBrowseCard;
+  following?: boolean;
+  onToggleFollow?: (committeeId: string) => void;
 }
 
 /** Committee grid card — leadership line + topic chips when enriched browse data is available. */
-export function KYCommitteeCard({ committee }: KYCommitteeCardProps) {
+export function KYCommitteeCard({ committee, following = false, onToggleFollow }: KYCommitteeCardProps) {
   const href = `/committees/${encodeURIComponent(committee.slug)}`;
   const displayName = normalizeKyGaDisplayName(committee.name);
   const leaders = committee.leadershipNames.slice(0, 2).map((entry) => {
@@ -52,21 +54,46 @@ export function KYCommitteeCard({ committee }: KYCommitteeCardProps) {
               <MetaChip key={tag} label={tag} size="small" variant="outlined" />
             ))}
           </Box>
-          <IconButton
-            component="span"
-            aria-hidden
-            tabIndex={-1}
-            size="small"
-            sx={{
-              color: 'text.secondary',
-              p: 0.25,
-              mr: -0.25,
-              mt: -0.25,
-              pointerEvents: 'none',
-            }}
-          >
-            <Bookmark size={22} strokeWidth={1.7} />
-          </IconButton>
+          {onToggleFollow ? (
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleFollow(committee.id);
+              }}
+              aria-pressed={following}
+              aria-label={following ? 'Unfollow this committee' : 'Follow this committee'}
+              sx={{
+                color: following ? 'primary.main' : 'text.secondary',
+                p: 0.25,
+                mr: -0.25,
+                mt: -0.25,
+              }}
+            >
+              {following ? (
+                <BookmarkCheck size={22} strokeWidth={1.7} />
+              ) : (
+                <Bookmark size={22} strokeWidth={1.7} />
+              )}
+            </IconButton>
+          ) : (
+            <IconButton
+              component="span"
+              aria-hidden
+              tabIndex={-1}
+              size="small"
+              sx={{
+                color: 'text.secondary',
+                p: 0.25,
+                mr: -0.25,
+                mt: -0.25,
+                pointerEvents: 'none',
+              }}
+            >
+              <Bookmark size={22} strokeWidth={1.7} />
+            </IconButton>
+          )}
         </Box>
       }
       body={

@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useGaChamberUrlState } from '@/lib/ky-ga-browse-url';
+import { useFollowedCommittees } from '@/lib/use-followed-committees';
 import { gaChamberFilterLabel } from '@/lib/ky-committee-display';
 import Link from 'next/link';
 import {
@@ -38,6 +39,7 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
   const [chamberFilter, setChamberFilter] = useGaChamberUrlState();
   const [topicFilter, setTopicFilter] = useState('');
   const [pageSize, setPageSize] = useState(COMMITTEES_PAGE_SIZE);
+  const { followedCommitteeIds, authed, toggleFollow } = useFollowedCommittees();
 
   const topics = useMemo(() => {
     const unique = new Set<string>();
@@ -181,7 +183,11 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
               <Grid container spacing={{ xs: 2, md: 3 }}>
                 {visible.map((committee) => (
                   <Grid item xs={12} sm={6} md={4} key={committee.id}>
-                    <KYCommitteeCard committee={committee} />
+                    <KYCommitteeCard
+                      committee={committee}
+                      following={followedCommitteeIds.has(committee.id)}
+                      onToggleFollow={authed ? toggleFollow : undefined}
+                    />
                   </Grid>
                 ))}
               </Grid>

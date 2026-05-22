@@ -30,6 +30,7 @@ import type { KyUserProfileRow } from '@/types/user-profile';
 import { KY_USER_PROFILE_SELECT } from '@/lib/ky-user-profile-select';
 import { ProfileNotificationsSection } from '@/components/profile/ProfileNotificationsSection';
 import { ProfileFollowedBillsSection } from '@/components/profile/ProfileFollowedBillsSection';
+import { ProfileFollowedCommitteesSection } from '@/components/profile/ProfileFollowedCommitteesSection';
 import { ProfileActivitySection } from '@/components/profile/ProfileActivitySection';
 import { ProfileDigestHistorySection } from '@/components/profile/ProfileDigestHistorySection';
 import { ProfileSavedSearchesSection } from '@/components/profile/ProfileSavedSearchesSection';
@@ -298,6 +299,7 @@ export default function ProfilePage() {
           { href: '#account', label: 'Account' },
           { href: '#notifications', label: 'Notifications' },
           { href: '#followed-bills', label: 'Followed bills' },
+          { href: '#followed-committees', label: 'Followed committees' },
           { href: '#saved-searches', label: 'Saved searches' },
           { href: '#activity', label: 'Activity' },
           { href: '#digest-history', label: 'Digest history' },
@@ -390,6 +392,10 @@ export default function ProfilePage() {
 
       <Paper component="section" id="followed-bills" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
         <ProfileFollowedBillsSection />
+      </Paper>
+
+      <Paper component="section" id="followed-committees" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+        <ProfileFollowedCommitteesSection />
       </Paper>
 
       <Paper component="section" id="saved-searches" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>

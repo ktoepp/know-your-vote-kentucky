@@ -21,7 +21,7 @@ import {
 import {
   OpenInNew,
 } from '@mui/icons-material';
-import { ArrowLeft, Bookmark, CalendarDays, ChevronDown, ChevronUp, FileText, MapPin } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChevronDown, ChevronUp, FileText, MapPin } from 'lucide-react';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { EmptyState } from '@/components/civic/EmptyState';
 import { ChamberChip, MetaChip } from '@/components/ui/Chip';
@@ -34,6 +34,7 @@ import {
   normalizeKyGaDisplayName,
 } from '@/lib/ky-committee-display';
 import { CommitteeMembersSection } from '@/components/committees/CommitteeMembersSection';
+import { FollowCommitteeButton } from '@/components/committees/FollowCommitteeButton';
 import type { CommitteeMemberDisplay } from '@/lib/ky-committee-members';
 import { classifyTopics } from '@/lib/ky-topic-classifier';
 
@@ -139,14 +140,9 @@ export function CommitteeDetailView({
           {topicTags.slice(0, 1).map((tag) => (
             <MetaChip key={tag} label={tag} size="small" variant="outlined" />
           ))}
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<Bookmark size={15} aria-hidden />}
-            sx={{ ml: { sm: 'auto' }, minHeight: 32, borderRadius: 999, px: 1.5 }}
-          >
-            Follow
-          </Button>
+          <Box sx={{ ml: { sm: 'auto' } }}>
+            <FollowCommitteeButton committeeId={committee.id} size="small" />
+          </Box>
         </Stack>
 
         <Card variant="outlined" sx={{ borderRadius: 1.25, mb: 2 }}>

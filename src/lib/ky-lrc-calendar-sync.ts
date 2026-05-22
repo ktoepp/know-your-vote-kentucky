@@ -245,6 +245,22 @@ export async function upsertLrcCalendarMeetings(
 
     meetingsSynced++;
 
+    // Emit a committee event when this is a newly-created meeting (no prior record).
+    // The unique index on (committee_id, event_type, meeting_id) prevents duplicates on re-sync.
+    if (!priorMeeting && !options.skipHearingEvents) {
+      await db.from('ky_committee_events').insert({
+        committee_id: committee.id,
+        meeting_id: meetingRecord.id,
+        event_type: 'meeting_scheduled',
+        event_payload: {
+          meeting_date: meeting.meetingDate,
+          time_and_location: timeAndLocation || null,
+          committee_name: committeeRow.name,
+          committee_slug: committeeRow.slug,
+        },
+      });
+    }
+
     await db.from('ky_committee_agenda_items').delete().eq('meeting_id', meetingRecord.id);
 
     const agendaRows = meeting.agendaItems.map((item, idx) => {

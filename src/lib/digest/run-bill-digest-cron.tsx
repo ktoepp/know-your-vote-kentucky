@@ -65,6 +65,15 @@ type BillRow = {
   legiscan_subjects: Array<{ subject_id?: number; subject_name?: string }> | null;
 };
 
+type CommitteeEventRow = {
+  id: number;
+  committee_id: string;
+  meeting_id: string | null;
+  event_type: string;
+  event_payload: Record<string, unknown>;
+  observed_at: string;
+};
+
 export type DigestCronResult = {
   ok: boolean;
   dryRun: boolean;
@@ -240,7 +249,47 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       return billMatchesTopicFilters(bill.topics, bill.legiscan_subjects, topicFilters);
     });
 
-    if (!candidates.length) {
+    // Fetch committee follows + events when the user has opted into committee_meeting_scheduled.
+    const committeeGroups: BillDigestGroup[] = [];
+    if (allowedTypes.has('committee_meeting_scheduled')) {
+      const { data: committeeFollows } = await supabaseAdmin
+        .from('ky_committee_follows')
+        .select('committee_id')
+        .eq('user_id', uid);
+      const followedCommitteeIds = new Set((committeeFollows ?? []).map((f) => String(f.committee_id)));
+
+      if (followedCommitteeIds.size > 0) {
+        const { data: committeeEvents } = await supabaseAdmin
+          .from('ky_committee_events')
+          .select('id, committee_id, event_type, event_payload, observed_at')
+          .in('committee_id', [...followedCommitteeIds])
+          .eq('event_type', 'meeting_scheduled')
+          .gte('observed_at', windowStart)
+          .lt('observed_at', windowEnd)
+          .order('observed_at', { ascending: false })
+          .limit(20);
+
+        const origin = publicSiteOrigin();
+        for (const ev of (committeeEvents ?? []) as CommitteeEventRow[]) {
+          const payload = ev.event_payload;
+          const committeeName = String(payload.committee_name ?? 'Committee');
+          const committeeSlug = String(payload.committee_slug ?? ev.committee_id);
+          const meetingDate = String(payload.meeting_date ?? '');
+          const timeAndLocation = payload.time_and_location ? String(payload.time_and_location) : null;
+          const detail = timeAndLocation
+            ? `New meeting: ${meetingDate} — ${timeAndLocation}`
+            : `New meeting: ${meetingDate}`;
+          committeeGroups.push({
+            billNumber: committeeName,
+            billTitle: 'New meeting added to the calendar',
+            billHref: `${origin}/committees/${encodeURIComponent(committeeSlug)}`,
+            lines: [{ detail, observedAt: formatObserved(ev.observed_at) }],
+          });
+        }
+      }
+    }
+
+    if (!candidates.length && !committeeGroups.length) {
       skippedNoEvents++;
       continue;
     }
@@ -298,6 +347,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const sections: BillDigestSection[] = [
       { heading: 'Bills you follow', groups: followedGroups },
       { heading: 'From topics you follow', groups: topicGroups },
+      { heading: 'Committees you follow', groups: committeeGroups },
     ].filter((s) => s.groups.length > 0);
 
     if (!sections.length) {
@@ -305,6 +355,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       continue;
     }
     const totalBills = followedGroups.length + topicGroups.length;
+    const totalItems = totalBills + committeeGroups.length;
 
     const unsubscribeToken = pref.unsubscribe_token as string;
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
@@ -313,7 +364,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const privacyHref = `${origin}/privacy`;
     const termsHref = `${origin}/terms`;
 
-    const previewText = `${totalBills} bill${totalBills === 1 ? '' : 's'} with new activity`;
+    const previewText = `${totalItems} update${totalItems === 1 ? '' : 's'} from bills and committees you follow`;
     const subject = `Kentucky bill digest — ${formatDigestDate(now)}`;
 
     const needsHtml = renderPreview || !(dryRun || !resend);
