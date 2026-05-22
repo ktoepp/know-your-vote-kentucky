@@ -26,6 +26,27 @@ export function GaChamberFilterBar({
       size="small"
       onChange={(_, v) => onChange((v ?? '') as GaChamberFilter)}
       aria-label={ariaLabel}
+      sx={{
+        gap: 1,
+        flexWrap: 'wrap',
+        '& .MuiToggleButtonGroup-grouped': {
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: '999px !important',
+          px: 1.75,
+          py: 0.5,
+          bgcolor: 'background.paper',
+          color: 'text.secondary',
+          textTransform: 'none',
+          fontWeight: 500,
+          '&.Mui-selected': {
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
+            borderColor: 'primary.main',
+            '&:hover': { bgcolor: 'primary.dark' },
+          },
+        },
+      }}
     >
       <ToggleButton value="house">House</ToggleButton>
       <ToggleButton value="senate">Senate</ToggleButton>
