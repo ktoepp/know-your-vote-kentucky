@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useGaChamberUrlState } from '@/lib/ky-ga-browse-url';
+import { useFollowedCommittees } from '@/lib/use-followed-committees';
 import { gaChamberFilterLabel } from '@/lib/ky-committee-display';
 import Link from 'next/link';
 import {
@@ -9,11 +10,15 @@ import {
   Box,
   Chip,
   Container,
+  FormControl,
   Grid,
+  MenuItem,
+  Select,
   Link as MuiLink,
   Typography,
 } from '@mui/material';
-import { Cancel, Gavel } from '@mui/icons-material';
+import type { SelectChangeEvent } from '@mui/material';
+import { Cancel } from '@mui/icons-material';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import type { GaChamberFilter } from '@/lib/ky-committee-display';
@@ -32,23 +37,52 @@ export interface CommitteesBrowseProps {
 export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
   const committees = initialCommittees;
   const [chamberFilter, setChamberFilter] = useGaChamberUrlState();
+  const [topicFilter, setTopicFilter] = useState('');
+  const [pageSize, setPageSize] = useState(COMMITTEES_PAGE_SIZE);
+  const { followedCommitteeIds, authed, toggleFollow } = useFollowedCommittees();
+
+  const topics = useMemo(() => {
+    const unique = new Set<string>();
+    for (const committee of committees) {
+      for (const tag of committee.topicTags) unique.add(tag);
+    }
+    return [...unique].sort((a, b) => a.localeCompare(b));
+  }, [committees]);
 
   const filtered = useMemo(() => {
-    if (!chamberFilter) return committees;
-    return committees.filter((c) => c.chamber === chamberFilter);
-  }, [committees, chamberFilter]);
+    return committees.filter((c) => {
+      const chamberMatches = !chamberFilter || c.chamber === chamberFilter;
+      const topicMatches = !topicFilter || c.topicTags.includes(topicFilter);
+      return chamberMatches && topicMatches;
+    });
+  }, [committees, chamberFilter, topicFilter]);
 
   const summary =
     filtered.length === 1 ? '1 committee' : `${filtered.length.toLocaleString()} committees`;
+  const clearFilters = () => {
+    setChamberFilter('');
+    setTopicFilter('');
+  };
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+      <Container maxWidth="lg" sx={{ pt: { xs: 2.5, md: 3 }, pb: { xs: 5, md: 7 } }}>
+        <Box sx={{ textAlign: 'center', mb: { xs: 2.75, md: 3.5 } }}>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+            2026 Regular Session · January 5, 2026 - April 14, 2026
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            display="block"
+            sx={{ fontStyle: 'italic', mb: { xs: 2.25, md: 3.25 } }}
+          >
+            Chambers or committees can still post limited activity after the last scheduled day.
+          </Typography>
+          <Typography variant="h3" component="h1" fontWeight={600}>
             Committees
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mx: 'auto', maxWidth: 640 }}>
             Kentucky General Assembly committees with scheduled meetings on the LRC legislative calendar.{' '}
             <MuiLink component={Link} href="/meetings" fontWeight={600}>
               Browse meetings
@@ -61,39 +95,73 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
           </Typography>
         </Box>
 
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            alignItems: { xs: 'flex-start', sm: 'center' },
-            gap: 2,
-            mb: 2,
-            flexWrap: 'wrap',
-          }}
-        >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2.5, flexWrap: 'wrap' }}>
           <GaChamberFilterBar value={chamberFilter} onChange={setChamberFilter} />
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', ml: { sm: 'auto' } }}>
+            <FormControl size="small">
+              <Select
+                value={topicFilter}
+                displayEmpty
+                onChange={(event: SelectChangeEvent) => setTopicFilter(event.target.value)}
+                sx={{ borderRadius: 999, minWidth: 112, bgcolor: 'background.paper' }}
+                inputProps={{ 'aria-label': 'Filter by topic' }}
+              >
+                <MenuItem value="">Topic</MenuItem>
+                {topics.map((topic) => (
+                  <MenuItem key={topic} value={topic}>
+                    {topic}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small">
+              <Select
+                value={String(pageSize)}
+                onChange={(event: SelectChangeEvent) => setPageSize(Number(event.target.value))}
+                sx={{ borderRadius: 999, minWidth: 76, bgcolor: 'background.paper' }}
+                inputProps={{ 'aria-label': 'Committees per page' }}
+              >
+                {[12, 24, 36].map((value) => (
+                  <MenuItem key={value} value={String(value)}>
+                    {value}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
         </Box>
 
-        {chamberFilter && (
+        {(chamberFilter || topicFilter) && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
               Active filters:
             </Typography>
-            <Chip
-              label={gaChamberFilterLabel(chamberFilter)}
-              size="small"
-              onDelete={() => setChamberFilter('')}
-              deleteIcon={<Cancel />}
-              color="primary"
-              variant="outlined"
-            />
-            <Chip label="Clear all" size="small" onClick={() => setChamberFilter('')} variant="outlined" sx={{ ml: 0.5 }} />
+            {chamberFilter && (
+              <Chip
+                label={gaChamberFilterLabel(chamberFilter)}
+                size="small"
+                onDelete={() => setChamberFilter('')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {topicFilter && (
+              <Chip
+                label={topicFilter}
+                size="small"
+                onDelete={() => setTopicFilter('')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            <Chip label="Clear all" size="small" onClick={clearFilters} variant="outlined" sx={{ ml: 0.5 }} />
           </Box>
         )}
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Gavel sx={{ fontSize: '1.2rem', color: 'primary.main' }} aria-hidden />
-          <Typography variant="body2" fontWeight={600}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight={600}>
             {summary}
           </Typography>
         </Box>
@@ -105,12 +173,21 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
         ) : filtered.length === 0 ? (
           <EmptyState message="No committees match your filters. Run the LRC calendar sync after migration 024." />
         ) : (
-          <PaginatedSection items={filtered} pageSize={COMMITTEES_PAGE_SIZE} variant="loadmore">
+          <PaginatedSection
+            items={filtered}
+            pageSize={pageSize}
+            resetKey={`${chamberFilter}:${topicFilter}`}
+            variant="loadmore"
+          >
             {(visible) => (
-              <Grid container spacing={3}>
+              <Grid container spacing={{ xs: 2, md: 3 }}>
                 {visible.map((committee) => (
                   <Grid item xs={12} sm={6} md={4} key={committee.id}>
-                    <KYCommitteeCard committee={committee} />
+                    <KYCommitteeCard
+                      committee={committee}
+                      following={followedCommitteeIds.has(committee.id)}
+                      onToggleFollow={authed ? toggleFollow : undefined}
+                    />
                   </Grid>
                 ))}
               </Grid>

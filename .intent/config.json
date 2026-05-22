@@ -1,0 +1,232 @@
+{
+  "scripts": [
+    {
+      "name": "dev",
+      "command": "npm run dev",
+      "mode": "service",
+      "category": "dev"
+    },
+    {
+      "name": "dev:clean",
+      "command": "npm run dev:clean",
+      "mode": "service",
+      "category": "dev"
+    },
+    {
+      "name": "build",
+      "command": "npm run build",
+      "mode": "command",
+      "category": "build"
+    },
+    {
+      "name": "start",
+      "command": "npm run start",
+      "mode": "service",
+      "category": "dev"
+    },
+    {
+      "name": "lint",
+      "command": "npm run lint",
+      "mode": "command",
+      "category": "lint"
+    },
+    {
+      "name": "test:env",
+      "command": "npm run test:env",
+      "mode": "command",
+      "category": "test"
+    },
+    {
+      "name": "test:supabase-auth",
+      "command": "npm run test:supabase-auth",
+      "mode": "command",
+      "category": "test"
+    },
+    {
+      "name": "db:apply-sql",
+      "command": "npm run db:apply-sql",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "geo:ky-districts",
+      "command": "npm run geo:ky-districts",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "geo:ky-mask",
+      "command": "npm run geo:ky-mask",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "sync:ky",
+      "command": "npm run sync:ky",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "sync:ky:legislators",
+      "command": "npm run sync:ky:legislators",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "sync:ky:sessions",
+      "command": "npm run sync:ky:sessions",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "sync:ky:quota",
+      "command": "npm run sync:ky:quota",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "sync:ky:bills:status",
+      "command": "npm run sync:ky:bills:status",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "sync:ky:dry",
+      "command": "npm run sync:ky:dry",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "bulk-seed:ky",
+      "command": "npm run bulk-seed:ky",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "check:legiscan-quota",
+      "command": "npm run check:legiscan-quota",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "clear-dataset-hashes",
+      "command": "npm run clear-dataset-hashes",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "slack:smoke-test",
+      "command": "npm run slack:smoke-test",
+      "mode": "command",
+      "category": "test"
+    },
+    {
+      "name": "verify:votes",
+      "command": "npm run verify:votes",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "verify:legislator-links",
+      "command": "npm run verify:legislator-links",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "spot-check:bill-links",
+      "command": "npm run spot-check:bill-links",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "preview:digest",
+      "command": "npm run preview:digest",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "verify:digest-state",
+      "command": "npm run verify:digest-state",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "preview:welcome",
+      "command": "npm run preview:welcome",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "audit:legiscan-subjects",
+      "command": "npm run audit:legiscan-subjects",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "diagnose:legislators",
+      "command": "npm run diagnose:legislators",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "cleanup:stale-legislators",
+      "command": "npm run cleanup:stale-legislators",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "debug:openstates-roster",
+      "command": "npm run debug:openstates-roster",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "normalize:legislator-districts",
+      "command": "npm run normalize:legislator-districts",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "spike:lrc:calendar",
+      "command": "npm run spike:lrc:calendar",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "audit:lrc:bill-refs",
+      "command": "npm run audit:lrc:bill-refs",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "verify:recent-ship",
+      "command": "npm run verify:recent-ship",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "sync:ky:lrc-calendar",
+      "command": "npm run sync:ky:lrc-calendar",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "sync:ky:lrc-calendar:dry",
+      "command": "npm run sync:ky:lrc-calendar:dry",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "backfill:lrc:calendar",
+      "command": "npm run backfill:lrc:calendar",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "backfill:lrc:calendar:dry",
+      "command": "npm run backfill:lrc:calendar:dry",
+      "mode": "command",
+      "category": "other"
+    }
+  ]
+}

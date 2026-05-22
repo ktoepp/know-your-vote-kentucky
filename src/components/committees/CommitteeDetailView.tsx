@@ -43,6 +43,7 @@ import {
   resolveKyCommitteeParent,
 } from '@/lib/ky-committee-display';
 import { CommitteeMembersSection } from '@/components/committees/CommitteeMembersSection';
+import { FollowCommitteeButton } from '@/components/committees/FollowCommitteeButton';
 import type { CommitteeMemberDisplay } from '@/lib/ky-committee-members';
 import { classifyTopics } from '@/lib/ky-topic-classifier';
 
@@ -163,12 +164,13 @@ export function CommitteeDetailView({
 
         <Card sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
           <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-            <Box sx={{ mb: 2 }}>
+            <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, justifyContent: 'space-between' }}>
               <CommitteeTagRow committee={committee}>
                 {topicTags.map((tag) => (
                   <MetaChip key={tag} label={tag} size="small" variant="outlined" />
                 ))}
               </CommitteeTagRow>
+              <FollowCommitteeButton committeeId={committee.id} size="small" />
             </Box>
 
             <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>

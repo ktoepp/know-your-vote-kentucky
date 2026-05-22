@@ -6,15 +6,18 @@
  *   npm run preview:digest -- --email you@example.com [--out /tmp/digest.html]
  *   npm run preview:digest -- --email you@example.com --send      # actually send via Resend
  *   npm run preview:digest -- --email you@example.com --inject HB1 --send
+ *   npm run preview:digest -- --email you@example.com --inject-committee interim-joint-education
  *
  * Flags:
- *   --email <addr>       Target one user (must exist in ky_user_profiles).
- *   --out <path>         Write rendered HTML preview to a file (default: ./digest-preview.html).
- *   --send               Send a real email via Resend (otherwise dry-run preview only).
- *   --inject <billNo>    Insert a synthetic ky_bill_status_history row for the bill,
- *                        run the digest, then delete the synthetic row.
- *   --event <type>       Event type for --inject (default: committee_action).
- *   --ignore-last-sent   Don't restrict to events after the last sent digest window.
+ *   --email <addr>            Target one user (must exist in ky_user_profiles).
+ *   --out <path>              Write rendered HTML preview to a file (default: ./digest-preview.html).
+ *   --send                    Send a real email via Resend (otherwise dry-run preview only).
+ *   --inject <billNo>         Insert a synthetic ky_bill_status_history row for the bill,
+ *                             run the digest, then delete the synthetic row.
+ *   --event <type>            Event type for --inject (default: committee_action).
+ *   --inject-committee <slug> Insert a synthetic ky_committee_events row for the committee,
+ *                             temporarily follow it, run the digest, then clean up.
+ *   --ignore-last-sent        Don't restrict to events after the last sent digest window.
  */
 import './load-env';
 import fs from 'node:fs/promises';
@@ -28,6 +31,7 @@ type Args = {
   send: boolean;
   inject?: string;
   event: string;
+  injectCommittee?: string;
   ignoreLastSent: boolean;
 };
 
@@ -46,10 +50,11 @@ function parseArgs(): Args {
     else if (a === '--send') out.send = true;
     else if (a === '--inject') out.inject = argv[++i];
     else if (a === '--event') out.event = argv[++i];
+    else if (a === '--inject-committee') out.injectCommittee = argv[++i];
     else if (a === '--ignore-last-sent') out.ignoreLastSent = true;
     else if (a === '--help' || a === '-h') {
       console.log(
-        'preview:digest --email <addr> [--out file] [--send] [--inject HB1 [--event committee_action]] [--ignore-last-sent]',
+        'preview:digest --email <addr> [--out file] [--send] [--inject HB1 [--event committee_action]] [--inject-committee <slug>] [--ignore-last-sent]',
       );
       process.exit(0);
     }
@@ -105,6 +110,54 @@ async function deleteEvent(id: number | null) {
   await supabaseAdmin.from('ky_bill_status_history').delete().eq('id', id);
 }
 
+async function lookupCommitteeBySlug(
+  slug: string,
+): Promise<{ id: string; name: string; slug: string } | null> {
+  if (!supabaseAdmin) return null;
+  const { data } = await supabaseAdmin
+    .from('ky_committees')
+    .select('id, name, slug')
+    .eq('slug', slug)
+    .maybeSingle();
+  return (data as { id: string; name: string; slug: string } | null) ?? null;
+}
+
+async function injectCommitteeEvent(committee: {
+  id: string;
+  name: string;
+  slug: string;
+}): Promise<string | null> {
+  if (!supabaseAdmin) return null;
+  // Pick a meeting ~7 days from now so it looks like a real upcoming alert.
+  const meetingDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const { data, error } = await supabaseAdmin
+    .from('ky_committee_events')
+    .insert({
+      committee_id: committee.id,
+      meeting_id: null,
+      event_type: 'meeting_scheduled',
+      event_payload: {
+        meeting_date: meetingDate,
+        time_and_location: '10:00 ET — Room 171, Capitol Annex [preview]',
+        committee_name: committee.name,
+        committee_slug: committee.slug,
+        preview: true,
+      },
+    })
+    .select('id')
+    .single();
+  if (error) {
+    console.warn('committee event inject failed:', error.message);
+    return null;
+  }
+  return String(data.id);
+}
+
+async function deleteCommitteeEvent(id: string | null) {
+  if (!id || !supabaseAdmin) return;
+  await supabaseAdmin.from('ky_committee_events').delete().eq('id', id);
+}
+
 async function main() {
   const args = parseArgs();
   if (!args.email) {
@@ -115,6 +168,39 @@ async function main() {
   if (!userId) {
     console.error(`No ky_user_profiles row found for ${args.email}`);
     process.exit(2);
+  }
+
+  let injectedCommitteeEventId: string | null = null;
+  let temporaryFollowCommitteeId: string | null = null;
+  if (args.injectCommittee) {
+    const committee = await lookupCommitteeBySlug(args.injectCommittee);
+    if (!committee) {
+      console.error(`Committee slug "${args.injectCommittee}" not found in ky_committees.`);
+      process.exit(3);
+    }
+    injectedCommitteeEventId = await injectCommitteeEvent(committee);
+    if (injectedCommitteeEventId) {
+      console.log(`Injected synthetic committee event id=${injectedCommitteeEventId} committee=${committee.id} (${committee.name})`);
+    }
+    // Ensure the user follows this committee.
+    if (supabaseAdmin) {
+      const { data: existing } = await supabaseAdmin
+        .from('ky_committee_follows')
+        .select('committee_id')
+        .eq('user_id', userId)
+        .eq('committee_id', committee.id)
+        .maybeSingle();
+      if (!existing) {
+        const { error } = await supabaseAdmin
+          .from('ky_committee_follows')
+          .insert({ user_id: userId, committee_id: committee.id });
+        if (error) console.warn('temp committee follow insert failed:', error.message);
+        else {
+          temporaryFollowCommitteeId = committee.id;
+          console.log(`Inserted temporary committee follow user=${userId} committee=${committee.id}`);
+        }
+      }
+    }
   }
 
   let injectedId: number | null = null;
@@ -180,14 +266,24 @@ async function main() {
     }
   } finally {
     await deleteEvent(injectedId);
-    if (injectedId) console.log(`Cleaned up synthetic event id=${injectedId}.`);
+    if (injectedId) console.log(`Cleaned up synthetic bill event id=${injectedId}.`);
     if (temporaryFollowBillId && supabaseAdmin) {
       await supabaseAdmin
         .from('ky_bill_follows')
         .delete()
         .eq('user_id', userId)
         .eq('bill_id', temporaryFollowBillId);
-      console.log(`Removed temporary follow bill=${temporaryFollowBillId}.`);
+      console.log(`Removed temporary bill follow bill=${temporaryFollowBillId}.`);
+    }
+    await deleteCommitteeEvent(injectedCommitteeEventId);
+    if (injectedCommitteeEventId) console.log(`Cleaned up synthetic committee event id=${injectedCommitteeEventId}.`);
+    if (temporaryFollowCommitteeId && supabaseAdmin) {
+      await supabaseAdmin
+        .from('ky_committee_follows')
+        .delete()
+        .eq('user_id', userId)
+        .eq('committee_id', temporaryFollowCommitteeId);
+      console.log(`Removed temporary committee follow committee=${temporaryFollowCommitteeId}.`);
     }
   }
 }

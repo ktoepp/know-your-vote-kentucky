@@ -2,14 +2,14 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
 
 /**
- * GET — list the current user's followed bills + the topic filters from their preferences.
+ * GET — list the current user's followed bills, committees, and topic filters.
  * Topic follows live inside `ky_notification_preferences.topic_filters` for v1 (no separate table).
  */
 export async function GET(request: NextRequest) {
   const auth = await getAuthedUser(request);
   if ('error' in auth) return auth.error;
 
-  const [followsRes, prefsRes] = await Promise.all([
+  const [followsRes, committeeFollowsRes, prefsRes] = await Promise.all([
     auth.supabase
       .from('ky_bill_follows')
       .select(
@@ -18,6 +18,16 @@ export async function GET(request: NextRequest) {
          bill:ky_bills (
            id, bill_number, title, status, chamber,
            last_action, last_action_date, topics
+         )`,
+      )
+      .eq('user_id', auth.userId)
+      .order('created_at', { ascending: false }),
+    auth.supabase
+      .from('ky_committee_follows')
+      .select(
+        `created_at,
+         committee:ky_committees (
+           id, name, slug, chamber
          )`,
       )
       .eq('user_id', auth.userId)
@@ -33,6 +43,10 @@ export async function GET(request: NextRequest) {
     console.error('ky_bill_follows select:', followsRes.error);
     return NextResponse.json({ error: followsRes.error.message }, { status: 500 });
   }
+  if (committeeFollowsRes.error) {
+    console.error('ky_committee_follows select:', committeeFollowsRes.error);
+    return NextResponse.json({ error: committeeFollowsRes.error.message }, { status: 500 });
+  }
   if (prefsRes.error) {
     console.error('ky_notification_preferences select:', prefsRes.error);
     return NextResponse.json({ error: prefsRes.error.message }, { status: 500 });
@@ -40,6 +54,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     bills: followsRes.data ?? [],
+    committees: committeeFollowsRes.data ?? [],
     topics: prefsRes.data?.topic_filters ?? [],
   });
 }

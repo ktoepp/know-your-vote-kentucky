@@ -15,6 +15,7 @@ export function pathRequiresSessionRefresh(pathname: string): boolean {
   if (pathname.startsWith('/feed')) return true;
   if (pathname.startsWith('/api/me')) return true;
   if (pathname.startsWith('/api/bills/') && pathname.endsWith('/follow')) return true;
+  if (pathname.startsWith('/api/committees/') && pathname.endsWith('/follow')) return true;
   return false;
 }
 
