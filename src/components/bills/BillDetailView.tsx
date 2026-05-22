@@ -20,9 +20,6 @@ import {
   ArrowBack,
   OpenInNew,
   Gavel,
-  Person,
-  History,
-  HowToVote,
   Check,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
@@ -191,12 +188,16 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest');
+  const [expanded, setExpanded] = useState(false);
+  const collapseAt = 8;
 
   const sorted = useMemo(() => {
     const copy = [...history].sort((a, b) => a.date.localeCompare(b.date));
     if (sortOrder === 'newest') copy.reverse();
     return copy;
   }, [history, sortOrder]);
+
+  const visible = expanded || sorted.length <= collapseAt ? sorted : sorted.slice(0, collapseAt);
 
   return (
     <Box>
@@ -219,8 +220,8 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
         </ToggleButtonGroup>
       </Box>
     <Box sx={{ pl: 0 }}>
-      {sorted.map((item, i) => {
-        const isLast = i === sorted.length - 1;
+      {visible.map((item, i) => {
+        const isLast = i === visible.length - 1 && (expanded || sorted.length <= collapseAt);
         const isImportant = item.importance === 1;
         /** LegiScan `importance === 1` marks major steps; both use solid fills (blue vs neutral grey). */
         const pinBg = isImportant
@@ -236,7 +237,7 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
         return (
           <Box
             key={`${item.date}-${i}-${item.chamber}-${(item.action || '').slice(0, 48)}`}
-            sx={{ display: 'flex', gap: 1.5, mb: isLast ? 0 : 1 }}
+            sx={{ display: 'flex', gap: 1.5, mb: isLast ? 0 : 2.5 }}
           >
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
               <Box sx={{
@@ -285,6 +286,16 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
           </Box>
         );
       })}
+      {sorted.length > collapseAt && (
+        <MuiButton
+          size="small"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          sx={{ mt: 2, textTransform: 'none', fontWeight: 600, pl: 0 }}
+        >
+          {expanded ? 'Show fewer' : `Show all ${sorted.length} actions`}
+        </MuiButton>
+      )}
     </Box>
     </Box>
   );
@@ -562,7 +573,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                     endIcon={<OpenInNew sx={{ fontSize: '0.9rem !important' }} />}
                     sx={{ fontWeight: 600, pl: 0, pr: 0.5, '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' } }}
                   >
-                    Read the full text →
+                    Read the full text
                   </MuiButton>
                 )}
                 {showOfficialKyBillLink && (
@@ -613,10 +624,8 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
             {history.length > 0 && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-                    <History color="primary" sx={{ fontSize: ICON_REM.section }} />
+                  <Box sx={{ mb: 2.5 }}>
                     <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>Legislative History</Typography>
-                    <MuiChip label={`${history.length} actions`} size="small" variant="outlined" sx={{ ml: 'auto' }} />
                   </Box>
                   <HistoryTimeline history={history} />
                 </MuiCardContent>
@@ -630,12 +639,9 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
             {primarySponsors.length > 0 && (
               <MuiCard elevation={0} sx={{ mb: 3, borderRadius: 3, boxShadow: 'none', border: 'none' }}>
                 <MuiCardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Person color="primary" sx={{ fontSize: ICON_REM.section }} />
-                    <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>
-                      {primarySponsors.length === 1 ? 'Primary Sponsor' : 'Primary Sponsors'}
-                    </Typography>
-                  </Box>
+                  <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
+                    {primarySponsors.length === 1 ? 'Primary Sponsor' : 'Primary Sponsors'}
+                  </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {primarySponsors.map((s) => (
                       <SponsorCard
@@ -704,10 +710,9 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
             {detail?.votes && detail.votes.length > 0 && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <HowToVote color="primary" sx={{ fontSize: ICON_REM.section }} />
-                    <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>Votes</Typography>
-                  </Box>
+                  <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
+                    Roll calls
+                  </Typography>
                   {detail.votes.map((v: any, i: number) => {
                     const rollId = v.roll_call_id as number | undefined;
                     const legiscanVoteUrl =

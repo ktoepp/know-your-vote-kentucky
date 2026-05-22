@@ -3,6 +3,11 @@ import { getAuthedUser } from '@/lib/supabase/route-auth';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { formatDigestEventDetail, formatDigestEventLabel } from '@/lib/digest/format-digest-event-detail';
 import { kyTodayIso, normalizeKyGaAgendaLine, normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
+import { KY_TOPICS } from '@/lib/ky-topic-classifier';
+import {
+  billMatchesTopicFilters,
+  topicsForLegiScanSubjects,
+} from '@/lib/ky-topic-legiscan-mapping';
 
 const DEFAULT_LIMIT = 40;
 const MAX_LIMIT = 80;
@@ -12,6 +17,12 @@ export type ProfileActivityKindFilter = 'all' | 'bill' | 'hearing';
 function parseKindFilter(raw: string | null): ProfileActivityKindFilter {
   if (raw === 'bill' || raw === 'hearing') return raw;
   return 'all';
+}
+
+function parseTopicFilter(raw: string | null): string | null {
+  if (!raw?.trim()) return null;
+  const topic = raw.trim();
+  return (KY_TOPICS as readonly string[]).includes(topic) ? topic : null;
 }
 
 const AGENDA_SELECT = `
@@ -38,6 +49,26 @@ export type ProfileActivityItem = {
   detail: string | null;
 };
 
+type BillMeta = {
+  bill_number: string | null;
+  title: string | null;
+  topics: string[] | null;
+  legiscan_subjects: unknown;
+};
+
+function collectBillTopics(meta: BillMeta): string[] {
+  const out = new Set<string>();
+  for (const t of meta.topics ?? []) {
+    if (t) out.add(t);
+  }
+  for (const t of topicsForLegiScanSubjects(
+    meta.legiscan_subjects as { subject_name?: string | null }[] | null,
+  )) {
+    out.add(t);
+  }
+  return Array.from(out).sort((a, b) => a.localeCompare(b));
+}
+
 export async function GET(request: NextRequest) {
   const auth = await getAuthedUser(request);
   if ('error' in auth) return auth.error;
@@ -48,10 +79,11 @@ export async function GET(request: NextRequest) {
     ? Math.min(Math.max(Math.trunc(rawLimit), 1), MAX_LIMIT)
     : DEFAULT_LIMIT;
   const kindFilter = parseKindFilter(url.searchParams.get('kind'));
+  const topicFilter = parseTopicFilter(url.searchParams.get('topic'));
 
   const followsRes = await auth.supabase
     .from('ky_bill_follows')
-    .select('bill_id, ky_bills ( id, bill_number, title )')
+    .select('bill_id, ky_bills ( id, bill_number, title, topics, legiscan_subjects )')
     .order('created_at', { ascending: false });
 
   if (followsRes.error) {
@@ -59,21 +91,37 @@ export async function GET(request: NextRequest) {
   }
 
   const billIds: string[] = [];
-  const billMeta = new Map<string, { bill_number: string | null; title: string | null }>();
+  const billMeta = new Map<string, BillMeta>();
+  const availableTopics = new Set<string>();
 
   for (const row of followsRes.data ?? []) {
     const id = row.bill_id as string;
     if (!id) continue;
     billIds.push(id);
-    const b = row.ky_bills as { id?: string; bill_number?: string | null; title?: string | null } | null;
-    billMeta.set(id, {
+    const b = row.ky_bills as {
+      id?: string;
+      bill_number?: string | null;
+      title?: string | null;
+      topics?: string[] | null;
+      legiscan_subjects?: unknown;
+    } | null;
+    const meta: BillMeta = {
       bill_number: b?.bill_number ?? null,
       title: b?.title ?? null,
-    });
+      topics: b?.topics ?? null,
+      legiscan_subjects: b?.legiscan_subjects ?? null,
+    };
+    billMeta.set(id, meta);
+    for (const t of collectBillTopics(meta)) availableTopics.add(t);
   }
 
   if (billIds.length === 0) {
-    return NextResponse.json({ items: [] satisfies ProfileActivityItem[] });
+    return NextResponse.json({
+      items: [] satisfies ProfileActivityItem[],
+      kind: kindFilter,
+      topic: topicFilter,
+      availableTopics: [],
+    });
   }
 
   const items: ProfileActivityItem[] = [];
@@ -155,12 +203,26 @@ export async function GET(request: NextRequest) {
 
   items.sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
 
-  const filtered =
+  let filtered =
     kindFilter === 'all'
       ? items
       : items.filter((item) =>
           kindFilter === 'hearing' ? item.kind === 'hearing' : item.kind === 'bill_event',
         );
 
-  return NextResponse.json({ items: filtered.slice(0, limit), kind: kindFilter });
+  if (topicFilter) {
+    filtered = filtered.filter((item) => {
+      if (!item.bill_id) return false;
+      const meta = billMeta.get(item.bill_id);
+      if (!meta) return false;
+      return billMatchesTopicFilters(meta.topics, meta.legiscan_subjects as never, [topicFilter]);
+    });
+  }
+
+  return NextResponse.json({
+    items: filtered.slice(0, limit),
+    kind: kindFilter,
+    topic: topicFilter,
+    availableTopics: Array.from(availableTopics).sort((a, b) => a.localeCompare(b)),
+  });
 }

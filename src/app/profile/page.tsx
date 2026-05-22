@@ -35,6 +35,8 @@ import { ProfileDigestHistorySection } from '@/components/profile/ProfileDigestH
 import { ProfileSavedSearchesSection } from '@/components/profile/ProfileSavedSearchesSection';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
 
+const PROFILE_SECTION_SCROLL_MARGIN = { scrollMarginTop: { xs: '7.5rem', sm: '8rem' } };
+
 function SectionCard({
   id,
   icon,
@@ -47,7 +49,12 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Paper id={id} component="section" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+    <Paper
+      id={id}
+      component="section"
+      elevation={1}
+      sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3, ...PROFILE_SECTION_SCROLL_MARGIN }}
+    >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2 }}>
         <Box sx={{ color: 'primary.main', display: 'flex' }} aria-hidden>
           {icon}
@@ -128,6 +135,15 @@ export default function ProfilePage() {
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    if (authLoading || (Boolean(user) && profileLoading) || !user) return;
+    const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
+    if (!hash) return;
+    requestAnimationFrame(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [authLoading, profileLoading, user]);
 
   const accessToken = session?.access_token;
 
@@ -292,7 +308,19 @@ export default function ProfilePage() {
       <Box
         component="nav"
         aria-label="Profile sections"
-        sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 1,
+          mb: 3,
+          position: 'sticky',
+          top: { xs: 56, sm: 64 },
+          zIndex: 10,
+          py: 1,
+          bgcolor: 'background.default',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+        }}
       >
         {[
           { href: '#account', label: 'Account' },
@@ -384,23 +412,23 @@ export default function ProfilePage() {
         )}
       </SectionCard>
 
-      <Paper component="section" id="notifications" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+      <Paper component="section" id="notifications" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3, ...PROFILE_SECTION_SCROLL_MARGIN }}>
         <ProfileNotificationsSection />
       </Paper>
 
-      <Paper component="section" id="followed-bills" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+      <Paper component="section" id="followed-bills" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3, ...PROFILE_SECTION_SCROLL_MARGIN }}>
         <ProfileFollowedBillsSection />
       </Paper>
 
-      <Paper component="section" id="saved-searches" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+      <Paper component="section" id="saved-searches" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3, ...PROFILE_SECTION_SCROLL_MARGIN }}>
         <ProfileSavedSearchesSection />
       </Paper>
 
-      <Paper component="section" id="activity" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+      <Paper component="section" id="activity" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3, ...PROFILE_SECTION_SCROLL_MARGIN }}>
         <ProfileActivitySection />
       </Paper>
 
-      <Paper component="section" id="digest-history" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3 }}>
+      <Paper component="section" id="digest-history" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3, ...PROFILE_SECTION_SCROLL_MARGIN }}>
         <ProfileDigestHistorySection />
       </Paper>
 

@@ -32,6 +32,7 @@
     "preview:welcome": "tsx scripts/preview-welcome-email.tsx",
     "audit:legiscan-subjects": "tsx scripts/audit-legiscan-subjects.ts",
     "diagnose:legislators": "tsx scripts/diagnose-legislators.ts",
+    "generate:district-thumbnails": "tsx scripts/generate-district-thumbnails.ts",
     "cleanup:stale-legislators": "tsx scripts/cleanup-stale-legislators.ts",
     "debug:openstates-roster": "tsx scripts/debug-openstates-roster.ts",
     "normalize:legislator-districts": "tsx scripts/normalize-legislator-districts.ts",

@@ -797,13 +797,19 @@ export default function DistrictMapExplorer() {
 
         <Stack spacing={2}>
           {/* Result state */}
-          {!selectedHouseName && !selectedSenateName ? (
+          {!marker ? (
             <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
               <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
                 Search your address above, or click anywhere on the map to find your House and Senate districts and representatives.
               </Typography>
               <Typography variant="caption" color="text.disabled" display="block" sx={{ mt: 1.5 }}>
                 Every Kentucky address has two state legislators — a House member (100 districts) and a senator (38 districts).
+              </Typography>
+            </Paper>
+          ) : !selectedHouseName && !selectedSenateName ? (
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                We couldn&apos;t match a Kentucky district at this location. Try a full street address in Kentucky, or click inside the state on the map.
               </Typography>
             </Paper>
           ) : (

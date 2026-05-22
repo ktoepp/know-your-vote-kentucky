@@ -26,6 +26,7 @@ import { SectionHeader } from '@/components/civic/SectionHeader';
 import { EmptyState } from '@/components/civic/EmptyState';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
+import { FOLLOW_COPY } from '@/lib/follow-labels';
 
 const FEED_PAGE_SIZE = 12;
 
@@ -91,7 +92,7 @@ export function FeedView({ initialRecentHouse, initialRecentSenate, legislatorRo
         </Box>
 
         <Box sx={{ mb: 6 }}>
-          <SectionHeader title="Bills you follow" icon={<Bookmark />} href="/bills?follows=1" />
+          <SectionHeader title={FOLLOW_COPY.followedBillsSection} icon={<Bookmark />} href="/bills?follows=me" />
           {!authed ? (
             <Box
               sx={{
@@ -102,7 +103,7 @@ export function FeedView({ initialRecentHouse, initialRecentSenate, legislatorRo
               }}
             >
               <Typography variant="body1" color="text.secondary" gutterBottom>
-                Follow bills to track them here.
+                Follow bills to see them here.
               </Typography>
               <Button component={Link} href="/bills" variant="contained" sx={{ mt: 1 }}>
                 Browse bills

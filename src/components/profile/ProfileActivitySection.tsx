@@ -21,6 +21,7 @@ import { BillNumber } from '@/components/bills/BillNumber';
 import { ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE } from '@/lib/ui-tokens';
 
 const ACTIVITY_FILTER_STORAGE_KEY = 'kyvky-profile-activity-filter';
+const ACTIVITY_TOPIC_FILTER_STORAGE_KEY = 'kyvky-profile-activity-topic-filter';
 
 export type ActivityKindFilter = 'all' | 'bill' | 'hearing';
 
@@ -49,11 +50,25 @@ function readStoredFilter(): ActivityKindFilter {
   return 'all';
 }
 
+function readStoredTopicFilter(): string {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem(ACTIVITY_TOPIC_FILTER_STORAGE_KEY) ?? '';
+}
+
 function EmptyState({
   filter,
+  topicFilter,
 }: {
   filter: ActivityKindFilter;
+  topicFilter: string;
 }) {
+  if (topicFilter) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        No activity for <strong>{topicFilter}</strong> among your followed bills.
+      </Typography>
+    );
+  }
   if (filter === 'hearing') {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -76,7 +91,7 @@ function EmptyState({
         <MuiLink component={NextLink} href="/bills" fontWeight={600}>
           Browse bills
         </MuiLink>{' '}
-        and tap Follow on bills you want to track.
+        and tap Follow on bills you want to follow.
       </Typography>
     );
   }
@@ -96,12 +111,15 @@ export function ProfileActivitySection() {
   const token = session?.access_token ?? null;
 
   const [kindFilter, setKindFilter] = useState<ActivityKindFilter>('all');
+  const [topicFilter, setTopicFilter] = useState('');
+  const [availableTopics, setAvailableTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<ProfileActivityItem[]>([]);
 
   useEffect(() => {
     setKindFilter(readStoredFilter());
+    setTopicFilter(readStoredTopicFilter());
   }, []);
 
   const load = useCallback(async () => {
@@ -109,22 +127,27 @@ export function ProfileActivitySection() {
     setLoading(true);
     setError(null);
     try {
-      const qs = kindFilter === 'all' ? '' : `?kind=${kindFilter}`;
-      const res = await fetch(`/api/me/activity${qs}`, {
+      const params = new URLSearchParams();
+      if (kindFilter !== 'all') params.set('kind', kindFilter);
+      if (topicFilter) params.set('topic', topicFilter);
+      const qs = params.toString();
+      const res = await fetch(`/api/me/activity${qs ? `?${qs}` : ''}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const body = (await res.json().catch(() => ({}))) as {
         items?: ProfileActivityItem[];
+        availableTopics?: string[];
         error?: string;
       };
       if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Could not load activity');
       setItems(body.items ?? []);
+      setAvailableTopics(body.availableTopics ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load activity');
     } finally {
       setLoading(false);
     }
-  }, [token, kindFilter]);
+  }, [token, kindFilter, topicFilter]);
 
   useEffect(() => {
     void load();
@@ -134,6 +157,14 @@ export function ProfileActivitySection() {
     setKindFilter(next);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(ACTIVITY_FILTER_STORAGE_KEY, next);
+    }
+  };
+
+  const setTopic = (next: string) => {
+    setTopicFilter(next);
+    if (typeof window !== 'undefined') {
+      if (next) window.localStorage.setItem(ACTIVITY_TOPIC_FILTER_STORAGE_KEY, next);
+      else window.localStorage.removeItem(ACTIVITY_TOPIC_FILTER_STORAGE_KEY);
     }
   };
 
@@ -156,7 +187,7 @@ export function ProfileActivitySection() {
         Recent updates and upcoming hearings for bills you follow — one timeline instead of separate alert columns.
       </Typography>
 
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2 }} role="group" aria-label="Activity filter">
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }} role="group" aria-label="Activity filter">
         {FILTER_OPTIONS.map((opt) => (
           <Chip
             key={opt.value}
@@ -170,6 +201,30 @@ export function ProfileActivitySection() {
         ))}
       </Box>
 
+      {availableTopics.length > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2 }} role="group" aria-label="Activity topic filter">
+          <Chip
+            label="All topics"
+            size="small"
+            clickable
+            color={!topicFilter ? 'primary' : 'default'}
+            variant={!topicFilter ? 'filled' : 'outlined'}
+            onClick={() => setTopic('')}
+          />
+          {availableTopics.map((topic) => (
+            <Chip
+              key={topic}
+              label={topic}
+              size="small"
+              clickable
+              color={topicFilter === topic ? 'primary' : 'default'}
+              variant={topicFilter === topic ? 'filled' : 'outlined'}
+              onClick={() => setTopic(topicFilter === topic ? '' : topic)}
+            />
+          ))}
+        </Box>
+      )}
+
       {loading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
           <CircularProgress size={28} aria-label="Loading activity" />
@@ -182,7 +237,9 @@ export function ProfileActivitySection() {
         </Typography>
       )}
 
-      {!loading && !error && items.length === 0 && <EmptyState filter={kindFilter} />}
+      {!loading && !error && items.length === 0 && (
+        <EmptyState filter={kindFilter} topicFilter={topicFilter} />
+      )}
 
       {!loading && items.length > 0 && (
         <List disablePadding>

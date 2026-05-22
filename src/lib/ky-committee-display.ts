@@ -121,3 +121,35 @@ export function kyTodayIso(): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
+
+const COMMITTEE_PREFIX_PATTERNS: { kind: string; re: RegExp }[] = [
+  { kind: 'house_standing', re: /^House Standing Committee on\s+/i },
+  { kind: 'senate_standing', re: /^Senate Standing Committee on\s+/i },
+  { kind: 'interim_joint', re: /^Interim Joint Committee on\s+/i },
+  { kind: 'statutory', re: /^Statutory Committee on\s+/i },
+  { kind: 'special', re: /^Special Committee on\s+/i },
+];
+
+export type ShortKyCommitteeLabel = {
+  shortLabel: string;
+  fullLabel: string;
+  committeeKind: string | null;
+};
+
+/** Strip LRC boilerplate prefixes for compact member-profile tiles. */
+export function shortKyCommitteeLabel(name: string | null | undefined): ShortKyCommitteeLabel {
+  const fullLabel = normalizeKyGaDisplayName(name);
+  if (!fullLabel) return { shortLabel: '', fullLabel: '', committeeKind: null };
+
+  for (const { kind, re } of COMMITTEE_PREFIX_PATTERNS) {
+    if (re.test(fullLabel)) {
+      return {
+        shortLabel: fullLabel.replace(re, '').trim(),
+        fullLabel,
+        committeeKind: kind,
+      };
+    }
+  }
+
+  return { shortLabel: fullLabel, fullLabel, committeeKind: null };
+}

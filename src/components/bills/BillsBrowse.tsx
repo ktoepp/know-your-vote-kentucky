@@ -49,6 +49,8 @@ import { withTimeout } from '@/lib/async-utils';
 import { usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
 import { KY_TOPICS } from '@/lib/ky-topic-classifier';
+import { LANDING_TOPICS } from '@/components/home/landing-data';
+import { FOLLOW_COPY } from '@/lib/follow-labels';
 import { useUser } from '@/app/lib/UserContext';
 
 export type BillsBrowseChamberMode = KyBillsBrowseChamberMode;
@@ -99,6 +101,23 @@ export function BillsBrowse({
     },
     [pathname, router, searchParams],
   );
+
+  const setTopicInUrl = useCallback(
+    (next: string) => {
+      setTopicFilter(next);
+      const p = new URLSearchParams(searchParams.toString());
+      if (next) p.set('topic', next);
+      else p.delete('topic');
+      const qs = p.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('topic') ?? '';
+    setTopicFilter((prev) => (prev === fromUrl ? prev : fromUrl));
+  }, [searchParams]);
 
   const skipInitialBrowseRef = useRef(Boolean(initialBrowse));
   const [bills, setBills] = useState<KYBill[]>(initialBrowse?.bills ?? []);
@@ -345,6 +364,39 @@ export function BillsBrowse({
           </Typography>
         </Box>
 
+        <Box
+          sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', mb: 3 }}
+          role="group"
+          aria-label="Browse by topic"
+        >
+          {LANDING_TOPICS.map(({ label, topic }) => (
+            <Chip
+              key={topic}
+              label={label}
+              size="small"
+              clickable
+              color={topicFilter === topic ? 'primary' : 'default'}
+              variant={topicFilter === topic ? 'filled' : 'outlined'}
+              onClick={() => setTopicInUrl(topicFilter === topic ? '' : topic)}
+            />
+          ))}
+          {topicFilter && !LANDING_TOPICS.some((t) => t.topic === topicFilter) && (
+            <Chip
+              label={topicFilter}
+              size="small"
+              clickable
+              color="primary"
+              variant="filled"
+              onClick={() => setTopicInUrl('')}
+            />
+          )}
+          {topicFilter ? (
+            <Chip label="All topics" size="small" clickable variant="outlined" onClick={() => setTopicInUrl('')} />
+          ) : (
+            <Chip label="more →" size="small" clickable variant="outlined" component={Link} href={browseBaseHref} />
+          )}
+        </Box>
+
         {!supabase && (
           <Alert severity="warning" sx={{ mb: 2 }}>
             Set <strong>NEXT_PUBLIC_SUPABASE_URL</strong> and <strong>NEXT_PUBLIC_SUPABASE_ANON_KEY</strong> in{' '}
@@ -380,7 +432,7 @@ export function BillsBrowse({
                 labelId="browse-topic-label"
                 label="Topic"
                 value={topicFilter}
-                onChange={(e) => setTopicFilter(e.target.value)}
+                onChange={(e) => setTopicInUrl(e.target.value)}
               >
                 <MenuItem value="">All topics</MenuItem>
                 {topicMenuItems.map((t) => (
@@ -446,7 +498,7 @@ export function BillsBrowse({
             </Typography>
             {effectiveFollowsMe && (
               <Chip
-                label="Following"
+                label={FOLLOW_COPY.followingFilter}
                 size="small"
                 onDelete={() => setFollowsMeInUrl(false)}
                 deleteIcon={<Cancel />}
@@ -478,7 +530,7 @@ export function BillsBrowse({
               <Chip
                 label={topicFilter}
                 size="small"
-                onDelete={() => setTopicFilter('')}
+                onDelete={() => setTopicInUrl('')}
                 deleteIcon={<Cancel />}
                 color="secondary"
                 variant="outlined"
@@ -518,7 +570,7 @@ export function BillsBrowse({
               onClick={() => {
                 setChamberFilter('');
                 setStatusFilter('all');
-                setTopicFilter('');
+                setTopicInUrl('');
                 const p = new URLSearchParams(searchParams.toString());
                 p.delete('follows');
                 p.delete('sort');
@@ -547,7 +599,7 @@ export function BillsBrowse({
 
         {followsParam && !authed && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            Sign in to use the <strong>Following</strong> filter.{' '}
+            {FOLLOW_COPY.signInForFollowingFilter}{' '}
             <Button component={Link} href={`/auth/login?next=${encodeURIComponent(pathname + (searchParams.toString() ? `?${searchParams}` : ''))}`} size="small" sx={{ ml: 1 }}>
               Log in
             </Button>
@@ -570,7 +622,7 @@ export function BillsBrowse({
               {!supabase
                 ? 'Supabase is not configured. Bills will appear once connected.'
                 : effectiveFollowsMe
-                  ? "You haven't followed any bills yet. Browse current bills and tap Follow on a bill to start tracking."
+                  ? "You haven't followed any bills yet. Browse current bills and tap Follow on a bill to start following."
                   : 'Try adjusting your filters.'}
             </Typography>
             {effectiveFollowsMe && (

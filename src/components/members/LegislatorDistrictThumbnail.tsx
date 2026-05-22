@@ -13,13 +13,21 @@ export interface LegislatorDistrictThumbnailProps {
   size?: 'card' | 'profile';
 }
 
+function localDistrictThumbSrc(
+  chamber: 'house' | 'senate',
+  districtName: string,
+  size: 'card' | 'profile',
+): string {
+  return `/geo/district-thumbs/${chamber}/${districtName}-${size}.webp`;
+}
+
 /**
- * Static district map thumbnail (Mapbox Static Images API via /api/geo/district-thumbnail).
- * One cached <img> per card — no WebGL — so it scales to a full roster. Use the live
- * LegislatorDistrictMinimap only where a single interactive map is needed.
+ * Static district map thumbnail — prefers committed assets under public/geo/district-thumbs,
+ * then falls back to /api/geo/district-thumbnail (Mapbox Static Images).
  */
 export function LegislatorDistrictThumbnail({ leg, size = 'card' }: LegislatorDistrictThumbnailProps) {
   const [error, setError] = React.useState(false);
+  const [useApiFallback, setUseApiFallback] = React.useState(false);
   const chamber = leg.chamber === 'house' || leg.chamber === 'senate' ? leg.chamber : null;
   const districtName = chamber ? parseKyDistrictNumber(leg.district) : null;
   if (!chamber || !districtName) return null;
@@ -52,7 +60,9 @@ export function LegislatorDistrictThumbnail({ leg, size = 'card' }: LegislatorDi
     );
   }
 
-  const src = `/api/geo/district-thumbnail?chamber=${chamber}&district=${encodeURIComponent(leg.district ?? '')}&size=${size}`;
+  const src = useApiFallback
+    ? `/api/geo/district-thumbnail?chamber=${chamber}&district=${encodeURIComponent(leg.district ?? '')}&size=${size}`
+    : localDistrictThumbSrc(chamber, districtName, size);
 
   return (
     <Box
@@ -63,15 +73,19 @@ export function LegislatorDistrictThumbnail({ leg, size = 'card' }: LegislatorDi
         border: '1px solid',
         borderColor: 'divider',
         bgcolor: 'action.hover',
+        pointerEvents: 'none',
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- external static map; next/image adds no value for a redirected single asset */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- static map asset; local or API redirect */}
       <img
         src={src}
         alt={ariaLabel}
         loading="lazy"
         decoding="async"
-        onError={() => setError(true)}
+        onError={() => {
+          if (!useApiFallback) setUseApiFallback(true);
+          else setError(true);
+        }}
         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
       />
     </Box>

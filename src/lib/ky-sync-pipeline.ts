@@ -57,6 +57,7 @@ import {
   type LegiScanBillSummary,
   type LegiScanMasterListRawBill,
   type LegiScanSession,
+  type LegiScanSessionPerson,
   type LegiScanPerson,
 } from './ky-legiscan-client';
 import { mapLegiScanBillStatus } from './map-legiscan-bill-status';
@@ -978,6 +979,51 @@ function legiscanSessionRoleToChamber(role: string | null | undefined): 'house' 
   return null;
 }
 
+function legiscanSessionPeopleAtSeat(
+  people: LegiScanSessionPerson[],
+  chamber: 'house' | 'senate',
+  districtNorm: string,
+): LegiScanSessionPerson[] {
+  return people.filter((p) => {
+    const ch = legiscanSessionRoleToChamber(p.role);
+    if (ch !== chamber) return false;
+    const pDist = normalizeKyLegislatorDistrictForDb(ch, p.district);
+    return Boolean(pDist && pDist === districtNorm);
+  });
+}
+
+function legiscanSessionPeopleMatchingLegislatorName(
+  people: LegiScanSessionPerson[],
+  leg: {
+    name: string;
+    first_name: string | null;
+    last_name: string | null;
+    chamber: string | null;
+    district: string | null;
+  },
+): LegiScanSessionPerson[] {
+  if (leg.chamber !== 'house' && leg.chamber !== 'senate') return [];
+  const districtNorm = (leg.district || '').trim();
+  if (!districtNorm) return [];
+
+  const legName = normalizeSponsorNameForMatch(
+    (leg.name || '').trim() || `${leg.first_name || ''} ${leg.last_name || ''}`.trim(),
+  );
+  if (!legName) return [];
+
+  return people.filter((p) => {
+    const ch = legiscanSessionRoleToChamber(p.role);
+    if (ch !== leg.chamber) return false;
+    const pDist = normalizeKyLegislatorDistrictForDb(ch, p.district);
+    if (!pDist || pDist !== districtNorm) return false;
+    const pName = (p.name || '').trim() || `${p.first_name || ''} ${p.last_name || ''}`.trim();
+    if (!pName) return false;
+    const pNorm = normalizeSponsorNameForMatch(pName);
+    if (pNorm.length > 0 && pNorm === legName) return true;
+    return legislatorNameMatchesLegiscanSessionPerson(leg, pName);
+  });
+}
+
 /**
  * Refresh `ky_legislators.legiscan_id` from LegiScan `getSessionPeople` for the latest KY session so public
  * `/people/id/{id}` links and vote joins stay aligned after turnover (stale rows often keep the predecessor id).
@@ -1021,17 +1067,12 @@ async function reconcileKyLegislatorLegiscanIdsFromLatestSession(
     );
     if (!legName) continue;
 
-    const matches = people.filter((p) => {
-      const ch = legiscanSessionRoleToChamber(p.role);
-      if (ch !== leg.chamber) return false;
-      const pDist = normalizeKyLegislatorDistrictForDb(ch, p.district);
-      if (!pDist || pDist !== districtNorm) return false;
-      const pName = (p.name || '').trim() || `${p.first_name || ''} ${p.last_name || ''}`.trim();
-      if (!pName) return false;
-      const pNorm = normalizeSponsorNameForMatch(pName);
-      if (pNorm.length > 0 && pNorm === legName) return true;
-      return legislatorNameMatchesLegiscanSessionPerson(leg, pName);
-    });
+    let matches = legiscanSessionPeopleMatchingLegislatorName(people, leg);
+    // Preferred vs legal names (e.g. Sarge/Michael Pollock, Max/George Wise) — unique seat is enough.
+    if (matches.length !== 1) {
+      const seatMatches = legiscanSessionPeopleAtSeat(people, leg.chamber, districtNorm);
+      if (seatMatches.length === 1) matches = seatMatches;
+    }
 
     if (matches.length !== 1) continue;
     const pid = matches[0]!.people_id;

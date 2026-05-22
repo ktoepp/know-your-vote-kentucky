@@ -82,8 +82,8 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 ### Suggested next implementation order (align with spec milestones)
 
 1. `GET/PATCH /api/me/preferences` — **Done in repo** (`src/app/api/me/preferences/route.ts`, `src/lib/ky-notification-preferences.ts`, migration **020** insert policy). Wire `/profile` Notifications panel next.
-2. `/profile` — **Partial.** Followed bills + Notifications panel wired to `/api/me/follows` and `/api/me/preferences`. Remaining M4 polish: optional nav anchors / section jump links; Security already on page.
-3. **Browse / cards / chips** — `?follows=me`, `KYBillCard` bookmark + topic chip styling, home topic chips; bill detail topic hint / pre-build checklist polish if needed.
+2. `/profile` — **Done (2026-05-22).** Followed bills + Notifications panel wired; **nav anchors** + hash scroll-on-load + **sticky section chip nav**; **Topics activity filter** on `/profile#activity` (`?topic=` on `GET /api/me/activity`).
+3. **Browse / cards / chips** — `?follows=me`, `KYBillCard` bookmark + topic chip styling, home topic chips; **bills browse topic quick-picks** (2026-05-22); bill detail topic hint / pre-build checklist polish if needed.
 4. **Sync pipeline — **`ky_bill_status_history` — Pre-upsert snapshots + `recordBillStatusHistoryForBuiltBatch` after `upsertKyBillRows` (hash-gated + legacy paths).
 5. **Digest email** — React Email + `/api/cron/notify` + Resend + `/api/unsubscribe/[token]` (M6–M7). **Remaining:** welcome email (optional), M8 hardening.
 6. **M8 + optional welcome** — Production digest validation; bounce handling; `WelcomeEmail` after verification if product wants it.
@@ -96,12 +96,13 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 ## Operator checklist
 
 - **Database migrations** — Apply `024_ky_committee_calendar.sql` before first `npm run sync:ky:lrc-calendar` (committee calendar Phase 1). Apply `025_ky_saved_searches_snooze.sql` for saved searches + bill snooze (Wave 1–2). **Primary environment:** migrations **016–017** applied (2026-05-11); `sync:ky:legislators` run successfully after fixing `scripts/load-env.ts` (repo-root `.env.local`, `override: true`). **New Supabase projects / restores:** apply in order `016_ky_user_profiles` → `017_search_members_discovery` → `018_ky_bills_plain_search_hardening` → `019_ky_follow_bills_schema` → `020_ky_notification_preferences_insert_policy` (`npm run db:apply-sql` or SQL editor); after **017**, run `npm run sync:ky:legislators` so `committee_memberships` can populate from Open States `roles` when present.
+- **legiscan_id verify loop** — After legislator sync or when member profiles show empty voting records: `npm run sync:ky:legislators` then `npm run diagnose:legislators` (exits 1 if active House/Senate rows missing `legiscan_id`). Optional district thumbnails: `npm run generate:district-thumbnails` (requires `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`; writes `public/geo/district-thumbs/`).
 - **Remove **`SENTRY_ENABLE_EXAMPLE_PAGE` from Vercel (and `.env.local` if set). The `/sentry-example-page` routes were removed from the repo; stale env vars are harmless but should be cleared.
 - **Legacy npm stacks** (puppeteer, GCS, pdf-parse, `three`, etc.) are **not** in root `package.json`. If you need them for a one-off script, use `docs/legacy-npm-deps/` and install into gitignored `optional/legacy-npm-deps/`.
 
 ## Recently completed
 
-- **PR train #23–#35 verified (2026-05-21)** — All 13 recent-ship PRs PASS verification (Waves 1, 2a–d on the `verify-and-refine-app` branch); see `decisions.md` § 2026-05-21 for the linked GH-Actions vs Vercel-cron decision.
+- **UX quick wins + browser review fixes (2026-05-22)** — Profile hash scroll + sticky section nav; map empty vs no-district states; member profile section reorder (Sponsored → Voting → Committees) with `KYBillCard` gallery, committee assignment tiles (`shortKyCommitteeLabel`), static district thumbnails on profile, clickable vote tally filters; bills browse topic quick-pick chips (`LANDING_TOPICS`); bill detail history expand/collapse (8 items), section header polish, Roll calls label, hearings empty copy; profile activity **Topics** filter (`?topic=` + hybrid LegiScan match); normalized Follow copy (`src/lib/follow-labels.ts`); nav tooltips toggle without secondary text; `diagnose:legislators` reports missing `legiscan_id`; `npm run generate:district-thumbnails` script added. — All 13 recent-ship PRs PASS verification (Waves 1, 2a–d on the `verify-and-refine-app` branch); see `decisions.md` § 2026-05-21 for the linked GH-Actions vs Vercel-cron decision.
   - **#23** Committee calendar + meetings routes + civic UX — `/committees`, `/meetings`, bill-detail hearings block, `/legislature/resources` hub all render and link as specified.
   - **#24** De-duplicate bills sync + quiet hourly Slack — no duplicate `ky_bills` upserts in dry-run; Slack noise reduced to summary lines only.
   - **#25** Digest email refinement — `BillDigest` grouped by reason with raw actions shown and clarified labels (`preview:digest` render matches spec).
@@ -175,8 +176,8 @@ Reference: [docs/reference/bill-watch/](./docs/reference/bill-watch/README.md). 
 - **Activity feed filters** — Shipped + verified 2026-05-21 (chips, `?kind=`, empty states).
 - **Alert settings UX** — Shipped + verified 2026-05-21 (groups + Bill Watch link on `/legislature/resources`).
 - **Saved searches MVP** — Shipped + verified 2026-05-21 (copy/save on `/bills` + `/profile#saved-searches`; migration **025** applied).
-- **Bill tracking polish** — Shipped + verified 2026-05-21 (“Track another bill”, `/dashboard` redirect).
-- **Design backlog (open)** — Home hero CTA contrast (Wave 4 ✅); member profile section order; returning-user hero (2026-05-20 ✅); optional **Topics** activity filter (v1.1 in plan).
+- **Bill tracking polish** — Shipped + verified 2026-05-21 (“Follow another bill”, `/dashboard` redirect); follow copy normalized 2026-05-22 (`follow-labels.ts`).
+- **Design backlog (open)** — Home hero CTA contrast (Wave 4 ✅); member profile section order (2026-05-22 ✅); returning-user hero (2026-05-20 ✅); **Topics** activity filter (2026-05-22 ✅).
 - **Bill card hover UX (browser review)** — **[P1] ✅ Wave 4b (2026-05-21)** — whole-card `<Tooltip>` wrapper removed from `KYBillCard`; preview-style tooltip components deleted; status-chip tooltip on bill detail remains as educational.
 
 **Wave 1 non-goals:** Kentucky.gov auth, rules wizard, mobile quiet hours, per-bill alert overrides, premium “new bill match” email blast.
@@ -230,7 +231,7 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
   - **M8 — Launch hardening:** **Complete.** Bounce / complaint webhook + suppression (migration 021); digest cap (10 events + "and N more"); copy review (subject line, footer); `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers; one-time welcome email after verification (migration 022). End-to-end harness: `npm run preview:digest`, `npm run verify:digest-state`, `npm run preview:welcome`.
   - **Follow-up — verify digest send time:** After first DST transition (Nov 2026) or once open-rate data exists, evaluate whether `0 11 * * *` UTC is still the right hour. Consider open rates by hour, user feedback, and whether to add a per-user time-zone preference.
   - **Investigation — official vs. inferred topic taxonomy:** **Resolved 2026-05-13.** Outcome: Option A (hybrid digest match) shipped via `src/lib/ky-topic-legiscan-mapping.ts`. Preferences UI keeps the 20 KY_TOPICS (no LegiScan-subject picker — rejected as power-user feature). AI-fallback tagging deferred unless `npm run audit:legiscan-subjects` shows bills missing from BOTH taxonomies. Coverage maintained via the audit step on the weekly workflow.
-- **Address search UX on map** — Street address lookup exists (`mapbox-geocode.ts`). Optional improvements: autocomplete/typeahead, clearer empty states.
+- **Address search UX on map** — Street address lookup exists (`mapbox-geocode.ts`); **empty vs no-district states** shipped 2026-05-22. Optional: autocomplete/typeahead.
 - **"How to contact your rep"** — District map accordion covers basics; expand with capitol workflows, hearings, testimony links to LRC as product needs evolve.
 
 ## UX design tracker (agent)
