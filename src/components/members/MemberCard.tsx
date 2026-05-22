@@ -2,21 +2,12 @@
 
 import React from 'react';
 import Link from 'next/link';
-import {
-  Box,
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  Divider,
-  Stack,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import { Box, Divider, Stack, Tooltip, Typography } from '@mui/material';
 import { Email, Phone, Public } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import type { KYLegislator } from '@/types/kentucky';
 import { useTooltips } from '@/lib/TooltipContext';
+import { CivicCard } from '@/components/ui/CivicCard';
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { KENTUCKY_GOVERNOR_OFFICE_URL } from '@/components/civic/GovernorBeshearChip';
 import { LegislatorExternalLinkButton } from '@/components/civic/LegislatorExternalLinkButton';
@@ -25,7 +16,7 @@ import { MemberName } from '@/components/civic/MemberName';
 import { MetaChip } from '@/components/ui/Chip';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
 import { legislatorRoleDistrictLine } from '@/lib/legislator-display';
-import { CARD } from '@/lib/ui-tokens';
+import { CARD, ICON_REM } from '@/lib/ui-tokens';
 import {
   isKentuckyGovernor,
   kyLegislatorAvatarInitials,
@@ -38,7 +29,6 @@ import {
   normalizeBallotpediaHref,
   normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
-import { ICON_REM } from '@/lib/ui-tokens';
 
 export interface MemberCardProps {
   leg: KYLegislator;
@@ -95,59 +85,9 @@ export function MemberCard({
     governor ||
     Boolean((showKyLegislatureButton && lrcPublicUrl) || campaignUrl || ballotpediaHref);
 
-  return (
-    <Card
-      id={anchorId}
-      elevation={governor ? 3 : 1}
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        borderRadius: 3,
-        border: governor ? `2px solid ${theme.palette.success.main}` : `1px solid ${theme.palette.divider}`,
-        bgcolor: governor ? (theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.08)' : 'rgba(46, 125, 50, 0.04)') : undefined,
-        transition: 'all 0.2s ease',
-        ...(profileHref && {
-          cursor: 'pointer',
-          '&:has(.member-card-stretch-link:focus-visible)': {
-            outline: `2px solid ${theme.palette.primary.main}`,
-            outlineOffset: 2,
-          },
-        }),
-        '&:hover': {
-          boxShadow: governor ? 8 : 4,
-          transform: 'translateY(-2px)',
-          borderColor: governor ? theme.palette.success.dark : theme.palette.primary.main,
-        },
-      }}
-    >
-      {profileHref && (
-        <Link
-          href={profileHref}
-          className="member-card-stretch-link"
-          aria-label={`View profile for ${leg.name?.trim() || 'legislator'}`}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 1,
-            borderRadius: theme.spacing(3),
-            textDecoration: 'none',
-          }}
-        >
-          <span className="sr-only">View profile</span>
-        </Link>
-      )}
-      <CardContent
-        sx={{
-          flexGrow: 1,
-          p: CARD.padding,
-          position: 'relative',
-          zIndex: 2,
-          ...(pointerPassthrough ? { pointerEvents: 'none' as const } : {}),
-        }}
-      >
-        <LegislatorIdentityBlock
+  const header = (
+    <>
+      <LegislatorIdentityBlock
           name={<MemberName member={leg} variant="primary" />}
           nameComponent={profileNameHeading}
           roleLine={legislatorRoleDistrictLine(leg, { includeDistrict: showDistrictInSubtitle })}
@@ -174,15 +114,18 @@ export function MemberCard({
             ) : undefined
           }
         />
-        {showDistrictMinimap && (leg.chamber === 'house' || leg.chamber === 'senate') && showDistrictInSubtitle && (
-          <Box sx={{ mt: 1.25, maxWidth: 200 }}>
-            <LegislatorDistrictThumbnail leg={leg} size={featured || governor ? 'profile' : 'card'} />
-          </Box>
-        )}
+      {showDistrictMinimap && (leg.chamber === 'house' || leg.chamber === 'senate') && showDistrictInSubtitle && (
+        <Box sx={{ mt: 1.25, maxWidth: 200 }}>
+          <LegislatorDistrictThumbnail leg={leg} size={featured || governor ? 'profile' : 'card'} />
+        </Box>
+      )}
+    </>
+  );
 
-        <Divider sx={{ my: 2 }} />
-
-        <Stack spacing={1.75}>
+  const body = (
+    <>
+      <Divider sx={{ mt: -0.5, mb: 2 }} />
+      <Stack spacing={1.75}>
           {leg.email && (
             <Box
               sx={{
@@ -304,58 +247,107 @@ export function MemberCard({
               </Box>
             </Box>
           )}
-        </Stack>
-      </CardContent>
+      </Stack>
+    </>
+  );
 
-      {hasFooterActions && (
-      <CardActions
-        sx={{
-          px: CARD.padding,
-          pb: 2,
-          pt: 0,
-          gap: 0.25,
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          borderTop: 1,
-          borderColor: 'divider',
-          position: 'relative',
-          zIndex: 3,
-          pointerEvents: pointerPassthrough ? 'auto' : undefined,
-        }}
-      >
-        {showKyLegislatureButton && lrcPublicUrl && (
-          <LegislatorExternalLinkButton href={lrcPublicUrl}>KY Legislature</LegislatorExternalLinkButton>
-        )}
-        {campaignUrl && (
-          <LegislatorExternalLinkButton href={campaignUrl}>Website</LegislatorExternalLinkButton>
-        )}
-        {ballotpediaHref && (
-          <Tooltip
-            title={
-              tooltipsEnabled
-                ? isFormerMember
-                  ? 'Ballotpedia often covers former officeholders; verify dates and current roles on official sources when needed.'
-                  : 'Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record.'
-                : ''
-            }
-            placement="top"
-            arrow
-            enterDelay={400}
-          >
-            <LegislatorExternalLinkButton href={ballotpediaHref}>Ballotpedia</LegislatorExternalLinkButton>
-          </Tooltip>
-        )}
-        {governor && (
-          <LegislatorExternalLinkButton
-            href={KENTUCKY_GOVERNOR_OFFICE_URL}
-            startIcon={<Public sx={{ fontSize: '0.95rem', opacity: 0.75 }} aria-hidden />}
-            sx={{ color: 'success.main' }}
-          >
-            Governor office
-          </LegislatorExternalLinkButton>
-        )}
-      </CardActions>
+  const footer = hasFooterActions ? (
+    <Box
+      sx={{
+        display: 'flex',
+        gap: 0.25,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        borderTop: 1,
+        borderColor: 'divider',
+        pt: 2,
+        mt: -0.5,
+        pointerEvents: pointerPassthrough ? 'auto' : undefined,
+      }}
+    >
+      {showKyLegislatureButton && lrcPublicUrl && (
+        <LegislatorExternalLinkButton href={lrcPublicUrl}>KY Legislature</LegislatorExternalLinkButton>
       )}
-    </Card>
+      {campaignUrl && (
+        <LegislatorExternalLinkButton href={campaignUrl}>Website</LegislatorExternalLinkButton>
+      )}
+      {ballotpediaHref && (
+        <Tooltip
+          title={
+            tooltipsEnabled
+              ? isFormerMember
+                ? 'Ballotpedia often covers former officeholders; verify dates and current roles on official sources when needed.'
+                : 'Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record.'
+              : ''
+          }
+          placement="top"
+          arrow
+          enterDelay={400}
+        >
+          <LegislatorExternalLinkButton href={ballotpediaHref}>Ballotpedia</LegislatorExternalLinkButton>
+        </Tooltip>
+      )}
+      {governor && (
+        <LegislatorExternalLinkButton
+          href={KENTUCKY_GOVERNOR_OFFICE_URL}
+          startIcon={<Public sx={{ fontSize: '0.95rem', opacity: 0.75 }} aria-hidden />}
+          sx={{ color: 'success.main' }}
+        >
+          Governor office
+        </LegislatorExternalLinkButton>
+      )}
+    </Box>
+  ) : undefined;
+
+  return (
+    <Box sx={{ position: 'relative', height: '100%' }}>
+      {profileHref && (
+        <Link
+          href={profileHref}
+          className="member-card-stretch-link"
+          aria-label={`View profile for ${leg.name?.trim() || 'legislator'}`}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 1,
+            borderRadius: theme.spacing(3),
+            textDecoration: 'none',
+          }}
+        >
+          <span className="sr-only">View profile</span>
+        </Link>
+      )}
+      <CivicCard
+        variant="member"
+        featured={governor}
+        id={anchorId}
+        sx={{
+          position: 'relative',
+          zIndex: 2,
+          ...(governor && {
+            border: `2px solid ${theme.palette.success.main}`,
+            bgcolor:
+              theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.08)' : 'rgba(46, 125, 50, 0.04)',
+          }),
+          ...(pointerPassthrough && { pointerEvents: 'none' as const }),
+          ...(profileHref && {
+            cursor: 'pointer',
+            '&:hover': {
+              boxShadow:
+                theme.palette.mode === 'dark' ? CARD.hoverBoxShadowDark : CARD.hoverBoxShadow,
+              transform: CARD.hoverTransform,
+              borderColor: governor ? theme.palette.success.dark : theme.palette.primary.main,
+            },
+            '&:has(.member-card-stretch-link:focus-visible)': {
+              outline: `2px solid ${theme.palette.primary.main}`,
+              outlineOffset: 2,
+            },
+          }),
+        }}
+        header={header}
+        body={body}
+        footer={footer}
+      />
+    </Box>
   );
 }

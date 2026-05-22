@@ -63,6 +63,11 @@ export function PaginatedSection<T>({
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
+  const pageItems = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return items.slice(start, start + pageSize);
+  }, [items, page, pageSize]);
+
   // Load more variant
   if (variant === 'loadmore') {
     const visibleItems = items.slice(0, visibleCount) as T[];
@@ -87,11 +92,6 @@ export function PaginatedSection<T>({
       </Box>
     );
   }
-
-  const pageItems = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }, [items, page, pageSize]);
 
   const showPager = items.length > pageSize;
   const showPageSizeSelect =

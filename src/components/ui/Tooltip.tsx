@@ -62,6 +62,12 @@ interface TooltipProps {
   maxWidth?: string;
   delay?: number;
   forceShow?: boolean;
+  /**
+   * If set, renders a small "Learn more" affordance inside the tooltip that
+   * links to `/glossary#{glossaryKey}`. The tooltip surface becomes hoverable
+   * so users can reach the link without it disappearing.
+   */
+  glossaryKey?: string;
 }
 
 export const Tooltip = ({
@@ -71,12 +77,14 @@ export const Tooltip = ({
   className = '',
   delay = 300,
   forceShow = false,
+  glossaryKey,
 }: TooltipProps) => {
   const { tooltipsEnabled } = useTooltips();
   const [isVisible, setIsVisible] = useState(false);
   const [placeReady, setPlaceReady] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const [showTimeout, setShowTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const { getSurfaceBackground, getAdaptiveBorder } = useThemeUtils();
@@ -115,9 +123,18 @@ export const Tooltip = ({
   const showTooltip = () => {
     if (!shouldShowTooltips) return;
     if (showTimeout) clearTimeout(showTimeout);
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
     setPlaceReady(false);
     const timeout = setTimeout(() => setIsVisible(true), delay);
     setShowTimeout(timeout);
+  };
+
+  const finalizeHide = () => {
+    setIsVisible(false);
+    setPlaceReady(false);
   };
 
   const hideTooltip = () => {
@@ -125,8 +142,24 @@ export const Tooltip = ({
       clearTimeout(showTimeout);
       setShowTimeout(null);
     }
-    setIsVisible(false);
-    setPlaceReady(false);
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    if (glossaryKey) {
+      // Give the user a short grace period to move the cursor onto the
+      // tooltip surface and reach the Learn-more link without it vanishing.
+      hideTimeoutRef.current = setTimeout(finalizeHide, 150);
+    } else {
+      finalizeHide();
+    }
+  };
+
+  const cancelPendingHide = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
   };
 
   useLayoutEffect(() => {
@@ -153,6 +186,7 @@ export const Tooltip = ({
   useEffect(() => {
     return () => {
       if (showTimeout) clearTimeout(showTimeout);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     };
   }, [showTimeout]);
 
@@ -185,13 +219,26 @@ export const Tooltip = ({
           backgroundColor: getSurfaceBackground(),
           border: `1px solid ${getAdaptiveBorder('#e2e8f0', '#333333')}`,
           color: 'inherit',
-          pointerEvents: 'none',
+          pointerEvents: glossaryKey ? 'auto' : 'none',
           boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
         }}
         role="tooltip"
         aria-hidden="false"
+        onMouseEnter={glossaryKey ? cancelPendingHide : undefined}
+        onMouseLeave={glossaryKey ? finalizeHide : undefined}
       >
         {content}
+        {glossaryKey && (
+          <div className="ky-tooltip-learn-more">
+            <a
+              href={`/glossary#${glossaryKey}`}
+              className="ky-tooltip-learn-more-link"
+              onClick={cancelPendingHide}
+            >
+              Learn more →
+            </a>
+          </div>
+        )}
       </div>,
       document.body,
     );
