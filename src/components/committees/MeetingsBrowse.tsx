@@ -29,6 +29,7 @@ import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { withTimeout } from '@/lib/async-utils';
 import { searchKyCommitteeAgendaItems } from '@/lib/ky-committee-search';
 import { KY_MEETING_BROWSE_SELECT } from '@/lib/ky-ga-browse-select';
+import { KY_SESSIONS } from '@/lib/ky-sessions';
 import {
   gaChamberFilterLabel,
   kyTodayIso,
@@ -86,6 +87,10 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
       const today = kyTodayIso();
       const from = new Date(`${today}T12:00:00`);
       from.setDate(from.getDate() - 30);
+      // Reach back to the active/most-recent session start so the "Recent"
+      // filter can surface the full session, not just the last 30 days.
+      const sessionStart = new Date(`${KY_SESSIONS[0]!.start}T12:00:00`);
+      if (sessionStart < from) from.setTime(sessionStart.getTime());
       const to = new Date(`${today}T12:00:00`);
       to.setDate(to.getDate() + 120);
 
@@ -96,7 +101,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
           .gte('meeting_date', from.toISOString().slice(0, 10))
           .lte('meeting_date', to.toISOString().slice(0, 10))
           .order('meeting_date', { ascending: true })
-          .limit(100),
+          .limit(500),
         30_000,
         'Loading meetings timed out.',
       );

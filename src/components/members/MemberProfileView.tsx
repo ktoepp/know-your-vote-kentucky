@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Box,
@@ -10,38 +10,33 @@ import {
   Chip,
   Container,
   Divider,
-  Grid,
   List,
   ListItem,
   ListItemText,
+  Paper,
   Stack,
   Typography,
 } from '@mui/material';
-import { ArrowLeft, ExternalLink, FileText, Mail, MapPinned, Phone, Users, Vote } from 'lucide-react';
+import { ArrowBack, Description, Groups, HowToVote } from '@mui/icons-material';
+import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import type { KYBill, KYLegislator } from '@/types/kentucky';
+import { MemberCard } from '@/components/members/MemberCard';
+import { KYBillCard } from '@/components/bills/KYBillCard';
+import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
 import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
 import { groupLegislatorExternalLinks, labelForLinkHost } from '@/lib/legislator-link-normalize';
+import { ICON_REM, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
 import { BillNumber } from '@/components/bills/BillNumber';
-import { LegislatorDistrictMinimapLazy } from '@/components/members/LegislatorDistrictMinimapLazy';
-import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
-import { MemberName } from '@/components/civic/MemberName';
-import { CopyableEmail } from '@/components/civic/CopyableEmail';
-import { ChamberChip, MetaChip } from '@/components/ui/Chip';
-import { billStatusChipLabel, formatKyIsoDateShort, formatKyLegislatorDistrict } from '@/lib/bill-display';
-import type { MemberVoteRecord } from '@/lib/member-profile-data';
+import { formatKyIsoDateShort } from '@/lib/bill-display';
+import { shortKyCommitteeLabel } from '@/lib/ky-committee-display';
+import { ChamberChip, CommitteeKindChip } from '@/components/ui/Chip';
+import type { MemberRecentRollVote, MemberVoteRecord } from '@/lib/member-profile-data';
 import type { MemberCommitteeAssignment } from '@/lib/ky-member-committees';
 import type { VoteBucket } from '@/lib/legiscan-vote-tally';
-import { legislatorRoleDistrictLine } from '@/lib/legislator-display';
-import {
-  isKentuckyGovernor,
-  kyLegislatorAvatarInitials,
-  kyLegislatorCampaignWebsite,
-  kyLegislatorPortraitAlt,
-  kyLegislaturePublicUrl,
-  legislatorDisplayPhone,
-  normalizeBallotpediaHref,
-  normalizeLegislatorPhotoUrl,
-} from '@/lib/ky-member-utils';
+
+type VoteFilter = 'all' | 'yea' | 'nay' | 'nv_absent' | 'unknown';
+
+const FILTERED_VOTE_DISPLAY_CAP = 50;
 
 function rollVoteChipColor(bucket: VoteBucket): 'success' | 'error' | 'warning' | 'default' {
   if (bucket === 'yea') return 'success';
@@ -59,51 +54,110 @@ function rollVoteLabel(bucket: VoteBucket, raw: string | null): string {
   return 'Other';
 }
 
-function SectionCard({
-  title,
-  icon,
-  children,
-  description,
-}: {
-  title: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-  description?: React.ReactNode;
-}) {
+function matchesVoteFilter(bucket: VoteBucket, filter: VoteFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'yea') return bucket === 'yea';
+  if (filter === 'nay') return bucket === 'nay';
+  if (filter === 'nv_absent') return bucket === 'nv' || bucket === 'absent';
+  return bucket === 'unknown';
+}
+
+function CommitteeAssignmentTile({ assignment }: { assignment: MemberCommitteeAssignment }) {
+  const { shortLabel, fullLabel, committeeKind } = shortKyCommitteeLabel(assignment.name);
+  const aria = assignment.roleLabel
+    ? `${fullLabel}, ${assignment.roleLabel}`
+    : fullLabel;
+
   return (
-    <Card variant="outlined" sx={{ borderRadius: 1.25 }}>
-      <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: description ? 0.5 : 2 }}>
-          {icon ? <Box sx={{ color: 'primary.main', lineHeight: 0 }}>{icon}</Box> : null}
-          <Typography component="h2" variant="h4" fontWeight={600} color="text.primary">
-            {title}
-          </Typography>
-        </Box>
-        {description ? (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {description}
-          </Typography>
+    <Paper
+      component={Link}
+      href={`/committees/${assignment.slug}`}
+      variant="outlined"
+      title={fullLabel}
+      aria-label={aria}
+      sx={{
+        p: 1.5,
+        borderRadius: 2,
+        textDecoration: 'none',
+        color: 'inherit',
+        minHeight: 72,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        gap: 0.5,
+        '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+      }}
+    >
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75 }}>
+        <ChamberChip chamber={assignment.chamber} size="small" />
+        {committeeKind && committeeKind !== 'unknown' ? (
+          <CommitteeKindChip kind={committeeKind} />
         ) : null}
-        {children}
-      </CardContent>
-    </Card>
+        <Typography variant="body2" fontWeight={700} component="span">
+          {shortLabel}
+        </Typography>
+      </Box>
+      {assignment.roleLabel ? (
+        <Typography variant="caption" color="text.secondary">
+          {assignment.roleLabel}
+        </Typography>
+      ) : null}
+    </Paper>
   );
 }
 
-function ExternalLinkButton({ href, children }: { href: string; children: React.ReactNode }) {
+function VoteRollCallList({ rows }: { rows: MemberRecentRollVote[] }) {
+  if (rows.length === 0) return null;
+
   return (
-    <Button
-      component="a"
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      size="small"
-      variant="outlined"
-      endIcon={<ExternalLink size={14} aria-hidden />}
-      sx={{ justifyContent: 'space-between' }}
-    >
-      {children}
-    </Button>
+    <List disablePadding>
+      {rows.map((r, j) => (
+        <React.Fragment key={r.voteId}>
+          {j > 0 && <Divider component="li" />}
+          <ListItem alignItems="flex-start" disablePadding sx={{ py: 1.25 }}>
+            <ListItemText
+              primary={
+                r.bill ? (
+                  <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.5 }}>
+                    <BillNumber billNumber={r.bill.bill_number} size="compact" href={`/bills/${r.bill.id}`} />
+                    {r.bill.title ? (
+                      <Typography component="span" color="text.secondary" variant="body2">
+                        — {r.bill.title}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Bill
+                  </Typography>
+                )
+              }
+              secondary={
+                <Box sx={{ pt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                  {r.date && (
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      {formatKyIsoDateShort(r.date)}
+                    </Typography>
+                  )}
+                  <Chip
+                    size="small"
+                    label={rollVoteLabel(r.myBucket, r.myVote)}
+                    color={rollVoteChipColor(r.myBucket)}
+                    variant="outlined"
+                  />
+                  {r.description && (
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      {r.description}
+                    </Typography>
+                  )}
+                </Box>
+              }
+              secondaryTypographyProps={{ component: 'div' }}
+            />
+          </ListItem>
+        </React.Fragment>
+      ))}
+    </List>
   );
 }
 
@@ -122,322 +176,273 @@ export function MemberProfileView({
   voteRecord?: MemberVoteRecord;
   committeeAssignments?: MemberCommitteeAssignment[];
 }) {
+  const [voteFilter, setVoteFilter] = useState<VoteFilter>('all');
+
   const hasLegiscan = legiscanMemberPersonUrl(leg.legiscan_id) != null;
   const isChamberMember = leg.chamber === 'house' || leg.chamber === 'senate';
   const showLegislativeSections = isChamberMember || hasLegiscan;
   const tally = voteRecord?.tally;
   const { social: socialLinks, other: otherLinks } = groupLegislatorExternalLinks(leg.external_links);
-  const governor = isKentuckyGovernor(leg);
-  const displayPhone = legislatorDisplayPhone(leg.phone);
-  const telHref = displayPhone ? `tel:${displayPhone.replace(/[^\d+]/g, '')}` : undefined;
-  const lrcPublicUrl = kyLegislaturePublicUrl(leg, legislatorRoster);
-  const campaignUrl = kyLegislatorCampaignWebsite(leg);
-  const ballotpediaHref = normalizeBallotpediaHref(leg.ballotpedia);
-  const legiscanUrl = legiscanMemberPersonUrl(leg.legiscan_id);
-  const district = formatKyLegislatorDistrict(leg);
-  const portraitSrc =
-    normalizeLegislatorPhotoUrl(leg.photo_url) ||
-    normalizeLegislatorPhotoUrl(leg.legiscan_image_url) ||
-    undefined;
-  const officialLinks = [
-    lrcPublicUrl ? { href: lrcPublicUrl, label: 'KY Legislature' } : null,
-    campaignUrl ? { href: campaignUrl, label: 'Website' } : null,
-    ballotpediaHref ? { href: ballotpediaHref, label: 'Ballotpedia' } : null,
-    legiscanUrl ? { href: legiscanUrl, label: 'LegiScan' } : null,
-  ].filter(Boolean) as Array<{ href: string; label: string }>;
-  const connectLinks = [
-    ...socialLinks.map((link) => ({ href: link.url, label: labelForLinkHost(link.host) })),
-    ...otherLinks.map((link) => ({
-      href: link.url,
-      label: link.note?.trim() || link.host.replace(/^www\./i, ''),
-    })),
-  ];
+  const hasConnectLinks = socialLinks.length > 0 || otherLinks.length > 0;
+
+  const filteredVotes = useMemo(() => {
+    if (!voteRecord?.votes.length) return [];
+    if (voteFilter === 'all') return voteRecord.recent;
+    const matched = voteRecord.votes.filter((v) => matchesVoteFilter(v.myBucket, voteFilter));
+    return matched.slice(0, FILTERED_VOTE_DISPLAY_CAP);
+  }, [voteFilter, voteRecord]);
+
+  const filteredOverflow = useMemo(() => {
+    if (voteFilter === 'all' || !voteRecord?.votes.length) return 0;
+    const total = voteRecord.votes.filter((v) => matchesVoteFilter(v.myBucket, voteFilter)).length;
+    return Math.max(0, total - FILTERED_VOTE_DISPLAY_CAP);
+  }, [voteFilter, voteRecord]);
+
+  const toggleVoteFilter = (next: VoteFilter) => {
+    setVoteFilter((prev) => (prev === next ? 'all' : next));
+  };
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Container maxWidth="lg" sx={{ pt: { xs: 2.5, md: 3 }, pb: { xs: 5, md: 7 } }}>
+      <Container maxWidth="md" sx={{ py: 4 }}>
         <Button
           component={Link}
           href="/members"
-          startIcon={<ArrowLeft size={16} aria-hidden />}
-          sx={{ px: 0, mb: 1.5, minHeight: 32, color: 'text.secondary', fontWeight: 600 }}
+          startIcon={<ArrowBack sx={{ fontSize: ICON_REM.nav }} aria-hidden />}
+          sx={{ mb: 2, textTransform: 'none', fontWeight: 600 }}
         >
-          Back to members
+          All members
         </Button>
 
-        <Card variant="outlined" sx={{ borderRadius: 1.25, mb: 2 }}>
-          <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} alignItems={{ xs: 'flex-start', sm: 'center' }}>
-              <LegislatorAvatar
-                src={portraitSrc}
-                alt={kyLegislatorPortraitAlt(leg)}
-                initials={kyLegislatorAvatarInitials(leg)}
-                party={leg.party}
-                imgProps={{ referrerPolicy: 'no-referrer' }}
-                sx={{ width: { xs: 84, md: 96 }, height: { xs: 84, md: 96 }, fontSize: '1.4rem' }}
-              />
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                  {leg.chamber && <ChamberChip chamber={leg.chamber} size="small" />}
-                  {leg.party && <MetaChip label={leg.party} size="small" variant="outlined" />}
-                  {governor && <MetaChip label="Governor" size="small" tone="success" variant="outlined" />}
-                  {leg.active === false && <MetaChip label="Not a current member" size="small" tone="warning" variant="outlined" />}
-                </Stack>
-                <Typography variant="h2" component="h1" fontWeight={600} color="text.primary" sx={{ mb: 0.5 }}>
-                  <MemberName member={leg} variant="primary" />
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  {legislatorRoleDistrictLine(leg)}
-                </Typography>
+        <MemberCard
+          leg={leg}
+          featured={false}
+          profileNameHeading="h1"
+          legislatorRoster={legislatorRoster}
+          showDistrictMinimap={false}
+        />
+
+        {(leg.chamber === 'house' || leg.chamber === 'senate') && (
+          <Box sx={{ mt: 2, maxWidth: 420, pointerEvents: 'none' }}>
+            <LegislatorDistrictThumbnail leg={leg} size="profile" />
+          </Box>
+        )}
+
+        {hasConnectLinks && (
+          <Box sx={{ mt: 3 }}>
+            <Typography
+              component="h2"
+              variant="subtitle2"
+              fontWeight={700}
+              color="text.secondary"
+              sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.75rem', mb: 1 }}
+            >
+              Connect &amp; follow
+            </Typography>
+            <OfficialSourceLinks
+              layout="stack"
+              links={[
+                ...socialLinks.map((link) => ({
+                  href: link.url,
+                  label: labelForLinkHost(link.host),
+                  ariaLabel: `${labelForLinkHost(link.host)} profile for ${leg.name} (opens in a new tab)`,
+                })),
+                ...otherLinks.map((link) => ({
+                  href: link.url,
+                  label: link.note?.trim() || link.host.replace(/^www\./i, ''),
+                })),
+              ]}
+            />
+          </Box>
+        )}
+
+        {showLegislativeSections && (
+          <>
+            {/* Sponsored bills */}
+            <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
+              <Typography
+                component="h2"
+                variant={TYPE.sectionTitle.variant}
+                fontWeight={TYPE.sectionTitle.fontWeight}
+                color="text.primary"
+                sx={SECTION_TITLE_DISPLAY_SX}
+              >
+                Sponsored bills
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Bills sponsored by this member in <strong>{sessionName}</strong>.
+            </Typography>
+
+            {sponsoredBills.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                No sponsored bills found for this session yet. If this member should have bills listed,
+                run a bills sync so sponsor data is populated.
+              </Typography>
+            ) : (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: 2,
+                  mb: 1,
+                }}
+              >
+                {sponsoredBills.map((b) => (
+                  <KYBillCard key={b.id} bill={b} legislators={legislatorRoster} />
+                ))}
               </Box>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {lrcPublicUrl && <ExternalLinkButton href={lrcPublicUrl}>KY Legislature</ExternalLinkButton>}
-                {leg.email && (
-                  <Button component="a" href={`mailto:${leg.email}`} variant="contained" size="small" startIcon={<Mail size={15} aria-hidden />}>
-                    Email
-                  </Button>
-                )}
-              </Stack>
-            </Stack>
-          </CardContent>
-        </Card>
+            )}
 
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={8}>
-            <Stack spacing={2}>
-              {showLegislativeSections && (
-                <>
-                  <SectionCard
-                    title="Sponsored bills"
-                    icon={<FileText size={19} aria-hidden />}
-                    description={
-                      <>
-                        Bills sponsored by this member in <strong>{sessionName}</strong>.
-                      </>
-                    }
+            {/* Voting record */}
+            {isChamberMember ? (
+              <>
+                <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <HowToVote sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
+                  <Typography
+                    component="h2"
+                    variant={TYPE.sectionTitle.variant}
+                    fontWeight={TYPE.sectionTitle.fontWeight}
+                    color="text.primary"
+                    sx={SECTION_TITLE_DISPLAY_SX}
                   >
-                    {sponsoredBills.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        No sponsored bills found for this session yet.
-                      </Typography>
-                    ) : (
-                      <List disablePadding>
-                        {sponsoredBills.map((b, i) => {
-                          const statusLabel = billStatusChipLabel(b.status);
-                          return (
-                            <React.Fragment key={b.id}>
-                              {i > 0 && <Divider component="li" />}
-                              <ListItem alignItems="flex-start" disablePadding sx={{ py: 1.25 }}>
-                                <ListItemText
-                                  primary={
-                                    <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.5 }}>
-                                      <BillNumber billNumber={b.bill_number} size="compact" href={`/bills/${b.id}`} />
-                                      {b.title ? (
-                                        <Typography component="span" color="text.secondary" variant="body2">
-                                          {b.title}
-                                        </Typography>
-                                      ) : null}
-                                    </Box>
-                                  }
-                                  secondary={
-                                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ pt: 0.5, gap: 0.5 }}>
-                                      {statusLabel ? <Chip size="small" label={statusLabel} variant="outlined" /> : null}
-                                      {b.last_action_date && (
-                                        <Typography component="span" variant="caption" color="text.secondary">
-                                          Last action {formatKyIsoDateShort(b.last_action_date)}
-                                        </Typography>
-                                      )}
-                                    </Stack>
-                                  }
-                                  secondaryTypographyProps={{ component: 'div' }}
-                                />
-                              </ListItem>
-                            </React.Fragment>
-                          );
-                        })}
-                      </List>
-                    )}
-                  </SectionCard>
-
-                  {isChamberMember && (
-                    <SectionCard
-                      title="Voting record"
-                      icon={<Vote size={19} aria-hidden />}
-                      description={
-                        <>
-                          How this member voted on floor and committee roll calls in <strong>{sessionName}</strong>.
-                        </>
-                      }
-                    >
-                      {tally && voteRecord ? (
-                        voteRecord.totalRollCalls === 0 ? (
-                          <Typography variant="body2" color="text.secondary">
-                            No recorded votes found for this session yet.
-                          </Typography>
-                        ) : (
-                          <>
-                            <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 1 }}>
-                              <Chip size="small" color="success" variant="outlined" label={`Yea: ${tally.yea}`} />
-                              <Chip size="small" color="error" variant="outlined" label={`Nay: ${tally.nay}`} />
-                              {(tally.notVoting > 0 || tally.absent > 0) && (
-                                <Chip
-                                  size="small"
-                                  color="warning"
-                                  variant="outlined"
-                                  label={`Not voting / absent: ${tally.notVoting + tally.absent}`}
-                                />
-                              )}
-                              {tally.unknown > 0 && <Chip size="small" variant="outlined" label={`Other: ${tally.unknown}`} />}
-                            </Stack>
-                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-                              Based on {voteRecord.totalRollCalls} roll call{voteRecord.totalRollCalls === 1 ? '' : 's'}.
-                            </Typography>
-
-                            {voteRecord.recent.length > 0 && (
-                              <List disablePadding>
-                                {voteRecord.recent.map((r, j) => (
-                                  <React.Fragment key={r.voteId}>
-                                    {j > 0 && <Divider component="li" />}
-                                    <ListItem alignItems="flex-start" disablePadding sx={{ py: 1.25 }}>
-                                      <ListItemText
-                                        primary={
-                                          r.bill ? (
-                                            <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.5 }}>
-                                              <BillNumber billNumber={r.bill.bill_number} size="compact" href={`/bills/${r.bill.id}`} />
-                                              {r.bill.title ? (
-                                                <Typography component="span" color="text.secondary" variant="body2">
-                                                  {r.bill.title}
-                                                </Typography>
-                                              ) : null}
-                                            </Box>
-                                          ) : (
-                                            <Typography variant="body2" color="text.secondary">
-                                              Bill
-                                            </Typography>
-                                          )
-                                        }
-                                        secondary={
-                                          <Box sx={{ pt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                                            {r.date && (
-                                              <Typography component="span" variant="caption" color="text.secondary">
-                                                {formatKyIsoDateShort(r.date)}
-                                              </Typography>
-                                            )}
-                                            <Chip
-                                              size="small"
-                                              label={rollVoteLabel(r.myBucket, r.myVote)}
-                                              color={rollVoteChipColor(r.myBucket)}
-                                              variant="outlined"
-                                            />
-                                            {r.description && (
-                                              <Typography component="span" variant="caption" color="text.secondary">
-                                                {r.description}
-                                              </Typography>
-                                            )}
-                                          </Box>
-                                        }
-                                        secondaryTypographyProps={{ component: 'div' }}
-                                      />
-                                    </ListItem>
-                                  </React.Fragment>
-                                ))}
-                              </List>
-                            )}
-                          </>
-                        )
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          Vote data is not available for this member yet.
-                        </Typography>
-                      )}
-                    </SectionCard>
-                  )}
-                </>
-              )}
-            </Stack>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Stack spacing={2}>
-              <SectionCard title="Contact" icon={<Mail size={19} aria-hidden />}>
-                <Stack spacing={1.5}>
-                  {leg.email ? (
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" fontWeight={700} display="block">
-                        Email
-                      </Typography>
-                      <CopyableEmail email={leg.email} display="block" variant="body2" />
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      Email is not available from the synced roster.
-                    </Typography>
-                  )}
-                  {displayPhone && (
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" fontWeight={700} display="block">
-                        Phone
-                      </Typography>
-                      <Typography component="a" href={telHref} variant="body2" color="primary" fontWeight={600} sx={{ textDecoration: 'none' }}>
-                        {displayPhone}
-                      </Typography>
-                    </Box>
-                  )}
-                </Stack>
-              </SectionCard>
-
-              {isChamberMember && (
-                <SectionCard title="District" icon={<MapPinned size={19} aria-hidden />}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    {district || 'District information is not available.'}
+                    Voting record
                   </Typography>
-                  <LegislatorDistrictMinimapLazy leg={leg} size="profile" />
-                </SectionCard>
-              )}
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  How this member voted on floor and committee roll calls in <strong>{sessionName}</strong>.
+                </Typography>
 
-              {isChamberMember && (
-                <SectionCard title="Committees" icon={<Users size={19} aria-hidden />}>
-                  {committeeAssignments.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
-                      No committee assignments on file for this member yet.
-                    </Typography>
-                  ) : (
-                    <Stack direction="row" flexWrap="wrap" useFlexGap sx={{ gap: 0.75 }}>
-                      {committeeAssignments.map((c) => (
-                        <Chip
-                          key={c.slug}
-                          component={Link}
-                          href={`/committees/${c.slug}`}
-                          clickable
-                          label={c.roleLabel ? `${c.name} (${c.roleLabel})` : c.name}
-                          variant="outlined"
-                          sx={{ textDecoration: 'none' }}
-                        />
-                      ))}
-                    </Stack>
-                  )}
-                </SectionCard>
-              )}
+                {tally && voteRecord && (
+                  <Card variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
+                    <CardContent>
+                      {voteRecord.totalRollCalls === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          No recorded votes found for this session yet.
+                        </Typography>
+                      ) : (
+                        <>
+                          <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 1 }} role="group" aria-label="Filter votes by outcome">
+                            {voteFilter !== 'all' && (
+                              <Chip
+                                size="small"
+                                label="All"
+                                clickable
+                                variant="outlined"
+                                onClick={() => setVoteFilter('all')}
+                              />
+                            )}
+                            <Chip
+                              size="small"
+                              color="success"
+                              variant={voteFilter === 'yea' ? 'filled' : 'outlined'}
+                              label={`Yea: ${tally.yea}`}
+                              clickable
+                              aria-pressed={voteFilter === 'yea'}
+                              onClick={() => toggleVoteFilter('yea')}
+                            />
+                            <Chip
+                              size="small"
+                              color="error"
+                              variant={voteFilter === 'nay' ? 'filled' : 'outlined'}
+                              label={`Nay: ${tally.nay}`}
+                              clickable
+                              aria-pressed={voteFilter === 'nay'}
+                              onClick={() => toggleVoteFilter('nay')}
+                            />
+                            {(tally.notVoting > 0 || tally.absent > 0) && (
+                              <Chip
+                                size="small"
+                                color="warning"
+                                variant={voteFilter === 'nv_absent' ? 'filled' : 'outlined'}
+                                label={`Not voting / absent: ${tally.notVoting + tally.absent}`}
+                                clickable
+                                aria-pressed={voteFilter === 'nv_absent'}
+                                onClick={() => toggleVoteFilter('nv_absent')}
+                              />
+                            )}
+                            {tally.unknown > 0 && (
+                              <Chip
+                                size="small"
+                                variant={voteFilter === 'unknown' ? 'filled' : 'outlined'}
+                                label={`Other: ${tally.unknown}`}
+                                clickable
+                                aria-pressed={voteFilter === 'unknown'}
+                                onClick={() => toggleVoteFilter('unknown')}
+                              />
+                            )}
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                            Based on {voteRecord.totalRollCalls} roll call
+                            {voteRecord.totalRollCalls === 1 ? '' : 's'} with this member&rsquo;s vote recorded.
+                          </Typography>
 
-              {(officialLinks.length > 0 || connectLinks.length > 0) && (
-                <SectionCard title="Official links" icon={<ExternalLink size={19} aria-hidden />}>
-                  <Stack spacing={1}>
-                    {officialLinks.map((link) => (
-                      <ExternalLinkButton key={link.href} href={link.href}>
-                        {link.label}
-                      </ExternalLinkButton>
+                          {filteredVotes.length > 0 ? (
+                            <>
+                              <Typography component="h3" variant="subtitle2" color="text.primary" sx={{ mb: 0.5 }}>
+                                {voteFilter === 'all' ? 'Recent' : 'Matching votes'}
+                              </Typography>
+                              <VoteRollCallList rows={filteredVotes} />
+                              {filteredOverflow > 0 && (
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                  …and {filteredOverflow} more
+                                </Typography>
+                              )}
+                            </>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              No matching votes in {sessionName}.
+                            </Typography>
+                          )}
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : null}
+
+            {/* Committee assignments */}
+            {isChamberMember && (
+              <>
+                <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Groups sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
+                  <Typography
+                    component="h2"
+                    variant={TYPE.sectionTitle.variant}
+                    fontWeight={TYPE.sectionTitle.fontWeight}
+                    color="text.primary"
+                    sx={SECTION_TITLE_DISPLAY_SX}
+                  >
+                    Committee assignments
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Standing and interim committees from the LRC legislative calendar and roster data.
+                </Typography>
+                {committeeAssignments.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    No committee assignments on file for this member yet.
+                  </Typography>
+                ) : (
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                      gap: 1,
+                      mb: 2,
+                    }}
+                  >
+                    {committeeAssignments.map((c) => (
+                      <CommitteeAssignmentTile key={c.slug} assignment={c} />
                     ))}
-                    {connectLinks.map((link) => (
-                      <ExternalLinkButton key={link.href} href={link.href}>
-                        {link.label}
-                      </ExternalLinkButton>
-                    ))}
-                  </Stack>
-                </SectionCard>
-              )}
-            </Stack>
-          </Grid>
-        </Grid>
+                  </Box>
+                )}
+              </>
+            )}
+          </>
+        )}
       </Container>
     </Box>
   );

@@ -12,7 +12,7 @@ export const KY_MEETING_BROWSE_SELECT = `
   source_url,
   created_at,
   updated_at,
-  ky_committees ( id, name, slug, chamber, profile_url )
+  ky_committees ( id, name, slug, chamber, profile_url, committee_type )
 `;
 
 /** Committee detail meetings — includes `member_refs` for the members section. */

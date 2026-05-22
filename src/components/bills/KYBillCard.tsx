@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Box, Tooltip, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { BillNumber } from '@/components/bills/BillNumber';
 import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
 import { Bookmark } from '@mui/icons-material';
@@ -20,21 +20,6 @@ import { CivicCard } from '@/components/ui/CivicCard';
 import { ChamberChip } from '@/components/ui/Chip';
 import { effectiveBillChamber, formatBillLabelText } from '@/lib/bill-display';
 import { getSponsorGroupsFromBill } from '@/lib/ky-bill-sponsors';
-import { useTooltips } from '@/lib/TooltipContext';
-import {
-  KYBillCardTooltipTitle,
-  kyBillCardHasTooltipContent,
-} from '@/components/bills/KYBillCardTooltipTitle';
-
-const BILL_CARD_TOOLTIP_SX = {
-  maxWidth: 420,
-  bgcolor: 'background.paper',
-  color: 'text.primary',
-  border: '1px solid',
-  borderColor: 'divider',
-  boxShadow: 4,
-  '& .MuiTooltip-arrow': { color: 'background.paper' },
-} as const;
 
 function sponsorInitials(name: string) {
   const parts = name.split(/\s+/).filter(Boolean);
@@ -49,10 +34,9 @@ export interface KYBillCardProps {
   followedTopics?: ReadonlySet<string> | null;
 }
 
-/** Bill grid card — browse, search, and feed; rich hover tooltip when enabled in nav. */
-export function KYBillCard({ bill, legislators, followedBillIds, followedTopics }: KYBillCardProps) {
+/** Bill grid card — browse, search, and feed. Educational tooltip on the status chip; no whole-card preview tooltip. */
+export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardProps) {
   const router = useRouter();
-  const { tooltipsEnabled } = useTooltips();
   const chamber = effectiveBillChamber(bill);
   const sponsorGroups = getSponsorGroupsFromBill(bill.sponsors, legislators, {
     maxPrimary: 4,
@@ -68,7 +52,6 @@ export function KYBillCard({ bill, legislators, followedBillIds, followedTopics 
       : '';
 
   const detailHref = `/bills/${bill.id}`;
-  const showTooltip = tooltipsEnabled && kyBillCardHasTooltipContent(bill, sponsorGroups);
 
   const primarySponsorLine =
     sponsorGroups.primary.length > 0
@@ -210,7 +193,7 @@ export function KYBillCard({ bill, legislators, followedBillIds, followedTopics 
       </Box>
     ) : undefined;
 
-  const cardWrap = (
+  return (
     <Box component="span" sx={{ display: 'block', height: '100%' }}>
       <CivicCard
         variant="bill"
@@ -220,21 +203,5 @@ export function KYBillCard({ bill, legislators, followedBillIds, followedTopics 
         footer={cardFooter}
       />
     </Box>
-  );
-
-  if (!showTooltip) {
-    return cardWrap;
-  }
-
-  return (
-    <Tooltip
-      title={<KYBillCardTooltipTitle bill={bill} sponsorGroups={sponsorGroups} followedTopics={followedTopics} />}
-      placement="top"
-      arrow
-      enterDelay={400}
-      componentsProps={{ tooltip: { sx: BILL_CARD_TOOLTIP_SX } }}
-    >
-      {cardWrap}
-    </Tooltip>
   );
 }

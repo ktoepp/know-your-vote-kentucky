@@ -4,7 +4,8 @@ import React from 'react';
 import { Avatar, Box, IconButton, Typography } from '@mui/material';
 import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { CivicCard } from '@/components/ui/CivicCard';
-import { ChamberChip, MetaChip } from '@/components/ui/Chip';
+import { MetaChip } from '@/components/ui/Chip';
+import { CommitteeTagRow } from '@/components/committees/CommitteeTagRow';
 import type { KYCommitteeBrowseCard } from '@/lib/ky-committees-browse-enriched';
 import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
 
@@ -32,6 +33,49 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
     return { name, role, initials };
   });
 
+  const followButton = onToggleFollow ? (
+    <IconButton
+      size="small"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggleFollow(committee.id);
+      }}
+      aria-pressed={following}
+      aria-label={following ? 'Unfollow this committee' : 'Follow this committee'}
+      sx={{
+        color: following ? 'primary.main' : 'text.secondary',
+        p: 0.25,
+        mr: -0.25,
+        mt: -0.25,
+        flexShrink: 0,
+      }}
+    >
+      {following ? (
+        <BookmarkCheck size={22} strokeWidth={1.7} />
+      ) : (
+        <Bookmark size={22} strokeWidth={1.7} />
+      )}
+    </IconButton>
+  ) : (
+    <IconButton
+      component="span"
+      aria-hidden
+      tabIndex={-1}
+      size="small"
+      sx={{
+        color: 'text.secondary',
+        p: 0.25,
+        mr: -0.25,
+        mt: -0.25,
+        pointerEvents: 'none',
+        flexShrink: 0,
+      }}
+    >
+      <Bookmark size={22} strokeWidth={1.7} />
+    </IconButton>
+  );
+
   return (
     <CivicCard
       variant="meeting"
@@ -48,52 +92,12 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
       }}
       header={
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5 }}>
-          <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center' }}>
-            {committee.chamber !== 'unknown' && <ChamberChip chamber={committee.chamber} size="small" />}
-            {committee.topicTags.slice(0, 1).map((tag) => (
+          <CommitteeTagRow committee={committee}>
+            {committee.topicTags.map((tag) => (
               <MetaChip key={tag} label={tag} size="small" variant="outlined" />
             ))}
-          </Box>
-          {onToggleFollow ? (
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onToggleFollow(committee.id);
-              }}
-              aria-pressed={following}
-              aria-label={following ? 'Unfollow this committee' : 'Follow this committee'}
-              sx={{
-                color: following ? 'primary.main' : 'text.secondary',
-                p: 0.25,
-                mr: -0.25,
-                mt: -0.25,
-              }}
-            >
-              {following ? (
-                <BookmarkCheck size={22} strokeWidth={1.7} />
-              ) : (
-                <Bookmark size={22} strokeWidth={1.7} />
-              )}
-            </IconButton>
-          ) : (
-            <IconButton
-              component="span"
-              aria-hidden
-              tabIndex={-1}
-              size="small"
-              sx={{
-                color: 'text.secondary',
-                p: 0.25,
-                mr: -0.25,
-                mt: -0.25,
-                pointerEvents: 'none',
-              }}
-            >
-              <Bookmark size={22} strokeWidth={1.7} />
-            </IconButton>
-          )}
+          </CommitteeTagRow>
+          {followButton}
         </Box>
       }
       body={

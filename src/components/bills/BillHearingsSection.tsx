@@ -14,7 +14,6 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { Event } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { supabase } from '@/app/lib/supabaseClient';
 import { EmptyState } from '@/components/civic/EmptyState';
@@ -93,7 +92,6 @@ export function BillHearingsSection({ billId }: BillHearingsSectionProps) {
     >
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Event color="primary" sx={{ fontSize: ICON_REM.section }} aria-hidden />
           <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>
             Hearings &amp; agendas
           </Typography>
@@ -111,7 +109,7 @@ export function BillHearingsSection({ billId }: BillHearingsSectionProps) {
             <CircularProgress size={28} />
           </Box>
         ) : items.length === 0 ? (
-          <EmptyState message="This bill is not on a synced committee agenda yet. Agendas update twice daily during session and interim." />
+          <EmptyState message="No hearings found for this bill." />
         ) : (
           <Card variant="outlined" sx={{ borderRadius: 2 }}>
             <List disablePadding>

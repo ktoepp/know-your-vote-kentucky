@@ -79,11 +79,12 @@ export const LegislativeStageTooltip = ({
   );
   
   return (
-    <Tooltip 
-      content={content} 
+    <Tooltip
+      content={content}
       position={position}
       className={className}
       maxWidth="max-w-md"
+      glossaryKey={stage}
     >
       {children}
     </Tooltip>
@@ -139,13 +140,14 @@ export const BillStatusTooltip = ({
   );
   
   return (
-    <Tooltip 
-      content={content} 
+    <Tooltip
+      content={content}
       position={position}
       className={className}
       maxWidth="max-w-md"
+      glossaryKey={status}
     >
       {children}
     </Tooltip>
   );
-}; 
+};

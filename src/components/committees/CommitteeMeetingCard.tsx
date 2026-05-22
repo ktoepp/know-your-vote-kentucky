@@ -1,12 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Box, Button, Typography } from '@mui/material';
-import { CalendarToday, LocationOn, OpenInNew } from '@mui/icons-material';
+import { Box, Typography } from '@mui/material';
+import { CalendarToday, LocationOn } from '@mui/icons-material';
+import { CommitteeTagRow } from '@/components/committees/CommitteeTagRow';
+import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import { CivicCard } from '@/components/ui/CivicCard';
-import { ChamberChip, MetaChip } from '@/components/ui/Chip';
+import { MetaChip } from '@/components/ui/Chip';
 import type { KYCommitteeMeetingBrowse, KYCommitteeMeetingWithCommittee } from '@/types/kentucky';
-import { EXTERNAL_LINK_ICON_SX, iconRemSx } from '@/lib/ui-tokens';
+import { iconRemSx } from '@/lib/ui-tokens';
 import {
   formatKyMeetingDate,
   LRC_LEGISLATIVE_CALENDAR_URL,
@@ -40,10 +42,8 @@ export function CommitteeMeetingCard({
           : `Committee meeting on ${formatKyMeetingDate(meeting.meeting_date)}`
       }
       header={
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          {committee?.chamber && committee.chamber !== 'unknown' && (
-            <ChamberChip chamber={committee.chamber} size="small" />
-          )}
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+          {committee ? <CommitteeTagRow committee={committee} /> : null}
           {meeting.status === 'cancelled' && (
             <MetaChip label="Cancelled" tone="error" size="small" variant="filled" />
           )}
@@ -118,17 +118,14 @@ export function CommitteeMeetingCard({
             View committee
           </Typography>
         ) : (
-          <Button
-            size="small"
-            variant="outlined"
-            href={meeting.source_url || LRC_LEGISLATIVE_CALENDAR_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-            sx={{ textTransform: 'none' }}
-          >
-            LRC calendar
-          </Button>
+          <OfficialSourceLinks
+            links={[
+              {
+                href: meeting.source_url || LRC_LEGISLATIVE_CALENDAR_URL,
+                label: 'LRC calendar',
+              },
+            ]}
+          />
         )
       }
     />

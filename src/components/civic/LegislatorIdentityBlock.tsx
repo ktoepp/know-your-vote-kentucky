@@ -9,7 +9,11 @@ import { LEGISLATOR_NAME_SX, LEGISLATOR_ROLE_LINE_SX } from '@/lib/ui-tokens';
 
 export interface LegislatorIdentityBlockProps {
   name: React.ReactNode;
-  /** Representative · House District 26 — one typography step below the name. */
+  /** Representative — title line when using split subtitle layout. */
+  roleTitle?: string | null;
+  /** House District 26 — second line below roleTitle. */
+  districtLine?: string | null;
+  /** Representative · House District 26 — single-line fallback when roleTitle/districtLine omitted. */
   roleLine?: string | null;
   avatar: {
     src?: string;
@@ -35,6 +39,8 @@ export interface LegislatorIdentityBlockProps {
  */
 export function LegislatorIdentityBlock({
   name,
+  roleTitle,
+  districtLine,
   roleLine,
   avatar,
   density = 'card',
@@ -77,13 +83,30 @@ export function LegislatorIdentityBlock({
             {name}
           </Typography>
         )}
-        {roleLine ? (
+        {roleTitle ? (
+          <Typography component="p" sx={{ ...LEGISLATOR_ROLE_LINE_SX, mt: 0.25 }}>
+            {roleTitle}
+          </Typography>
+        ) : roleLine ? (
           <Typography component="p" sx={{ ...LEGISLATOR_ROLE_LINE_SX, mt: 0.25 }}>
             {roleLine}
           </Typography>
         ) : null}
+        {districtLine ? (
+          <Typography component="p" sx={{ ...LEGISLATOR_ROLE_LINE_SX, mt: 0.1 }}>
+            {districtLine}
+          </Typography>
+        ) : null}
         {chips ? (
-          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: roleLine ? 0.5 : 0.25, alignItems: 'center' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 0.5,
+              flexWrap: 'wrap',
+              mt: roleTitle || roleLine || districtLine ? 0.5 : 0.25,
+              alignItems: 'center',
+            }}
+          >
             {chips}
           </Box>
         ) : null}

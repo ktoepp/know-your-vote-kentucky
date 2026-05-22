@@ -53,12 +53,15 @@ A civic transparency platform focused on the **Kentucky General Assembly**: brow
 
 ### Tooltip system architecture
 
-The tooltip layer has two parts:
+Tooltips fall into three categories (per the Wave 4 locked decisions in the spec). Only the first two are part of the product; the third is a small set of UI hints.
 
-1. **Custom `Tooltip` component** (`src/components/ui/Tooltip.tsx`) — respects the global `tooltipsEnabled` toggle from `TooltipContext`. Use this for educational jargon tooltips on text/inline elements.
-2. **MUI `Tooltip`** — used throughout for UI affordances (card hovers, button hints). Does **not** automatically respect `tooltipsEnabled` — must be gated manually if needed.
+| Category | What it is | Where it lives | Notes |
+| --- | --- | --- | --- |
+| **Educational** | Defines a civic/legislative term (e.g. "veto", "committee", a status like "Reported"). Always tied to a `TooltipContent` entry. | `src/components/ui/Tooltip.tsx` + `src/components/ui/LegislativeStageTooltip.tsx`; content in `src/lib/tooltipContent.ts` (`governmentTooltips`) and the bill-status records in `src/lib/bill-display.ts` (`billStatusToTooltipKey`, `billPrefixToTooltipKey`). | Respects the global `tooltipsEnabled` toggle (`src/lib/TooltipContext.tsx`). Use for jargon / acronyms / process steps. The `BillStatusMetaChip` tooltip on bill cards is in this category. |
+| **Preview (removed)** | Whole-card hover popovers that previewed row-specific data (title, sponsor, next action, co-sponsors). **Do not re-introduce these.** Row data already lives on the card body and on the detail page. | Formerly `KYBillCardTooltipTitle.tsx`, `BillTooltip.tsx`, `BillNumberTooltip` — all deleted in Wave 4b. | If you find yourself building a hover popover that surfaces information already on the card, stop. Link to the detail page or surface the info on the card itself. |
+| **UI affordance** | Short labels on icon-only buttons / interactive controls (e.g. "Open in new tab" on an external-link icon, MUI `Tooltip title="…"` on an icon button). | MUI `<Tooltip />` inline at the call site. | Plain string, single sentence. Not gated by `tooltipsEnabled`. Don't use this for definitions — that's the Educational bucket. |
 
-Content lives in `src/lib/tooltipContent.ts` (`governmentTooltips` record). Add new terms there; use `getTooltipContent(key)` to retrieve.
+Content for the Educational bucket lives in `src/lib/tooltipContent.ts` (`governmentTooltips` record). Add new terms there; use `getTooltipContent(key)` to retrieve. The same `governmentTooltips` entries are rendered as a public, link-shareable glossary at [`/glossary`](./src/app/glossary/page.tsx) (grouped + alphabetized by `category`, with stable anchors); the in-page `<Tooltip>` exposes a small "Learn more" affordance that deep-links to the matching glossary entry.
 
 ---
 
@@ -125,9 +128,9 @@ Heavy dependencies removed from the root app (puppeteer, pdf tooling, GCS client
 
 **In the app bar:** **Bills** (with House/Senate shortcuts), **Members**, **Committees**, **Meetings**, **District map**, plus a global **Search** field (bill designation or keywords; results on `/search`).
 
-**Also public:** `/legislature/resources` (official LRC/KET/Bill Watch links), signed-in **`/profile`** (follows, notifications, activity timeline, digest history).
+**Also public:** `/legislature/resources` (official LRC/KET/Bill Watch links), `/glossary` (plain-English glossary of civic / KY legislative terms, sourced from `governmentTooltips`), signed-in **`/profile`** (follows, notifications, activity timeline, digest history).
 
-**Footer:** **About** (substantive page when Wave 2 ships; was placeholder), **Licenses**.
+**Footer:** **About**, **Glossary**, **Licenses** (footer links added 2026-05-21).
 
 `/about` is not yet substantive editorial content; treat it as a stub until real copy ships.
 
@@ -155,7 +158,7 @@ Scheduled jobs are listed in `vercel.json`. The table below is **pipeline** stat
 | ordinances     | **Paused** | Louisville + Lexington Legistar — manual `?source=ordinances` only |
 | school-boards  | **Paused** | JCPS + FCPS — manual `?source=school-boards` only |
 | county-actions | **Paused** | Jefferson/Fayette Legistar — manual `?source=county-actions` only |
-| lrc-calendar   | Cron 12:00/18:00 UTC | LRC legislative calendar HTML — `npm run sync:ky:lrc-calendar` after migration **024** |
+| lrc-calendar   | GitHub Actions 12:00/18:00 UTC | LRC legislative calendar HTML — scheduled in `.github/workflows/sync-lrc-calendar.yml` (off Vercel Cron since 2026-05-21, see `decisions.md`); manual run: `npm run sync:ky:lrc-calendar` (requires migration **024**) |
 
 Only **bills**, **legislators** (roster/profiles), and **district geometry** are in the main navigation today.
 
@@ -205,7 +208,8 @@ Set `CRON_SECRET` in Vercel (16+ random characters). Vercel Cron invokes `/api/s
 
 Configured for Vercel with automatic cron jobs for data sync (see `vercel.json`):
 
-- **Scheduled:** bills, legislators, votes, **lrc-calendar**, bill digest (`/api/cron/notify`), health-check
+- **Scheduled (Vercel Cron):** bills, legislators, votes, bill digest (`/api/cron/notify`), health-check
+- **Scheduled (GitHub Actions):** **lrc-calendar** (`.github/workflows/sync-lrc-calendar.yml`, 12:00/18:00 UTC); weekly **legislator-links** verifier (`.github/workflows/legislator-links-weekly.yml`)
 - **Paused:** ordinances, school-boards, county-actions (see [committee-calendar spec](./docs/specs/committee-calendar.md))
 
 Executive-order sync is not scheduled (deferred); see the note at the top of this file.

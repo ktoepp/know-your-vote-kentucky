@@ -148,7 +148,7 @@ export interface KYCommitteeAgendaItem {
 }
 
 export type KYCommitteeMeetingWithCommittee = KYCommitteeMeeting & {
-  ky_committees: Pick<KYCommittee, 'id' | 'name' | 'slug' | 'chamber' | 'profile_url'> | null;
+  ky_committees: Pick<KYCommittee, 'id' | 'name' | 'slug' | 'chamber' | 'profile_url' | 'committee_type'> | null;
 };
 
 /** Meetings browse grid — omits heavy `member_refs` / agenda fields. */
@@ -163,12 +163,12 @@ export type KYCommitteeMeetingBrowse = Pick<
   | 'created_at'
   | 'updated_at'
 > & {
-  ky_committees: Pick<KYCommittee, 'id' | 'name' | 'slug' | 'chamber' | 'profile_url'> | null;
+  ky_committees: Pick<KYCommittee, 'id' | 'name' | 'slug' | 'chamber' | 'profile_url' | 'committee_type'> | null;
 };
 
 export type KYCommitteeAgendaItemWithMeeting = KYCommitteeAgendaItem & {
   ky_committee_meetings: (KYCommitteeMeeting & {
-    ky_committees: Pick<KYCommittee, 'id' | 'name' | 'slug' | 'chamber' | 'profile_url'> | null;
+    ky_committees: Pick<KYCommittee, 'id' | 'name' | 'slug' | 'chamber' | 'profile_url' | 'committee_type'> | null;
   }) | null;
 };
 

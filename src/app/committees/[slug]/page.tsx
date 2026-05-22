@@ -7,6 +7,7 @@ import {
   fetchKyLegislatorRoster,
   getKyCommitteeBySlug,
 } from '@/lib/ky-committee-data';
+import { fetchKyCommitteesBrowseList } from '@/lib/ky-ga-browse-server';
 import { buildCommitteeMemberDisplay } from '@/lib/ky-committee-members';
 import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
 
@@ -32,9 +33,10 @@ export default async function CommitteeDetailPage({ params }: PageProps) {
   const committee = await getKyCommitteeBySlug(slug);
   if (!committee) notFound();
 
-  const [meetings, legislatorRoster] = await Promise.all([
+  const [meetings, legislatorRoster, committeeRoster] = await Promise.all([
     fetchKyCommitteeMeetingsForCommittee(committee.id),
     fetchKyLegislatorRoster(),
+    fetchKyCommitteesBrowseList(),
   ]);
   const members = buildCommitteeMemberDisplay(committee, meetings, legislatorRoster);
   const agendaByMeetingId = await fetchKyCommitteeAgendaForMeetings(meetings.map((m) => m.id));
@@ -45,6 +47,7 @@ export default async function CommitteeDetailPage({ params }: PageProps) {
       meetings={meetings}
       agendaByMeetingId={agendaByMeetingId}
       members={members}
+      committeeRoster={committeeRoster.map((c) => ({ slug: c.slug, name: c.name }))}
     />
   );
 }

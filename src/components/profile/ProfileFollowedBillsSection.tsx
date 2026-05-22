@@ -115,7 +115,7 @@ export function ProfileFollowedBillsSection() {
           </Typography>
         </Box>
         <Button component={NextLink} href="/search" size="small" variant="outlined" sx={{ textTransform: 'none' }}>
-          Track another bill
+          Follow another bill
         </Button>
       </Box>
 

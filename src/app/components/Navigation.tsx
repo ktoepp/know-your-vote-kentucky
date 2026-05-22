@@ -264,7 +264,6 @@ function TooltipToggleMenuItem({ onClose }: { onClose?: () => void }) {
       </ListItemIcon>
       <ListItemText
         primary={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
-        secondary="Bill status, process, and hover help"
       />
     </MenuItem>
   );
@@ -612,10 +611,8 @@ export default function Navigation() {
                   </ListItemIcon>
                   <ListItemText
                     primary={tooltipsEnabled ? 'Disable tooltips' : 'Enable tooltips'}
-                    secondary="Educational hover help on bills"
                     sx={{
                       '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1rem' },
-                      '& .MuiListItemText-secondary': { fontSize: '0.8125rem' },
                     }}
                   />
                 </ListItemButton>

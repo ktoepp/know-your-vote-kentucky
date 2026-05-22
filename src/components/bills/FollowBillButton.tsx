@@ -5,6 +5,12 @@ import { Button as MuiButton, CircularProgress } from '@mui/material';
 import { Bookmark, BookmarkBorder } from '@mui/icons-material';
 import NextLink from 'next/link';
 import { useUser } from '@/app/lib/UserContext';
+import {
+  FOLLOW_BILL_BUTTON_SX,
+  followBillAriaLabel,
+  followBillButtonLabel,
+  type FollowBillButtonState,
+} from '@/lib/follow-labels';
 
 type Props = {
   /** UUID or bill number (e.g. "HB1") — same shape the bill page receives. */
@@ -46,20 +52,13 @@ export function FollowBillButton({ billId }: Props) {
     };
   }, [authedReady, billId, token]);
 
-  if (userLoading) {
-    return (
-      <MuiButton
-        variant="outlined"
-        disabled
-        startIcon={<CircularProgress size={16} thickness={5} />}
-        sx={{ fontSize: '1rem', py: 1, px: 2, flexShrink: 0 }}
-        aria-busy="true"
-        aria-label="Loading account"
-      >
-        Follow
-      </MuiButton>
-    );
-  }
+  const uiState: FollowBillButtonState = userLoading || state === 'loading'
+    ? 'loading'
+    : !user
+      ? 'signed_out'
+      : following
+        ? 'following'
+        : 'idle';
 
   if (!user) {
     const next = `/bills/${billId}`;
@@ -68,10 +67,11 @@ export function FollowBillButton({ billId }: Props) {
         component={NextLink}
         href={`/auth/login?next=${encodeURIComponent(next)}`}
         variant="outlined"
+        size="medium"
         startIcon={<BookmarkBorder />}
-        sx={{ fontSize: '1rem', py: 1, px: 2, flexShrink: 0 }}
+        sx={FOLLOW_BILL_BUTTON_SX}
       >
-        Sign in to follow
+        {followBillButtonLabel('signed_out')}
       </MuiButton>
     );
   }
@@ -90,20 +90,20 @@ export function FollowBillButton({ billId }: Props) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error || 'Request failed');
       setState('idle');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setFollowing(prev);
-      setErrMsg(err.message);
+      setErrMsg(err instanceof Error ? err.message : 'Request failed');
       setState('error');
     }
   };
 
   const busy = state === 'loading' || state === 'saving';
-  const label = following ? 'Following' : 'Follow';
 
   return (
     <MuiButton
       onClick={toggle}
-      disabled={busy}
+      disabled={busy || userLoading}
+      size="medium"
       variant={following ? 'contained' : 'outlined'}
       startIcon={
         busy ? (
@@ -115,11 +115,11 @@ export function FollowBillButton({ billId }: Props) {
         )
       }
       aria-pressed={following}
-      aria-label={following ? 'Unfollow this bill' : 'Follow this bill'}
+      aria-label={followBillAriaLabel(uiState)}
       title={errMsg ?? undefined}
-      sx={{ fontSize: '1rem', py: 1, px: 2, flexShrink: 0 }}
+      sx={FOLLOW_BILL_BUTTON_SX}
     >
-      {label}
+      {followBillButtonLabel(uiState)}
     </MuiButton>
   );
 }

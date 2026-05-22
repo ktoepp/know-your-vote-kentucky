@@ -99,6 +99,24 @@ async function main() {
     }
   }
   console.log(`Seats with multiple distinct surnames: ${seatGroups}`);
+
+  // ---- legiscan_id coverage (active chamber members only) ----
+  console.log('\n--- legiscan_id coverage (active House/Senate) ---');
+  const chamberRows = rows.filter((r) => r.chamber === 'house' || r.chamber === 'senate');
+  const missingLegiscan = chamberRows.filter((r) => r.legiscan_id == null || r.legiscan_id === '');
+  console.log(
+    `Missing legiscan_id: ${missingLegiscan.length}/${chamberRows.length} active chamber legislators`,
+  );
+  if (missingLegiscan.length > 0) {
+    console.log('Missing (up to 20):');
+    for (const r of missingLegiscan.slice(0, 20)) {
+      console.log(`  ${r.name} | ${r.chamber} ${r.district ?? ''} | id=${r.id}`);
+    }
+    if (missingLegiscan.length > 20) {
+      console.log(`  …and ${missingLegiscan.length - 20} more`);
+    }
+    process.exit(1);
+  }
 }
 
 main().catch((e) => {

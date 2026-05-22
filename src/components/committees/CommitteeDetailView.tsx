@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import {
   Box,
@@ -8,30 +8,39 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Collapse,
   Container,
   Divider,
-  Grid,
+  Link as MuiLink,
   List,
   ListItem,
   ListItemText,
   Stack,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import {
-  OpenInNew,
+  ArrowBack,
+  CalendarMonth,
+  ExpandLess,
+  ExpandMore,
 } from '@mui/icons-material';
-import { ArrowLeft, CalendarDays, ChevronDown, ChevronUp, FileText, MapPin } from 'lucide-react';
+import { CalendarToday, LocationOn } from '@mui/icons-material';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { EmptyState } from '@/components/civic/EmptyState';
-import { ChamberChip, MetaChip } from '@/components/ui/Chip';
+import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
+import { CommitteeTagRow, useCommitteeKindInfo } from '@/components/committees/CommitteeTagRow';
+import { MetaChip } from '@/components/ui/Chip';
 import type { KYCommittee, KYCommitteeAgendaItem, KYCommitteeMeeting } from '@/types/kentucky';
+import { ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE, iconRemSx } from '@/lib/ui-tokens';
 import {
   formatAgendaItemKind,
   formatKyMeetingDate,
   LRC_LEGISLATIVE_CALENDAR_URL,
   normalizeKyGaAgendaLine,
   normalizeKyGaDisplayName,
+  resolveKyCommitteeParent,
 } from '@/lib/ky-committee-display';
 import { CommitteeMembersSection } from '@/components/committees/CommitteeMembersSection';
 import { FollowCommitteeButton } from '@/components/committees/FollowCommitteeButton';
@@ -43,6 +52,8 @@ export interface CommitteeDetailViewProps {
   meetings: KYCommitteeMeeting[];
   agendaByMeetingId: Record<string, KYCommitteeAgendaItem[]>;
   members: CommitteeMemberDisplay[];
+  /** Full committee roster for subcommittee → parent links. */
+  committeeRoster?: Pick<KYCommittee, 'slug' | 'name'>[];
 }
 
 function MeetingAgendaBlock({ items, expanded }: { items: KYCommitteeAgendaItem[]; expanded: boolean }) {
@@ -50,7 +61,7 @@ function MeetingAgendaBlock({ items, expanded }: { items: KYCommitteeAgendaItem[
   return (
     <Box sx={{ mt: 1.5 }}>
       <Collapse in={expanded}>
-        <Card variant="outlined" sx={{ borderRadius: 1.25, mt: 0.5, bgcolor: 'background.default' }}>
+        <Card variant="outlined" sx={{ borderRadius: 2, mt: 0.5 }}>
           <List dense disablePadding>
             {items.map((item, i) => (
               <React.Fragment key={item.id}>
@@ -90,11 +101,24 @@ export function CommitteeDetailView({
   meetings,
   agendaByMeetingId,
   members,
+  committeeRoster = [],
 }: CommitteeDetailViewProps) {
+  const theme = useTheme();
   const displayName = normalizeKyGaDisplayName(committee.name);
-  const [expandedAgenda, setExpandedAgenda] = useState<Record<string, boolean>>({});
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const kindInfo = useCommitteeKindInfo(committee);
+  const [expandedAgenda, setExpandedAgenda] = React.useState<Record<string, boolean>>({});
   const topicTags = useMemo(() => classifyTopics(committee.name, '').slice(0, 4), [committee.name]);
+
+  const parentRef = useMemo(
+    () =>
+      resolveKyCommitteeParent(
+        committee.name,
+        kindInfo.kind,
+        kindInfo.shortLabel,
+        committeeRoster,
+      ),
+    [committee.name, committeeRoster, kindInfo.kind, kindInfo.shortLabel],
+  );
 
   const upcoming = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -103,22 +127,33 @@ export function CommitteeDetailView({
       .sort((a, b) => a.meeting_date.localeCompare(b.meeting_date))[0];
   }, [meetings]);
 
-  const sortedMeetings = useMemo(() => {
-    return [...meetings].sort((a, b) =>
-      sortOrder === 'newest'
-        ? b.meeting_date.localeCompare(a.meeting_date)
-        : a.meeting_date.localeCompare(b.meeting_date),
-    );
-  }, [meetings, sortOrder]);
-
   const toggleAgenda = (meetingId: string) => {
     setExpandedAgenda((prev) => ({ ...prev, [meetingId]: !prev[meetingId] }));
   };
 
+  const officialLinks = [
+    ...(committee.profile_url
+      ? [{ href: committee.profile_url, label: 'LRC committee profile' }]
+      : []),
+    { href: LRC_LEGISLATIVE_CALENDAR_URL, label: 'Legislative calendar' },
+    ...(committee.profile_url
+      ? [{ href: committee.profile_url, label: 'Meeting materials' }]
+      : []),
+  ];
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Container maxWidth="lg" sx={{ pt: { xs: 2.5, md: 3 }, pb: { xs: 5, md: 7 } }}>
-        <Breadcrumbs aria-label="Breadcrumb" sx={{ mb: 1.5 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Button
+          component={Link}
+          href="/committees"
+          startIcon={<ArrowBack sx={{ fontSize: ICON_REM.nav }} aria-hidden />}
+          sx={{ mb: 2, textTransform: 'none', fontWeight: 600 }}
+        >
+          All committees
+        </Button>
+
+        <Breadcrumbs aria-label="Breadcrumb" sx={{ mb: 2 }}>
           <Link href="/committees" style={{ textDecoration: 'none', color: 'inherit' }}>
             Committees
           </Link>
@@ -127,202 +162,170 @@ export function CommitteeDetailView({
           </Typography>
         </Breadcrumbs>
 
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
-          <Button
-            component={Link}
-            href="/committees"
-            startIcon={<ArrowLeft size={16} aria-hidden />}
-            sx={{ px: 0, minHeight: 32, color: 'text.secondary', fontWeight: 600 }}
-          >
-            Back to committees
-          </Button>
-          {committee.chamber !== 'unknown' && <ChamberChip chamber={committee.chamber} size="small" />}
-          {topicTags.slice(0, 1).map((tag) => (
-            <MetaChip key={tag} label={tag} size="small" variant="outlined" />
-          ))}
-          <Box sx={{ ml: { sm: 'auto' } }}>
-            <FollowCommitteeButton committeeId={committee.id} size="small" />
-          </Box>
-        </Stack>
+        <Card sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+            <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, justifyContent: 'space-between' }}>
+              <CommitteeTagRow committee={committee}>
+                {topicTags.map((tag) => (
+                  <MetaChip key={tag} label={tag} size="small" variant="outlined" />
+                ))}
+              </CommitteeTagRow>
+              <FollowCommitteeButton committeeId={committee.id} size="small" />
+            </Box>
 
-        <Card variant="outlined" sx={{ borderRadius: 1.25, mb: 2 }}>
-          <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
-            <Typography variant="h2" component="h1" fontWeight={600} sx={{ mb: 1, color: 'text.primary' }}>
+            <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
               {displayName}
             </Typography>
-            <Typography variant="body1" color="text.primary" sx={{ mb: 2.25, maxWidth: 980 }}>
-              Jurisdiction and staff rosters are maintained by the Kentucky Legislative Research Commission.
-              Know Your Vote Kentucky adds parsed meeting agendas from the legislative calendar.
-            </Typography>
 
-            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-              {topicTags.map((tag) => (
-                <MetaChip key={tag} label={tag} size="small" variant="outlined" />
-              ))}
+            {parentRef && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                {parentRef.href ? (
+                  <>
+                    Part of{' '}
+                    <MuiLink component={Link} href={parentRef.href} fontWeight={600} underline="hover">
+                      {parentRef.label}
+                    </MuiLink>
+                  </>
+                ) : (
+                  <>Part of {parentRef.label}</>
+                )}
+              </Typography>
+            )}
+
+            <Stack spacing={0.75} sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{members.length}</strong> legislative {members.length === 1 ? 'member' : 'members'} synced
+                {' · '}
+                <strong>{meetings.length}</strong> meeting{meetings.length === 1 ? '' : 's'} on calendar
+              </Typography>
+              {upcoming ? (
+                <Typography variant="body2" color="text.secondary">
+                  Next meeting: <strong>{formatKyMeetingDate(upcoming.meeting_date)}</strong>
+                  {upcoming.time_and_location ? ` · ${upcoming.time_and_location}` : ''}
+                </Typography>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No upcoming meetings listed on the calendar.
+                </Typography>
+              )}
             </Stack>
 
-            <Divider sx={{ my: 2 }} />
+            <Box sx={{ mb: 2 }}>
+              <OfficialSourceLinks links={officialLinks} />
+            </Box>
 
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={7}>
-                <Stack spacing={0.75}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                    Next meeting
-                  </Typography>
-                  {upcoming ? (
-                    <Typography variant="body2" color="text.primary">
-                      {formatKyMeetingDate(upcoming.meeting_date)}
-                      {upcoming.time_and_location ? ` · ${upcoming.time_and_location}` : ''}
-                    </Typography>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      No upcoming meetings listed on the calendar.
-                    </Typography>
-                  )}
-                </Stack>
-              </Grid>
-              <Grid item xs={12} md={5}>
-                <Stack direction="row" spacing={1} justifyContent={{ xs: 'flex-start', md: 'flex-end' }} flexWrap="wrap" useFlexGap>
-                  {committee.profile_url && (
-                    <Button
-                      href={committee.profile_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      variant="contained"
-                      size="small"
-                      endIcon={<OpenInNew sx={{ fontSize: '0.85rem' }} aria-hidden />}
-                    >
-                      LRC profile
-                    </Button>
-                  )}
-                  <Button
-                    href={LRC_LEGISLATIVE_CALENDAR_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="outlined"
-                    size="small"
-                    endIcon={<OpenInNew sx={{ fontSize: '0.85rem' }} aria-hidden />}
-                  >
-                    Calendar
-                  </Button>
-                </Stack>
-              </Grid>
-            </Grid>
+            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+              Jurisdiction and staff rosters are maintained on the{' '}
+              {committee.profile_url ? (
+                <MuiLink href={committee.profile_url} target="_blank" rel="noopener noreferrer">
+                  official LRC committee profile
+                </MuiLink>
+              ) : (
+                'Kentucky Legislature website'
+              )}
+              . Know Your Vote Kentucky adds parsed meeting agendas from the legislative calendar below.
+            </Typography>
           </CardContent>
         </Card>
 
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={8}>
-            <Card variant="outlined" sx={{ borderRadius: 1.25 }}>
-              <CardContent sx={{ p: { xs: 2.25, md: 3 } }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2 }}>
-                  <Box>
-                    <Typography component="h2" variant="h4" fontWeight={600} color="text.primary">
-                      Meetings
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {meetings.length} calendar meeting{meetings.length === 1 ? '' : 's'} synced
-                    </Typography>
-                  </Box>
-                  <Stack direction="row" spacing={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
-                    {(['newest', 'oldest'] as const).map((order) => (
-                      <Button
-                        key={order}
-                        size="small"
-                        variant={sortOrder === order ? 'contained' : 'text'}
-                        onClick={() => setSortOrder(order)}
-                        sx={{ borderRadius: 0, minHeight: 34, px: 1.5 }}
-                      >
-                        {order === 'newest' ? 'Newest first' : 'Oldest first'}
-                      </Button>
-                    ))}
-                  </Stack>
-                </Box>
+        <CommitteeMembersSection members={members} committeeProfileUrl={committee.profile_url} />
 
-                {meetings.length === 0 ? (
-                  <EmptyState message="No meetings synced for this committee yet." />
-                ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    {sortedMeetings.map((meeting, index) => {
-                      const items = agendaByMeetingId[meeting.id] ?? [];
-                      const agendaExpanded = Boolean(expandedAgenda[meeting.id]);
-                      const hasAgenda = items.length > 0;
-                      return (
-                        <Box key={meeting.id}>
-                          {index > 0 && <Divider />}
-                          <Box sx={{ py: 1.6 }}>
-                            <Box
-                              component={hasAgenda ? 'button' : 'div'}
-                              type={hasAgenda ? 'button' : undefined}
-                              onClick={hasAgenda ? () => toggleAgenda(meeting.id) : undefined}
-                              aria-expanded={hasAgenda ? agendaExpanded : undefined}
-                              sx={{
-                                display: 'block',
-                                width: '100%',
-                                p: 0,
-                                m: 0,
-                                border: 0,
-                                bgcolor: 'transparent',
-                                textAlign: 'left',
-                                cursor: hasAgenda ? 'pointer' : 'default',
-                                color: 'inherit',
-                                font: 'inherit',
-                                '&:hover': hasAgenda ? { opacity: 0.88 } : undefined,
-                              }}
-                            >
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'flex-start' }}>
-                                <Box sx={{ minWidth: 0 }}>
-                                  <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                                    {formatKyMeetingDate(meeting.meeting_date)}
-                                    {meeting.status === 'cancelled' ? ' · Cancelled' : ''}
-                                  </Typography>
-                                  {meeting.time_and_location && (
-                                    <Typography
-                                      variant="body2"
-                                      color="text.secondary"
-                                      sx={{ mt: 0.25, display: 'flex', alignItems: 'flex-start', gap: 0.75 }}
-                                    >
-                                      <MapPin size={14} aria-hidden />
-                                      <Box component="span">{meeting.time_and_location}</Box>
-                                    </Typography>
-                                  )}
-                                  {hasAgenda && (
-                                    <Typography variant="body2" color="text.primary" fontWeight={600} sx={{ mt: 0.75 }}>
-                                      {items.length} agenda item{items.length === 1 ? '' : 's'}
-                                    </Typography>
-                                  )}
-                                </Box>
-                                {hasAgenda && (
-                                  <Box sx={{ color: 'text.secondary', lineHeight: 0, mt: 0.25 }}>
-                                    {agendaExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                                  </Box>
-                                )}
-                              </Box>
-                            </Box>
-                            <MeetingAgendaBlock items={items} expanded={agendaExpanded} />
-                          </Box>
+        <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, mt: 1 }}>
+          <CalendarMonth sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
+          <Typography
+            component="h2"
+            variant={TYPE.sectionTitle.variant}
+            fontWeight={TYPE.sectionTitle.fontWeight}
+            color="text.primary"
+            sx={SECTION_TITLE_DISPLAY_SX}
+          >
+            Meetings &amp; agendas
+          </Typography>
+          {meetings.length > 0 && (
+            <Chip label={meetings.length} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
+          )}
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Parsed from the LRC legislative calendar. Click a meeting to expand its agenda. Agendas can change the day before a meeting.
+        </Typography>
+
+        {meetings.length === 0 ? (
+          <EmptyState message="No meetings synced for this committee yet." />
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}>
+            {meetings.map((meeting) => {
+              const items = agendaByMeetingId[meeting.id] ?? [];
+              const agendaExpanded = Boolean(expandedAgenda[meeting.id]);
+              const hasAgenda = items.length > 0;
+              return (
+                <Card key={meeting.id} variant="outlined" sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+                  <Box sx={{ p: 2.5 }}>
+                    <Box
+                      component={hasAgenda ? 'button' : 'div'}
+                      type={hasAgenda ? 'button' : undefined}
+                      onClick={hasAgenda ? () => toggleAgenda(meeting.id) : undefined}
+                      aria-expanded={hasAgenda ? agendaExpanded : undefined}
+                      sx={{
+                        display: 'block',
+                        width: '100%',
+                        p: 0,
+                        m: 0,
+                        border: 0,
+                        bgcolor: 'transparent',
+                        textAlign: 'left',
+                        cursor: hasAgenda ? 'pointer' : 'default',
+                        color: 'inherit',
+                        font: 'inherit',
+                        '&:hover': hasAgenda ? { opacity: 0.92 } : undefined,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                        {meeting.status === 'cancelled' && (
+                          <MetaChip label="Cancelled" tone="error" size="small" variant="filled" />
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, mb: 0.75 }}>
+                        <CalendarToday sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.2 }} aria-hidden />
+                        <Typography variant="body1" fontWeight={600} component="span">
+                          {formatKyMeetingDate(meeting.meeting_date)}
+                        </Typography>
+                      </Box>
+                      {meeting.time_and_location && (
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, mb: 0.5 }}>
+                          <LocationOn sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.2 }} aria-hidden />
+                          <Typography variant="body2" color="text.secondary" component="span">
+                            {meeting.time_and_location}
+                          </Typography>
                         </Box>
-                      );
-                    })}
+                      )}
+                      {hasAgenda && (
+                        <Typography
+                          variant="body2"
+                          color="primary.main"
+                          fontWeight={600}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}
+                        >
+                          {agendaExpanded ? 'Hide agenda' : 'Show agenda'}
+                          {agendaExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                          <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                            ({items.length} item{items.length === 1 ? '' : 's'})
+                          </Box>
+                        </Typography>
+                      )}
+                    </Box>
+                    <MeetingAgendaBlock items={items} expanded={agendaExpanded} />
                   </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+                </Card>
+              );
+            })}
+          </Box>
+        )}
 
-          <Grid item xs={12} md={4}>
-            <CommitteeMembersSection members={members} committeeProfileUrl={committee.profile_url} />
-          </Grid>
-        </Grid>
-
-        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ mt: 3 }}>
-          <Button component={Link} href="/meetings" variant="outlined" size="small" startIcon={<CalendarDays size={16} aria-hidden />}>
-            Browse all meetings
-          </Button>
-          <Button component={Link} href="/legislature/resources" variant="outlined" size="small" startIcon={<FileText size={16} aria-hidden />}>
-            Frankfort resources
-          </Button>
-        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          <Link href="/meetings">Browse all committee meetings</Link>
+          {' · '}
+          <Link href="/legislature/resources">Frankfort resources</Link>
+        </Typography>
 
         <DataFreshnessNote variant="page" source="lrc-calendar" />
       </Container>

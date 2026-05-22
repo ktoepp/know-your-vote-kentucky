@@ -123,7 +123,10 @@ export interface MemberVoteRecord {
   sessionName: string;
   totalRollCalls: number;
   tally: ReturnType<typeof tallyFromMap>;
+  /** First N roll calls for default "Recent" view. */
   recent: MemberRecentRollVote[];
+  /** All roll calls in session (up to maxRows) for client-side filtering. */
+  votes: MemberRecentRollVote[];
 }
 
 function emptyMemberVoteRecord(sessionName: string): MemberVoteRecord {
@@ -132,7 +135,23 @@ function emptyMemberVoteRecord(sessionName: string): MemberVoteRecord {
     totalRollCalls: 0,
     tally: { yea: 0, nay: 0, notVoting: 0, absent: 0, unknown: 0 },
     recent: [],
+    votes: [],
   };
+}
+
+function mapRollVotes(
+  myVotes: { vote: KYVote; myVote: string | null; bucket: VoteBucket }[],
+  billById: Map<string, Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status'>>,
+): MemberRecentRollVote[] {
+  return myVotes.map(({ vote, myVote, bucket }) => ({
+    voteId: vote.id,
+    date: vote.date,
+    description: vote.description,
+    chamber: vote.chamber,
+    myVote,
+    myBucket: bucket,
+    bill: billById.get(vote.bill_id) ?? null,
+  }));
 }
 
 /**
@@ -227,7 +246,7 @@ export async function fetchMemberVoteRecord(
     myVotes.push({ vote: v, myVote: text, bucket });
   }
 
-  const billIds = [...new Set(myVotes.slice(0, recentLimit).map((m) => m.vote.bill_id))];
+  const billIds = [...new Set(myVotes.map((m) => m.vote.bill_id))];
   const billById = new Map<string, Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status'>>();
 
   if (billIds.length) {
@@ -243,20 +262,13 @@ export async function fetchMemberVoteRecord(
     }
   }
 
-  const recent: MemberRecentRollVote[] = myVotes.slice(0, recentLimit).map(({ vote, myVote, bucket }) => ({
-    voteId: vote.id,
-    date: vote.date,
-    description: vote.description,
-    chamber: vote.chamber,
-    myVote,
-    myBucket: bucket,
-    bill: billById.get(vote.bill_id) ?? null,
-  }));
+  const allVotes = mapRollVotes(myVotes, billById);
 
   return {
     sessionName,
     totalRollCalls: votes.length,
     tally: tallyFromMap(tallies),
-    recent,
+    recent: allVotes.slice(0, recentLimit),
+    votes: allVotes,
   };
 }
