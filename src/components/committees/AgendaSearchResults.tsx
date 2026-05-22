@@ -32,7 +32,16 @@ export function AgendaSearchResults({ items }: { items: KYCommitteeAgendaItemWit
                 <ListItemText
                   primary={
                     <Typography variant="body1" fontWeight={500}>
-                      {normalizeKyGaAgendaLine(item.raw_text)}
+                      {item.ky_bill_id ? (
+                        <Link
+                          href={`/bills/${item.ky_bill_id}`}
+                          style={{ textDecoration: 'underline', textUnderlineOffset: 2 }}
+                        >
+                          {normalizeKyGaAgendaLine(item.raw_text)}
+                        </Link>
+                      ) : (
+                        normalizeKyGaAgendaLine(item.raw_text)
+                      )}
                     </Typography>
                   }
                   secondary={
