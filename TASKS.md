@@ -8,39 +8,9 @@
 
 ## In Progress
 
-*Browser review queue closed 2026-05-21 — see ****Recently completed (2026-05-21)**** for the verify-and-refine branch summary. Remaining backlog is data/sync work (e.g. *`legiscan_id`* backfill in production) or future LRC scrape (jurisdiction/staff columns).*
+*(none)*
 
-### Browser review — closed 2026-05-21 (acceptance criteria retained)
-
-All P1 items from the 2026-05-19 local browser review shipped in the 2026-05-19 batches (see Recently completed) or in the 2026-05-21 verify-and-refine Wave 4a–d sweep. The acceptance paragraphs below remain the canonical specification for these UI behaviors and are kept here for reference.
-
-**Acceptance (P1 bill cards):** Hovering any `KYBillCard` in browse/search/feed does not show a tooltip popup or hover overlay/lift; click still opens bill detail. Keyboard `:focus-visible` ring remains on the card link.
-
-**Acceptance (P1 party badge):** Every legislator portrait listed above shows a small circular D/R/I badge on the avatar rim when `party` is known; unknown/missing party omits badge (no empty circle). Badge scales with avatar size (32px vs 40px on bill cards). Existing inline party **chips** beside names may remain unless product wants chips removed after badge ships.
-
-**Acceptance (P1 bill number):** On `/bills/[id]`, designation (e.g. `SR57`) reads clearly larger than today and below the title in visual hierarchy (`h2` under title `h1`). Grid cards and list/table bill numbers are visibly larger than body text without breaking card layout. Document outline: one `h1` per bill detail page (title, not number).
-
-**Acceptance (P1 committee card):** On `/committees` grid, each card shows committee name + chamber chip + leadership names (when known) + up to ~3 topic chips from `KY_TOPICS`; no gavel / “View meetings & agendas” line. Whole card still navigates to committee detail.
-
-**Acceptance (P1 committee detail):** Audit doc maps LRC fields (jurisdiction, members w/ (S)/(H)/role, calendar, materials, minutes, staff) to KYVKY sections and notes data source (synced vs link-out). `/committees/[slug]` shows jurisdiction (or clear LRC link if not scraped), scannable member list with roles, action row for calendar + materials + minutes, staff block or LRC fallback; KYVKY meetings/agendas + related bills below fold; bill-detail-like typography/sections.
-
-**Acceptance (P2 meeting agenda click):** Committee detail meeting cards do not show “Synced …” line. Clicking a meeting with agenda items toggles agenda list; keyboard-accessible control (button or `aria-expanded`). Empty meetings show no false “show agenda” if zero items.
-
-**Acceptance (P1 members executive):** `/members` shows one top section with Governor + Lt. Gov + AG (no separate “Other statewide officials” block). Coleman card shows **Lieutenant Governor**, not `Lt_governor`. House/Senate sections unchanged below.
-
-**Acceptance (P1 district minimap):** House/Senate `MemberCard` rows and `/members/[slug]` show a minimap with the correct district filled/highlighted inside Kentucky; no map for statewide-only roles without a district. Map does not break card stretch-link navigation (pointer-events / z-index). Graceful placeholder if Mapbox token or GeoJSON missing.
-
-**Acceptance (P1 member phone):** Member cards/tooltips do not show clickable `502-564-8100` (or normalized equivalent) as if it were the legislator’s direct line. Cards with a distinct `phone` value still show `tel:` link. Capitol directory fallback copy remains when email is missing.
-
-**Acceptance (P1 member profile data):** Active House/Senate members with bills/votes in LegiScan show **Sponsored bills** and **Voting history** on `/members/[slug]` (no info alert). Spot-check: member with known sponsorship (e.g. Josh Calloway) shows list or session-empty copy, not “not available for this member yet.” `npm run diagnose:legislators` (or equivalent) reports near-zero active rows missing `legiscan_id`.
-
-**Acceptance (P2 LegiScan on cards):** No “LegiScan” text button in `MemberCard` footer on `/members` (or map if it reuses the same component). Other outbound links still render when data exists.
-
-**Acceptance (P2 passed chip):** Bills whose status maps to the **passed** stage (chip label “Passed”, “Enrolled”, etc. per helper) show a green outlined chip with check icon, visually consistent with “Signed by Governor”. Signed/chaptered bills still use the signed chip only (no double icons).
-
-**Acceptance (P2 resources page):** `/legislature/resources` shows `h1` without the long intro paragraph; no stacked resource cards and no “Open in KYVKY” buttons; external links remain (LRC calendar, committees index, KET, Bill Watch, KRC, bill status). Page is scannable in one viewport-ish on desktop.
-
-**Acceptance (P2 gavel):** Results count row shows only typography (no gavel); layout/spacing still aligned with filter bar above.
+Browser review closed **2026-05-22** (P1/P2 items + UX quick wins + committee UI polish UI-8–UI-11). See **Recently completed** and **UX design tracker → Done**. Next backlog: optional prod `legiscan_id` spot-check, map address autocomplete, **Follow committees** (Backlog), committee materials Wave 3.
 
 ## Maintained on autopilot
 
@@ -102,7 +72,10 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Recently completed
 
-- **UX quick wins + browser review fixes (2026-05-22)** — Profile hash scroll + sticky section nav; map empty vs no-district states; member profile section reorder (Sponsored → Voting → Committees) with `KYBillCard` gallery, committee assignment tiles (`shortKyCommitteeLabel`), static district thumbnails on profile, clickable vote tally filters; bills browse topic quick-pick chips (`LANDING_TOPICS`); bill detail history expand/collapse (8 items), section header polish, Roll calls label, hearings empty copy; profile activity **Topics** filter (`?topic=` + hybrid LegiScan match); normalized Follow copy (`src/lib/follow-labels.ts`); nav tooltips toggle without secondary text; `diagnose:legislators` reports missing `legiscan_id`; `npm run generate:district-thumbnails` script added. — All 13 recent-ship PRs PASS verification (Waves 1, 2a–d on the `verify-and-refine-app` branch); see `decisions.md` § 2026-05-21 for the linked GH-Actions vs Vercel-cron decision.
+- **Committee + member UI polish (2026-05-22, UI-8–UI-11)** — Committee kind tags (`CommitteeKindChip`, `resolveKyCommitteeKind`) on meetings browse, committee cards/detail, member profile tiles; `OfficialSourceLinks` replaces heavy outbound button stacks; member roster two-line title + district; committee detail merges “At a glance” into overview + subcommittee parent link via `resolveKyCommitteeParent()`.
+- **UX quick wins + browser review fixes (2026-05-22)** — Profile hash scroll + sticky section nav; map empty vs no-district states; member profile section reorder (Sponsored → Voting → Committees) with `KYBillCard` gallery, committee assignment tiles (`shortKyCommitteeLabel`), static district thumbnails on profile, clickable vote tally filters; bills browse topic quick-pick chips (`LANDING_TOPICS`); bill detail history expand/collapse (8 items), section header polish, Roll calls label, hearings empty copy; profile activity **Topics** filter (`?topic=` + hybrid LegiScan match); normalized Follow copy (`src/lib/follow-labels.ts`); nav tooltips toggle without secondary text; `diagnose:legislators` reports missing `legiscan_id`; `generate:district-thumbnails` (276 assets under `public/geo/district-thumbs/`); LegiScan reconcile seat-only fallback when Open States preferred names differ from LegiScan legal names (`ky-sync-pipeline.ts` — 0/138 missing after sync).
+- **Doc / artifact hygiene (2026-05-22)** — Removed stale Framer handoff doc (`docs/framer-architecture.md`); stopped tracking LRC audit JSON under `reports/` (script output only; gitignored).
+- **Verify-and-refine PR train (2026-05-21)** — All 13 recent-ship PRs PASS verification (Waves 1, 2a–d on the `verify-and-refine-app` branch); see `decisions.md` § 2026-05-21 for the linked GH-Actions vs Vercel-cron decision.
   - **#23** Committee calendar + meetings routes + civic UX — `/committees`, `/meetings`, bill-detail hearings block, `/legislature/resources` hub all render and link as specified.
   - **#24** De-duplicate bills sync + quiet hourly Slack — no duplicate `ky_bills` upserts in dry-run; Slack noise reduced to summary lines only.
   - **#25** Digest email refinement — `BillDigest` grouped by reason with raw actions shown and clarified labels (`preview:digest` render matches spec).
@@ -203,8 +176,29 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
 - **Session record spike** — `fixtures/lrc/legislative-record-26rs-live.html`; floor vs committee event split.
 - **Interim period + session milestones** — `ky-sessions.ts` concurrence / veto recess banners.
 - **LRC bulk API** — revisit if state publishes machine-readable roster (see Backlog below).
+- **Follow committees (roadmap)** — See Backlog § Follow committees; depends on stable committee calendar sync (Phases 1–4 ✅) and notification prefs from bill follows.
 
 ## Backlog
+
+### Follow committees (roadmap — larger item)
+
+**Goal:** Let signed-in users **follow committees** (standing, interim joint, subcommittees, boards) and get notified when those committees schedule meetings, publish agendas, or add bills — analogous to bill follows but committee-scoped.
+
+**Not in scope for current browser-review quick wins (UI-8–11).** Treat as a **Wave 3+ / Bill Watch extension** (~multi-day).
+
+**Product sketch:**
+- Follow / Following on `/committees/[slug]`, committee browse cards, and optionally `/meetings` rows (mirror `FollowBillButton` + `follow-labels.ts` patterns).
+- Profile section: **Followed committees** (alongside followed bills); filter `/meetings?follows=me`.
+- Activity feed: committee-scoped events (new meeting, agenda posted, cancellation) in `GET /api/me/activity`.
+- Digest: optional committee block or merge into existing digest when followed committees have agenda changes (respect snooze + notification prefs).
+
+**Technical dependencies (TBD — needs spec):**
+- **Schema:** e.g. `ky_committee_follows(user_id, committee_id)` + RLS; extend `ky_notification_preferences` with committee event toggles or reuse hearing/agenda presets.
+- **Diff capture:** meeting/agenda change detection on LRC calendar sync (compare `agenda_content_hash`, new `meeting_date` rows) → append to activity/history table (may extend `ky_bill_status_history` pattern or add `ky_committee_meeting_history`).
+- **API:** `GET/POST/DELETE /api/committees/[id]/follow` (or `/api/me/committee-follows`); list on `/api/me/follows` or dedicated route.
+- **Copy/spec:** Extend or sibling [docs/specs/follow-bills.md](./docs/specs/follow-bills.md) with committee follow vocabulary and digest rules.
+
+**Prerequisites:** Committee kind tags + subcommittee parent context (UI-8, UI-11) help users follow the *right* entity; materials sync (Wave 3) optional for v1.
 
 ### Committee calendar (GA) — from [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md)
 
@@ -241,6 +235,11 @@ Active:
 - (none)
 
 Done:
+
+- **UI-8 — Committee type tags (2026-05-22)** — `CommitteeKindChip` + `resolveKyCommitteeKind()` (LRC `committee_type` + name patterns: standing, subcommittee, interim joint, statutory, board, oversight). Wired on `CommitteeMeetingCard`, `KYCommitteeCard`, `CommitteeDetailView`, member profile committee tiles.
+- **UI-9 — De-emphasize outbound LRC / external links (2026-05-22)** — `OfficialSourceLinks` text-link row replaces button stacks on committee detail, meeting card footer, member profile Connect & follow.
+- **UI-10 — Member list: title + district on separate lines (2026-05-22)** — `LegislatorIdentityBlock` split `roleTitle` / `districtLine`; `MemberCard` roster listings use two-line subtitle.
+- **UI-11 — Committee detail: merge At a glance + subcommittee context (2026-05-22)** — Stats folded into header overview card; `resolveKyCommitteeParent()` links subcommittees to parent standing committee when roster match exists.
 
 - Home IA (2026-05-09): orientation-first hero primary CTA (district map), merged topic module, bill-area-only loading spinner — see `decisions.md`.
 - Members (2026-05-09): filtered roster `profileHref` bugfix; member profile `h1`/`h2`/`h3` outline, `Link` back control, bill links identifiable by underline; roster card keyboard profile navigation + portrait alt + refresh `aria-label` — see `decisions.md`.

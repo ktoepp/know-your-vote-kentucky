@@ -17,7 +17,8 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { ArrowBack, Description, Groups, HowToVote, OpenInNew } from '@mui/icons-material';
+import { ArrowBack, Description, Groups, HowToVote } from '@mui/icons-material';
+import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import type { KYBill, KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { KYBillCard } from '@/components/bills/KYBillCard';
@@ -28,7 +29,7 @@ import { ICON_REM, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
 import { BillNumber } from '@/components/bills/BillNumber';
 import { formatKyIsoDateShort } from '@/lib/bill-display';
 import { shortKyCommitteeLabel } from '@/lib/ky-committee-display';
-import { ChamberChip } from '@/components/ui/Chip';
+import { ChamberChip, CommitteeKindChip } from '@/components/ui/Chip';
 import type { MemberRecentRollVote, MemberVoteRecord } from '@/lib/member-profile-data';
 import type { MemberCommitteeAssignment } from '@/lib/ky-member-committees';
 import type { VoteBucket } from '@/lib/legiscan-vote-tally';
@@ -62,7 +63,7 @@ function matchesVoteFilter(bucket: VoteBucket, filter: VoteFilter): boolean {
 }
 
 function CommitteeAssignmentTile({ assignment }: { assignment: MemberCommitteeAssignment }) {
-  const { shortLabel, fullLabel } = shortKyCommitteeLabel(assignment.name);
+  const { shortLabel, fullLabel, committeeKind } = shortKyCommitteeLabel(assignment.name);
   const aria = assignment.roleLabel
     ? `${fullLabel}, ${assignment.roleLabel}`
     : fullLabel;
@@ -89,6 +90,9 @@ function CommitteeAssignmentTile({ assignment }: { assignment: MemberCommitteeAs
     >
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75 }}>
         <ChamberChip chamber={assignment.chamber} size="small" />
+        {committeeKind && committeeKind !== 'unknown' ? (
+          <CommitteeKindChip kind={committeeKind} />
+        ) : null}
         <Typography variant="body2" fontWeight={700} component="span">
           {shortLabel}
         </Typography>
@@ -235,52 +239,20 @@ export function MemberProfileView({
             >
               Connect &amp; follow
             </Typography>
-            {socialLinks.length > 0 && (
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 0.75, mb: otherLinks.length > 0 ? 1 : 0 }}>
-                {socialLinks.map((link) => {
-                  const platform = labelForLinkHost(link.host);
-                  return (
-                    <Button
-                      key={link.url}
-                      component="a"
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      size="small"
-                      variant="outlined"
-                      endIcon={<OpenInNew sx={{ fontSize: '0.85rem' }} aria-hidden />}
-                      aria-label={`${platform} profile for ${leg.name} (opens in a new tab)`}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      {platform}
-                    </Button>
-                  );
-                })}
-              </Stack>
-            )}
-            {otherLinks.length > 0 && (
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 0.75 }}>
-                {otherLinks.map((link) => {
-                  const label = link.note?.trim() || link.host.replace(/^www\./i, '');
-                  return (
-                    <Button
-                      key={link.url}
-                      component="a"
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      size="small"
-                      variant="outlined"
-                      endIcon={<OpenInNew sx={{ fontSize: '0.85rem' }} aria-hidden />}
-                      aria-label={`${label} (opens in a new tab)`}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      {label}
-                    </Button>
-                  );
-                })}
-              </Stack>
-            )}
+            <OfficialSourceLinks
+              layout="stack"
+              links={[
+                ...socialLinks.map((link) => ({
+                  href: link.url,
+                  label: labelForLinkHost(link.host),
+                  ariaLabel: `${labelForLinkHost(link.host)} profile for ${leg.name} (opens in a new tab)`,
+                })),
+                ...otherLinks.map((link) => ({
+                  href: link.url,
+                  label: link.note?.trim() || link.host.replace(/^www\./i, ''),
+                })),
+              ]}
+            />
           </Box>
         )}
 

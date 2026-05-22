@@ -15,7 +15,7 @@ import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBl
 import { MemberName } from '@/components/civic/MemberName';
 import { MetaChip } from '@/components/ui/Chip';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
-import { legislatorRoleDistrictLine } from '@/lib/legislator-display';
+import { legislatorDistrictLine, legislatorRoleTitle } from '@/lib/legislator-display';
 import { CARD, ICON_REM } from '@/lib/ui-tokens';
 import {
   isKentuckyGovernor,
@@ -90,7 +90,10 @@ export function MemberCard({
       <LegislatorIdentityBlock
           name={<MemberName member={leg} variant="primary" />}
           nameComponent={profileNameHeading}
-          roleLine={legislatorRoleDistrictLine(leg, { includeDistrict: showDistrictInSubtitle })}
+          roleTitle={legislatorRoleTitle(leg)}
+          districtLine={
+            showDistrictInSubtitle ? legislatorDistrictLine(leg) : null
+          }
           density={avatarDensity}
           avatar={{
             src:

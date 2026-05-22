@@ -26,6 +26,24 @@ type LegislatorRoleLineInput = {
   last_name?: string | null;
 };
 
+/** Representative (title only). */
+export function legislatorRoleTitle(leg: LegislatorRoleLineInput): string {
+  return kyMemberTitleShort(leg);
+}
+
+/** House District 26 — district line for two-line member card subtitles. */
+export function legislatorDistrictLine(
+  leg: LegislatorRoleLineInput,
+  opts?: { includeDistrict?: boolean },
+): string | null {
+  const includeDistrict = opts?.includeDistrict !== false;
+  if (!includeDistrict) return null;
+  const district = formatKyLegislatorDistrict(leg as KYLegislator);
+  if (district) return district;
+  if (isKentuckyGovernor(leg)) return 'Statewide';
+  return null;
+}
+
 /** Representative · House District 26 (or role-only when district omitted). */
 export function legislatorRoleDistrictLine(
   leg: LegislatorRoleLineInput,

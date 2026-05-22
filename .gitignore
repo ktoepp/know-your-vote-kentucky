@@ -68,3 +68,6 @@ welcome-preview.html
 # Local diagnostic output
 diagnose-out.txt
 diagnose-after.txt
+
+# Script audit output (npm run audit:lrc:bill-refs, weekly workflow artifacts)
+/reports/

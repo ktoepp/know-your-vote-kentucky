@@ -4,6 +4,7 @@ import React from 'react';
 import { Chip } from '@mui/material';
 import type { ChipProps } from '@mui/material';
 import { CHIP } from '@/lib/ui-tokens';
+import { committeeKindLabel, type KyCommitteeKind } from '@/lib/ky-committee-display';
 
 /**
  * Canonical chip primitives. These are drop-in wrappers around MUI `<Chip>`
@@ -80,6 +81,30 @@ export interface ChamberChipProps extends Omit<BaseChipProps, 'label' | 'tone'> 
   chamber: 'house' | 'senate' | string;
   label?: React.ReactNode;
   tone?: ChipTone;
+}
+
+export interface CommitteeKindChipProps extends Omit<BaseChipProps, 'label' | 'tone'> {
+  kind: KyCommitteeKind;
+  label?: React.ReactNode;
+}
+
+export function CommitteeKindChip({
+  kind,
+  label,
+  size = 'small',
+  variant = 'outlined',
+  ...rest
+}: CommitteeKindChipProps) {
+  const displayLabel = label ?? committeeKindLabel(kind);
+  const tone: ChipTone =
+    kind === 'board' || kind === 'oversight' || kind === 'statutory'
+      ? 'secondary'
+      : kind === 'house_subcommittee' || kind === 'senate_subcommittee' || kind === 'subcommittee'
+        ? 'info'
+        : kind === 'interim_joint'
+          ? 'info'
+          : 'default';
+  return <MetaChip label={displayLabel} tone={tone} size={size} variant={variant} {...rest} />;
 }
 
 export function ChamberChip({

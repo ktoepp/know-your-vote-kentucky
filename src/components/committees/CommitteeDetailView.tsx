@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import {
   Box,
@@ -12,6 +12,7 @@ import {
   Collapse,
   Container,
   Divider,
+  Link as MuiLink,
   List,
   ListItem,
   ListItemText,
@@ -22,14 +23,15 @@ import { useTheme } from '@mui/material/styles';
 import {
   ArrowBack,
   CalendarMonth,
-  Description,
   ExpandLess,
   ExpandMore,
-  OpenInNew,
 } from '@mui/icons-material';
+import { CalendarToday, LocationOn } from '@mui/icons-material';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { EmptyState } from '@/components/civic/EmptyState';
-import { ChamberChip, MetaChip } from '@/components/ui/Chip';
+import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
+import { CommitteeTagRow, useCommitteeKindInfo } from '@/components/committees/CommitteeTagRow';
+import { MetaChip } from '@/components/ui/Chip';
 import type { KYCommittee, KYCommitteeAgendaItem, KYCommitteeMeeting } from '@/types/kentucky';
 import { ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE, iconRemSx } from '@/lib/ui-tokens';
 import {
@@ -38,8 +40,8 @@ import {
   LRC_LEGISLATIVE_CALENDAR_URL,
   normalizeKyGaAgendaLine,
   normalizeKyGaDisplayName,
+  resolveKyCommitteeParent,
 } from '@/lib/ky-committee-display';
-import { CalendarToday, LocationOn } from '@mui/icons-material';
 import { CommitteeMembersSection } from '@/components/committees/CommitteeMembersSection';
 import type { CommitteeMemberDisplay } from '@/lib/ky-committee-members';
 import { classifyTopics } from '@/lib/ky-topic-classifier';
@@ -49,6 +51,8 @@ export interface CommitteeDetailViewProps {
   meetings: KYCommitteeMeeting[];
   agendaByMeetingId: Record<string, KYCommitteeAgendaItem[]>;
   members: CommitteeMemberDisplay[];
+  /** Full committee roster for subcommittee → parent links. */
+  committeeRoster?: Pick<KYCommittee, 'slug' | 'name'>[];
 }
 
 function MeetingAgendaBlock({ items, expanded }: { items: KYCommitteeAgendaItem[]; expanded: boolean }) {
@@ -91,33 +95,29 @@ function MeetingAgendaBlock({ items, expanded }: { items: KYCommitteeAgendaItem[
   );
 }
 
-function SectionHeading({ icon, title }: { icon: React.ReactNode; title: string }) {
-  return (
-    <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-      {icon}
-      <Typography
-        component="h2"
-        variant={TYPE.sectionTitle.variant}
-        fontWeight={TYPE.sectionTitle.fontWeight}
-        color="text.primary"
-        sx={SECTION_TITLE_DISPLAY_SX}
-      >
-        {title}
-      </Typography>
-    </Box>
-  );
-}
-
 export function CommitteeDetailView({
   committee,
   meetings,
   agendaByMeetingId,
   members,
+  committeeRoster = [],
 }: CommitteeDetailViewProps) {
   const theme = useTheme();
   const displayName = normalizeKyGaDisplayName(committee.name);
-  const [expandedAgenda, setExpandedAgenda] = useState<Record<string, boolean>>({});
+  const kindInfo = useCommitteeKindInfo(committee);
+  const [expandedAgenda, setExpandedAgenda] = React.useState<Record<string, boolean>>({});
   const topicTags = useMemo(() => classifyTopics(committee.name, '').slice(0, 4), [committee.name]);
+
+  const parentRef = useMemo(
+    () =>
+      resolveKyCommitteeParent(
+        committee.name,
+        kindInfo.kind,
+        kindInfo.shortLabel,
+        committeeRoster,
+      ),
+    [committee.name, committeeRoster, kindInfo.kind, kindInfo.shortLabel],
+  );
 
   const upcoming = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -130,7 +130,15 @@ export function CommitteeDetailView({
     setExpandedAgenda((prev) => ({ ...prev, [meetingId]: !prev[meetingId] }));
   };
 
-  const materialsUrl = committee.profile_url;
+  const officialLinks = [
+    ...(committee.profile_url
+      ? [{ href: committee.profile_url, label: 'LRC committee profile' }]
+      : []),
+    { href: LRC_LEGISLATIVE_CALENDAR_URL, label: 'Legislative calendar' },
+    ...(committee.profile_url
+      ? [{ href: committee.profile_url, label: 'Meeting materials' }]
+      : []),
+  ];
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -155,85 +163,41 @@ export function CommitteeDetailView({
 
         <Card sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
           <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-              {committee.chamber !== 'unknown' && <ChamberChip chamber={committee.chamber} />}
-              {topicTags.map((tag) => (
-                <MetaChip key={tag} label={tag} size="small" variant="outlined" />
-              ))}
+            <Box sx={{ mb: 2 }}>
+              <CommitteeTagRow committee={committee}>
+                {topicTags.map((tag) => (
+                  <MetaChip key={tag} label={tag} size="small" variant="outlined" />
+                ))}
+              </CommitteeTagRow>
             </Box>
+
             <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
               {displayName}
             </Typography>
 
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 0.75, mb: 2 }}>
-              {committee.profile_url && (
-                <Button
-                  href={committee.profile_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="contained"
-                  size="small"
-                  endIcon={<OpenInNew sx={{ fontSize: '0.85rem' }} aria-hidden />}
-                  sx={{ textTransform: 'none' }}
-                >
-                  LRC committee profile
-                </Button>
-              )}
-              <Button
-                href={LRC_LEGISLATIVE_CALENDAR_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="outlined"
-                size="small"
-                endIcon={<OpenInNew sx={{ fontSize: '0.85rem' }} aria-hidden />}
-                sx={{ textTransform: 'none' }}
-              >
-                Legislative calendar
-              </Button>
-              {materialsUrl && (
-                <Button
-                  href={materialsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="outlined"
-                  size="small"
-                  endIcon={<OpenInNew sx={{ fontSize: '0.85rem' }} aria-hidden />}
-                  sx={{ textTransform: 'none' }}
-                >
-                  Meeting materials
-                </Button>
-              )}
-            </Stack>
-
-            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-              Jurisdiction and staff rosters are maintained on the{' '}
-              {committee.profile_url ? (
-                <Link href={committee.profile_url} target="_blank" rel="noopener noreferrer">
-                  official LRC committee profile
-                </Link>
-              ) : (
-                'Kentucky Legislature website'
-              )}
-              . Know Your Vote Kentucky adds parsed meeting agendas from the legislative calendar below.
-            </Typography>
-          </CardContent>
-        </Card>
-
-        <Card variant="outlined" sx={{ borderRadius: 3, mb: 3 }}>
-          <CardContent>
-            <SectionHeading
-              icon={<Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />}
-              title="At a glance"
-            />
-            <Stack spacing={1}>
-              <Typography variant="body2">
-                <strong>{members.length}</strong> legislative {members.length === 1 ? 'member' : 'members'} synced
+            {parentRef && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                {parentRef.href ? (
+                  <>
+                    Part of{' '}
+                    <MuiLink component={Link} href={parentRef.href} fontWeight={600} underline="hover">
+                      {parentRef.label}
+                    </MuiLink>
+                  </>
+                ) : (
+                  <>Part of {parentRef.label}</>
+                )}
               </Typography>
-              <Typography variant="body2">
+            )}
+
+            <Stack spacing={0.75} sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{members.length}</strong> legislative {members.length === 1 ? 'member' : 'members'} synced
+                {' · '}
                 <strong>{meetings.length}</strong> meeting{meetings.length === 1 ? '' : 's'} on calendar
               </Typography>
               {upcoming ? (
-                <Typography variant="body2">
+                <Typography variant="body2" color="text.secondary">
                   Next meeting: <strong>{formatKyMeetingDate(upcoming.meeting_date)}</strong>
                   {upcoming.time_and_location ? ` · ${upcoming.time_and_location}` : ''}
                 </Typography>
@@ -243,6 +207,22 @@ export function CommitteeDetailView({
                 </Typography>
               )}
             </Stack>
+
+            <Box sx={{ mb: 2 }}>
+              <OfficialSourceLinks links={officialLinks} />
+            </Box>
+
+            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+              Jurisdiction and staff rosters are maintained on the{' '}
+              {committee.profile_url ? (
+                <MuiLink href={committee.profile_url} target="_blank" rel="noopener noreferrer">
+                  official LRC committee profile
+                </MuiLink>
+              ) : (
+                'Kentucky Legislature website'
+              )}
+              . Know Your Vote Kentucky adds parsed meeting agendas from the legislative calendar below.
+            </Typography>
           </CardContent>
         </Card>
 

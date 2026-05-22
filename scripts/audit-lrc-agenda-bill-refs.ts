@@ -4,7 +4,7 @@
  *
  *   npm run audit:lrc:bill-refs
  */
-import { readFileSync, writeFileSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { parseLegislativeCalendarHtml } from '../src/lib/lrc-legislative-calendar-parser';
 import { extractLrcBillReferences } from '../src/lib/lrc-bill-reference-parser';
@@ -53,6 +53,7 @@ function main() {
   };
 
   const outPath = resolve(__dirname, '../reports/lrc-agenda-bill-refs-audit.json');
+  mkdirSync(resolve(__dirname, '../reports'), { recursive: true });
   writeFileSync(outPath, JSON.stringify(report, null, 2), 'utf8');
 
   console.log(`Wrote ${outPath}`);

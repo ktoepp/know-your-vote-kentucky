@@ -3,7 +3,8 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { CivicCard } from '@/components/ui/CivicCard';
-import { ChamberChip, MetaChip } from '@/components/ui/Chip';
+import { MetaChip } from '@/components/ui/Chip';
+import { CommitteeTagRow } from '@/components/committees/CommitteeTagRow';
 import type { KYCommitteeBrowseCard } from '@/lib/ky-committees-browse-enriched';
 import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
 
@@ -22,12 +23,11 @@ export function KYCommitteeCard({ committee }: KYCommitteeCardProps) {
       href={href}
       ariaLabel={displayName}
       header={
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-          {committee.chamber !== 'unknown' && <ChamberChip chamber={committee.chamber} size="small" />}
+        <CommitteeTagRow committee={committee}>
           {committee.topicTags.map((tag) => (
             <MetaChip key={tag} label={tag} size="small" variant="outlined" />
           ))}
-        </Box>
+        </CommitteeTagRow>
       }
       body={
         <>
