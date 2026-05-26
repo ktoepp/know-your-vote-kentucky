@@ -10,7 +10,7 @@
 
 *(none)*
 
-Browser review closed **2026-05-22** (P1/P2 items + UX quick wins + committee UI polish UI-8–UI-11). See **Recently completed** and **UX design tracker → Done**. Next backlog: optional prod `legiscan_id` spot-check, map address autocomplete, **Follow committees** (Backlog), committee materials Wave 3.
+Browser review closed **2026-05-22**; **Follow committees v1** shipped in PR **#38** (2026-05-22). Migrations **026–027** applied on primary (2026-05-26). See **Recently completed** and **Backlog → Follow committees v1.5**. Next: optional prod `legiscan_id` spot-check, committee follow gaps (meetings filter, activity feed), manual email client QA, Wave 3 committee materials.
 
 ## Maintained on autopilot
 
@@ -25,53 +25,51 @@ Browser review closed **2026-05-22** (P1/P2 items + UX quick wins + committee UI
 - **Inbox routing** — confirm `hello@kyvky.com` lands somewhere a human reads (privacy/terms pages and email Reply-To all point there).
 - **Legal review** — `/privacy` and `/terms` are honest practical drafts (`src/app/privacy/page.tsx` + `src/app/terms/page.tsx`); a lawyer should review before scaling beyond a small audience.
 
-## Handoff — next agent (digest hardening + optional welcome email)
+## Handoff — next agent (committee follow v1.5 + Wave 3)
 
-Use this when continuing **digest reliability**, **welcome mail**, or **follow-bills M8**.
+Use this when continuing **Follow committees v1.5**, **Wave 3 committee/data**, or **launch operator checklist**.
 
 ### Context (already in repo)
 
 - **Auth:** Supabase with `@supabase/ssr` — cookie-backed browser client (`src/app/lib/supabaseClient.ts`), middleware session refresh (`src/lib/supabase/middleware.ts`, `src/middleware.ts`), `UserContext`, auth routes under `src/app/auth/`, centered layout `src/app/auth/layout.tsx` + `AuthPaperLayout`.
-- **Follow data:** Migration `019_ky_follow_bills_schema.sql` — `ky_bill_follows`, `ky_notification_preferences`, `ky_bill_status_history`, `ky_notifications_log` + RLS.
-- **Follow API:** `GET/POST/DELETE /api/bills/[id]/follow` — uses **Bearer **`session.access_token` via `getAuthedUser` (not cookies on the route). Client: `FollowBillButton` on `/bills/[id]`. List follows: `GET /api/me/follows`.
-- **Two different “Resend” uses:** (1) **Supabase Auth** transactional mail (verify, reset) — configure in **Supabase Dashboard → SMTP** (host `smtp.resend.com`, user `resend`, password = API key). (2) **App digests** — `RESEND_API_KEY` / `RESEND_FROM_EMAIL` + `APP_PUBLIC_URL`; `/api/cron/notify` runs `runBillDigestCron` (`src/lib/digest/run-bill-digest-cron.tsx`).
+- **Bill follows:** Migration **019** — `ky_bill_follows`, `ky_notification_preferences`, `ky_bill_status_history`, `ky_notifications_log` + RLS. API: `GET/POST/DELETE /api/bills/[id]/follow` (Bearer token via `getAuthedUser`). Client: `FollowBillButton` on `/bills/[id]`.
+- **Committee follows (v1 — PR #38):** Migration **026** — `ky_committee_follows` + `ky_committee_events`. API: `GET/POST/DELETE /api/committees/[id]/follow`. Client: `FollowCommitteeButton` on committee detail; bookmark toggle on `KYCommitteeCard`; `ProfileFollowedCommitteesSection` on `/profile`. Digest: `committee_meeting_scheduled` opt-in on `/profile`; LRC sync emits `meeting_scheduled` on new meetings. List: `GET /api/me/follows` returns bills + committees.
+- **Digest / email:** M6–M8 **complete** — `/api/cron/notify`, Resend, bounce webhook, welcome email, `preview:digest` harness. Two Resend uses: (1) Supabase Auth SMTP; (2) app digests via `RESEND_API_KEY` / `RESEND_FROM_EMAIL`.
 
 ### Ops / env
 
-- Apply **019**, **020**, **021**, **022**, **023**, **025** on any environment that does not have them yet (`npm run db:apply-sql` or SQL editor). **020** adds `INSERT` RLS on `ky_notification_preferences`. **021** adds bounce / complaint / suppression columns powering Resend webhook handling. **022** adds `welcome_email_sent_at` for one-time welcome email idempotency. **023** adds `external_links` JSONB on `ky_legislators` (full Open States links + grouped Social/Other UI). **Operator checklist** order: **016 → 017 → 018 → 019 → 020 → 021 → 022 → 023** (match your branch's migrations). Also set Vercel env vars `RESEND_WEBHOOK_SECRET` (Production + Preview), and ensure `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` use the canonical `www.kyvky.com` host (apex 307-redirects to www, which breaks webhook POST and one-click unsubscribe POST).
-- After applying **023** for the first time on a database with legacy data: run `npm run normalize:legislator-districts -- --apply` then `npm run cleanup:stale-legislators -- --apply`, then `npm run diagnose:legislators` to confirm active count is ~141 (100 House + 38 Senate + 3 statewide). Future syncs handle this automatically.
-- `env-template.txt` — SMTP notes, rate limits, CAPTCHA troubleshooting (“For security purposes…”).
-- `npm run test:supabase-auth` — smoke reachability for Auth API (no mail send).
+- **Migration order (new projects):** **016 → 017 → 018 → 019 → 020 → 021 → 022 → 023 → 024 → 025 → 026 → 027** (`npm run db:apply-sql` or SQL editor). **Primary environment:** **016–027** applied (026 pre-existing; **027** applied 2026-05-26).
+- After **023** on legacy data: `npm run normalize:legislator-districts -- --apply` → `npm run cleanup:stale-legislators -- --apply` → `npm run diagnose:legislators` (~141 active).
+- After **027** on a fresh DB: run `npx tsx scripts/backfill-interim-calendar-2026.ts` (idempotent; seeds interim meetings from LRC PDF). Primary already has meetings (214 rows as of 2026-05-26).
+- Vercel: `RESEND_WEBHOOK_SECRET`; canonical `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` = `https://www.kyvky.com` (apex 307 breaks webhook POST).
+- `npm run preview:digest -- --email <addr>` — add `--inject HB1` for synthetic bill events; supports committee sections when user follows committees + opts into **Committee meeting scheduled**.
 
-### Digest E2E validation harness
+### Suggested next implementation order
 
-- `npm run preview:digest -- --email <addr>` renders the digest for one user (no send) and writes `digest-preview.html`. Add `--inject HB1` to insert a synthetic `ky_bill_status_history` row (cleaned up on exit) so you can drive the full path even when no real bill movement is in the window. Add `--send` to actually send via Resend, and `--ignore-last-sent` to bypass the prior-window cutoff.
-- Bounce / complaint events update `ky_notifications_log.delivery_status` and flip `ky_notification_preferences.bounce_state` / `suppressed_at` via `POST /api/webhooks/resend` (requires `RESEND_WEBHOOK_SECRET` + Resend webhook configured for `email.delivered`, `email.bounced`, `email.complained`, `email.delivery_delayed`).
-- One-click unsubscribe: digest emails now set `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click`; the unsubscribe route accepts both `GET` (HTML page) and `POST` (RFC 8058).
-
-### Suggested next implementation order (align with spec milestones)
-
-1. `GET/PATCH /api/me/preferences` — **Done in repo** (`src/app/api/me/preferences/route.ts`, `src/lib/ky-notification-preferences.ts`, migration **020** insert policy). Wire `/profile` Notifications panel next.
-2. `/profile` — **Done (2026-05-22).** Followed bills + Notifications panel wired; **nav anchors** + hash scroll-on-load + **sticky section chip nav**; **Topics activity filter** on `/profile#activity` (`?topic=` on `GET /api/me/activity`).
-3. **Browse / cards / chips** — `?follows=me`, `KYBillCard` bookmark + topic chip styling, home topic chips; **bills browse topic quick-picks** (2026-05-22); bill detail topic hint / pre-build checklist polish if needed.
-4. **Sync pipeline — **`ky_bill_status_history` — Pre-upsert snapshots + `recordBillStatusHistoryForBuiltBatch` after `upsertKyBillRows` (hash-gated + legacy paths).
-5. **Digest email** — React Email + `/api/cron/notify` + Resend + `/api/unsubscribe/[token]` (M6–M7). **Remaining:** welcome email (optional), M8 hardening.
-6. **M8 + optional welcome** — Production digest validation; bounce handling; `WelcomeEmail` after verification if product wants it.
+1. **Follow committees v1.5** — `/meetings?follows=me`; committee events in `GET /api/me/activity`; `agenda_updated` / `meeting_cancelled` in LRC sync (v1 only emits `meeting_scheduled`). See **Backlog → Follow committees v1.5**.
+2. **Manual email QA** — [docs/email-client-qa.md](./docs/email-client-qa.md).
+3. **Wave 3** — committee materials sync, session record spike, interim/milestone banners ([committee-calendar.md](./docs/specs/committee-calendar.md) Phase 5+).
+4. **Operator launch checklist** — Resend SPF/DKIM, Sentry alert rules, legal review of `/privacy` + `/terms`.
 
 ### Files to read first
 
-- [docs/specs/follow-bills.md](./docs/specs/follow-bills.md) — source of truth for UX and phases.
-- [decisions.md](./decisions.md) — auth / product decisions (append new ones).
+- [docs/specs/follow-bills.md](./docs/specs/follow-bills.md) — bill follow UX and phases.
+- [decisions.md](./decisions.md) § 2026-05-26 — committee follows v1 decisions.
+- PR **#38** on GitHub — full committee-follow ship list.
 
 ## Operator checklist
 
-- **Database migrations** — Apply `024_ky_committee_calendar.sql` before first `npm run sync:ky:lrc-calendar` (committee calendar Phase 1). Apply `025_ky_saved_searches_snooze.sql` for saved searches + bill snooze (Wave 1–2). **Primary environment:** migrations **016–017** applied (2026-05-11); `sync:ky:legislators` run successfully after fixing `scripts/load-env.ts` (repo-root `.env.local`, `override: true`). **New Supabase projects / restores:** apply in order `016_ky_user_profiles` → `017_search_members_discovery` → `018_ky_bills_plain_search_hardening` → `019_ky_follow_bills_schema` → `020_ky_notification_preferences_insert_policy` (`npm run db:apply-sql` or SQL editor); after **017**, run `npm run sync:ky:legislators` so `committee_memberships` can populate from Open States `roles` when present.
+- **Database migrations** — Full order: **016 → 027** (see Handoff). Highlights: **024** before first `npm run sync:ky:lrc-calendar`; **025** for saved searches + bill snooze; **026** for committee follows + event log; **027** seeds 2026 interim/statutory committees. **Primary environment:** **016–027** applied (2026-05-26). After **027**, run `npx tsx scripts/backfill-interim-calendar-2026.ts` on new DBs (idempotent). After **017**, run `npm run sync:ky:legislators` so `committee_memberships` populate from Open States `roles`.
 - **legiscan_id verify loop** — After legislator sync or when member profiles show empty voting records: `npm run sync:ky:legislators` then `npm run diagnose:legislators` (exits 1 if active House/Senate rows missing `legiscan_id`). Optional district thumbnails: `npm run generate:district-thumbnails` (requires `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`; writes `public/geo/district-thumbs/`).
 - **Remove **`SENTRY_ENABLE_EXAMPLE_PAGE` from Vercel (and `.env.local` if set). The `/sentry-example-page` routes were removed from the repo; stale env vars are harmless but should be cleared.
 - **Legacy npm stacks** (puppeteer, GCS, pdf-parse, `three`, etc.) are **not** in root `package.json`. If you need them for a one-off script, use `docs/legacy-npm-deps/` and install into gitignored `optional/legacy-npm-deps/`.
 
 ## Recently completed
 
+- **TASKS + backlog refresh (2026-05-26)** — Reconciled tracker with PR **#38** (committee follows), PR **#37** (meetings browse window), home Lottie ship, migrations **026–027** on primary.
+- **Home hero — capitol background + Lottie icons (2026-05-25)** — Optimized `ky-capitol-hero.jpg`; `HoverLottie` on landing feature cards; `LandingHeroCtas` / `landingHeroStyles` refactor (`37c881a`).
+- **Follow committees v1 (2026-05-22, PR #38)** — Migration **026** (`ky_committee_follows`, `ky_committee_events`); `GET/POST/DELETE /api/committees/[id]/follow`; `FollowCommitteeButton` + `useFollowedCommittees`; profile **Followed committees** section; digest **Committee meeting scheduled** block; LRC sync emits `meeting_scheduled` on new meetings; migration **027** interim committee seed + `scripts/backfill-interim-calendar-2026.ts`; agenda search bill links; `preview:digest` committee preview support.
+- **Meetings browse — session window (2026-05-22, PR #37)** — `/meetings` browse widened to session start so historical in-session meetings surface.
 - **Committee + member UI polish (2026-05-22, UI-8–UI-11)** — Committee kind tags (`CommitteeKindChip`, `resolveKyCommitteeKind`) on meetings browse, committee cards/detail, member profile tiles; `OfficialSourceLinks` replaces heavy outbound button stacks; member roster two-line title + district; committee detail merges “At a glance” into overview + subcommittee parent link via `resolveKyCommitteeParent()`.
 - **UX quick wins + browser review fixes (2026-05-22)** — Profile hash scroll + sticky section nav; map empty vs no-district states; member profile section reorder (Sponsored → Voting → Committees) with `KYBillCard` gallery, committee assignment tiles (`shortKyCommitteeLabel`), static district thumbnails on profile, clickable vote tally filters; bills browse topic quick-pick chips (`LANDING_TOPICS`); bill detail history expand/collapse (8 items), section header polish, Roll calls label, hearings empty copy; profile activity **Topics** filter (`?topic=` + hybrid LegiScan match); normalized Follow copy (`src/lib/follow-labels.ts`); nav tooltips toggle without secondary text; `diagnose:legislators` reports missing `legiscan_id`; `generate:district-thumbnails` (276 assets under `public/geo/district-thumbs/`); LegiScan reconcile seat-only fallback when Open States preferred names differ from LegiScan legal names (`ky-sync-pipeline.ts` — 0/138 missing after sync).
 - **Doc / artifact hygiene (2026-05-22)** — Removed stale Framer handoff doc (`docs/framer-architecture.md`); stopped tracking LRC audit JSON under `reports/` (script output only; gitignored).
@@ -138,7 +136,24 @@ Use this when continuing **digest reliability**, **welcome mail**, or **follow-b
 
 ## Up Next
 
-Roadmap priority (2026-05-19): **Wave 1 Bill Watch parity** → **Wave 2 launch polish** → **Wave 3 committee/data**. See `decisions.md` § 2026-05-19 roadmap.
+Roadmap priority (2026-05-26): **Follow committees v1.5** → **launch operator checklist** → **Wave 3 committee/data**. Waves 1–2 and committee calendar Phases 0–4 are shipped.
+
+### Follow committees v1.5 (next feature work)
+
+Gaps after PR **#38** v1 ship — see **Backlog → Follow committees v1.5**:
+
+- `/meetings?follows=me` filter
+- Committee-scoped events in `GET /api/me/activity` (activity is bill + hearing only today)
+- `agenda_updated` / `meeting_cancelled` event types in LRC sync (v1 only emits `meeting_scheduled`)
+- Follow affordance on individual `/meetings` rows (detail + browse cards only today)
+
+### Launch operator checklist (manual, not blocking code)
+
+- **Resend domain** — SPF / DKIM / DMARC green on `kyvky.com`
+- **Sentry alerts** — `route:cron/notify` any event; ≥5 `route:webhooks/resend` in 5 min
+- **Email client QA** — [docs/email-client-qa.md](./docs/email-client-qa.md) (~2 hr manual)
+- **Legal review** — `/privacy` + `/terms` before scaling audience
+- **Regression cadence** — After large syncs: `npm run verify:legislator-links`, `npm run spot-check:bill-links`, optional `npm run diagnose:legislators`
 
 ### Wave 1 — Bill Watch parity (shipped 2026-05-19 — verified PASS 2026-05-21)
 
@@ -161,7 +176,7 @@ Reference: [docs/reference/bill-watch/](./docs/reference/bill-watch/README.md). 
 - **Resend "Send welcome again"** — `POST /api/me/welcome-email?force=1`.
 - **Email rendering QA** (~2 hr, manual) — [docs/email-client-qa.md](./docs/email-client-qa.md); run after copy tweaks from review.
 - **Snooze on follows** — Profile toggle; digest skips snoozed (needs **025**).
-- **Map address autocomplete** — `/members/map`.
+- **Map address autocomplete** — Shipped on `/members/map` (`DistrictMapExplorer` MUI `Autocomplete` + Mapbox suggest).
 - **About page** — `/about` + footer link.
 - **"How to contact your rep"** — Map accordion + resources links.
 - **In-app notification badge** (~4–8 hr, lower priority) — not shipped.
@@ -176,29 +191,46 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
 - **Session record spike** — `fixtures/lrc/legislative-record-26rs-live.html`; floor vs committee event split.
 - **Interim period + session milestones** — `ky-sessions.ts` concurrence / veto recess banners.
 - **LRC bulk API** — revisit if state publishes machine-readable roster (see Backlog below).
-- **Follow committees (roadmap)** — See Backlog § Follow committees; depends on stable committee calendar sync (Phases 1–4 ✅) and notification prefs from bill follows.
+
+**Wave 3 note:** Follow committees **v1 shipped PR #38**; remaining gaps are **v1.5** (see Backlog), not Wave 3.
 
 ## Backlog
 
-### Follow committees (roadmap — larger item)
+### Follow committees v1.5 (gaps after PR #38)
 
-**Goal:** Let signed-in users **follow committees** (standing, interim joint, subcommittees, boards) and get notified when those committees schedule meetings, publish agendas, or add bills — analogous to bill follows but committee-scoped.
+**Shipped in v1 (2026-05-22, PR #38):**
+- Migration **026**: `ky_committee_follows` + `ky_committee_events` + RLS
+- `GET/POST/DELETE /api/committees/[id]/follow`; committees on `GET /api/me/follows`
+- `FollowCommitteeButton` on `/committees/[slug]`; bookmark toggle on browse cards
+- `ProfileFollowedCommitteesSection` on `/profile`
+- Digest: **Committee meeting scheduled** preference + committee block in `runBillDigestCron`
+- LRC sync: `meeting_scheduled` events on new meetings
+- Migration **027**: interim/statutory committee seed; `scripts/backfill-interim-calendar-2026.ts`
 
-**Not in scope for current browser-review quick wins (UI-8–11).** Treat as a **Wave 3+ / Bill Watch extension** (~multi-day).
+**Still open (v1.5):**
+- `/meetings?follows=me` filter
+- Committee events in `GET /api/me/activity`
+- `agenda_updated` / `meeting_cancelled` diff capture on LRC sync
+- Follow on individual `/meetings` rows
+- Extend [docs/specs/follow-bills.md](./docs/specs/follow-bills.md) with committee vocabulary + digest rules
 
-**Product sketch:**
+### Follow committees (original roadmap — archived reference)
+
+**Goal:** Follow committees and get notified on schedule/agenda changes — analogous to bill follows. **Core v1 shipped PR #38**; see v1.5 above for gaps.
+
+**Product sketch (status annotated):**
 - Follow / Following on `/committees/[slug]`, committee browse cards, and optionally `/meetings` rows (mirror `FollowBillButton` + `follow-labels.ts` patterns).
-- Profile section: **Followed committees** (alongside followed bills); filter `/meetings?follows=me`.
-- Activity feed: committee-scoped events (new meeting, agenda posted, cancellation) in `GET /api/me/activity`.
-- Digest: optional committee block or merge into existing digest when followed committees have agenda changes (respect snooze + notification prefs).
+- Profile section: **Followed committees** — **Done.** `/meetings?follows=me` — **open.**
+- Activity feed: committee-scoped events — **open** (bill + hearing only today).
+- Digest: committee block when followed committees change — **Done** (`meeting_scheduled`).
 
-**Technical dependencies (TBD — needs spec):**
-- **Schema:** e.g. `ky_committee_follows(user_id, committee_id)` + RLS; extend `ky_notification_preferences` with committee event toggles or reuse hearing/agenda presets.
-- **Diff capture:** meeting/agenda change detection on LRC calendar sync (compare `agenda_content_hash`, new `meeting_date` rows) → append to activity/history table (may extend `ky_bill_status_history` pattern or add `ky_committee_meeting_history`).
-- **API:** `GET/POST/DELETE /api/committees/[id]/follow` (or `/api/me/committee-follows`); list on `/api/me/follows` or dedicated route.
-- **Copy/spec:** Extend or sibling [docs/specs/follow-bills.md](./docs/specs/follow-bills.md) with committee follow vocabulary and digest rules.
+**Original technical sketch (mostly implemented):**
+- **Schema:** `ky_committee_follows` + `ky_committee_events` — **Done (026).**
+- **Diff capture:** `meeting_scheduled` on new meetings — **Done.** `agenda_updated` / `meeting_cancelled` — **open.**
+- **API:** `/api/committees/[id]/follow` + `/api/me/follows` — **Done.**
+- **Copy/spec:** Extend follow-bills spec — **open.**
 
-**Prerequisites:** Committee kind tags + subcommittee parent context (UI-8, UI-11) help users follow the *right* entity; materials sync (Wave 3) optional for v1.
+**Prerequisites:** Committee kind tags + subcommittee parent (UI-8, UI-11) — **Done.**
 
 ### Committee calendar (GA) — from [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md)
 
@@ -218,14 +250,14 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
   - **M1 — Auth polish & profile foundation:** **Complete.** `ky_user_profiles` migration `016`, Supabase sync triggers, auth/forgot/reset/verify flows, `/profile` Account + Security, account deletion API, login → `/profile`, Profile-first nav. Cookie-session middleware + auth layout/register polish. See Recently completed and `decisions.md` § 2026-05-11.
   - **M2 — Data model for follows:** **In repo** — migration `019_ky_follow_bills_schema.sql` (`ky_bill_follows`, `ky_notification_preferences`, `ky_bill_status_history`, `ky_notifications_log` + RLS). **Apply 019** on all deployed DBs.
   - **M3 — Follow UX (inline, no dashboard):** **Complete.** Follow button; `?follows=me` + Following filter on browse; `KYBillCard` bookmark + topic chips; profile lists. `BillTopicMatchHint` shown on bill detail when topics match user filters but bill isn't individually followed. KY_TOPICS ↔ LegiScan subject hybrid mapping (`src/lib/ky-topic-legiscan-mapping.ts`) used by both digest filter and the hint so they agree.
-  - **M4 — Preferences UI:** **Partial —** notification panel on `/profile` (frequency, event presets/checkboxes, topic grid + list, followed bills list). `GET/PATCH /api/me/preferences` wired.
+  - **M4 — Preferences UI:** **Complete.** Notification panel on `/profile` (frequency, event presets/checkboxes, topic grid, followed bills); `GET/PATCH /api/me/preferences` wired (2026-05-22).
   - **M5 — Diff capture in sync:** `recordBillStatusHistoryForBuiltBatch` after bill upserts with **pre-upsert** `fetchBillHistorySnapshots` (hash-gated + legacy `syncKyBills`). Dedupe via `legiscan_change_hash` + unique index.
   - **M6 — Email plumbing:** `RESEND_*` + `BillDigest` template + `/api/unsubscribe/[token]`. Domain verification / `WelcomeEmail` optional follow-ups.
   - **M7 — Digest cron:** `/api/cron/notify` (Bearer cron secret); Vercel `0 11 * * *`; `ky_notifications_log` idempotency.
   - **M8 — Launch hardening:** **Complete.** Bounce / complaint webhook + suppression (migration 021); digest cap (10 events + "and N more"); copy review (subject line, footer); `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers; one-time welcome email after verification (migration 022). End-to-end harness: `npm run preview:digest`, `npm run verify:digest-state`, `npm run preview:welcome`.
   - **Follow-up — verify digest send time:** After first DST transition (Nov 2026) or once open-rate data exists, evaluate whether `0 11 * * *` UTC is still the right hour. Consider open rates by hour, user feedback, and whether to add a per-user time-zone preference.
   - **Investigation — official vs. inferred topic taxonomy:** **Resolved 2026-05-13.** Outcome: Option A (hybrid digest match) shipped via `src/lib/ky-topic-legiscan-mapping.ts`. Preferences UI keeps the 20 KY_TOPICS (no LegiScan-subject picker — rejected as power-user feature). AI-fallback tagging deferred unless `npm run audit:legiscan-subjects` shows bills missing from BOTH taxonomies. Coverage maintained via the audit step on the weekly workflow.
-- **Address search UX on map** — Street address lookup exists (`mapbox-geocode.ts`); **empty vs no-district states** shipped 2026-05-22. Optional: autocomplete/typeahead.
+- **Address search UX on map** — Shipped: Mapbox autocomplete on `/members/map` (2026-05-18 committee calendar ship); empty vs no-district states (2026-05-22).
 - **"How to contact your rep"** — District map accordion covers basics; expand with capitol workflows, hearings, testimony links to LRC as product needs evolve.
 
 ## UX design tracker (agent)
@@ -240,6 +272,7 @@ Done:
 - **UI-9 — De-emphasize outbound LRC / external links (2026-05-22)** — `OfficialSourceLinks` text-link row replaces button stacks on committee detail, meeting card footer, member profile Connect & follow.
 - **UI-10 — Member list: title + district on separate lines (2026-05-22)** — `LegislatorIdentityBlock` split `roleTitle` / `districtLine`; `MemberCard` roster listings use two-line subtitle.
 - **UI-11 — Committee detail: merge At a glance + subcommittee context (2026-05-22)** — Stats folded into header overview card; `resolveKyCommitteeParent()` links subcommittees to parent standing committee when roster match exists.
+- **Home hero Lottie + capitol background (2026-05-25)** — `HoverLottie` on landing feature icons; optimized capitol hero image; `LandingHeroCtas` extracted (`37c881a`).
 
 - Home IA (2026-05-09): orientation-first hero primary CTA (district map), merged topic module, bill-area-only loading spinner — see `decisions.md`.
 - Members (2026-05-09): filtered roster `profileHref` bugfix; member profile `h1`/`h2`/`h3` outline, `Link` back control, bill links identifiable by underline; roster card keyboard profile navigation + portrait alt + refresh `aria-label` — see `decisions.md`.
