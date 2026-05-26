@@ -14,7 +14,8 @@ Browser review closed **2026-05-22**; **Follow committees v1** shipped in PR **#
 
 ## Maintained on autopilot
 
-- **Legislator outbound links** — `.github/workflows/legislator-links-weekly.yml` runs Mondays 12:00 UTC: `sync:ky:legislators` → `verify:legislator-links --json` → `audit:legiscan-subjects --json`, uploading `reports/` as artifacts. Manual fallback: `npm run verify:legislator-links`. Required GH secrets: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENSTATES_API_KEY`, `LEGISCAN_API_KEY` (last optional).
+- **Legislator outbound links** — `.github/workflows/legislator-links-weekly.yml` runs Mondays 12:00 UTC: `sync:ky:legislators` → `verify:legislator-links --json` → `audit:legiscan-subjects --json`, uploading `reports/` as artifacts. Manual fallback: `npm run verify:legislator-links`. Required GH secrets: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENSTATES_API_KEY`, `LEGISCAN_API_KEY` (last optional). **Slack:** sync + verify digests when `SLACK_WEBHOOK_*` + `SLACK_SYNC_NOTIFY_CLI=true` (heartbeat via `SLACK_SYNC_CLI_DIGEST_ALWAYS=true` while validating).
+- **GitHub Actions sync Slack** — `sync-ky-bills-status.yml` (every 6h), `sync-lrc-calendar.yml` (2× daily live + weekly Wayback backfill), `verify-outbound-links.yml` (weekly), `legislator-links-weekly.yml` post to `#status-reports` on success and `#errors` on failure. Optional repo secrets: `SLACK_WEBHOOK_STATUS_REPORTS`, `SLACK_WEBHOOK_ERRORS`, `SLACK_WEBHOOK_SYNC`, `SLACK_WEBHOOK_URL`. **Heartbeat mode (temporary):** `SLACK_SYNC_CLI_DIGEST_ALWAYS=true` on sync workflows — remove when notifications are stable. Commits: `b008d96`, `2529ab4`.
 - **Email digest** — `/api/cron/notify` runs daily 11:00 UTC via Vercel Cron (weekly users batched on Mondays). Suppressed users skipped. Failures + per-user-error spikes captured in Sentry (tags `route:cron/notify` and `route:webhooks/resend`).
 - **Outbound mail policy** — `From: alerts@kyvky.com` (transactional only, do not reply); `Reply-To: hello@kyvky.com` (real inbox). All inbound contact / vulnerability reports go to `hello@kyvky.com`. Webhook deliveries from Resend → `https://www.kyvky.com/api/webhooks/resend` (apex 307s break POST). Plain-text fallback included on every transactional send.
 
@@ -66,7 +67,7 @@ Use this when continuing **Follow committees v1.5**, **Wave 3 committee/data**, 
 
 ## Recently completed
 
-- **TASKS + backlog refresh (2026-05-26)** — Reconciled tracker with PR **#38** (committee follows), PR **#37** (meetings browse window), home Lottie ship, migrations **026–027** on primary.
+- **TASKS + backlog refresh (2026-05-26)** — Reconciled tracker with PR **#38** (committee follows), PR **#37** (meetings browse window), home Lottie ship, migrations **026–027** on primary, GitHub Actions Slack digests + heartbeat (`b008d96`, `2529ab4`).
 - **Home hero — capitol background + Lottie icons (2026-05-25)** — Optimized `ky-capitol-hero.jpg`; `HoverLottie` on landing feature cards; `LandingHeroCtas` / `landingHeroStyles` refactor (`37c881a`).
 - **Follow committees v1 (2026-05-22, PR #38)** — Migration **026** (`ky_committee_follows`, `ky_committee_events`); `GET/POST/DELETE /api/committees/[id]/follow`; `FollowCommitteeButton` + `useFollowedCommittees`; profile **Followed committees** section; digest **Committee meeting scheduled** block; LRC sync emits `meeting_scheduled` on new meetings; migration **027** interim committee seed + `scripts/backfill-interim-calendar-2026.ts`; agenda search bill links; `preview:digest` committee preview support.
 - **Meetings browse — session window (2026-05-22, PR #37)** — `/meetings` browse widened to session start so historical in-session meetings surface.
