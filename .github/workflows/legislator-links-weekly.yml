@@ -16,7 +16,7 @@ permissions:
 
 # Optional Slack (see env-template.txt):
 #   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL, SLACK_SYNC_NOTIFY_CLI=true
-# Sync step posts digest when legislators change; verify step posts weekly link-check summary.
+# Sync step posts digest every run while SLACK_SYNC_CLI_DIGEST_ALWAYS=true; verify posts weekly summary.
 
 concurrency:
   group: legislator-links-weekly
@@ -36,6 +36,7 @@ jobs:
       SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       SLACK_SYNC_NOTIFY_CLI: 'true'
+      SLACK_SYNC_CLI_DIGEST_ALWAYS: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

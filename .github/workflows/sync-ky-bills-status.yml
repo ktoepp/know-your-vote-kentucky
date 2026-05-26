@@ -14,7 +14,7 @@
 #
 # Optional Slack (same Incoming Webhooks as Vercel — see env-template.txt):
 #   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL, SLACK_SYNC_NOTIFY_CLI=true
-# Posts digest when bills change or on errors; set SLACK_SYNC_CLI_DIGEST_ALWAYS=true for every-run heartbeats.
+# Posts digest every run while SLACK_SYNC_CLI_DIGEST_ALWAYS=true (heartbeat for ops visibility).
 name: Sync KY bill statuses
 
 on:
@@ -65,6 +65,7 @@ jobs:
           SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_SYNC_NOTIFY_CLI: 'true'
+          SLACK_SYNC_CLI_DIGEST_ALWAYS: 'true'
         run: |
           set -euo pipefail
           EXTRA=""

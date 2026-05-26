@@ -12,6 +12,7 @@
 #
 # Optional Slack (see env-template.txt):
 #   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL, SLACK_SYNC_NOTIFY_CLI=true
+#   SLACK_SYNC_CLI_DIGEST_ALWAYS=true — every-run sync digest (heartbeat; disable when stable)
 name: Sync LRC committee calendar
 
 on:
@@ -78,6 +79,7 @@ jobs:
           SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_SYNC_NOTIFY_CLI: 'true'
+          SLACK_SYNC_CLI_DIGEST_ALWAYS: 'true'
         run: npm run sync:ky:lrc-calendar
 
       - name: Slack notify on workflow failure
@@ -153,6 +155,7 @@ jobs:
           SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_SYNC_NOTIFY_CLI: 'true'
+          SLACK_SYNC_CLI_DIGEST_ALWAYS: 'true'
         run: npm run sync:ky:lrc-calendar
 
       - name: Slack notify on workflow failure
