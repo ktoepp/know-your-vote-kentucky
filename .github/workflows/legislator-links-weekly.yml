@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+# Optional Slack (see env-template.txt):
+#   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL, SLACK_SYNC_NOTIFY_CLI=true
+# Sync step posts digest when legislators change; verify step posts weekly link-check summary.
+
 concurrency:
   group: legislator-links-weekly
   cancel-in-progress: false

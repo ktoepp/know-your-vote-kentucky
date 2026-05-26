@@ -218,6 +218,80 @@ function syncTriggerLabel(isVercelCron: boolean, fromCli: boolean): string {
   return 'Manual HTTP';
 }
 
+function githubActionsRunUrl(): string | undefined {
+  const id = process.env.GITHUB_RUN_ID?.trim();
+  if (!id) return undefined;
+  const server = process.env.GITHUB_SERVER_URL?.trim() || 'https://github.com';
+  const repo = process.env.GITHUB_REPOSITORY?.trim();
+  if (!repo) return undefined;
+  return `${server}/${repo}/actions/runs/${id}`;
+}
+
+export type LegislatorLinkVerifyFailure = {
+  name: string;
+  field: string;
+  status: number;
+  url: string;
+};
+
+/**
+ * Posts legislator outbound-link verify summaries for CLI / GitHub Actions
+ * (set SLACK_SYNC_NOTIFY_CLI=true — same flag as manual-sync.ts).
+ *
+ * Success → status-reports digest. Failures → errors webhook (and digest when configured).
+ */
+export async function notifyLegislatorLinksVerifySlack(params: {
+  legislators: number;
+  probes: number;
+  failed: number;
+  skippedLegiscan403: number;
+  skippedSocialBlock: number;
+  failures?: LegislatorLinkVerifyFailure[];
+  fromCli?: boolean;
+  runUrl?: string;
+}): Promise<void> {
+  if (params.fromCli !== true || process.env.SLACK_SYNC_NOTIFY_CLI !== 'true') {
+    return;
+  }
+
+  const syncUrl = webhookUrlForSyncDigest();
+  const alertUrl = webhookUrlForAlerts();
+  if (!syncUrl && !alertUrl) return;
+
+  const trigger = syncTriggerLabel(false, true);
+  const header = `*KY Vote — legislator link verify* (${trigger})`;
+  const stats =
+    `Legislators \`${params.legislators}\` · Probes \`${params.probes}\` · Failed \`${params.failed}\`` +
+    (params.skippedLegiscan403 > 0 ? ` · LegiScan HTTP skipped \`${params.skippedLegiscan403}\`` : '') +
+    (params.skippedSocialBlock > 0 ? ` · Social skipped \`${params.skippedSocialBlock}\`` : '');
+  const runUrl = params.runUrl ?? githubActionsRunUrl();
+  const runLine = runUrl ? `\n<${runUrl}|GitHub run>` : '';
+
+  let failureBlock = '';
+  if (params.failed > 0 && params.failures?.length) {
+    const lines = params.failures
+      .slice(0, 10)
+      .map((f) => `• ${f.name} (\`${f.field}\`, HTTP ${f.status}): ${f.url}`)
+      .join('\n');
+    const more =
+      params.failures.length > 10 ? `\n_…and ${params.failures.length - 10} more_` : '';
+    failureBlock = `\n*Failures*\n${lines}${more}`;
+  }
+
+  const body = `${header}\n${stats}${failureBlock}${runLine}`;
+
+  if (params.failed > 0 && alertUrl) {
+    await postSlackIncomingWebhook(alertUrl, body);
+    if (syncUrl && syncUrl !== alertUrl) {
+      await postSlackIncomingWebhook(syncUrl, body);
+    }
+  } else if (syncUrl) {
+    await postSlackIncomingWebhook(syncUrl, body);
+  } else if (alertUrl) {
+    await postSlackIncomingWebhook(alertUrl, body);
+  }
+}
+
 /**
  * Posts a digest to the sync webhook for cron runs (or manual runs when SLACK_SYNC_NOTIFY_MANUAL=true).
  * CLI/GitHub Actions: set SLACK_SYNC_NOTIFY_CLI=true when invoking `scripts/manual-sync.ts`.

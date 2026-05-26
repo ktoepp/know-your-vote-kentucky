@@ -13,7 +13,8 @@
 #   SUPABASE_SERVICE_ROLE_KEY
 #
 # Optional Slack (same Incoming Webhooks as Vercel — see env-template.txt):
-#   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_SYNC_NOTIFY_CLI=true
+#   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL, SLACK_SYNC_NOTIFY_CLI=true
+# Posts digest when bills change or on errors; set SLACK_SYNC_CLI_DIGEST_ALWAYS=true for every-run heartbeats.
 name: Sync KY bill statuses
 
 on:
@@ -82,5 +83,5 @@ jobs:
             exit 0
           fi
           curl -sS -X POST -H 'Content-Type: application/json' \
-            -d "{\"text\":\"*KY Vote — hourly bills sync workflow failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            -d "{\"text\":\"*KY Vote — bill status sync workflow failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
             "$WEBHOOK"

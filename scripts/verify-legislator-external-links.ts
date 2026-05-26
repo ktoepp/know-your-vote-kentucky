@@ -19,15 +19,16 @@
  *
  * Requires: SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) in .env.local
  * Optional: LEGISCAN_API_KEY — LegiScan API verification for person IDs (recommended).
+ * Optional Slack (GitHub Actions / CLI): SLACK_WEBHOOK_STATUS_REPORTS (+ SLACK_WEBHOOK_ERRORS) and SLACK_SYNC_NOTIFY_CLI=true
  *
  * Exit: 0 if every non-exempt probe returns 2xx/3xx (LegiScan API counts as OK when getPerson succeeds); 1 if any other failure.
- */
 import fs from 'node:fs';
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { legiscanPersonUrl, normalizeBallotpediaHref } from '../src/lib/external-legislative-links';
 import { normalizeHttpsUrl, type LegislatorExternalLink } from '../src/lib/legislator-link-normalize';
 import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
+import { notifyLegislatorLinksVerifySlack } from '../src/lib/slack-webhook';
 
 const TIMEOUT_MS = 18_000;
 const CONCURRENCY = 6;
@@ -412,6 +413,25 @@ async function main() {
         console.log(`${''.padEnd(wName)} ${''.padEnd(18)}      note: ${t.error}`);
     }
   }
+
+  const failures = table
+    .filter((row) => !row.ok && !row.exemptLegiscan403 && !row.exemptSocialBlock)
+    .map((row) => ({
+      name: row.name,
+      field: row.field,
+      status: row.status,
+      url: row.finalUrl,
+    }));
+
+  await notifyLegislatorLinksVerifySlack({
+    legislators: rows.length,
+    probes: table.length,
+    failed,
+    skippedLegiscan403,
+    skippedSocialBlock,
+    failures,
+    fromCli: true,
+  }).catch((e) => console.error('[Slack] verify notify failed:', e));
 
   process.exit(failed > 0 ? 1 : 0);
 }

@@ -1,11 +1,13 @@
 # HTTP checks on legislator outbound URLs (LRC, website, Ballotpedia, LegiScan).
+#
 # Requires repository secrets (Settings → Secrets and variables → Actions):
 #   NEXT_PUBLIC_SUPABASE_URL — or set SUPABASE_URL instead (either works)
 #   SUPABASE_SERVICE_ROLE_KEY — service_role JWT (not anon)
 # Optional but recommended:
 #   LEGISCAN_API_KEY — validates LegiScan via getPerson (public HTML often 403 for bots)
-# Optional Slack on verify failure:
-#   SLACK_WEBHOOK_ERRORS — Incoming Webhook for failure notifications
+#
+# Optional Slack (same Incoming Webhooks as sync workflows — see env-template.txt):
+#   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL, SLACK_SYNC_NOTIFY_CLI=true
 #
 # Node: opt into Actions’ Node 24 for JS-based actions (checkout/setup-node/upload-artifact)
 # before Node 20 is removed from runners. See:
@@ -28,6 +30,17 @@ jobs:
   verify-legislator-links:
     name: Verify outbound links
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+      SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+      SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+      SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SLACK_SYNC_NOTIFY_CLI: 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -39,14 +52,9 @@ jobs:
       - run: npm ci
 
       - name: Verify legislator links
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
         run: npm run verify:legislator-links
 
-      - name: Slack notify on verify failure
+      - name: Slack notify on workflow failure
         if: failure()
         env:
           WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
