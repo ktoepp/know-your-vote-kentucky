@@ -4,6 +4,7 @@ import { Box, CircularProgress, Container } from '@mui/material';
 import { useUser } from '@/app/lib/UserContext';
 import { LandingHero } from '@/components/home/LandingHero';
 import { LandingHeroReturning } from '@/components/home/LandingHeroReturning';
+import { LandingPersonalStrip } from '@/components/home/LandingPersonalStrip';
 import { LandingFeatures } from '@/components/home/LandingFeatures';
 import { LandingMapSection } from '@/components/home/LandingMapSection';
 import { LandingTopics } from '@/components/home/LandingTopics';
@@ -23,6 +24,7 @@ export function HomePageContent({ currentSessionBillCount }: { currentSessionBil
   return (
     <>
       {user ? <LandingHeroReturning /> : <LandingHero />}
+      {user ? <LandingPersonalStrip /> : null}
       <Container maxWidth="lg">
         <LandingFeatures currentSessionBillCount={currentSessionBillCount} />
         <LandingMapSection />
