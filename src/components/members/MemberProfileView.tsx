@@ -19,10 +19,11 @@ import {
 } from '@mui/material';
 import { ArrowBack, Description, Groups, HowToVote } from '@mui/icons-material';
 import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
-import type { KYBill, KYLegislator } from '@/types/kentucky';
+import type { KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
-import { KYBillCard } from '@/components/bills/KYBillCard';
+import { MemberSponsoredBills } from '@/components/members/MemberSponsoredBills';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
+import { kyLegislaturePublicUrl } from '@/lib/ky-member-utils';
 import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
 import { groupLegislatorExternalLinks, labelForLinkHost } from '@/lib/legislator-link-normalize';
 import { ICON_REM, INTERACTION, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
@@ -30,7 +31,7 @@ import { BillNumber } from '@/components/bills/BillNumber';
 import { formatKyIsoDateShort } from '@/lib/bill-display';
 import { shortKyCommitteeLabel } from '@/lib/ky-committee-display';
 import { ChamberChip, CommitteeKindChip } from '@/components/ui/Chip';
-import type { MemberRecentRollVote, MemberVoteRecord } from '@/lib/member-profile-data';
+import type { MemberRecentRollVote, MemberSponsoredBill, MemberVoteRecord } from '@/lib/member-profile-data';
 import type { MemberCommitteeAssignment } from '@/lib/ky-member-committees';
 import type { VoteBucket } from '@/lib/legiscan-vote-tally';
 
@@ -172,7 +173,7 @@ export function MemberProfileView({
   leg: KYLegislator;
   legislatorRoster: KYLegislator[];
   sessionName: string;
-  sponsoredBills?: KYBill[];
+  sponsoredBills?: MemberSponsoredBill[];
   voteRecord?: MemberVoteRecord;
   committeeAssignments?: MemberCommitteeAssignment[];
 }) {
@@ -183,7 +184,28 @@ export function MemberProfileView({
   const showLegislativeSections = isChamberMember || hasLegiscan;
   const tally = voteRecord?.tally;
   const { social: socialLinks, other: otherLinks } = groupLegislatorExternalLinks(leg.external_links);
-  const hasConnectLinks = socialLinks.length > 0 || otherLinks.length > 0;
+  const showDistrictMap = leg.chamber === 'house' || leg.chamber === 'senate';
+  const officialProfileUrl = kyLegislaturePublicUrl(leg, legislatorRoster);
+  const profileSourceLinks = [
+    ...(officialProfileUrl
+      ? [
+          {
+            href: officialProfileUrl,
+            label: 'Official profile (KY Legislature)',
+            ariaLabel: `Official Kentucky Legislature profile for ${leg.name} (opens in a new tab)`,
+          },
+        ]
+      : []),
+    ...socialLinks.map((link) => ({
+      href: link.url,
+      label: labelForLinkHost(link.host),
+      ariaLabel: `${labelForLinkHost(link.host)} profile for ${leg.name} (opens in a new tab)`,
+    })),
+    ...otherLinks.map((link) => ({
+      href: link.url,
+      label: link.note?.trim() || link.host.replace(/^www\./i, ''),
+    })),
+  ].filter((link, i, arr) => arr.findIndex((l) => l.href === link.href) === i);
 
   const filteredVotes = useMemo(() => {
     if (!voteRecord?.votes.length) return [];
@@ -204,7 +226,7 @@ export function MemberProfileView({
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Container maxWidth="md" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         <Button
           component={Link}
           href="/members"
@@ -214,47 +236,45 @@ export function MemberProfileView({
           All members
         </Button>
 
-        <MemberCard
-          leg={leg}
-          featured={false}
-          profileNameHeading="h1"
-          legislatorRoster={legislatorRoster}
-          showDistrictMinimap={false}
-        />
-
-        {(leg.chamber === 'house' || leg.chamber === 'senate') && (
-          <Box sx={{ mt: 2, maxWidth: 420, pointerEvents: 'none' }}>
-            <LegislatorDistrictThumbnail leg={leg} size="profile" />
-          </Box>
-        )}
-
-        {hasConnectLinks && (
-          <Box sx={{ mt: 3 }}>
-            <Typography
-              component="h2"
-              variant="subtitle2"
-              fontWeight={700}
-              color="text.secondary"
-              sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.75rem', mb: 1 }}
-            >
-              Connect &amp; follow
-            </Typography>
-            <OfficialSourceLinks
-              layout="stack"
-              links={[
-                ...socialLinks.map((link) => ({
-                  href: link.url,
-                  label: labelForLinkHost(link.host),
-                  ariaLabel: `${labelForLinkHost(link.host)} profile for ${leg.name} (opens in a new tab)`,
-                })),
-                ...otherLinks.map((link) => ({
-                  href: link.url,
-                  label: link.note?.trim() || link.host.replace(/^www\./i, ''),
-                })),
-              ]}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: showDistrictMap ? 'minmax(0, 1.5fr) minmax(0, 1fr)' : '1fr' },
+            gap: 3,
+            alignItems: 'start',
+          }}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            <MemberCard
+              leg={leg}
+              featured={false}
+              profileNameHeading="h1"
+              legislatorRoster={legislatorRoster}
+              showDistrictMinimap={false}
             />
+
+            {profileSourceLinks.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Typography
+                  component="h2"
+                  variant="subtitle2"
+                  fontWeight={700}
+                  color="text.secondary"
+                  sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.75rem', mb: 1 }}
+                >
+                  Profiles &amp; links
+                </Typography>
+                <OfficialSourceLinks layout="stack" links={profileSourceLinks} />
+              </Box>
+            )}
           </Box>
-        )}
+
+          {showDistrictMap && (
+            <Box sx={{ pointerEvents: 'none' }}>
+              <LegislatorDistrictThumbnail leg={leg} size="profile" />
+            </Box>
+          )}
+        </Box>
 
         {showLegislativeSections && (
           <>
@@ -281,18 +301,7 @@ export function MemberProfileView({
                 run a bills sync so sponsor data is populated.
               </Typography>
             ) : (
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: 2,
-                  mb: 1,
-                }}
-              >
-                {sponsoredBills.map((b) => (
-                  <KYBillCard key={b.id} bill={b} legislators={legislatorRoster} />
-                ))}
-              </Box>
+              <MemberSponsoredBills entries={sponsoredBills} legislatorRoster={legislatorRoster} />
             )}
 
             {/* Voting record */}
