@@ -162,28 +162,6 @@ nav.nav-container .nav-link.active {
 
 .tooltip-container { position: relative; display: inline; }
 
-/* "Learn more" affordance inside an educational tooltip */
-.ky-tooltip-learn-more {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-  font-size: 0.75rem;
-  text-align: right;
-}
-.ky-tooltip-learn-more-link {
-  color: inherit;
-  opacity: 0.85;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 2px;
-  font-weight: 500;
-}
-.ky-tooltip-learn-more-link:hover,
-.ky-tooltip-learn-more-link:focus-visible {
-  opacity: 1;
-  text-decoration-style: solid;
-}
-
 /* Accessibility media queries */
 @media (prefers-contrast: high) {
   nav.nav-container { border-bottom-width: 2px; }

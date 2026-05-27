@@ -116,6 +116,11 @@ function isLegacyPrimary(s: Record<string, unknown>): boolean {
   return st === undefined || st === null || st === 1 || st === '1';
 }
 
+/** Role of a single sponsor record: explicit co-sponsor (type 2/3) vs everything else (primary). */
+export function classifySponsorRole(s: Record<string, unknown>): 'primary' | 'cosponsor' {
+  return isExplicitCosponsor(s) ? 'cosponsor' : 'primary';
+}
+
 /** Primary sponsors first (LegiScan sponsor_type_id === 1), then first entries; enrich with roster photos. */
 export function getPrimarySponsorsFromBill(
   sponsors: unknown,

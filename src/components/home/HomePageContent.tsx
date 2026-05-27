@@ -9,7 +9,7 @@ import { LandingMapSection } from '@/components/home/LandingMapSection';
 import { LandingTopics } from '@/components/home/LandingTopics';
 
 /** Picks marketing vs returning hero; no forced redirect off `/`. */
-export function HomePageContent() {
+export function HomePageContent({ currentSessionBillCount }: { currentSessionBillCount?: number }) {
   const { user, loading } = useUser();
 
   if (loading) {
@@ -24,7 +24,7 @@ export function HomePageContent() {
     <>
       {user ? <LandingHeroReturning /> : <LandingHero />}
       <Container maxWidth="lg">
-        <LandingFeatures />
+        <LandingFeatures currentSessionBillCount={currentSessionBillCount} />
         <LandingMapSection />
         <LandingTopics />
       </Container>

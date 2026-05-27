@@ -77,7 +77,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   sjr: {
     category: 'bill_types',
     title: "Senate Joint Resolution (SJR)",
-    content: "Same as a House Joint Resolution, but introduced in the Senate. Needs approval from both chambers."
+    content: "A formal action requiring approval from both the Senate and House. Often used to propose constitutional amendments or make official statements. Introduced in the Senate."
   },
 
   hcr: {
@@ -89,7 +89,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   scr: {
     category: 'bill_types',
     title: "Senate Concurrent Resolution (SCR)",
-    content: "Same as a House Concurrent Resolution, but introduced in the Senate."
+    content: "A statement that expresses the position of both chambers, but doesn't become law. Often used for official acknowledgments or to direct state agencies. Introduced in the Senate."
   },
 
   hr: {
@@ -243,7 +243,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
     category: 'bill_status_and_stages',
     title: "Routine procedural step",
     content:
-      "A routine paperwork step — like a clerk's note that the bill was read or sent to a committee — that doesn't change the bill itself. Real progress happens when a committee or the full chamber actually votes."
+      "A routine paperwork step that doesn't change the bill itself. Real progress happens when a committee or the full chamber actually votes."
   },
 
   recommitted: {
@@ -597,7 +597,7 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
   topic_healthcare: {
     category: 'subject_topics',
     title: "Healthcare",
-    content: "Hospitals, clinics, Medicaid, Medicare, insurance, mental health, the opioid response, pharmacies, and the healthcare workforce. (Postsecondary medical training falls under Higher Education.)"
+    content: "Hospitals, clinics, Medicaid, Medicare, insurance, mental health, the opioid response, pharmacies, and the healthcare workforce."
   },
   topic_infrastructure: {
     category: 'subject_topics',
@@ -612,7 +612,7 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
   topic_public_safety: {
     category: 'subject_topics',
     title: "Public Safety",
-    content: "Police, fire, EMS, 911 systems, sheriffs, emergency management, and disaster response. (Courts and incarceration are under Criminal Justice and Corrections.)"
+    content: "Police, fire, EMS, 911 systems, sheriffs, emergency management, and disaster response."
   },
   topic_environment: {
     category: 'subject_topics',
@@ -642,7 +642,7 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
   topic_criminal_justice: {
     category: 'subject_topics',
     title: "Criminal Justice",
-    content: "Criminal laws and penalties, courts, prosecutors and defenders, sentencing, juvenile justice, and re-entry. (Day-to-day jail and prison operations are under Corrections.)"
+    content: "Criminal laws and penalties, courts, prosecutors and defenders, sentencing, juvenile justice, and re-entry."
   },
   topic_voting_rights: {
     category: 'subject_topics',

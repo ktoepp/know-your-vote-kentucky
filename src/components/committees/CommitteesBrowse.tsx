@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { useGaChamberUrlState } from '@/lib/ky-ga-browse-url';
 import { useFollowedCommittees } from '@/lib/use-followed-committees';
 import { gaChamberFilterLabel } from '@/lib/ky-committee-display';
+import { getSessionBannerModel } from '@/lib/ky-session-banner';
 import Link from 'next/link';
 import {
   Alert,
@@ -11,7 +12,6 @@ import {
   Chip,
   Container,
   FormControl,
-  Grid,
   MenuItem,
   Select,
   Link as MuiLink,
@@ -24,6 +24,7 @@ import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import type { GaChamberFilter } from '@/lib/ky-committee-display';
 import { EmptyState } from '@/components/civic/EmptyState';
 import { KYCommitteeCard } from '@/components/committees/KYCommitteeCard';
+import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import type { KYCommitteeBrowseCard } from '@/lib/ky-committees-browse-enriched';
 import { LRC_COMMITTEES_INDEX_URL } from '@/lib/ky-committee-display';
@@ -64,12 +65,14 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
     setTopicFilter('');
   };
 
+  const sessionBanner = getSessionBannerModel();
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="lg" sx={{ pt: { xs: 2.5, md: 3 }, pb: { xs: 5, md: 7 } }}>
         <Box sx={{ textAlign: 'center', mb: { xs: 2.75, md: 3.5 } }}>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-            2026 Regular Session · January 5, 2026 - April 14, 2026
+            {sessionBanner.sessionName} · {sessionBanner.dateRange}
           </Typography>
           <Typography
             variant="caption"
@@ -180,17 +183,17 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
             variant="loadmore"
           >
             {(visible) => (
-              <Grid container spacing={{ xs: 2, md: 3 }}>
+              <CardGrid>
                 {visible.map((committee) => (
-                  <Grid item xs={12} sm={6} md={4} key={committee.id}>
+                  <CardGridItem key={committee.id}>
                     <KYCommitteeCard
                       committee={committee}
                       following={followedCommitteeIds.has(committee.id)}
                       onToggleFollow={authed ? toggleFollow : undefined}
                     />
-                  </Grid>
+                  </CardGridItem>
                 ))}
-              </Grid>
+              </CardGrid>
             )}
           </PaginatedSection>
         )}

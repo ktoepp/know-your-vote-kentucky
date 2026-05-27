@@ -176,3 +176,44 @@ export const CARD = {
   hoverTransform: 'translateY(-2px)',
   hoverTransition: 'all 0.2s ease',
 } as const;
+
+/**
+ * Standard responsive card grid. Browse/search/feed surfaces render through
+ * `<CardGrid>` / `<CardGridItem>` (see `components/ui/CardGrid.tsx`) so every
+ * grid uses the same breakpoints (1 col mobile → 2 tablet → 3 desktop) and gap.
+ */
+export const GRID = {
+  /** `spacing` on the MUI Grid container (sx scale). */
+  spacing: 3,
+  /** Item breakpoints — legacy MUI Grid API to match existing call sites. */
+  item: { xs: 12, sm: 6, md: 4 },
+} as const;
+
+/**
+ * Shared keyboard focus ring. Apply to interactive cards and stretch-link
+ * containers (`&:focus-visible` / `&:has(.stretch-link:focus-visible)`) so the
+ * focus indicator is identical everywhere. Outline follows border-radius in
+ * modern browsers, so it reads correctly on rounded cards.
+ */
+export const FOCUS_RING = {
+  outline: '2px solid',
+  outlineColor: 'primary.main',
+  outlineOffset: 2,
+} as const;
+
+/**
+ * Hover/transition vocabulary for non-card interactive surfaces (list rows,
+ * tiles, clickable chips). Cards use the `CARD` shadow+lift tokens instead.
+ */
+export const INTERACTION = {
+  /** Subtle row/list-item hover: background tint with a short transition. */
+  rowHover: {
+    transition: 'background-color 0.15s ease',
+    '&:hover': { bgcolor: 'action.hover' },
+  },
+  /** Tile/link hover: border + background change with a short transition. */
+  tileHover: {
+    transition: 'background-color 0.15s ease, border-color 0.15s ease',
+    '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+  },
+} as const;

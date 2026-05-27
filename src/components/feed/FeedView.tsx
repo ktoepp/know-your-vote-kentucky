@@ -22,6 +22,7 @@ import { useUser } from '@/app/lib/UserContext';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import { KY_BILL_BROWSE_SELECT } from '@/lib/ky-bills-browse-server';
 import { KYBillCard } from '@/components/bills/KYBillCard';
+import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import { SectionHeader } from '@/components/civic/SectionHeader';
 import { EmptyState } from '@/components/civic/EmptyState';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
@@ -128,18 +129,18 @@ export function FeedView({ initialRecentHouse, initialRecentSenate, legislatorRo
           ) : (
             <PaginatedSection items={followedBills} pageSize={FEED_PAGE_SIZE} variant="loadmore">
               {(pageBills) => (
-                <Grid container spacing={3}>
+                <CardGrid>
                   {pageBills.map((bill) => (
-                    <Grid item xs={12} sm={6} md={4} key={bill.id}>
+                    <CardGridItem key={bill.id}>
                       <KYBillCard
                         bill={bill}
                         legislators={legislators}
                         followedBillIds={followedBillIds}
                         followedTopics={followedTopics}
                       />
-                    </Grid>
+                    </CardGridItem>
                   ))}
-                </Grid>
+                </CardGrid>
               )}
             </PaginatedSection>
           )}

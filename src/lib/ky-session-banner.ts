@@ -1,4 +1,5 @@
 import { getActiveSession, KY_SESSIONS } from '@/lib/ky-sessions';
+import { formatCivicDate } from '@/lib/civic-date';
 
 export type SessionBannerModel = {
   sessionName: string;
@@ -7,7 +8,7 @@ export type SessionBannerModel = {
 };
 
 function fmtDate(d: string): string {
-  return new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return formatCivicDate(d) ?? d;
 }
 
 /** Pure session banner copy for server or client render. */

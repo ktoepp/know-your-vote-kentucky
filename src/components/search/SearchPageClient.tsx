@@ -13,7 +13,6 @@ import {
   TextField,
   InputAdornment,
   Button,
-  Grid,
   Chip,
   FormControl,
   InputLabel,
@@ -28,6 +27,7 @@ import { supabase } from '@/app/lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import Link from 'next/link';
 import { KYBillCard } from '@/components/bills/KYBillCard';
+import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { withTimeout } from '@/lib/async-utils';
 import {
@@ -498,18 +498,18 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                   variant="responsive"
                 >
                   {(pageBills) => (
-                    <Grid container spacing={3}>
+                    <CardGrid>
                       {pageBills.map((bill) => (
-                        <Grid item xs={12} sm={6} md={4} key={bill.id}>
+                        <CardGridItem key={bill.id}>
                           <KYBillCard
                             bill={bill}
                             legislators={legislators}
                             followedBillIds={followAuthed ? followedBillIds : null}
                             followedTopics={followAuthed ? followedTopics : null}
                           />
-                        </Grid>
+                        </CardGridItem>
                       ))}
-                    </Grid>
+                    </CardGrid>
                   )}
                 </PaginatedSection>
                 <Button component={Link} href="/bills" endIcon={<ArrowForward />} sx={{ mt: 1 }}>Browse all bills</Button>

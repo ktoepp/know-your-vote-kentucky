@@ -1,4 +1,5 @@
 import type { KYBill } from '@/types/kentucky';
+import { formatCivicDate } from '@/lib/civic-date';
 
 /**
  * Chamber from DB, or inferred from Kentucky bill number (HB/HR/… vs SB/SR/…).
@@ -70,14 +71,7 @@ export function formatKyBillNumberDisplay(input: string | null | undefined): str
 
 /** ISO calendar/date string → short US locale (same pattern as KYBillCard / BillsListTable). */
 export function formatKyIsoDateShort(iso: string | null | undefined): string {
-  if (iso == null || iso === '') return '';
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return String(iso).trim();
-  return new Date(t).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatCivicDate(iso, { month: 'short', day: 'numeric', year: 'numeric' }) ?? '';
 }
 
 /** Governor has signed the bill (KY sync often stores short label "Signed"). */

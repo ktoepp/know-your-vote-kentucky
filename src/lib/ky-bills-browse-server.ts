@@ -8,6 +8,7 @@ import {
   isKyJointResolutionBill,
   type KyBillSortKey,
 } from '@/lib/bill-display';
+import { getCivicDataSessionName } from '@/lib/ky-sessions';
 
 export type KyBillsBrowseChamberMode = 'all' | 'house' | 'senate';
 
@@ -18,7 +19,10 @@ export type KyBillsBrowseChamberFilter = '' | 'house' | 'senate' | 'joint';
 export const KY_BILL_BROWSE_SELECT =
   'id,bill_number,title,status,last_action,last_action_date,introduced_date,session,chamber,sponsors,topics,legiscan_id,committee_name,openstates_id';
 
-const IN_MEMORY_FILTER_CAP = 2000;
+// PostgREST caps responses at ~1000 rows by default, so the in-memory path can never
+// actually receive more than that. Keep the cap aligned with reality so the `capped`
+// flag (rows.length >= cap) is honest and the UI shows the "more may match" caveat.
+const IN_MEMORY_FILTER_CAP = 1000;
 const BILLS_BROWSE_REVALIDATE_SECONDS = 60;
 
 export type KyBillsBrowseQuery = {
@@ -79,11 +83,15 @@ function applyChamberToQuery<T extends BillQuery>(
 
 function needsInMemoryFiltering(query: KyBillsBrowseQuery): boolean {
   const nonDefaultSort = query.sortBy !== 'last_action_date' || query.sortDir !== 'desc';
+  // House/Senate are fully SQL-expressible (chamber column OR bill_number prefix), so a
+  // chamber chip can use the exact-count + SQL-pagination path. Only `joint` needs the
+  // in-memory path because joint detection (isKyJointResolutionBill) is stricter than the
+  // bill_number prefix match.
   return (
     nonDefaultSort ||
     (query.statusFilter !== '' && query.statusFilter !== 'all') ||
     query.followIds.length > 0 ||
-    (query.chamberMode === 'all' && Boolean(query.chamberFilter))
+    (query.chamberMode === 'all' && query.chamberFilter === 'joint')
   );
 }
 
@@ -211,4 +219,23 @@ export async function fetchKyBillsBrowsePage(query: KyBillsBrowseQuery): Promise
     return fetchKyBillsBrowsePageUncached(query);
   }
   return getCachedKyBillsBrowsePage(query);
+}
+
+/** Exact measure count (bills + resolutions) for the current/most-recent session — for the home card. */
+export async function fetchKyCurrentSessionBillCount(): Promise<number> {
+  return unstable_cache(
+    async () => {
+      const supabase = createAnonClient();
+      if (!supabase) return 0;
+      const session = getCivicDataSessionName();
+      const { count, error } = await supabase
+        .from('ky_bills')
+        .select('id', { count: 'exact', head: true })
+        .eq('session', session);
+      if (error) return 0;
+      return count ?? 0;
+    },
+    ['ky-current-session-bill-count'],
+    { revalidate: BILLS_BROWSE_REVALIDATE_SECONDS },
+  )();
 }

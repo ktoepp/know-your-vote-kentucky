@@ -2,6 +2,8 @@
  * Session labels aligned with LRC / Open States naming and used in `ky_bills.session`.
  * Update when a new regular session is added.
  */
+import { formatCivicDate } from '@/lib/civic-date';
+
 export const KY_SESSIONS = [
   { name: '2026 Regular Session', start: '2026-01-06', end: '2026-04-15', type: 'regular' as const },
   { name: '2025 Regular Session', start: '2025-01-07', end: '2025-04-15', type: 'regular' as const },
@@ -30,8 +32,9 @@ export function getCivicDataSessionName(asOf: Date = new Date()): string {
 const SESSION_TYPE_DESCRIPTIONS: Record<KYSessionType, string> = {
   regular:
     'A regular session convenes each January under the Kentucky Constitution. ' +
-    'The General Assembly meets for up to 60 legislative days: 30 days in even-numbered years (budget years) ' +
-    'and up to 60 days in odd-numbered years. Most bills can only be introduced and passed during this window.',
+    'In even-numbered years the General Assembly meets for up to 60 legislative days and must adjourn by April 15 — ' +
+    'these are the budget sessions. In odd-numbered years it meets for up to 30 legislative days, adjourning by March 30. ' +
+    'Most bills can only be introduced and passed during this window.',
   special:
     'A special session is called by the Governor — or by petition of 3/5 of the members of each chamber — ' +
     'outside the regular annual schedule. Business is limited to topics specified in the call. ' +
@@ -39,7 +42,7 @@ const SESSION_TYPE_DESCRIPTIONS: Record<KYSessionType, string> = {
 };
 
 function fmtSessionDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return formatCivicDate(iso) ?? iso;
 }
 
 export interface SessionTooltipContent {

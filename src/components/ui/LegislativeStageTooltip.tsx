@@ -84,7 +84,6 @@ export const LegislativeStageTooltip = ({
       position={position}
       className={className}
       maxWidth="max-w-md"
-      glossaryKey={stage}
     >
       {children}
     </Tooltip>
@@ -145,7 +144,6 @@ export const BillStatusTooltip = ({
       position={position}
       className={className}
       maxWidth="max-w-md"
-      glossaryKey={status}
     >
       {children}
     </Tooltip>

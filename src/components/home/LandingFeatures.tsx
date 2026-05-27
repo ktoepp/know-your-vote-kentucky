@@ -52,12 +52,21 @@ function LandingFeatureCard({
   );
 }
 
-export function LandingFeatures() {
+export function LandingFeatures({ currentSessionBillCount }: { currentSessionBillCount?: number }) {
+  const billsBody =
+    currentSessionBillCount && currentSessionBillCount > 0
+      ? `Browse and search ${currentSessionBillCount.toLocaleString()} bills & resolutions by topic`
+      : undefined;
+
   return (
     <Grid container spacing={3} sx={{ mt: { xs: 4, md: 6 }, mb: { xs: 6, md: 8 } }}>
       {LANDING_FEATURE_CARDS.map(({ title, body }, index) => (
         <Grid item xs={12} sm={4} key={title}>
-          <LandingFeatureCard title={title} body={body} animationData={FEATURE_ANIMATIONS[index]} />
+          <LandingFeatureCard
+            title={title}
+            body={title === 'Track bills' && billsBody ? billsBody : body}
+            animationData={FEATURE_ANIMATIONS[index]}
+          />
         </Grid>
       ))}
     </Grid>

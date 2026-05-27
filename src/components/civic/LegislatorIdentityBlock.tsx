@@ -28,6 +28,8 @@ export interface LegislatorIdentityBlockProps {
   nameComponent?: React.ElementType;
   /** When set, the name links to the member profile. */
   nameHref?: string;
+  /** Contact / detail content (email, phone, …) — rendered in the text column below the role line, above chips. */
+  meta?: React.ReactNode;
   /** Status / context chips (Primary sponsor, Chair, …) — rendered below the role line. */
   chips?: React.ReactNode;
   gap?: number;
@@ -46,6 +48,7 @@ export function LegislatorIdentityBlock({
   density = 'card',
   nameComponent = 'div',
   nameHref,
+  meta,
   chips,
   gap = 2,
   avatarSx,
@@ -97,13 +100,16 @@ export function LegislatorIdentityBlock({
             {districtLine}
           </Typography>
         ) : null}
+        {meta ? (
+          <Box sx={{ mt: roleTitle || roleLine || districtLine ? 0.5 : 0.25, minWidth: 0 }}>{meta}</Box>
+        ) : null}
         {chips ? (
           <Box
             sx={{
               display: 'flex',
               gap: 0.5,
               flexWrap: 'wrap',
-              mt: roleTitle || roleLine || districtLine ? 0.5 : 0.25,
+              mt: meta || roleTitle || roleLine || districtLine ? 0.5 : 0.25,
               alignItems: 'center',
             }}
           >

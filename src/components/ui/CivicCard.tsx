@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Box, Card, CardContent } from '@mui/material';
 import type { CardProps } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { CARD } from '@/lib/ui-tokens';
+import { CARD, FOCUS_RING } from '@/lib/ui-tokens';
 
 export type CivicCardVariant = 'bill' | 'member' | 'ordinance' | 'meeting';
 
@@ -96,8 +96,7 @@ export function CivicCard({
             borderColor: theme.palette.primary.main,
           },
           '&:focus-visible': {
-            outline: 'none',
-            boxShadow: `0 0 0 3px ${theme.palette.primary.main}66`,
+            ...FOCUS_RING,
             borderColor: theme.palette.primary.main,
           },
         }),

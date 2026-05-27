@@ -3,6 +3,19 @@ import type { KYBill, KYLegislator, KYVote } from '@/types/kentucky';
 import { getCivicDataSessionName } from '@/lib/ky-sessions';
 import { bucketLegiscanVoteText, type VoteBucket } from '@/lib/legiscan-vote-tally';
 import { matchLegislatorBySponsorName } from '@/lib/ky-member-utils';
+import {
+  classifySponsorRole,
+  getSponsorRecordDisplayName,
+  parseLegiscanSponsorRecords,
+} from '@/lib/ky-bill-sponsors';
+
+export type MemberSponsorRole = 'primary' | 'cosponsor';
+
+/** A bill this member sponsored, tagged with whether they were a primary sponsor or a co-sponsor. */
+export interface MemberSponsoredBill {
+  bill: KYBill;
+  role: MemberSponsorRole;
+}
 
 function createAnonClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -14,9 +27,35 @@ function createAnonClient(): SupabaseClient | null {
 const BILL_SUMMARY =
   'id, bill_number, title, status, last_action_date, last_action, session, chamber, legiscan_id';
 
-const BILL_SUMMARY_WITH_SPONSORS = `${BILL_SUMMARY}, sponsors`;
+/** Sponsored-bill rows need `sponsors` (to classify this member's role) and `topics` (client-side topic filter). */
+const SPONSORED_BILL_SELECT = `${BILL_SUMMARY}, sponsors, topics`;
 
 type SponsorRow = { name?: string; people_id?: number };
+
+/** Find this member's own sponsor record on a bill, then classify it as primary vs co-sponsor. */
+function memberSponsorRole(sponsors: unknown, leg: KYLegislator): MemberSponsorRole {
+  const records = parseLegiscanSponsorRecords(sponsors);
+  for (const r of records) {
+    const pid = r.people_id != null ? Number(r.people_id) : NaN;
+    if (leg.legiscan_id != null && Number.isFinite(pid) && pid === Number(leg.legiscan_id)) {
+      return classifySponsorRole(r);
+    }
+    const name = getSponsorRecordDisplayName(r);
+    if (name && matchLegislatorBySponsorName([leg], name)?.id === leg.id) {
+      return classifySponsorRole(r);
+    }
+  }
+  return 'primary';
+}
+
+/** Strip the raw `sponsors` blob and tag each row with this member's sponsor role. */
+function toSponsoredBills(rows: Array<KYBill & { sponsors?: unknown }>, leg: KYLegislator): MemberSponsoredBill[] {
+  return rows.map((row) => {
+    const role = memberSponsorRole(row.sponsors, leg);
+    const { sponsors: _sponsors, ...bill } = row;
+    return { bill: bill as KYBill, role };
+  });
+}
 
 function billListsLegislatorAsSponsor(sponsors: unknown, leg: KYLegislator): boolean {
   if (!Array.isArray(sponsors)) return false;
@@ -77,17 +116,17 @@ async function fetchSponsoredBillsByPeopleId(
   peopleId: number,
   sessionName: string,
   limit: number,
-): Promise<KYBill[]> {
+): Promise<Array<KYBill & { sponsors?: unknown }>> {
   const { data, error } = await supabase
     .from('ky_bills')
-    .select(BILL_SUMMARY)
+    .select(SPONSORED_BILL_SELECT)
     .eq('session', sessionName)
     .filter('sponsors', 'cs', JSON.stringify([{ people_id: peopleId }]))
     .order('last_action_date', { ascending: false, nullsFirst: false })
     .limit(limit);
 
   if (error || !data) return [];
-  return data as KYBill[];
+  return data as Array<KYBill & { sponsors?: unknown }>;
 }
 
 function memberRollVote(
@@ -160,7 +199,7 @@ function mapRollVotes(
 export async function fetchSponsoredBillsForLegislator(
   leg: KYLegislator,
   options?: { limit?: number; sessionName?: string },
-): Promise<KYBill[]> {
+): Promise<MemberSponsoredBill[]> {
   const supabase = createAnonClient();
   if (!supabase) return [];
 
@@ -174,28 +213,27 @@ export async function fetchSponsoredBillsForLegislator(
 
   if (peopleId != null && Number.isFinite(peopleId)) {
     const byId = await fetchSponsoredBillsByPeopleId(supabase, peopleId, sessionName, limit);
-    if (byId.length > 0) return byId;
+    if (byId.length > 0) return toSponsoredBills(byId, leg);
   }
 
   if (!leg.name?.trim()) return [];
 
   const { data, error } = await supabase
     .from('ky_bills')
-    .select(BILL_SUMMARY_WITH_SPONSORS)
+    .select(SPONSORED_BILL_SELECT)
     .eq('session', sessionName)
     .order('last_action_date', { ascending: false, nullsFirst: false })
     .limit(500);
 
   if (error || !data) return [];
 
-  const matched: KYBill[] = [];
+  const matched: Array<KYBill & { sponsors?: unknown }> = [];
   for (const row of data) {
     if (!billListsLegislatorAsSponsor((row as { sponsors?: unknown }).sponsors, leg)) continue;
-    const { sponsors: _s, ...bill } = row as KYBill & { sponsors?: unknown };
-    matched.push(bill as KYBill);
+    matched.push(row as KYBill & { sponsors?: unknown });
     if (matched.length >= limit) break;
   }
-  return matched;
+  return toSponsoredBills(matched, leg);
 }
 
 /**

@@ -25,6 +25,7 @@ import {
   CalendarMonth,
   ExpandLess,
   ExpandMore,
+  Groups,
 } from '@mui/icons-material';
 import { CalendarToday, LocationOn } from '@mui/icons-material';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
@@ -33,7 +34,7 @@ import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import { CommitteeTagRow, useCommitteeKindInfo } from '@/components/committees/CommitteeTagRow';
 import { MetaChip } from '@/components/ui/Chip';
 import type { KYCommittee, KYCommitteeAgendaItem, KYCommitteeMeeting } from '@/types/kentucky';
-import { ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE, iconRemSx } from '@/lib/ui-tokens';
+import { FOCUS_RING, ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE, iconRemSx } from '@/lib/ui-tokens';
 import {
   formatAgendaItemKind,
   formatKyMeetingDate,
@@ -162,75 +163,139 @@ export function CommitteeDetailView({
           </Typography>
         </Breadcrumbs>
 
-        <Card sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
-          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-            <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, justifyContent: 'space-between' }}>
+        {/* Overview + quick facts */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1.6fr) minmax(0, 1fr)' },
+            gap: 3,
+            alignItems: 'start',
+            mb: 4,
+          }}
+        >
+          <Card sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, height: '100%' }}>
+            <CardContent sx={{ p: { xs: 2, md: 3 } }}>
               <CommitteeTagRow committee={committee}>
                 {topicTags.map((tag) => (
                   <MetaChip key={tag} label={tag} size="small" variant="outlined" />
                 ))}
               </CommitteeTagRow>
-              <FollowCommitteeButton committeeId={committee.id} size="small" />
-            </Box>
 
-            <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-              {displayName}
-            </Typography>
-
-            {parentRef && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                {parentRef.href ? (
-                  <>
-                    Part of{' '}
-                    <MuiLink component={Link} href={parentRef.href} fontWeight={600} underline="hover">
-                      {parentRef.label}
-                    </MuiLink>
-                  </>
-                ) : (
-                  <>Part of {parentRef.label}</>
-                )}
+              <Typography variant="h4" component="h1" fontWeight={700} sx={{ mt: 2 }} gutterBottom>
+                {displayName}
               </Typography>
-            )}
 
-            <Stack spacing={0.75} sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                <strong>{members.length}</strong> legislative {members.length === 1 ? 'member' : 'members'} synced
-                {' · '}
-                <strong>{meetings.length}</strong> meeting{meetings.length === 1 ? '' : 's'} on calendar
+              {parentRef && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  {parentRef.href ? (
+                    <>
+                      Part of{' '}
+                      <MuiLink component={Link} href={parentRef.href} fontWeight={600} underline="hover">
+                        {parentRef.label}
+                      </MuiLink>
+                    </>
+                  ) : (
+                    <>Part of {parentRef.label}</>
+                  )}
+                </Typography>
+              )}
+
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6, mt: 1 }}>
+                Jurisdiction and staff rosters are maintained on the{' '}
+                {committee.profile_url ? (
+                  <MuiLink href={committee.profile_url} target="_blank" rel="noopener noreferrer">
+                    official LRC committee profile
+                  </MuiLink>
+                ) : (
+                  'Kentucky Legislature website'
+                )}
+                . Know Your Vote Kentucky adds parsed meeting agendas from the legislative calendar below.
+              </Typography>
+            </CardContent>
+          </Card>
+
+          {/* Quick facts */}
+          <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+                <FollowCommitteeButton committeeId={committee.id} size="small" />
+              </Box>
+
+              <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: 0.4 }}>
+                Next meeting
               </Typography>
               {upcoming ? (
-                <Typography variant="body2" color="text.secondary">
-                  Next meeting: <strong>{formatKyMeetingDate(upcoming.meeting_date)}</strong>
-                  {upcoming.time_and_location ? ` · ${upcoming.time_and_location}` : ''}
-                </Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <CalendarMonth sx={{ ...iconRemSx('inline'), color: 'primary.main' }} aria-hidden />
+                    <Typography variant="body1" fontWeight={700} component="span">
+                      {formatKyMeetingDate(upcoming.meeting_date)}
+                    </Typography>
+                  </Box>
+                  {upcoming.time_and_location && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                      {upcoming.time_and_location}
+                    </Typography>
+                  )}
+                  <MuiLink href="#committee-meetings" underline="hover" sx={{ display: 'inline-block', mt: 0.75, fontWeight: 600 }}>
+                    View agenda →
+                  </MuiLink>
+                </Box>
               ) : (
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                   No upcoming meetings listed on the calendar.
                 </Typography>
               )}
-            </Stack>
 
-            <Box sx={{ mb: 2 }}>
-              <OfficialSourceLinks links={officialLinks} />
-            </Box>
+              <Divider sx={{ my: 2 }} />
 
-            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-              Jurisdiction and staff rosters are maintained on the{' '}
-              {committee.profile_url ? (
-                <MuiLink href={committee.profile_url} target="_blank" rel="noopener noreferrer">
-                  official LRC committee profile
+              <Stack spacing={1}>
+                <MuiLink href="#committee-members" underline="hover" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                  {members.length} {members.length === 1 ? 'member' : 'members'}
                 </MuiLink>
-              ) : (
-                'Kentucky Legislature website'
-              )}
-              . Know Your Vote Kentucky adds parsed meeting agendas from the legislative calendar below.
-            </Typography>
-          </CardContent>
-        </Card>
+                <MuiLink href="#committee-meetings" underline="hover" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                  {meetings.length} meeting{meetings.length === 1 ? '' : 's'} on record
+                </MuiLink>
+              </Stack>
 
-        <CommitteeMembersSection members={members} committeeProfileUrl={committee.profile_url} />
+              <Divider sx={{ my: 2 }} />
 
-        <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, mt: 1 }}>
+              <OfficialSourceLinks layout="stack" links={officialLinks} />
+            </CardContent>
+          </Card>
+        </Box>
+
+        {/* Members */}
+        <Box
+          id="committee-members"
+          sx={{ scrollMarginTop: '80px', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}
+        >
+          <Groups sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
+          <Typography
+            component="h2"
+            variant={TYPE.sectionTitle.variant}
+            fontWeight={TYPE.sectionTitle.fontWeight}
+            color="text.primary"
+            sx={SECTION_TITLE_DISPLAY_SX}
+          >
+            Members
+          </Typography>
+          {members.length > 0 && (
+            <Chip label={members.length} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
+          )}
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Synced from the LRC committee roster and legislative calendar. Select a member for their full profile.
+        </Typography>
+        <Box sx={{ mb: 4 }}>
+          <CommitteeMembersSection members={members} committeeProfileUrl={committee.profile_url} />
+        </Box>
+
+        {/* Meetings & agendas */}
+        <Box
+          id="committee-meetings"
+          sx={{ scrollMarginTop: '80px', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}
+        >
           <CalendarMonth sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
           <Typography
             component="h2"
@@ -246,7 +311,7 @@ export function CommitteeDetailView({
           )}
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Parsed from the LRC legislative calendar. Click a meeting to expand its agenda. Agendas can change the day before a meeting.
+          Parsed from the LRC legislative calendar. Select a meeting to expand its agenda. Agendas can change the day before a meeting.
         </Typography>
 
         {meetings.length === 0 ? (
@@ -276,7 +341,9 @@ export function CommitteeDetailView({
                         cursor: hasAgenda ? 'pointer' : 'default',
                         color: 'inherit',
                         font: 'inherit',
+                        borderRadius: 1,
                         '&:hover': hasAgenda ? { opacity: 0.92 } : undefined,
+                        '&:focus-visible': hasAgenda ? FOCUS_RING : undefined,
                       }}
                     >
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>

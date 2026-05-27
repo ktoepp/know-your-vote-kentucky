@@ -8,8 +8,9 @@ import {
   Gavel, 
   CheckCircle, 
   Warning, 
-  Error 
+  Error
 } from '@mui/icons-material';
+import { CARD } from '@/lib/ui-tokens';
 
 interface StatCard {
   id: string;
@@ -69,12 +70,10 @@ export default function StatsGrid({ stats, columns = 2 }: StatsGridProps) {
             borderRadius: 2,
             border: `1px solid ${theme.palette.divider}`,
             backgroundColor: theme.palette.background.paper,
-            transition: 'all 0.2s ease',
+            transition: CARD.hoverTransition,
             '&:hover': {
-              transform: 'translateY(-2px)',
-              boxShadow: theme.palette.mode === 'dark' 
-                ? '0 4px 20px rgba(255,255,255,0.15)' 
-                : '0 4px 20px rgba(0,0,0,0.15)'
+              transform: CARD.hoverTransform,
+              boxShadow: theme.palette.mode === 'dark' ? CARD.hoverBoxShadowDark : CARD.hoverBoxShadow,
             }
           }}
         >
