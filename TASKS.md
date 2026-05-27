@@ -12,39 +12,6 @@
 
 Browser review closed **2026-05-22**; **Follow committees v1** shipped in PR **#38** (2026-05-22). Migrations **026–027** applied on primary (2026-05-26). See **Recently completed** and **Backlog → Follow committees v1.5**. Next: optional prod `legiscan_id` spot-check, committee follow gaps (meetings filter, activity feed), manual email client QA, Wave 3 committee materials.
 
-### Functional test — live site (2026-05-26)
-
-Full browser walkthrough of **www.kyvky.com** (public + authenticated; real account created by operator via disposable email — Claude does not create accounts / enter passwords). Core flows solid and KY-specific accuracy good (100 House / 38 Senate / Governor; correct current officeholders; interim committees post-session; 3/5 supermajority + 90-day effective date in glossary). What shipped, the LRC accuracy check, and remaining open items below.
-
-**Shipped in this PR (2026-05-26, verified on localhost:3000):**
-- ✅ Roll-call label now derived from action history (chamber + tally) — `deriveRollCallLabel` in `BillDetailView.tsx`; ignores LegiScan's unreliable `desc`. Root cause (via `scripts/diagnose-rollcall-desc.ts` on SB98 + HB869): **systematic LegiScan upstream issue** — every House roll call returns `desc="House: Veto Override RCS# N"`, every Senate one `"Senate: Third Reading RSN# N"`, regardless of the actual vote; `getBill` and `getRollCall` descs are identical so `desc` can't be trusted at all. SB98 House vote now reads "House: 3rd reading, passed 89-5 with Floor Amendment (4)".
-- ✅ Date off-by-one + #418 hydration — new `src/lib/civic-date.ts` (`formatCivicDate`, UTC-noon anchor) wired into `BillDetailView.fmtDate`, `bill-display.formatKyIsoDateShort`, `ky-session-banner`, `ky-sessions.fmtSessionDate`, `KYBillCard`, `BillsListTable`. Bill dates correct (Apr 15 / Apr 27); console #418 gone.
-- ✅ Members chamber filter — `MembersBrowse.legislatorsScoped` now handles house/senate (was governor-only); HOUSE → 100, SENATE → 38.
-- ✅ Bills browse count — house/senate chips routed to exact-count SQL path (`needsInMemoryFiltering`); `IN_MEMORY_FILTER_CAP` aligned to PostgREST's 1000 ceiling so `capped` is honest. House now shows real 13,642.
-- ✅ Session date inconsistency — `CommitteesBrowse` banner was **hardcoded** "January 5 – April 14"; now single-sourced from `getSessionBannerModel` → "January 6 – April 15" (matches home).
-- ✅ Committee detail meeting count copy → "N meetings on record"; LRC leadership placeholder removed when empty (`KYCommitteeCard`).
-- ✅ Home "1,400+ bills" (was stale 2025 count) → now **dynamic**: `fetchKyCurrentSessionBillCount()` (cached, exact) threaded `page.tsx → HomePageContent → LandingFeatures`; card reads "Browse and search {count} bills & resolutions by topic" (1,737 for 2026). Static fallback de-numbered.
-- ✅ Glossary/session tooltip accuracy — `ky-sessions.ts` SESSION_TYPE_DESCRIPTIONS had even/odd **swapped** ("30 days in even-numbered years … 60 days in odd"). Corrected: even years = up to 60 legislative days (budget session, adjourn Apr 15); odd years = up to 30 days (adjourn Mar 30).
-
-**LRC accuracy check — 2026 Regular Session — FULL MATCH (verified 2026-05-26 against `apps.legislature.ky.gov/record/26rs`, LRC last-updated 5/20/2026):**
-All 8 measure types match our DB exactly:
-- House Bills 939 = 939 ✅ | Senate Bills 354 = 354 ✅ (LRC max SB 358; 67/126/150/182 unused — DB correctly excludes)
-- House Resolutions 67 = 67 ✅ | House Joint Res 49 = 49 ✅ | House Concurrent Res 25 = 25 ✅ (HR/HJR/HCR share one 1–141 sequence)
-- Senate Resolutions 264 = 264 ✅ | Senate Joint Res 24 = 24 ✅ | Senate Concurrent Res 15 = 15 ✅ (SR/SJR/SCR share 1–305; 67 & 210 unused)
-- **Total 1,737 measures (1,293 bills + 444 resolutions) = LRC exactly.** No data drift; sync is current.
-
-**Build:** `npm run build` ✅ compiled successfully, types valid (2026-05-26).
-- Diagnostic kept as reusable tool: `scripts/diagnose-rollcall-desc.ts [BILL_NUMBER]`.
-
-**Remaining open (not in this PR):**
-
-- [ ] **Follow-click external-link flicker** — clicking **Follow** on a bill momentarily drops the "Kentucky Legislature" link (returns on reload; follow itself persists). Transient re-render of the external-links row; needs an authed session to reproduce. Cosmetic.
-- [ ] **Activity feed shows sync date, not action date** — feed lists SB98 "Signed into law" as **May 21, 2026** (detection time) but the actual signing was **Apr 27** (Acts Ch. 201). This is a data/logic choice (which timestamp to display), separate from the date-format fix shipped above.
-- [ ] **Possible duplicate committee** — both **"Administrative Regulation Review Subcommittee"** (co-chairs Derek Lewis / Steve West) and **"Administrative Regulations Review Subcommittee"** (no leadership) appear in `/committees`. Data question — confirm two real LRC entities vs. a sync dupe (not a code fix).
-- [ ] **District-assignment spot-check vs LRC (operator)** — bill + resolution counts verified (full match, below); the Frankfort test (`700 Capital Ave 40601` → House 57 Erika Hancock / Senate 20 Gex Williams) still to confirm against LRC "Find Your Legislator".
-
-**Verified working (no action):** address→legislator lookup; bill detail (status/dates/sponsors/co-sponsors/roll-call counts/external links); member profiles (contact + district map + sponsored bills); bills topic+chamber filtering + sort; committee detail (22 members w/ party/district/email + chair); meetings filters + UPCOMING/RECENT (persist to URL); search relevance + freshness stamp + AI disclaimer; KY-specific glossary; full auth stack (register → email verify ["Verified" badge] → login → follow persists into Followed bills + Activity feed + list bookmark; digest frequency/event/topic settings; digest-history empty state).
-
 ## Maintained on autopilot
 
 - **Legislator outbound links** — `.github/workflows/legislator-links-weekly.yml` runs Mondays 12:00 UTC: `sync:ky:legislators` → `verify:legislator-links --json` → `audit:legiscan-subjects --json`, uploading `reports/` as artifacts. Manual fallback: `npm run verify:legislator-links`. Required GH secrets: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENSTATES_API_KEY`, `LEGISCAN_API_KEY` (last optional). **Slack:** sync + verify digests when `SLACK_WEBHOOK_*` + `SLACK_SYNC_NOTIFY_CLI=true` (heartbeat via `SLACK_SYNC_CLI_DIGEST_ALWAYS=true` while validating).
@@ -100,7 +67,7 @@ Use this when continuing **Follow committees v1.5**, **Wave 3 committee/data**, 
 
 ## Recently completed
 
-- **TASKS + backlog refresh (2026-05-26)** — Reconciled tracker with PR **#38** (committee follows), PR **#37** (meetings browse window), home Lottie ship, migrations **026–027** on primary, GitHub Actions Slack digests + heartbeat (`b008d96`, `2529ab4`).
+- **TASKS + backlog refresh (2026-05-26)** — Reconciled tracker with PR **#38** (committee follows), PR **#37** (meetings browse window), home Lottie ship, migrations **026–027** on primary.
 - **Home hero — capitol background + Lottie icons (2026-05-25)** — Optimized `ky-capitol-hero.jpg`; `HoverLottie` on landing feature cards; `LandingHeroCtas` / `landingHeroStyles` refactor (`37c881a`).
 - **Follow committees v1 (2026-05-22, PR #38)** — Migration **026** (`ky_committee_follows`, `ky_committee_events`); `GET/POST/DELETE /api/committees/[id]/follow`; `FollowCommitteeButton` + `useFollowedCommittees`; profile **Followed committees** section; digest **Committee meeting scheduled** block; LRC sync emits `meeting_scheduled` on new meetings; migration **027** interim committee seed + `scripts/backfill-interim-calendar-2026.ts`; agenda search bill links; `preview:digest` committee preview support.
 - **Meetings browse — session window (2026-05-22, PR #37)** — `/meetings` browse widened to session start so historical in-session meetings surface.
