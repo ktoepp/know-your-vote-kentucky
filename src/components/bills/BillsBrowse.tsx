@@ -343,7 +343,7 @@ export function BillsBrowse({
     const verb = total === 1 ? 'matches' : 'match';
     let s = `${total.toLocaleString()} ${billsWord} ${verb} your filters`;
     if (browseCapped) {
-      s += ' · Based on the 2,000 most recently updated bills in this view; more may match';
+      s += ' · Based on the most recently updated bills in this view; more may match';
     }
     if (loaded < total) {
       s += ` · Showing ${loaded.toLocaleString()} of ${total.toLocaleString()}`;

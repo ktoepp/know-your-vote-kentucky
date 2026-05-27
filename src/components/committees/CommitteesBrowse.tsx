@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { useGaChamberUrlState } from '@/lib/ky-ga-browse-url';
 import { useFollowedCommittees } from '@/lib/use-followed-committees';
 import { gaChamberFilterLabel } from '@/lib/ky-committee-display';
+import { getSessionBannerModel } from '@/lib/ky-session-banner';
 import Link from 'next/link';
 import {
   Alert,
@@ -64,12 +65,14 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
     setTopicFilter('');
   };
 
+  const sessionBanner = getSessionBannerModel();
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="lg" sx={{ pt: { xs: 2.5, md: 3 }, pb: { xs: 5, md: 7 } }}>
         <Box sx={{ textAlign: 'center', mb: { xs: 2.75, md: 3.5 } }}>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-            2026 Regular Session · January 5, 2026 - April 14, 2026
+            {sessionBanner.sessionName} · {sessionBanner.dateRange}
           </Typography>
           <Typography
             variant="caption"

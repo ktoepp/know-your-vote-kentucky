@@ -18,7 +18,7 @@ import { LEGISLATOR_FIELD_LABEL_SX, LEGISLATOR_NAME_SX, LEGISLATOR_ROLE_LINE_SX 
 import { BillStatusMetaChip } from '@/components/bills/BillStatusMetaChip';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { ChamberChip } from '@/components/ui/Chip';
-import { effectiveBillChamber, formatBillLabelText } from '@/lib/bill-display';
+import { effectiveBillChamber, formatBillLabelText, formatKyIsoDateShort } from '@/lib/bill-display';
 import { getSponsorGroupsFromBill } from '@/lib/ky-bill-sponsors';
 
 function sponsorInitials(name: string) {
@@ -42,14 +42,7 @@ export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardPro
     maxPrimary: 4,
     maxCosponsor: 8,
   });
-  const actionDateCard =
-    bill.last_action_date != null && bill.last_action_date !== ''
-      ? new Date(bill.last_action_date).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })
-      : '';
+  const actionDateCard = formatKyIsoDateShort(bill.last_action_date);
 
   const detailHref = `/bills/${bill.id}`;
 

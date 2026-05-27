@@ -137,11 +137,7 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
                 </Box>
               ))}
             </Box>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              Leadership synced from calendar when available
-            </Typography>
-          )}
+          ) : null}
         </>
       }
     />

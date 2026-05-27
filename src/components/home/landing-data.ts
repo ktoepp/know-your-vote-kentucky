@@ -15,7 +15,7 @@ export const LANDING_FEATURE_CARDS = [
   },
   {
     title: 'Track bills',
-    body: 'Browse and search 1,400+ bills by topic',
+    body: 'Browse and search bills & resolutions by topic',
   },
   {
     title: 'Get notified',

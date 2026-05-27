@@ -25,6 +25,7 @@ import {
   billStatusToTooltipKey,
   effectiveBillChamber,
   formatBillLabelText,
+  formatKyIsoDateShort,
   isSignedByGovernorBillStatus,
 } from '@/lib/bill-display';
 import { governmentTooltips } from '@/lib/tooltipContent';
@@ -43,10 +44,7 @@ function billHref(bill: KYBill): string {
 }
 
 function formatShortDate(iso: string | null | undefined): string {
-  if (iso == null || iso === '') return '';
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return '';
-  return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatKyIsoDateShort(iso);
 }
 
 function chamberLabel(bill: KYBill): string {

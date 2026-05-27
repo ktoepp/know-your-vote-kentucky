@@ -102,6 +102,8 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
 
   const legislatorsScoped = useMemo(() => {
     if (chamberFilter === 'governor') return legislators.filter(isKentuckyGovernor);
+    if (chamberFilter === 'house') return legislators.filter((l) => l.chamber === 'house');
+    if (chamberFilter === 'senate') return legislators.filter((l) => l.chamber === 'senate');
     return legislators;
   }, [legislators, chamberFilter]);
 

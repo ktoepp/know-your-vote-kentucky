@@ -40,6 +40,7 @@ import {
 } from '@/lib/bill-display';
 import { governmentTooltips, voteCountTooltips } from '@/lib/tooltipContent';
 import { getSessionTooltip } from '@/lib/ky-sessions';
+import { formatCivicDate } from '@/lib/civic-date';
 import { supabase } from '@/app/lib/supabaseClient';
 import {
   matchLegislatorByLegiscanId,
@@ -119,8 +120,45 @@ interface LegiScanSubject {
 /* Helpers                                                              */
 /* ------------------------------------------------------------------ */
 function fmtDate(d: string | null | undefined, opts?: Intl.DateTimeFormatOptions) {
-  if (!d) return null;
-  return new Date(d).toLocaleDateString('en-US', opts ?? { month: 'long', day: 'numeric', year: 'numeric' });
+  return formatCivicDate(d, opts);
+}
+
+function rollCallChamberFromDesc(desc: string | null | undefined): 'H' | 'S' | null {
+  const d = (desc ?? '').trim().toLowerCase();
+  if (d.startsWith('house')) return 'H';
+  if (d.startsWith('senate')) return 'S';
+  return null;
+}
+
+/**
+ * LegiScan's KY roll-call `desc` is unreliable: every House roll call comes back
+ * "House: Veto Override RCS# N" and every Senate one "Senate: Third Reading RSN# N",
+ * regardless of the actual vote. Derive a trustworthy label from the action history
+ * (which embeds the true action + tally) by matching chamber + yea-nay. The "House:"/
+ * "Senate:" prefix on `desc` is the only reliable part, so we keep the chamber.
+ */
+function deriveRollCallLabel(
+  v: { desc?: string | null; yea?: number; nay?: number; date?: string },
+  history: LegiScanHistory[],
+): string {
+  const chamber = rollCallChamberFromDesc(v.desc);
+  const chamberLabel = chamber === 'H' ? 'House' : chamber === 'S' ? 'Senate' : '';
+  const yea = Number(v.yea);
+  const nay = Number(v.nay);
+  if (Number.isFinite(yea) && Number.isFinite(nay)) {
+    const tally = `${yea}-${nay}`;
+    const norm = (s: string) => s.replace(/\s+/g, ' ').toLowerCase();
+    const matches = history.filter(
+      (h) => (!chamber || !h.chamber || h.chamber === chamber) && h.action && norm(h.action).includes(tally),
+    );
+    const best = matches.find((h) => h.date === v.date) ?? matches[0];
+    if (best) {
+      const action = best.action.trim();
+      const pretty = action.charAt(0).toUpperCase() + action.slice(1);
+      return chamberLabel ? `${chamberLabel}: ${pretty}` : pretty;
+    }
+  }
+  return chamberLabel ? `${chamberLabel} floor vote` : 'Floor vote';
 }
 
 /* ------------------------------------------------------------------ */
@@ -735,7 +773,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                           {fmtDate(v.date)}
                         </Typography>
                         <Typography variant="body2" fontWeight={500} gutterBottom>
-                          {v.desc}
+                          {deriveRollCallLabel(v, history)}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1.25 }}>
                           {(['yea', 'nay'] as const).map((key) => {

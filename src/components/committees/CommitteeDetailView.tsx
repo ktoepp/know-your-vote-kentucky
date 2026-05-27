@@ -196,7 +196,7 @@ export function CommitteeDetailView({
               <Typography variant="body2" color="text.secondary">
                 <strong>{members.length}</strong> legislative {members.length === 1 ? 'member' : 'members'} synced
                 {' · '}
-                <strong>{meetings.length}</strong> meeting{meetings.length === 1 ? '' : 's'} on calendar
+                <strong>{meetings.length}</strong> meeting{meetings.length === 1 ? '' : 's'} on record
               </Typography>
               {upcoming ? (
                 <Typography variant="body2" color="text.secondary">
