@@ -49,7 +49,6 @@ export const ContextualTooltip = ({
       position={position}
       className={className}
       maxWidth="max-w-md"
-      glossaryKey={term}
     >
       {triggerElement}
     </Tooltip>

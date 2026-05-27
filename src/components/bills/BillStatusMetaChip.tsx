@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { Check } from '@mui/icons-material';
 import { Box, Chip as MuiChip, Tooltip, Typography } from '@mui/material';
 import type { KYBill } from '@/types/kentucky';
@@ -49,32 +48,11 @@ function BillStatusTooltipShell({
             {tip.title}
           </Typography>
           <Typography variant="body2">{tip.content}</Typography>
-          <Box
-            sx={{
-              mt: 0.75,
-              pt: 0.75,
-              borderTop: '1px solid',
-              borderColor: 'divider',
-              textAlign: 'right',
-            }}
-          >
-            <Link
-              href={`/glossary#${key}`}
-              style={{
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                textDecoration: 'underline',
-                textUnderlineOffset: 2,
-                opacity: 0.85,
-              }}
-            >
-              Learn more →
-            </Link>
-          </Box>
         </Box>
       }
       arrow
       enterDelay={300}
+      disableInteractive
       componentsProps={{ tooltip: { sx: STATUS_TOOLTIP_POPPER_SX } }}
     >
       <span style={{ display: 'inline-flex', cursor: 'help' }}>{children}</span>
