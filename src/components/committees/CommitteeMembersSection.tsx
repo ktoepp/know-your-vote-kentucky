@@ -2,16 +2,14 @@
 
 import Link from 'next/link';
 import { Box, Card, CardContent, Divider, Typography } from '@mui/material';
+import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { EmptyState } from '@/components/civic/EmptyState';
-import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
+import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBlock';
+import { MemberName } from '@/components/civic/MemberName';
 import type { CommitteeMemberDisplay } from '@/lib/ky-committee-members';
-import {
-  kyLegislatorAvatarInitials,
-  kyLegislatorPortraitAlt,
-  memberProfilePath,
-  normalizeLegislatorPhotoUrl,
-} from '@/lib/ky-member-utils';
+import { legislatorAvatarDescriptor, memberProfilePath } from '@/lib/ky-member-utils';
 import { legislatorRoleDistrictLine } from '@/lib/legislator-display';
+import { FOCUS_RING, INTERACTION } from '@/lib/ui-tokens';
 
 export interface CommitteeMembersSectionProps {
   members: CommitteeMemberDisplay[];
@@ -20,11 +18,6 @@ export interface CommitteeMembersSectionProps {
 
 function isChairRole(roleLabel: string | null) {
   return Boolean(roleLabel && roleLabel.toLowerCase().includes('chair'));
-}
-
-function initialsFromName(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return `${parts[0]?.[0] ?? ''}${parts.length > 1 ? parts[parts.length - 1]?.[0] ?? '' : ''}`.toUpperCase() || '?';
 }
 
 export function CommitteeMembersSection({ members, committeeProfileUrl }: CommitteeMembersSectionProps) {
@@ -58,59 +51,59 @@ export function CommitteeMembersSection({ members, committeeProfileUrl }: Commit
                   {group.rows.map((member) => {
                     const leg = member.legislator;
                     const href = leg ? memberProfilePath(leg) : member.lrcProfileUrl;
-                    const portraitSrc = leg
-                      ? normalizeLegislatorPhotoUrl(leg.photo_url) || normalizeLegislatorPhotoUrl(leg.legiscan_image_url) || undefined
-                      : undefined;
-                    const initials = leg ? kyLegislatorAvatarInitials(leg) : initialsFromName(member.displayName);
-                    const row = (
+                    const external = !leg;
+                    const identity = (
+                      <LegislatorIdentityBlock
+                        name={leg ? <MemberName member={leg} variant="primary" /> : member.displayName}
+                        roleLine={
+                          member.roleLabel || (leg ? legislatorRoleDistrictLine(leg) : 'LRC legislator profile')
+                        }
+                        density="compact"
+                        gap={1.5}
+                        avatar={legislatorAvatarDescriptor(leg, member.displayName)}
+                        meta={
+                          leg?.email ? (
+                            // Copy button must stay interactive even though the whole row is a stretch link.
+                            <Box onClick={(e) => e.stopPropagation()} sx={{ pointerEvents: 'auto' }}>
+                              <CopyableEmail email={leg.email} variant="caption" display="block" />
+                            </Box>
+                          ) : undefined
+                        }
+                      />
+                    );
+                    return (
                       <Box
+                        key={member.key}
                         sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.5,
+                          position: 'relative',
                           borderRadius: 1,
                           p: 0.75,
                           mx: -0.75,
-                          color: 'inherit',
-                          textDecoration: 'none',
-                          '&:hover': href ? { bgcolor: 'action.hover' } : undefined,
+                          ...(href && INTERACTION.rowHover),
+                          '&:has(.committee-member-stretch-link:focus-visible)': FOCUS_RING,
                         }}
                       >
-                        <LegislatorAvatar
-                          src={portraitSrc}
-                          alt={leg ? kyLegislatorPortraitAlt(leg) : member.displayName}
-                          initials={initials}
-                          party={leg?.party}
-                          showPartyBadge={Boolean(leg)}
-                          imgProps={{ referrerPolicy: 'no-referrer' }}
-                          sx={{ width: 52, height: 52, fontSize: '0.95rem' }}
-                        />
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="subtitle1" color="text.primary" fontWeight={600} noWrap>
-                            {member.displayName}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            {member.roleLabel || (leg ? legislatorRoleDistrictLine(leg) : 'LRC legislator profile')}
-                          </Typography>
-                          {leg?.email && (
-                            <Typography variant="caption" color="text.secondary" display="block" noWrap>
-                              {leg.email}
-                            </Typography>
-                          )}
+                        {href && (
+                          <Link
+                            href={href}
+                            className="committee-member-stretch-link"
+                            {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                            aria-label={`View profile for ${member.displayName}`}
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              zIndex: 1,
+                              borderRadius: 8,
+                              textDecoration: 'none',
+                            }}
+                          >
+                            <span className="sr-only">View profile</span>
+                          </Link>
+                        )}
+                        <Box sx={{ position: 'relative', zIndex: 2, pointerEvents: href ? 'none' : undefined }}>
+                          {identity}
                         </Box>
                       </Box>
-                    );
-                    return href ? (
-                      <Link
-                        key={member.key}
-                        href={href}
-                        {...(!leg ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                        style={{ textDecoration: 'none', color: 'inherit' }}
-                      >
-                        {row}
-                      </Link>
-                    ) : (
-                      <Box key={member.key}>{row}</Box>
                     );
                   })}
                 </Box>

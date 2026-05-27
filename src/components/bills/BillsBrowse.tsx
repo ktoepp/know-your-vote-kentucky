@@ -9,7 +9,6 @@ import {
   Box,
   CircularProgress,
   Alert,
-  Grid,
   ToggleButtonGroup,
   ToggleButton,
   Chip,
@@ -33,6 +32,7 @@ import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import type { KyBillsBrowseChamberMode } from '@/lib/ky-bills-browse-server';
 import { kyBillsBrowseQueryKey } from '@/lib/ky-bills-browse-query';
 import { KYBillCard } from '@/components/bills/KYBillCard';
+import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { gaChamberFilterLabel, type GaChamberFilter } from '@/lib/ky-committee-display';
@@ -633,18 +633,18 @@ export function BillsBrowse({
           </Box>
         ) : !followsAwaiting ? (
           <Box key={browsePagerResetKey}>
-            <Grid container spacing={3}>
+            <CardGrid>
               {bills.map((bill) => (
-                <Grid item xs={12} sm={6} md={4} key={bill.id}>
+                <CardGridItem key={bill.id}>
                   <KYBillCard
                     bill={bill}
                     legislators={legislators}
                     followedBillIds={authed ? followedBillIds : null}
                     followedTopics={authed ? followedTopics : null}
                   />
-                </Grid>
+                </CardGridItem>
               ))}
-            </Grid>
+            </CardGrid>
             <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
               <Typography variant="caption" color="text.secondary">
                 Showing {bills.length.toLocaleString()} of {browseTotal.toLocaleString()}

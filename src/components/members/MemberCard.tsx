@@ -16,18 +16,16 @@ import { MemberName } from '@/components/civic/MemberName';
 import { MetaChip } from '@/components/ui/Chip';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
 import { legislatorDistrictLine, legislatorRoleTitle } from '@/lib/legislator-display';
-import { CARD, ICON_REM } from '@/lib/ui-tokens';
+import { CARD, FOCUS_RING, ICON_REM } from '@/lib/ui-tokens';
 import {
   isKentuckyGovernor,
-  kyLegislatorAvatarInitials,
   kyLegislatorCampaignWebsite,
-  kyLegislatorPortraitAlt,
   kyLegislatureProfileUrl,
   kyLegislaturePublicUrl,
+  legislatorAvatarDescriptor,
   legislatorDisplayPhone,
   memberSlug,
   normalizeBallotpediaHref,
-  normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
 
 export interface MemberCardProps {
@@ -95,16 +93,7 @@ export function MemberCard({
             showDistrictInSubtitle ? legislatorDistrictLine(leg) : null
           }
           density={avatarDensity}
-          avatar={{
-            src:
-              normalizeLegislatorPhotoUrl(leg.photo_url) ||
-              normalizeLegislatorPhotoUrl(leg.legiscan_image_url) ||
-              undefined,
-            alt: kyLegislatorPortraitAlt(leg),
-            party: leg.party,
-            initials: kyLegislatorAvatarInitials(leg),
-            imgProps: { referrerPolicy: 'no-referrer' },
-          }}
+          avatar={legislatorAvatarDescriptor(leg)}
           avatarSx={governor ? { border: `2px solid ${theme.palette.success.main}` } : undefined}
           chips={
             isFormerMember || governor ? (
@@ -341,10 +330,7 @@ export function MemberCard({
               transform: CARD.hoverTransform,
               borderColor: governor ? theme.palette.success.dark : theme.palette.primary.main,
             },
-            '&:has(.member-card-stretch-link:focus-visible)': {
-              outline: `2px solid ${theme.palette.primary.main}`,
-              outlineOffset: 2,
-            },
+            '&:has(.member-card-stretch-link:focus-visible)': FOCUS_RING,
           }),
         }}
         header={header}

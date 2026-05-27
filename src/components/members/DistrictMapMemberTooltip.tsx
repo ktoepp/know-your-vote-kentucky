@@ -6,12 +6,10 @@ import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBl
 import type { KYLegislator } from '@/types/kentucky';
 import { legislatorRoleDistrictLine } from '@/lib/legislator-display';
 import {
-  kyLegislatorAvatarInitials,
-  kyLegislatorPortraitAlt,
   kyLegislaturePublicUrl,
+  legislatorAvatarDescriptor,
   legislatorDisplayPhone,
   memberProfilePath,
-  normalizeLegislatorPhotoUrl,
 } from '@/lib/ky-member-utils';
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { MemberName } from '@/components/civic/MemberName';
@@ -90,16 +88,7 @@ function DistrictMapTooltipSectionView({
             roleLine={legislatorRoleDistrictLine(leg, { includeDistrict: false })}
             density="compact"
             gap={1.25}
-            avatar={{
-              src:
-                normalizeLegislatorPhotoUrl(leg.photo_url) ||
-                normalizeLegislatorPhotoUrl(leg.legiscan_image_url) ||
-                undefined,
-              alt: kyLegislatorPortraitAlt(leg),
-              party: leg.party,
-              initials: kyLegislatorAvatarInitials(leg),
-              imgProps: { referrerPolicy: 'no-referrer' },
-            }}
+            avatar={legislatorAvatarDescriptor(leg)}
           />
             {(leg.email ||
               legislatorDisplayPhone(leg.phone) ||

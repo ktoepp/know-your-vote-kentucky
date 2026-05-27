@@ -9,7 +9,6 @@ import {
   CircularProgress,
   Container,
   FormControl,
-  Grid,
   IconButton,
   InputAdornment,
   Link as MuiLink,
@@ -25,6 +24,7 @@ import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import { EmptyState } from '@/components/civic/EmptyState';
 import { AgendaSearchResults } from '@/components/committees/AgendaSearchResults';
 import { CommitteeMeetingCard } from '@/components/committees/CommitteeMeetingCard';
+import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { withTimeout } from '@/lib/async-utils';
 import { searchKyCommitteeAgendaItems } from '@/lib/ky-committee-search';
@@ -328,13 +328,13 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
         ) : (
           <PaginatedSection items={filteredMeetings} pageSize={MEETINGS_PAGE_SIZE} variant="loadmore">
             {(visible) => (
-              <Grid container spacing={3}>
+              <CardGrid>
                 {visible.map((meeting) => (
-                  <Grid item xs={12} sm={6} md={4} key={meeting.id}>
+                  <CardGridItem key={meeting.id}>
                     <CommitteeMeetingCard meeting={meeting} />
-                  </Grid>
+                  </CardGridItem>
                 ))}
-              </Grid>
+              </CardGrid>
             )}
           </PaginatedSection>
         )}

@@ -12,7 +12,6 @@ import {
   Chip,
   Container,
   FormControl,
-  Grid,
   MenuItem,
   Select,
   Link as MuiLink,
@@ -25,6 +24,7 @@ import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import type { GaChamberFilter } from '@/lib/ky-committee-display';
 import { EmptyState } from '@/components/civic/EmptyState';
 import { KYCommitteeCard } from '@/components/committees/KYCommitteeCard';
+import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import type { KYCommitteeBrowseCard } from '@/lib/ky-committees-browse-enriched';
 import { LRC_COMMITTEES_INDEX_URL } from '@/lib/ky-committee-display';
@@ -183,17 +183,17 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
             variant="loadmore"
           >
             {(visible) => (
-              <Grid container spacing={{ xs: 2, md: 3 }}>
+              <CardGrid>
                 {visible.map((committee) => (
-                  <Grid item xs={12} sm={6} md={4} key={committee.id}>
+                  <CardGridItem key={committee.id}>
                     <KYCommitteeCard
                       committee={committee}
                       following={followedCommitteeIds.has(committee.id)}
                       onToggleFollow={authed ? toggleFollow : undefined}
                     />
-                  </Grid>
+                  </CardGridItem>
                 ))}
-              </Grid>
+              </CardGrid>
             )}
           </PaginatedSection>
         )}

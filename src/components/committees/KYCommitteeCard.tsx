@@ -83,7 +83,6 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
       ariaLabel={displayName}
       sx={{
         minHeight: 214,
-        borderRadius: 1.25,
         borderColor: 'divider',
         '& .MuiCardContent-root': {
           p: { xs: 2, sm: 2.25 },

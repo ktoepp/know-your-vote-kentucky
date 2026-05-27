@@ -25,7 +25,7 @@ import { KYBillCard } from '@/components/bills/KYBillCard';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
 import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
 import { groupLegislatorExternalLinks, labelForLinkHost } from '@/lib/legislator-link-normalize';
-import { ICON_REM, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
+import { ICON_REM, INTERACTION, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
 import { BillNumber } from '@/components/bills/BillNumber';
 import { formatKyIsoDateShort } from '@/lib/bill-display';
 import { shortKyCommitteeLabel } from '@/lib/ky-committee-display';
@@ -85,7 +85,7 @@ function CommitteeAssignmentTile({ assignment }: { assignment: MemberCommitteeAs
         flexDirection: 'column',
         justifyContent: 'center',
         gap: 0.5,
-        '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+        ...INTERACTION.tileHover,
       }}
     >
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75 }}>

@@ -43,6 +43,7 @@ import { getSessionTooltip } from '@/lib/ky-sessions';
 import { formatCivicDate } from '@/lib/civic-date';
 import { supabase } from '@/app/lib/supabaseClient';
 import {
+  kyLegislatorAvatarInitials,
   matchLegislatorByLegiscanId,
   matchLegislatorBySponsorName,
   memberProfilePath,
@@ -193,13 +194,16 @@ function SponsorCard({
             src: photo || undefined,
             alt: kySponsorPortraitAlt(sponsor.name),
             party: sponsor.party,
-            initials: `${sponsor.first_name?.[0] ?? ''}${sponsor.last_name?.[0] ?? ''}`,
+            initials: kyLegislatorAvatarInitials(sponsor),
             imgProps: { referrerPolicy: 'no-referrer' },
           }}
           chips={
-            isPrimary ? (
-              <MetaChip label="Primary sponsor" size="small" tone="primary" variant="filled" />
-            ) : undefined
+            <MetaChip
+              label={isPrimary ? 'Primary sponsor' : 'Co-sponsor'}
+              size="small"
+              tone="primary"
+              variant="filled"
+            />
           }
         />
 
@@ -706,39 +710,18 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                   <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
                     Co-sponsors ({coSponsors.length})
                   </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    {coSponsors.map((s) => {
-                      const coHref = memberProfilePath({ name: s.name, id: s.name });
-                      const coBp = normalizeBallotpediaHref(s.bio?.social?.ballotpedia ?? s.ballotpedia);
-                      const coPhoto = normalizeLegislatorPhotoUrl(
-                        matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
-                          matchLegislatorBySponsorName(legislators, s.name)?.photo_url ??
-                          s.bio?.social?.image,
-                      );
-                      return (
-                        <Box key={s.people_id}>
-                          <LegislatorIdentityBlock
-                            name={<MemberName member={s} variant="primary" />}
-                            nameHref={coHref}
-                            roleLine={legislatorRoleDistrictLineFromSponsor(s, legislators)}
-                            density="compact"
-                            avatar={{
-                              src: coPhoto || undefined,
-                              alt: kySponsorPortraitAlt(s.name),
-                              party: s.party,
-                              initials: `${s.first_name?.[0] ?? ''}${s.last_name?.[0] ?? ''}`,
-                              imgProps: { referrerPolicy: 'no-referrer' },
-                            }}
-                            chips={
-                              <>
-                                <MetaChip label="Co-sponsor" size="small" tone="primary" variant="filled" />
-                                {coBp && <LegislatorExternalLinkButton href={coBp}>Ballotpedia</LegislatorExternalLinkButton>}
-                              </>
-                            }
-                          />
-                        </Box>
-                      );
-                    })}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {coSponsors.map((s) => (
+                      <SponsorCard
+                        key={s.people_id}
+                        sponsor={s}
+                        legislators={legislators}
+                        rosterPhoto={
+                          matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
+                          matchLegislatorBySponsorName(legislators, s.name)?.photo_url
+                        }
+                      />
+                    ))}
                   </Box>
                 </MuiCardContent>
               </MuiCard>

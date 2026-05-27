@@ -9,7 +9,6 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  Grid,
   TextField,
   InputAdornment,
   Link as MuiLink,
@@ -20,6 +19,7 @@ import { AccountBalance, Cancel, Groups, House, Search } from '@mui/icons-materi
 import type { KYLegislator } from '@/types/kentucky';
 import { isKentuckyGovernor, memberProfilePath } from '@/lib/ky-member-utils';
 import { MemberCard } from '@/components/members/MemberCard';
+import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 
@@ -37,14 +37,12 @@ function ChamberSection({
   icon,
   legislators,
   legislatorRoster,
-  cardFeatured = false,
 }: {
   title: string;
   caption?: string;
   icon: React.ReactNode;
   legislators: KYLegislator[];
   legislatorRoster: KYLegislator[];
-  cardFeatured?: boolean;
 }) {
   if (legislators.length === 0) return null;
   return (
@@ -65,25 +63,17 @@ function ChamberSection({
       </Box>
       <PaginatedSection items={legislators} pageSize={MEMBERS_PAGE_SIZE} variant="loadmore">
         {(visible) => (
-          <Grid container spacing={3}>
+          <CardGrid>
             {visible.map((leg) => (
-              <Grid
-                item
-                xs={12}
-                sm={cardFeatured ? 12 : 6}
-                md={cardFeatured ? 8 : 4}
-                lg={cardFeatured ? 6 : 4}
-                key={leg.id}
-              >
+              <CardGridItem key={leg.id}>
                 <MemberCard
                   leg={leg}
-                  featured={cardFeatured}
                   profileHref={memberProfilePath(leg)}
                   legislatorRoster={legislatorRoster}
                 />
-              </Grid>
+              </CardGridItem>
             ))}
-          </Grid>
+          </CardGrid>
         )}
       </PaginatedSection>
     </Box>
@@ -262,7 +252,6 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
                 icon={<AccountBalance sx={{ fontSize: 28 }} />}
                 legislators={executiveLegislators}
                 legislatorRoster={legislatorRoster}
-                cardFeatured
               />
             )}
             <ChamberSection
@@ -286,25 +275,17 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
             variant="loadmore"
           >
             {(visible) => (
-              <Grid container spacing={3}>
+              <CardGrid>
                 {visible.map((leg) => (
-                  <Grid
-                    item
-                    xs={12}
-                    sm={6}
-                    md={chamberFilter === 'governor' ? 8 : 4}
-                    lg={chamberFilter === 'governor' ? 6 : 4}
-                    key={leg.id}
-                  >
+                  <CardGridItem key={leg.id}>
                     <MemberCard
                       leg={leg}
-                      featured={chamberFilter === 'governor'}
                       profileHref={memberProfilePath(leg)}
                       legislatorRoster={legislatorRoster}
                     />
-                  </Grid>
+                  </CardGridItem>
                 ))}
-              </Grid>
+              </CardGrid>
             )}
           </PaginatedSection>
         )}

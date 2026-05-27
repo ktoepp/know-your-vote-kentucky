@@ -10,6 +10,23 @@ import {
 } from '@/lib/legislator-link-normalize';
 import { legiscanMemberPersonUrl, normalizeBallotpediaHref, legiscanPersonUrl } from './external-legislative-links';
 
+/**
+ * Two-letter initials for `Avatar` from a display-name string. Strips parentheticals
+ * (e.g. party tags like "(R)") before parsing. Canonical fallback used everywhere a
+ * legislator object isn't available.
+ */
+export function avatarInitialsFromName(name: string | null | undefined): string {
+  const cleaned = (name || '').replace(/\([^)]*\)/g, ' ').trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const a = parts[0]?.[0];
+    const b = parts[parts.length - 1]?.[0];
+    if (a && b) return `${a}${b}`.toUpperCase();
+  }
+  if (parts.length === 1 && parts[0]!.length) return parts[0]!.slice(0, 2).toUpperCase();
+  return '?';
+}
+
 /** Two-letter initials for `Avatar` when photo is missing (uses first/last or parses `name`). */
 export function kyLegislatorAvatarInitials(leg: Pick<KYLegislator, 'name' | 'first_name' | 'last_name'>): string {
   const fi = leg.first_name?.trim();
@@ -17,14 +34,51 @@ export function kyLegislatorAvatarInitials(leg: Pick<KYLegislator, 'name' | 'fir
   if (fi && la) return `${fi[0]!}${la[0]!}`.toUpperCase();
   if (fi) return fi.slice(0, 2).toUpperCase();
   if (la) return la.slice(0, 2).toUpperCase();
-  const parts = (leg.name || '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    const a = parts[0]?.[0];
-    const b = parts[parts.length - 1]?.[0];
-    if (a && b) return `${a}${b}`.toUpperCase();
+  return avatarInitialsFromName(leg.name);
+}
+
+/** Avatar descriptor for `LegislatorIdentityBlock` — single source for portrait, alt, party badge, and initials. */
+export interface LegislatorAvatarDescriptor {
+  src?: string;
+  alt: string;
+  party?: string | null;
+  initials: string;
+  showPartyBadge: boolean;
+  imgProps: { referrerPolicy: 'no-referrer' };
+}
+
+/**
+ * Build the avatar block for a legislator (or an unresolved member, given a fallback name).
+ * Normalizes photo URL, alt text, party badge, and initials so every surface renders portraits identically.
+ */
+export function legislatorAvatarDescriptor(
+  leg:
+    | Pick<KYLegislator, 'name' | 'first_name' | 'last_name' | 'party' | 'photo_url' | 'legiscan_image_url'>
+    | null
+    | undefined,
+  fallbackName?: string,
+): LegislatorAvatarDescriptor {
+  if (!leg) {
+    return {
+      src: undefined,
+      alt: kySponsorPortraitAlt(fallbackName),
+      party: null,
+      initials: avatarInitialsFromName(fallbackName),
+      showPartyBadge: false,
+      imgProps: { referrerPolicy: 'no-referrer' },
+    };
   }
-  if (parts.length === 1 && parts[0].length) return parts[0].slice(0, 2).toUpperCase();
-  return '?';
+  return {
+    src:
+      normalizeLegislatorPhotoUrl(leg.photo_url) ||
+      normalizeLegislatorPhotoUrl(leg.legiscan_image_url) ||
+      undefined,
+    alt: kyLegislatorPortraitAlt(leg),
+    party: leg.party,
+    initials: kyLegislatorAvatarInitials(leg),
+    showPartyBadge: true,
+    imgProps: { referrerPolicy: 'no-referrer' },
+  };
 }
 
 /** Accessible `alt` for legislator headshots when `name` / roster row is available. */

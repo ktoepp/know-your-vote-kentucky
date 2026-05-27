@@ -4,15 +4,15 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Chip } from '@mui/material';
 import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
-import { formatMemberDisplay, memberSlug, normalizeLegislatorPhotoUrl, kySponsorPortraitAlt } from '@/lib/ky-member-utils';
+import {
+  avatarInitialsFromName,
+  formatMemberDisplay,
+  memberSlug,
+  normalizeLegislatorPhotoUrl,
+  kySponsorPortraitAlt,
+} from '@/lib/ky-member-utils';
 import { formatPartyLetterAbbrev } from '@/lib/bill-display';
 import { CHIP } from '@/lib/ui-tokens';
-
-function initials(name: string) {
-  const parts = name.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
 
 export interface SponsorAvatarChipProps {
   name: string;
@@ -48,7 +48,7 @@ export function SponsorAvatarChip({
           alt={kySponsorPortraitAlt(name)}
           imgProps={{ referrerPolicy: 'no-referrer' }}
           party={party}
-          initials={initials(name)}
+          initials={avatarInitialsFromName(name)}
           sx={{
             width: 24,
             height: 24,
@@ -58,7 +58,12 @@ export function SponsorAvatarChip({
       }
       label={label}
       title={partyAbbrev ? `${name} · ${partyAbbrev}` : name}
-      sx={{ ...CHIP.standard, ...CHIP.avatar }}
+      sx={{
+        ...CHIP.standard,
+        ...CHIP.avatar,
+        transition: 'background-color 0.15s ease, border-color 0.15s ease',
+        '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
+      }}
     />
   );
 }

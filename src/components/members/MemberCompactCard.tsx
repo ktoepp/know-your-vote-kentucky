@@ -10,12 +10,8 @@ import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBl
 import { MemberName } from '@/components/civic/MemberName';
 import { MetaChip } from '@/components/ui/Chip';
 import { legislatorRoleDistrictLine } from '@/lib/legislator-display';
-import { CARD } from '@/lib/ui-tokens';
-import {
-  kyLegislatorAvatarInitials,
-  kyLegislatorPortraitAlt,
-  normalizeLegislatorPhotoUrl,
-} from '@/lib/ky-member-utils';
+import { CARD, FOCUS_RING } from '@/lib/ui-tokens';
+import { legislatorAvatarDescriptor } from '@/lib/ky-member-utils';
 
 export interface MemberCompactCardProps {
   /** Resolved legislator — drives portrait, party badge, and title/district subtitle. */
@@ -29,14 +25,6 @@ export interface MemberCompactCardProps {
   roleLabel?: string | null;
   /** Heading level for the member name. @default 'h3' */
   profileNameHeading?: 'h2' | 'h3' | 'h4';
-}
-
-function initialsFromName(name: string): string {
-  const parts = name.replace(/\([^)]*\)/g, '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  const first = parts[0]!.charAt(0);
-  const last = parts.length > 1 ? parts[parts.length - 1]!.charAt(0) : '';
-  return (first + last).toUpperCase() || '?';
 }
 
 /**
@@ -53,10 +41,6 @@ export function MemberCompactCard({
 }: MemberCompactCardProps) {
   const theme = useTheme();
   const clickable = Boolean(profileHref);
-  const portraitSrc = leg
-    ? normalizeLegislatorPhotoUrl(leg.photo_url) || normalizeLegislatorPhotoUrl(leg.legiscan_image_url) || undefined
-    : undefined;
-  const initials = leg ? kyLegislatorAvatarInitials(leg) : initialsFromName(displayName);
   const ariaName = leg?.name?.trim() || displayName;
 
   return (
@@ -70,12 +54,9 @@ export function MemberCompactCard({
         transition: CARD.hoverTransition,
         ...(clickable && {
           cursor: 'pointer',
-          '&:has(.member-card-stretch-link:focus-visible)': {
-            outline: `2px solid ${theme.palette.primary.main}`,
-            outlineOffset: 2,
-          },
+          '&:has(.member-card-stretch-link:focus-visible)': FOCUS_RING,
           '&:hover': {
-            boxShadow: 4,
+            boxShadow: theme.palette.mode === 'dark' ? CARD.hoverBoxShadowDark : CARD.hoverBoxShadow,
             transform: CARD.hoverTransform,
             borderColor: theme.palette.primary.main,
           },
@@ -124,14 +105,7 @@ export function MemberCompactCard({
           nameComponent={profileNameHeading}
           roleLine={leg ? legislatorRoleDistrictLine(leg) : 'LRC legislator profile'}
           density="compact"
-          avatar={{
-            src: portraitSrc,
-            alt: leg ? kyLegislatorPortraitAlt(leg) : displayName,
-            party: leg?.party,
-            initials,
-            showPartyBadge: Boolean(leg),
-            imgProps: { referrerPolicy: 'no-referrer' },
-          }}
+          avatar={legislatorAvatarDescriptor(leg, displayName)}
           chips={roleLabel ? <MetaChip label={roleLabel} size="small" tone="primary" variant="outlined" /> : undefined}
         />
       </CardContent>
