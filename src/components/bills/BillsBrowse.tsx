@@ -622,7 +622,7 @@ export function BillsBrowse({
               {!supabase
                 ? 'Supabase is not configured. Bills will appear once connected.'
                 : effectiveFollowsMe
-                  ? "You haven't followed any bills yet. Browse current bills and tap Follow on a bill to start following."
+                  ? "You haven't followed any bills yet. Browse current bills and select Follow on a bill to start following."
                   : 'Try adjusting your filters.'}
             </Typography>
             {effectiveFollowsMe && (

@@ -91,7 +91,7 @@ function EmptyState({
         <MuiLink component={NextLink} href="/bills" fontWeight={600}>
           Browse bills
         </MuiLink>{' '}
-        and tap Follow on bills you want to follow.
+        and select Follow on bills you want to follow.
       </Typography>
     );
   }

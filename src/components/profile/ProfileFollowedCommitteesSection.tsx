@@ -129,7 +129,7 @@ export function ProfileFollowedCommitteesSection() {
             No committees followed yet
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420 }}>
-            Tap <strong>Follow</strong> on any committee page to get notified when new meetings are
+            Select <strong>Follow</strong> on any committee page to get notified when new meetings are
             added to the calendar.
           </Typography>
           <Button component={NextLink} href="/committees" variant="contained" size="small" sx={{ mt: 1 }}>
