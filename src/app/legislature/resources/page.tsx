@@ -35,7 +35,7 @@ const EXTERNAL_RESOURCES = [
   {
     title: 'Kentucky Bill Watch',
     description:
-      'Official state bill tracking and email alerts (Kentucky.gov account). KYVKY adds an open calendar UI plus optional digest alerts when you enable Hearing scheduled on your profile.',
+      'Official state bill tracking and email alerts (Kentucky.gov account). KYVKY adds an open calendar UI plus optional digest alerts when you turn on hearing alerts in your notification preferences.',
     href: 'https://www.kentucky.gov/services/pages/billwatch.aspx',
   },
   {
@@ -62,6 +62,9 @@ export default function LegislatureResourcesPage() {
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Typography variant="h4" component="h1" fontWeight={700} gutterBottom sx={{ textAlign: 'center' }}>
           Frankfort resources
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+          Official sources from the Kentucky General Assembly and the Legislative Research Commission (LRC).
         </Typography>
 
         <List disablePadding sx={{ mt: 3 }}>

@@ -86,7 +86,7 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
             Committees
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mx: 'auto', maxWidth: 640 }}>
-            Kentucky General Assembly committees with scheduled meetings on the LRC legislative calendar.{' '}
+            Kentucky General Assembly committees with scheduled meetings on the Legislative Research Commission (LRC) legislative calendar.{' '}
             <MuiLink component={Link} href="/meetings" fontWeight={600}>
               Browse meetings
             </MuiLink>{' '}

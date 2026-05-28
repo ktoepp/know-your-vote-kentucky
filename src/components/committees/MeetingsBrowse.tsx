@@ -170,7 +170,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
             Committee meetings
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Scheduled General Assembly committee meetings from the LRC legislative calendar.{' '}
+            Scheduled General Assembly committee meetings from the Legislative Research Commission (LRC) legislative calendar.{' '}
             <MuiLink component={Link} href="/committees" fontWeight={600}>
               Committee directory
             </MuiLink>

@@ -60,7 +60,7 @@ export default function BackNavigation({
       case 'dashboard':
         return 'Back to Dashboard';
       default:
-        return 'Back to Events';
+        return 'Back to home';
     }
   };
 
@@ -82,7 +82,7 @@ export default function BackNavigation({
         case 'dashboard':
           return '/dashboard';
         default:
-          return '/events';
+          return '/';
       }
     })();
 
@@ -148,9 +148,7 @@ export default function BackNavigation({
         );
         break;
       default:
-        breadcrumbs.push(
-          { label: 'Events', href: '/events', icon: <Search fontSize="small" /> }
-        );
+        break;
     }
 
     if (eventTitle) {

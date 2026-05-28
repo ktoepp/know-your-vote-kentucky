@@ -134,7 +134,7 @@ export function CommitteeDetailView({
 
   const officialLinks = [
     ...(committee.profile_url
-      ? [{ href: committee.profile_url, label: 'LRC committee profile' }]
+      ? [{ href: committee.profile_url, label: 'Legislative Research Commission (LRC) committee profile' }]
       : []),
     { href: LRC_LEGISLATIVE_CALENDAR_URL, label: 'Legislative calendar' },
     ...(committee.profile_url

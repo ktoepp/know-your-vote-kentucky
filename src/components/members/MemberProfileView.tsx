@@ -297,8 +297,7 @@ export function MemberProfileView({
 
             {sponsoredBills.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                No sponsored bills found for this session yet. If this member should have bills listed,
-                run a bills sync so sponsor data is populated.
+                No sponsored bills found for this session yet. Sponsor data may lag the official record.
               </Typography>
             ) : (
               <MemberSponsoredBills entries={sponsoredBills} legislatorRoster={legislatorRoster} />
@@ -428,7 +427,7 @@ export function MemberProfileView({
                   </Typography>
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Standing and interim committees from the LRC legislative calendar and roster data.
+                  Standing and interim committees from the Legislative Research Commission (LRC) legislative calendar and roster data.
                 </Typography>
                 {committeeAssignments.length === 0 ? (
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

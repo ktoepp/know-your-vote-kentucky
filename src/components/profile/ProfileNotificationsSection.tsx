@@ -233,7 +233,7 @@ export function ProfileNotificationsSection() {
         <MuiLink component={Link} href="/legislature/resources" underline="hover" fontWeight={600}>
           Bill Watch
         </MuiLink>{' '}
-        — no separate state login needed. Committee hearings come from the LRC legislative calendar; enable{' '}
+        — no separate state login needed. Committee hearings come from the Legislative Research Commission (LRC) legislative calendar; enable{' '}
         <strong>Agenda / hearing scheduled</strong> to include those lines.
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
