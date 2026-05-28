@@ -1,7 +1,13 @@
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import { DynamicFeed, ListAlt, Place } from '@mui/icons-material';
 import Link from 'next/link';
-import { LANDING_HERO_BACKGROUND, LANDING_HERO_SCRIM } from '@/components/home/landingHeroStyles';
+import {
+  HERO_CTA_PRIMARY_SX,
+  HERO_CTA_SECONDARY_SX,
+  HERO_CTA_TERTIARY_SX,
+  LANDING_HERO_BACKGROUND,
+  LANDING_HERO_SCRIM_RETURNING,
+} from '@/components/home/landingHeroStyles';
 
 /** Signed-in home hero: bill/feed first, map secondary (returning users). */
 export function LandingHeroReturning() {
@@ -13,7 +19,7 @@ export function LandingHeroReturning() {
         textAlign: 'center',
       }}
     >
-      <Box sx={LANDING_HERO_SCRIM} />
+      <Box sx={LANDING_HERO_SCRIM_RETURNING} />
       <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
         <Typography
           variant="h4"
@@ -31,15 +37,18 @@ export function LandingHeroReturning() {
         <Typography
           variant="body1"
           sx={{
-            opacity: 0.95,
             mb: 3,
             maxWidth: 480,
             mx: 'auto',
             lineHeight: 1.55,
-            textShadow: '0 1px 8px rgba(15, 23, 42, 0.35)',
+            fontWeight: 500,
+            // The `body1` variant bakes in a dark color (theme.ts) which would
+            // otherwise win over the hero's inherited white — force white here.
+            color: 'common.white',
+            textShadow: '0 1px 4px rgba(0, 0, 0, 0.55)',
           }}
         >
-          Pick up where you left off — your feed, bills you follow, or the full legislature browse.
+          Pick up where you left off — your feed, bills you follow, or browse the full legislature.
         </Typography>
         <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" useFlexGap>
           <Button
@@ -48,12 +57,7 @@ export function LandingHeroReturning() {
             variant="contained"
             size="large"
             startIcon={<DynamicFeed sx={{ fontSize: 20 }} aria-hidden />}
-            sx={{
-              bgcolor: 'common.white',
-              color: '#0f172a',
-              fontWeight: 700,
-              '&:hover': { bgcolor: '#f1f5f9' },
-            }}
+            sx={HERO_CTA_PRIMARY_SX}
           >
             Your feed
           </Button>
@@ -63,27 +67,17 @@ export function LandingHeroReturning() {
             variant="contained"
             size="large"
             startIcon={<ListAlt sx={{ fontSize: 20 }} aria-hidden />}
-            sx={{
-              bgcolor: '#0f172a',
-              color: 'common.white',
-              fontWeight: 600,
-              '&:hover': { bgcolor: '#1e293b' },
-            }}
+            sx={HERO_CTA_SECONDARY_SX}
           >
             Browse bills
           </Button>
           <Button
             component={Link}
             href="/members/map"
-            variant="outlined"
+            variant="contained"
             size="large"
             startIcon={<Place sx={{ fontSize: 20 }} aria-hidden />}
-            sx={{
-              color: 'common.white',
-              borderColor: 'rgba(255,255,255,0.65)',
-              fontWeight: 600,
-              '&:hover': { borderColor: 'common.white', bgcolor: 'rgba(255,255,255,0.1)' },
-            }}
+            sx={HERO_CTA_TERTIARY_SX}
           >
             District map
           </Button>
