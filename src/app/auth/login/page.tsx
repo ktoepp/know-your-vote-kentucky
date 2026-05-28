@@ -49,7 +49,7 @@ function LoginForm() {
   };
 
   return (
-    <AuthPaperLayout title="Log in" subtitle="Sign in to manage your account and preferences.">
+    <AuthPaperLayout title="Log in" subtitle="Log in to manage your account and preferences.">
       <Box component="form" onSubmit={handleLogin}>
         <TextField
           label="Email"
@@ -82,7 +82,7 @@ function LoginForm() {
           </Alert>
         )}
         <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 3 }} disabled={loading}>
-          {loading ? 'Signing in…' : 'Sign in'}
+          {loading ? 'Logging in…' : 'Log in'}
         </Button>
       </Box>
       <Divider sx={{ my: 3 }}>

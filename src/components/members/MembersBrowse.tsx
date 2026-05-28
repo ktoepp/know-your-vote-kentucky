@@ -216,7 +216,7 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Groups sx={{ fontSize: '1.2rem', color: 'primary.main' }} />
           <Typography variant="body2" fontWeight={600}>
-            {filtered.length} {filtered.length === 1 ? 'person' : 'people'}
+            {filtered.length} {filtered.length === 1 ? 'member' : 'members'}
           </Typography>
         </Box>
 

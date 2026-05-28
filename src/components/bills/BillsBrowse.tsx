@@ -651,7 +651,7 @@ export function BillsBrowse({
               </Typography>
               {bills.length < browseTotal && (
                 <Button variant="outlined" onClick={loadMoreBills} disabled={loadingMore}>
-                  {loadingMore ? 'Loading…' : 'Load more bills'}
+                  {loadingMore ? 'Loading…' : 'Load more'}
                 </Button>
               )}
             </Box>

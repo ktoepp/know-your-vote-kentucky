@@ -83,7 +83,7 @@ const navLinks: NavLinkConfig[] = [
   },
   {
     href: '/members/map',
-    label: 'Find my Legislator',
+    label: 'Find my legislators',
     icon: <KentuckyStateIcon />,
     priority: 'primary',
   },
@@ -332,7 +332,7 @@ function UserMenu() {
         size="small"
         sx={{ whiteSpace: 'nowrap', color: 'text.primary', display: { xs: 'none', sm: 'inline-flex' } }}
       >
-        Sign in
+        Log in
       </Button>
       <Button
         component={Link}

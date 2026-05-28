@@ -229,12 +229,12 @@ export function ProfileNotificationsSection() {
         Email about these event types
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        Aligned with Kentucky{' '}
+        These match the alert types in Kentucky&apos;s official{' '}
         <MuiLink component={Link} href="/legislature/resources" underline="hover" fontWeight={600}>
           Bill Watch
         </MuiLink>{' '}
-        alert types — without a separate state login. Hearings use our LRC calendar sync; enable{' '}
-        <strong>Agenda / hearing scheduled</strong> for committee agenda lines.
+        — no separate state login needed. Committee hearings come from the LRC legislative calendar; enable{' '}
+        <strong>Agenda / hearing scheduled</strong> to include those lines.
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
         <Button size="small" variant="outlined" onClick={applyPresetMilestones}>

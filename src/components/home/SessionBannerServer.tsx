@@ -27,7 +27,7 @@ export function SessionBannerServer() {
               rel="noopener noreferrer"
               sx={{ color: 'primary.main', textDecoration: 'underline' }}
             >
-              Check the LRC for meetings and published calendars.
+              Check the Legislative Research Commission (LRC) for meetings and published calendars.
             </Box>
           </Typography>
         )}

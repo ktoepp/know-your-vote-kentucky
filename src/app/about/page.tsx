@@ -29,7 +29,7 @@ export default function AboutPage() {
           <ListItem disableGutters>
             <ListItemText
               primary="Bills, votes, and status"
-              secondary="LegiScan API — synced daily during session and interim when bills move."
+              secondary="LegiScan — synced daily during session and interim when bills move."
             />
           </ListItem>
           <ListItem disableGutters>
@@ -47,7 +47,7 @@ export default function AboutPage() {
           <ListItem disableGutters>
             <ListItemText
               primary="District boundaries"
-              secondary="Public GeoJSON maintained in this project; address lookup via Mapbox geocoding."
+              secondary="Public boundary data maintained in this project; address lookup via Mapbox."
             />
           </ListItem>
         </List>

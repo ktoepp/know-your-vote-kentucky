@@ -38,8 +38,8 @@ export function LandingHero() {
             textShadow: '0 1px 8px rgba(15, 23, 42, 0.35)',
           }}
         >
-          Free tool for Kentucky residents to find their reps, track bills, and get notified when legislation
-          moves.
+          Free tool for Kentucky residents to find their representatives, track bills, and get notified when
+          legislation moves.
         </Typography>
         <LandingHeroCtas />
       </Container>

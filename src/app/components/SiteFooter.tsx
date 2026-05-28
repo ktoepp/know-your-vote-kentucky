@@ -19,7 +19,7 @@ const footerNavLinks = [
 ];
 
 const footerAuthLinks = [
-  { href: '/auth/login', label: 'Sign in' },
+  { href: '/auth/login', label: 'Log in' },
   { href: '/auth/register', label: 'Sign up' },
 ];
 

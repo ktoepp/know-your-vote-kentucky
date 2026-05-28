@@ -60,14 +60,15 @@ export function WelcomeEmail(props: {
               representatives in the current session.
             </Text>
             <Text style={cta}>
-              <Link href={districtMapHref} style={link}>District map →</Link>
+              <Link href={districtMapHref} style={link}>Find my legislators →</Link>
             </Text>
           </Section>
           <Section style={card}>
             <Text style={cardHeading}>Set digest preferences</Text>
             <Text style={body}>
-              Choose daily or weekly delivery, select which event types to include, and
-              follow topics by subject area — bills in that area will be matched automatically.
+              Choose daily or weekly delivery and select which event types to include. You can also
+              follow topics by subject area — automated tagging, so following a specific bill stays
+              the most reliable way to track it.
             </Text>
             <Text style={cta}>
               <Link href={preferencesHref} style={link}>Notification preferences →</Link>
