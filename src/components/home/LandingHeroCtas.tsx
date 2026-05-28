@@ -1,10 +1,11 @@
 'use client';
 
-import { Box, Button, Stack } from '@mui/material';
+import { Button, Stack } from '@mui/material';
 import { Place } from '@mui/icons-material';
 import Link from 'next/link';
 import { type ReactNode } from 'react';
 import { LottieIcon, useHoverLottieControls } from '@/components/ui/HoverLottie';
+import { HERO_CTA_PRIMARY_SX, HERO_CTA_SECONDARY_SX } from '@/components/home/landingHeroStyles';
 import searchAnimation from '../../../public/lottie/search.json';
 
 function HeroCtaButton({
@@ -37,23 +38,7 @@ function HeroCtaButton({
       {...(startIcon ? { startIcon } : {})}
       onMouseEnter={animationData ? handleMouseEnter : undefined}
       onMouseLeave={animationData ? handleMouseLeave : undefined}
-      sx={
-        primary
-          ? {
-              bgcolor: 'common.white',
-              color: '#0f172a',
-              fontWeight: 700,
-              boxShadow: '0 1px 3px rgba(15,23,42,0.2)',
-              '&:hover': { bgcolor: '#f1f5f9' },
-            }
-          : {
-              bgcolor: '#0f172a',
-              color: 'common.white',
-              fontWeight: 600,
-              border: '1px solid rgba(255,255,255,0.35)',
-              '&:hover': { bgcolor: '#1e293b' },
-            }
-      }
+      sx={primary ? HERO_CTA_PRIMARY_SX : HERO_CTA_SECONDARY_SX}
     >
       {label}
     </Button>
