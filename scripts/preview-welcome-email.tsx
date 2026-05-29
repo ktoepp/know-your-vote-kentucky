@@ -82,7 +82,7 @@ async function main() {
       browseBillsHref={`${origin}/bills`}
       profileHref={`${origin}/profile`}
       preferencesHref={`${origin}/profile#notifications`}
-      districtMapHref={`${origin}/district-map`}
+      districtMapHref={`${origin}/members/map`}
       privacyHref={`${origin}/privacy`}
       termsHref={`${origin}/terms`}
     />

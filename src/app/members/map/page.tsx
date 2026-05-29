@@ -19,7 +19,7 @@ export default function MembersDistrictMapPage() {
       <Container maxWidth="xl" sx={{ py: 4 }}>
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-            Find My Legislators
+            Find my legislators
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Enter your address or ZIP code to find your Kentucky House and Senate representatives.

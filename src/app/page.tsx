@@ -5,9 +5,9 @@ import { SessionBannerServer } from '@/components/home/SessionBannerServer';
 import { fetchKyCurrentSessionBillCount } from '@/lib/ky-bills-browse-server';
 
 export const metadata: Metadata = {
-  title: 'Know Your Vote Kentucky — Track KY legislation',
+  title: 'Know Your Vote Kentucky — Track Kentucky legislation',
   description:
-    'Free tool for Kentucky residents to find their reps, track bills, and get notified when legislation moves.',
+    'Free tool for Kentucky residents to find their representatives, track bills, and get notified when legislation moves.',
 };
 
 export default async function HomePage() {

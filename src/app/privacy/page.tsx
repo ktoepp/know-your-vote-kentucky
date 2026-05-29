@@ -109,7 +109,7 @@ export default function PrivacyPage() {
               <MuiLink component={Link} href="/profile">your profile</MuiLink>.
             </li>
             <li>
-              Click <em>Unsubscribe from digests</em> at the bottom of any digest email — turns
+              Select <em>Unsubscribe from digests</em> at the bottom of any digest email — turns
               digests off immediately, no login needed.
             </li>
             <li>

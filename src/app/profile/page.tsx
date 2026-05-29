@@ -280,10 +280,10 @@ export default function ProfilePage() {
       <Container maxWidth="sm" sx={{ py: 6 }}>
         <Paper elevation={1} sx={{ p: 4, borderRadius: 2 }}>
           <Typography variant="h5" fontWeight={700} gutterBottom>
-            Sign in
+            Log in
           </Typography>
           <Typography color="text.secondary" sx={{ mb: 3 }}>
-            Sign in to manage your account and security settings.
+            Log in to manage your account and security settings.
           </Typography>
           <Button
             component={Link}

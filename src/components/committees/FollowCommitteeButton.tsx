@@ -74,7 +74,7 @@ export function FollowCommitteeButton({ committeeId, size = 'small' }: Props) {
         startIcon={<Bookmark size={14} aria-hidden />}
         sx={{ borderRadius: 999, px: 1.5 }}
       >
-        Sign in to follow
+        Log in to follow
       </Button>
     );
   }

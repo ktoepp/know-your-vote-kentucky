@@ -151,7 +151,7 @@ export function ProfileFollowedBillsSection() {
             No bills followed yet
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420 }}>
-            Tap <strong>Follow</strong> on any bill page to add it here. We&apos;ll email you a
+            Select <strong>Follow</strong> on any bill page to add it here. We&apos;ll email you a
             digest when it changes status — committee action, floor votes, sent to governor,
             signed, vetoed.
           </Typography>
@@ -159,8 +159,8 @@ export function ProfileFollowedBillsSection() {
             <Button component={NextLink} href="/bills" variant="contained" size="small">
               Browse bills
             </Button>
-            <Button component={NextLink} href="/district-map" variant="outlined" size="small">
-              Find your legislators
+            <Button component={NextLink} href="/members/map" variant="outlined" size="small">
+              Find my legislators
             </Button>
           </Box>
         </Box>

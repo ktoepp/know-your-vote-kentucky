@@ -5,12 +5,12 @@ export const FOLLOW_COPY = {
   follow: 'Follow',
   following: 'Following',
   followed: 'Followed',
-  signInToFollow: 'Sign in to follow',
+  signInToFollow: 'Log in to follow',
   unfollow: 'Unfollow',
   followedBillsSection: 'Followed bills',
   followAnotherBill: 'Follow another bill',
   followingFilter: 'Following',
-  signInForFollowingFilter: 'Sign in to use the Following filter.',
+  signInForFollowingFilter: 'Log in to use the Following filter.',
 } as const;
 
 export type FollowBillButtonState = 'loading' | 'signed_out' | 'idle' | 'following';
@@ -23,7 +23,7 @@ export function followBillButtonLabel(state: FollowBillButtonState): string {
 
 export function followBillAriaLabel(state: FollowBillButtonState): string {
   if (state === 'following') return 'Unfollow this bill';
-  if (state === 'signed_out') return 'Sign in to follow this bill';
+  if (state === 'signed_out') return 'Log in to follow this bill';
   return 'Follow this bill';
 }
 

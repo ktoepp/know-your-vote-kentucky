@@ -79,7 +79,7 @@ export function LandingHeroReturning() {
             startIcon={<Place sx={{ fontSize: 20 }} aria-hidden />}
             sx={HERO_CTA_TERTIARY_SX}
           >
-            District map
+            Find my legislators
           </Button>
         </Stack>
       </Container>
