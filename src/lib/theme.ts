@@ -234,6 +234,36 @@ export const lightTheme = createTheme({
         },
       },
     },
+    /**
+     * Touch-target floor for icon buttons (WCAG 2.5.5). Mirrors the MuiButton
+     * minHeight: 44 above. `size="small"` IconButtons keep their compact footprint
+     * for genuine density needs (e.g. Chip delete icons, dense table rows).
+     */
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          minWidth: 44,
+          minHeight: 44,
+        },
+        sizeSmall: {
+          minWidth: 32,
+          minHeight: 32,
+        },
+      },
+    },
+    /**
+     * Compact `size="small"` Select still respects the touch-target floor on its
+     * outer hit area. The visible adornment may render shorter but the click
+     * region inherits the 44px MuiOutlinedInput-root minHeight.
+     */
+    MuiSelect: {
+      styleOverrides: {
+        select: {
+          minHeight: '44px !important',
+          boxSizing: 'border-box',
+        },
+      },
+    },
     MuiAppBar: {
       styleOverrides: {
         root: {

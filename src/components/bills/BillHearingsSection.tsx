@@ -92,7 +92,7 @@ export function BillHearingsSection({ billId }: BillHearingsSectionProps) {
     >
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>
+          <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight}>
             Hearings &amp; agendas
           </Typography>
         </Box>
