@@ -365,7 +365,18 @@ export function BillsBrowse({
         </Box>
 
         <Box
-          sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', mb: 3 }}
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1,
+            justifyContent: 'center',
+            mb: 3,
+            // WCAG 2.5.5: clickable chips need 44×44 on touch. Desktop keeps the
+            // dense size="small" footprint.
+            '& .MuiChip-clickable': {
+              height: { xs: 44, sm: 'auto' },
+            },
+          }}
           role="group"
           aria-label="Browse by topic"
         >

@@ -7,7 +7,20 @@ export function LandingTopics() {
       <Typography variant="h5" component="h2" fontWeight={700} gutterBottom>
         Explore by topic
       </Typography>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', mt: 2 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 1,
+          justifyContent: 'center',
+          mt: 2,
+          // WCAG 2.5.5: topic chips here are the primary "Explore by topic"
+          // affordance — 44px on touch, default on desktop.
+          '& .MuiChip-clickable': {
+            height: { xs: 44, sm: 'auto' },
+          },
+        }}
+      >
         {LANDING_TOPICS.map(({ label, topic }) => (
           <Chip
             key={label}

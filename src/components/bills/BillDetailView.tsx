@@ -667,7 +667,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
                   <Box sx={{ mb: 2.5 }}>
-                    <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight}>Legislative History</Typography>
+                    <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight}>Legislative History</Typography>
                   </Box>
                   <HistoryTimeline history={history} />
                 </MuiCardContent>
@@ -681,7 +681,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
             {primarySponsors.length > 0 && (
               <MuiCard elevation={0} sx={{ mb: 3, borderRadius: 3, boxShadow: 'none', border: 'none' }}>
                 <MuiCardContent>
-                  <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
+                  <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
                     {primarySponsors.length === 1 ? 'Primary Sponsor' : 'Primary Sponsors'}
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -707,7 +707,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
             {coSponsors.length > 0 && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
-                  <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
+                  <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
                     Co-sponsors ({coSponsors.length})
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -731,7 +731,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
             {detail?.votes && detail.votes.length > 0 && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
-                  <Typography variant={TYPE.cardTitle.variant} fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
+                  <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
                     Roll calls
                   </Typography>
                   {detail.votes.map((v: any, i: number) => {
