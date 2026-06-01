@@ -134,7 +134,20 @@ export default function SiteFooter() {
           </Typography>
           <Typography variant="caption" color="text.disabled" aria-hidden>·</Typography>
           <Typography variant="caption" color="text.secondary">
-            A product of The Eighth Dimension, LLC
+            A product of{' '}
+            <MuiLink
+              href="https://katietoepp.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="always"
+              sx={{
+                color: 'text.secondary',
+                textUnderlineOffset: 3,
+                '&:hover': { color: 'primary.main' },
+              }}
+            >
+              The Eighth Dimension, LLC
+            </MuiLink>
           </Typography>
           <Typography variant="caption" color="text.disabled" aria-hidden>·</Typography>
           <Typography variant="caption" color="text.secondary">
