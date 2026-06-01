@@ -22,6 +22,7 @@
  * Optional Slack (GitHub Actions / CLI): SLACK_WEBHOOK_STATUS_REPORTS (+ SLACK_WEBHOOK_ERRORS) and SLACK_SYNC_NOTIFY_CLI=true
  *
  * Exit: 0 if every non-exempt probe returns 2xx/3xx (LegiScan API counts as OK when getPerson succeeds); 1 if any other failure.
+ */
 import fs from 'node:fs';
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
