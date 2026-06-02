@@ -201,8 +201,8 @@ Reference: [docs/reference/bill-watch/](./docs/reference/bill-watch/README.md). 
 
 From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § Phase 5+:
 
-- `ky_committee_materials`** + **`sync:lrc:committee-materials` — Meeting Materials tab (metadata URLs only).
-- **Session record spike** — **Done 2026-06-02.** See **[docs/specs/session-record-spike-report.md](./docs/specs/session-record-spike-report.md)**. Phase 5b parser + `sync:lrc:enrollment-actions` is the recommended follow-up.
+- `ky_committee_materials`** + **`sync:lrc:committee-materials` — **Shipped 2026-06-02** (see Recently completed). Cron wiring + Slack notify on first sync still pending.
+- **Session record spike** — `fixtures/lrc/legislative-record-26rs-live.html`; floor vs committee event split.
 - **Interim period + session milestones** — **Shipped 2026-06-01** (see Recently completed).
 - **LRC bulk API** — revisit if state publishes machine-readable roster (see Backlog below).
 
