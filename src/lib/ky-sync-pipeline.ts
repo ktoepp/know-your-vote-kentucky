@@ -19,6 +19,7 @@ import { legislatorNameMatchesLegiscanSessionPerson } from './ky-member-committe
 import { legiscanSubjectColumnsFromDetail } from './ky-legiscan-subjects';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
 import { syncKyLrcCalendar } from './ky-lrc-calendar-sync';
+import { syncKyLrcCommitteeMaterials } from './ky-lrc-committee-materials-sync';
 import {
   fetchBillHistorySnapshots,
   recordBillStatusHistoryForBuiltBatch,
@@ -1715,6 +1716,48 @@ export const SYNC_SOURCES: Record<string, (options: SyncOptions) => Promise<Sync
         );
       }
       return result;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      logError(source, message);
+      if (!opts.dryRun) await updateSourceStatus(source, 'error', 0, message);
+      return {
+        source,
+        status: 'error',
+        itemsSynced: 0,
+        error: message,
+        duration: Date.now() - start,
+      };
+    }
+  },
+  /**
+   * Committee meeting materials — scrapes
+   * apps.legislature.ky.gov/CommitteeDocuments/{lrc_rsn} for every committee
+   * with an lrc_rsn. Idempotent upserts; safe to run daily.
+   * See docs/specs/committee-calendar.md § Phase 5 + decisions.md § 2026-06-02.
+   */
+  'lrc-committee-materials': async (opts) => {
+    const start = Date.now();
+    const source = 'lrc-committee-materials';
+    try {
+      const db = getSupabase();
+      const stats = await syncKyLrcCommitteeMaterials(db, {
+        dryRun: opts.dryRun,
+        delayMs: 250,
+      });
+      const itemsSynced = stats.materialsInserted + stats.materialsUpdated;
+      const status = stats.errors > 0 ? 'error' : 'success';
+      const errorMsg =
+        stats.errors > 0 ? `${stats.errors} committee fetch/parse error(s)` : undefined;
+      if (!opts.dryRun) {
+        await updateSourceStatus(source, status, itemsSynced, errorMsg);
+      }
+      return {
+        source,
+        status,
+        itemsSynced,
+        error: errorMsg,
+        duration: Date.now() - start,
+      };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       logError(source, message);

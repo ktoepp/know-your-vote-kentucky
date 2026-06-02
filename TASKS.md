@@ -31,14 +31,12 @@ Browser review closed **2026-05-22**; **Follow committees v1** shipped in PR **#
 - **Legislator outbound links** — `.github/workflows/legislator-links-weekly.yml` runs Mondays 12:00 UTC: `sync:ky:legislators` → `verify:legislator-links --json` → `audit:legiscan-subjects --json`, uploading `reports/` as artifacts. Manual fallback: `npm run verify:legislator-links`. Required GH secrets: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENSTATES_API_KEY`, `LEGISCAN_API_KEY` (last optional). **Slack:** sync + verify digests when `SLACK_WEBHOOK_*` + `SLACK_SYNC_NOTIFY_CLI=true` (heartbeat via `SLACK_SYNC_CLI_DIGEST_ALWAYS=true` while validating).
 - **GitHub Actions sync Slack** — `sync-ky-bills-status.yml` (every 6h), `sync-lrc-calendar.yml` (2× daily live + weekly Wayback backfill), `verify-outbound-links.yml` (weekly), `legislator-links-weekly.yml` post to `#status-reports` on success and `#errors` on failure. Optional repo secrets: `SLACK_WEBHOOK_STATUS_REPORTS`, `SLACK_WEBHOOK_ERRORS`, `SLACK_WEBHOOK_SYNC`, `SLACK_WEBHOOK_URL`. **Heartbeat mode (temporary):** `SLACK_SYNC_CLI_DIGEST_ALWAYS=true` on sync workflows — remove when notifications are stable. Commits: `b008d96`, `2529ab4`.
 - **Email digest** — `/api/cron/notify` runs daily 11:00 UTC via Vercel Cron (weekly users batched on Mondays). Suppressed users skipped. Failures + per-user-error spikes captured in Sentry (tags `route:cron/notify` and `route:webhooks/resend`).
+- **Committee meeting materials** — `/api/sync?source=lrc-committee-materials` runs daily **13:30 UTC** via Vercel Cron. Scrapes `apps.legislature.ky.gov/CommitteeDocuments/{lrc_rsn}` for every committee with `lrc_rsn`, upserts into `ky_committee_materials`. Idempotent via `(committee_id, url)`. Status tracked in `ky_sources`.
 - **Outbound mail policy** — `From: alerts@kyvky.com` (transactional only, do not reply); `Reply-To: katie@kyvky.com` (real inbox). All inbound contact / vulnerability reports go to `katie@kyvky.com`. Webhook deliveries from Resend → `https://www.kyvky.com/api/webhooks/resend` (apex 307s break POST). Plain-text fallback included on every transactional send.
 
-## Operator follow-ups (not blocking, but recommended before public launch)
+## Operator launch checklist
 
-- **Resend → Domains → kyvky.com** — confirm SPF / DKIM / DMARC are all green. Cold-start sends to Gmail otherwise land in Junk.
-- **Sentry → Alerts** — add two rules: (1) any event tagged `route:cron/notify` → notify; (2) ≥5 events tagged `route:webhooks/resend` in 5 min → notify.
-- **Inbox routing** — confirm `katie@kyvky.com` lands somewhere a human reads (privacy/terms pages and email Reply-To all point there).
-- **Legal review** — `/privacy` and `/terms` are honest practical drafts (`src/app/privacy/page.tsx` + `src/app/terms/page.tsx`); a lawyer should review before scaling beyond a small audience.
+Consolidated into **[docs/launch-checklist.md](./docs/launch-checklist.md)** (2026-06-02) — single source of truth for the not-blocking-but-recommended-before-launch items (Resend DKIM, Sentry alerts, inbox routing, legal review, email-client QA, Vercel env cleanup, regression cadence).
 
 ## Handoff — next agent (committee follow v1.5 + Wave 3)
 
@@ -163,11 +161,7 @@ Roadmap priority (2026-06-02): **launch operator checklist** → **Wave 3 commit
 
 ### Launch operator checklist (manual, not blocking code)
 
-- **Resend domain** — SPF / DKIM / DMARC green on `kyvky.com`
-- **Sentry alerts** — `route:cron/notify` any event; ≥5 `route:webhooks/resend` in 5 min
-- **Email client QA** — [docs/email-client-qa.md](./docs/email-client-qa.md) (~2 hr manual)
-- **Legal review** — `/privacy` + `/terms` before scaling audience
-- **Regression cadence** — After large syncs: `npm run verify:legislator-links`, `npm run spot-check:bill-links`, optional `npm run diagnose:legislators`
+See **[docs/launch-checklist.md](./docs/launch-checklist.md)**.
 
 ### Wave 1 — Bill Watch parity (shipped 2026-05-19 — verified PASS 2026-05-21)
 
@@ -201,7 +195,7 @@ Reference: [docs/reference/bill-watch/](./docs/reference/bill-watch/README.md). 
 
 From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § Phase 5+:
 
-- `ky_committee_materials`** + **`sync:lrc:committee-materials` — **Shipped 2026-06-02** (see Recently completed). Cron wired same day at **13:30 UTC daily** via Vercel (`vercel.json` `crons`, PR #62). Historical backfill via prior-year LRC pages: `npm run backfill:lrc:committee-materials` (PR #63 — one-time after migration 029 lands on the env). Slack notify follows the existing `ky_sources` pipeline.
+- `ky_committee_materials`** + **`sync:lrc:committee-materials` — **Shipped 2026-06-02** (see Recently completed). Cron wired same day at **13:30 UTC daily** via Vercel (`vercel.json` `crons`). Slack notify follows the existing `ky_sources` pipeline.
 - **Session record spike** — `fixtures/lrc/legislative-record-26rs-live.html`; floor vs committee event split.
 - **Interim period + session milestones** — **Shipped 2026-06-01** (see Recently completed).
 - **LRC bulk API** — revisit if state publishes machine-readable roster (see Backlog below).

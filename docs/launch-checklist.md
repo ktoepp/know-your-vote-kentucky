@@ -1,0 +1,113 @@
+# Launch checklist (operator)
+
+Single source of truth for what needs to happen *outside the code* before
+public launch. Replaces the three previously-scattered lists in
+[TASKS.md](../TASKS.md) ("Operator follow-ups", "Operator checklist",
+"Launch operator checklist") plus [docs/email-client-qa.md](./email-client-qa.md).
+
+Items A–F are the actual launch gates. G is post-launch hygiene.
+
+---
+
+## A. Resend (email deliverability)
+
+- [ ] **Resend → Domains → `kyvky.com`** — SPF / DKIM / DMARC all green.
+      Cold-start sends to Gmail land in Junk otherwise.
+- [ ] Sender = `alerts@kyvky.com`; Reply-To = `katie@kyvky.com`
+      (transactional-only From; real-inbox Reply-To)
+- [ ] Webhook = **`https://www.kyvky.com/api/webhooks/resend`**
+      (apex `kyvky.com` 307-redirects POST and breaks signature
+      verification — must be `www`)
+
+## B. Sentry alerts (2 rules)
+
+- [ ] Rule 1: any event tagged `route:cron/notify` → notify
+- [ ] Rule 2: ≥5 events tagged `route:webhooks/resend` in 5 min → notify
+
+Both tags are already emitted by the existing routes; the rules just need
+to be configured in Sentry's Alerts UI.
+
+## C. Inbox routing
+
+- [ ] Confirm `katie@kyvky.com` lands somewhere a human reads.
+      Used in `/privacy`, `/terms`, every email Reply-To, and the
+      vulnerability-report inbox.
+
+## D. Legal review
+
+- [ ] Lawyer pass on [`/privacy`](../src/app/privacy/page.tsx)
+- [ ] Lawyer pass on [`/terms`](../src/app/terms/page.tsx)
+
+The current drafts are honest practical text, not lawyer-written. Fine for
+a small audience; review before scaling beyond friends-and-family.
+
+## E. Email-client QA (~2 hr)
+
+Test sends:
+
+```bash
+npm run preview:digest -- --email you@example.com --send
+npm run preview:welcome
+```
+
+In each client below, verify the checklist for both bill digest and welcome.
+
+### Clients
+
+- [ ] Gmail (web)
+- [ ] Gmail (mobile app)
+- [ ] Apple Mail (macOS or iOS)
+- [ ] Outlook (web or desktop)
+
+### Per-message checks — bill digest
+
+- [ ] Subject line readable; preview text not truncated awkwardly
+- [ ] Plain-text part present (a11y + deliverability)
+- [ ] Unsubscribe link works: GET page **and** one-click POST
+      (List-Unsubscribe headers respected)
+- [ ] Bill links use `https://kyvky.com` (not the legacy `knowyourvoteky.com`)
+- [ ] Footer has privacy, terms, preference link
+
+### Per-message checks — welcome email
+
+- [ ] Single-column layout
+- [ ] Links to browse, profile, find-my-legislators map
+- [ ] Sender = `alerts@kyvky.com`, Reply-To = `katie@kyvky.com`
+
+## F. Vercel env cleanup
+
+- [ ] Remove `SENTRY_ENABLE_EXAMPLE_PAGE` from the Vercel project (and
+      `.env.local` if set). The `/sentry-example-page` route is already
+      deleted; the var is harmless but stale.
+
+---
+
+## G. Regression cadence (post-launch hygiene, not a launch gate)
+
+Already on weekly GitHub Actions
+([`.github/workflows/legislator-links-weekly.yml`](../.github/workflows/legislator-links-weekly.yml)).
+Useful to run manually if something looks off after a large sync:
+
+- `npm run verify:legislator-links`
+- `npm run spot-check:bill-links`
+- `npm run diagnose:legislators` (optional)
+
+---
+
+## Going live
+
+When A–F are checked:
+
+1. **Resend domain green** → first real digest send will deliver to inbox,
+   not spam.
+2. **Sentry alerts armed** → silent partial failures in
+   `/api/cron/notify` or `/api/webhooks/resend` get caught immediately.
+3. **`katie@kyvky.com` routes to a human** → users who reply / report
+   issues / hit unsubscribe edge cases get a response.
+4. **Legal review done** → safe to broaden marketing past
+   friends-and-family.
+5. **Email QA clean** → confidence the daily digest isn't visually
+   broken in the four clients ~95% of users will be on.
+6. **Vercel env trimmed** → no stale config drift.
+
+Then turn up the audience.
