@@ -42,7 +42,9 @@
     "sync:ky:lrc-committee-materials": "tsx scripts/sync-lrc-committee-materials.ts",
     "sync:ky:lrc-committee-materials:dry": "tsx scripts/sync-lrc-committee-materials.ts --dry-run",
     "backfill:lrc:calendar": "tsx scripts/backfill-lrc-calendar-wayback.ts",
-    "backfill:lrc:calendar:dry": "tsx scripts/backfill-lrc-calendar-wayback.ts --dry-run"
+    "backfill:lrc:calendar:dry": "tsx scripts/backfill-lrc-calendar-wayback.ts --dry-run",
+    "backfill:lrc:committee-materials": "tsx scripts/backfill-lrc-committee-materials-history.ts",
+    "backfill:lrc:committee-materials:dry": "tsx scripts/backfill-lrc-committee-materials-history.ts --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
