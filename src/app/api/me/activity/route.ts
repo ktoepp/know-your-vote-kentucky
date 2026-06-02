@@ -12,10 +12,10 @@ import {
 const DEFAULT_LIMIT = 40;
 const MAX_LIMIT = 80;
 
-export type ProfileActivityKindFilter = 'all' | 'bill' | 'hearing';
+export type ProfileActivityKindFilter = 'all' | 'bill' | 'hearing' | 'committee';
 
 function parseKindFilter(raw: string | null): ProfileActivityKindFilter {
-  if (raw === 'bill' || raw === 'hearing') return raw;
+  if (raw === 'bill' || raw === 'hearing' || raw === 'committee') return raw;
   return 'all';
 }
 
@@ -39,15 +39,41 @@ const AGENDA_SELECT = `
 
 export type ProfileActivityItem = {
   id: string;
-  kind: 'bill_event' | 'hearing';
+  kind: 'bill_event' | 'hearing' | 'committee_event';
+  event_type: string | null;
   occurred_at: string;
   bill_id: string | null;
   bill_number: string | null;
   bill_title: string | null;
+  /** Committee display name + slug for committee_event rows (also used for hearings). */
+  committee_name: string | null;
+  committee_slug: string | null;
   label: string;
   href: string;
   detail: string | null;
 };
+
+type CommitteeEventRow = {
+  id: number;
+  committee_id: string;
+  event_type: string;
+  event_payload: Record<string, unknown> | null;
+  observed_at: string;
+  ky_committees: { name?: string; slug?: string } | null;
+};
+
+function committeeEventLabel(eventType: string): string {
+  switch (eventType) {
+    case 'meeting_scheduled':
+      return 'New meeting scheduled';
+    case 'agenda_updated':
+      return 'Agenda updated';
+    case 'meeting_cancelled':
+      return 'Meeting cancelled';
+    default:
+      return 'Committee update';
+  }
+}
 
 type BillMeta = {
   bill_number: string | null;
@@ -115,7 +141,19 @@ export async function GET(request: NextRequest) {
     for (const t of collectBillTopics(meta)) availableTopics.add(t);
   }
 
-  if (billIds.length === 0) {
+  // Committee follows — independent of bill follows, so we fetch even when billIds is empty.
+  const committeeFollowsRes = await auth.supabase
+    .from('ky_committee_follows')
+    .select('committee_id')
+    .eq('user_id', auth.userId);
+
+  const followedCommitteeIds: string[] = [];
+  for (const row of committeeFollowsRes.data ?? []) {
+    const cid = row.committee_id as string | null;
+    if (cid) followedCommitteeIds.push(cid);
+  }
+
+  if (billIds.length === 0 && followedCommitteeIds.length === 0) {
     return NextResponse.json({
       items: [] satisfies ProfileActivityItem[],
       kind: kindFilter,
@@ -128,7 +166,7 @@ export async function GET(request: NextRequest) {
   const today = kyTodayIso();
   const hearingKeysFromHistory = new Set<string>();
 
-  if (supabaseAdmin) {
+  if (billIds.length > 0 && supabaseAdmin) {
     const historyRes = await supabaseAdmin
       .from('ky_bill_status_history')
       .select('id, bill_id, event_type, event_payload, observed_at')
@@ -151,10 +189,13 @@ export async function GET(request: NextRequest) {
       items.push({
         id: `history-${row.id}`,
         kind: 'bill_event',
+        event_type: eventType,
         occurred_at: row.observed_at as string,
         bill_id: billId,
         bill_number: meta?.bill_number ?? null,
         bill_title: meta?.title ?? null,
+        committee_name: null,
+        committee_slug: null,
         label,
         href: `/bills/${billId}`,
         detail,
@@ -162,11 +203,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const agendaRes = await auth.supabase
-    .from('ky_committee_agenda_items')
-    .select(AGENDA_SELECT)
-    .in('ky_bill_id', billIds)
-    .limit(limit * 3);
+  const agendaRes = billIds.length
+    ? await auth.supabase
+        .from('ky_committee_agenda_items')
+        .select(AGENDA_SELECT)
+        .in('ky_bill_id', billIds)
+        .limit(limit * 3)
+    : { data: [] as never[] };
 
   for (const row of agendaRes.data ?? []) {
     const billId = row.ky_bill_id as string | null;
@@ -191,24 +234,77 @@ export async function GET(request: NextRequest) {
     items.push({
       id: `hearing-${row.id}`,
       kind: 'hearing',
+      event_type: 'hearing_scheduled',
       occurred_at: `${meetingDate}T12:00:00.000Z`,
       bill_id: billId,
       bill_number: meta?.bill_number ?? row.bill_number ?? null,
       bill_title: meta?.title ?? null,
+      committee_name: committee?.name ? committeeName : null,
+      committee_slug: committee?.slug ?? null,
       label: 'Hearing on committee agenda',
       href: `/bills/${billId}`,
       detail: `${detailParts.join(' · ')} · ${normalizeKyGaAgendaLine(row.raw_text as string)}`,
     });
   }
 
+  if (followedCommitteeIds.length > 0 && supabaseAdmin) {
+    const eventsRes = await supabaseAdmin
+      .from('ky_committee_events')
+      .select('id, committee_id, event_type, event_payload, observed_at, ky_committees ( name, slug )')
+      .in('committee_id', followedCommitteeIds)
+      .in('event_type', ['meeting_scheduled', 'agenda_updated', 'meeting_cancelled'])
+      .order('observed_at', { ascending: false })
+      .limit(limit);
+
+    for (const row of (eventsRes.data ?? []) as unknown as CommitteeEventRow[]) {
+      const payload = row.event_payload ?? {};
+      const committee = row.ky_committees;
+      const committeeName =
+        typeof payload.committee_name === 'string'
+          ? normalizeKyGaDisplayName(payload.committee_name)
+          : committee?.name
+            ? normalizeKyGaDisplayName(committee.name)
+            : 'Committee';
+      const committeeSlug =
+        (typeof payload.committee_slug === 'string' ? payload.committee_slug : null) ??
+        committee?.slug ??
+        '';
+      const meetingDate = typeof payload.meeting_date === 'string' ? payload.meeting_date : null;
+      const timeAndLocation =
+        typeof payload.time_and_location === 'string' ? payload.time_and_location : null;
+      const detailBits: string[] = [committeeName];
+      if (meetingDate) detailBits.push(meetingDate);
+      if (timeAndLocation) detailBits.push(timeAndLocation);
+
+      items.push({
+        id: `committee-${row.id}`,
+        kind: 'committee_event',
+        event_type: row.event_type,
+        occurred_at: row.observed_at,
+        bill_id: null,
+        bill_number: null,
+        bill_title: null,
+        committee_name: committeeName,
+        committee_slug: committeeSlug || null,
+        label: committeeEventLabel(row.event_type),
+        href: committeeSlug ? `/committees/${encodeURIComponent(committeeSlug)}` : '/committees',
+        detail: meetingDate
+          ? [meetingDate, timeAndLocation].filter(Boolean).join(' · ')
+          : detailBits.slice(1).join(' · ') || null,
+      });
+    }
+  }
+
   items.sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
 
-  let filtered =
-    kindFilter === 'all'
-      ? items
-      : items.filter((item) =>
-          kindFilter === 'hearing' ? item.kind === 'hearing' : item.kind === 'bill_event',
-        );
+  let filtered = items;
+  if (kindFilter !== 'all') {
+    filtered = filtered.filter((item) => {
+      if (kindFilter === 'hearing') return item.kind === 'hearing';
+      if (kindFilter === 'committee') return item.kind === 'committee_event';
+      return item.kind === 'bill_event';
+    });
+  }
 
   if (topicFilter) {
     filtered = filtered.filter((item) => {
