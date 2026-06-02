@@ -5,7 +5,6 @@ import { Instrument_Sans } from 'next/font/google';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import ClientThemeProvider from './components/ClientThemeProvider';
 import PostHogPageviewTracker from './components/PostHogPageviewTracker';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const instrumentSans = Instrument_Sans({
   subsets: ['latin'],
