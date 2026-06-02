@@ -201,7 +201,7 @@ Reference: [docs/reference/bill-watch/](./docs/reference/bill-watch/README.md). 
 
 From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § Phase 5+:
 
-- `ky_committee_materials`** + **`sync:lrc:committee-materials` — **Shipped 2026-06-02** (see Recently completed). Cron wiring + Slack notify on first sync still pending.
+- `ky_committee_materials`** + **`sync:lrc:committee-materials` — **Shipped 2026-06-02** (see Recently completed). Cron wired same day at **13:30 UTC daily** via Vercel (`vercel.json` `crons`, PR #62). Historical backfill via prior-year LRC pages: `npm run backfill:lrc:committee-materials` (PR #63 — one-time after migration 029 lands on the env). Slack notify follows the existing `ky_sources` pipeline.
 - **Session record spike** — `fixtures/lrc/legislative-record-26rs-live.html`; floor vs committee event split.
 - **Interim period + session milestones** — **Shipped 2026-06-01** (see Recently completed).
 - **LRC bulk API** — revisit if state publishes machine-readable roster (see Backlog below).
