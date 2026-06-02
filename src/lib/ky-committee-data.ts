@@ -100,6 +100,46 @@ export async function fetchKyCommitteeMeetingsForCommittee(
   )();
 }
 
+export interface KYCommitteeMaterial {
+  id: string;
+  committee_id: string;
+  meeting_id: string | null;
+  meeting_date: string | null;
+  date_label: string | null;
+  title: string;
+  url: string;
+  file_type: string | null;
+  sort_order: number;
+}
+
+async function fetchKyCommitteeMaterialsUncached(
+  committeeId: string,
+  limit: number,
+): Promise<KYCommitteeMaterial[]> {
+  const supabase = createAnonClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('ky_committee_materials')
+    .select('id, committee_id, meeting_id, meeting_date, date_label, title, url, file_type, sort_order')
+    .eq('committee_id', committeeId)
+    .order('meeting_date', { ascending: false, nullsFirst: false })
+    .order('sort_order', { ascending: true })
+    .limit(limit);
+  if (error || !data) return [];
+  return data as KYCommitteeMaterial[];
+}
+
+export async function fetchKyCommitteeMaterials(
+  committeeId: string,
+  { limit = 200 }: { limit?: number } = {},
+): Promise<KYCommitteeMaterial[]> {
+  return unstable_cache(
+    () => fetchKyCommitteeMaterialsUncached(committeeId, limit),
+    ['ky-committee-materials', committeeId, String(limit)],
+    { revalidate: COMMITTEE_DETAIL_REVALIDATE_SECONDS },
+  )();
+}
+
 export async function fetchKyCommitteeAgendaForMeeting(meetingId: string): Promise<KYCommitteeAgendaItem[]> {
   const map = await fetchKyCommitteeAgendaForMeetings([meetingId]);
   return map[meetingId] ?? [];

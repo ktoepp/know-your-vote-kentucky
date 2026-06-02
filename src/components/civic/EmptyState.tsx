@@ -5,7 +5,7 @@ import { Card, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 
 export interface EmptyStateProps {
-  message: string;
+  message: React.ReactNode;
 }
 
 /** Dashed bordered empty list placeholder — home, browse, and search. */

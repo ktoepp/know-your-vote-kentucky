@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { CommitteeDetailView } from '@/components/committees/CommitteeDetailView';
 import {
   fetchKyCommitteeAgendaForMeetings,
+  fetchKyCommitteeMaterials,
   fetchKyCommitteeMeetingsForCommittee,
   fetchKyLegislatorRoster,
   getKyCommitteeBySlug,
@@ -33,10 +34,11 @@ export default async function CommitteeDetailPage({ params }: PageProps) {
   const committee = await getKyCommitteeBySlug(slug);
   if (!committee) notFound();
 
-  const [meetings, legislatorRoster, committeeRoster] = await Promise.all([
+  const [meetings, legislatorRoster, committeeRoster, materials] = await Promise.all([
     fetchKyCommitteeMeetingsForCommittee(committee.id),
     fetchKyLegislatorRoster(),
     fetchKyCommitteesBrowseList(),
+    fetchKyCommitteeMaterials(committee.id),
   ]);
   const members = buildCommitteeMemberDisplay(committee, meetings, legislatorRoster);
   const agendaByMeetingId = await fetchKyCommitteeAgendaForMeetings(meetings.map((m) => m.id));
@@ -47,6 +49,7 @@ export default async function CommitteeDetailPage({ params }: PageProps) {
       meetings={meetings}
       agendaByMeetingId={agendaByMeetingId}
       members={members}
+      materials={materials}
       committeeRoster={committeeRoster.map((c) => ({ slug: c.slug, name: c.name }))}
     />
   );
