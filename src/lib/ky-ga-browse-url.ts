@@ -47,6 +47,8 @@ export function useGaMeetingsBrowseUrlState(): {
   setRange: (next: GaMeetingsRangeParam) => void;
   agendaQuery: string;
   setAgendaQuery: (next: string) => void;
+  followsMe: boolean;
+  setFollowsMe: (next: boolean) => void;
 } {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -55,6 +57,7 @@ export function useGaMeetingsBrowseUrlState(): {
   const chamber = parseGaChamberParam(searchParams.get('chamber'));
   const range = parseGaMeetingsRangeParam(searchParams.get('when'));
   const agendaQuery = searchParams.get('q')?.trim() ?? '';
+  const followsMe = searchParams.get('follows') === 'me';
 
   const patchParams = useCallback(
     (mutate: (p: URLSearchParams) => void) => {
@@ -97,5 +100,24 @@ export function useGaMeetingsBrowseUrlState(): {
     [patchParams],
   );
 
-  return { chamber, setChamber, range, setRange, agendaQuery, setAgendaQuery };
+  const setFollowsMe = useCallback(
+    (next: boolean) => {
+      patchParams((p) => {
+        if (next) p.set('follows', 'me');
+        else p.delete('follows');
+      });
+    },
+    [patchParams],
+  );
+
+  return {
+    chamber,
+    setChamber,
+    range,
+    setRange,
+    agendaQuery,
+    setAgendaQuery,
+    followsMe,
+    setFollowsMe,
+  };
 }

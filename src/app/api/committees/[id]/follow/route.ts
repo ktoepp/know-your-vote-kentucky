@@ -18,9 +18,8 @@ async function resolveCommitteeId(supabase: SupabaseClient, raw: string): Promis
     .from('ky_committees')
     .select('id')
     .eq('slug', raw)
-    .maybeSingle();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ((data as any)?.id as string) ?? null;
+    .maybeSingle<{ id: string }>();
+  return data?.id ?? null;
 }
 
 async function checkWriteRateLimit(userId: string, route: string) {

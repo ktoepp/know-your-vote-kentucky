@@ -80,7 +80,7 @@ Use this when continuing **Follow committees v1.5**, **Wave 3 committee/data**, 
 
 ## Recently completed
 
-- **Wave 3 — Committee materials sync (2026-06-02)** — Closes Phase 5 item from [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md). New migration **029** (`ky_committee_materials`: title, url, file_type, meeting_date, date_label, source_url, sort_order; FK to `ky_committees` + nullable FK to `ky_committee_meetings`; public read RLS). New parser `lrc-committee-materials-parser.ts` (cheerio; targets `apps.legislature.ky.gov/CommitteeDocuments/{rsn}` — finds `<h2>Meeting Materials</h2>`, descends into the sibling `<div>`, picks up each `<h3>{date}</h3><ul>{files}</ul>` pair; "Other Meeting Years" links extracted separately into `priorYearUrls`). Fixture: `fixtures/lrc/committee-materials-itoc-live.html` (ITOC, rsn=390). New sync lib `ky-lrc-committee-materials-sync.ts` — iterates `ky_committees` with `lrc_rsn`, fetches each materials page, upserts by `(committee_id, url)`, best-effort links to a `ky_committee_meetings.id` when dates match. Idempotent. New CLI: `npm run sync:ky:lrc-committee-materials [--dry-run] [--limit=N] [--committee-type="..."] [--delay-ms=N]` and `npm run spike:lrc:committee-materials [--refresh] [--rsn=N] [--fixture=path]` for one-off parser checks. UI: `CommitteeMaterialsSection` on `/committees/[slug]` — groups by meeting date (newest first), shows `[PDF]` chip + title link with `OpenInNew` icon, dashed `EmptyState` when no materials linking out to the LRC profile. Quick-facts panel adds a "{N} meeting materials" jump link when materials exist. **Not yet on cron** — operator runs the CLI manually; spec calls for 2× daily later. **Migration not applied** to primary until PR lands. Rationale: **decisions.md § 2026-06-02 — Committee materials sync**.
+- **Follow committees v1.5 (2026-06-02)** — Closed the four v1.5 gaps from PR #38: `agenda_updated` + `meeting_cancelled` events in LRC sync (migration **028** relaxes dedupe index to include `agenda_content_hash`), `/meetings?follows=me` filter (mirror of `/bills?follows=me` — signed-in toolbar toggle, deletable chip, login alert, follow-but-empty empty state), committee events in `GET /api/me/activity` (new `committee_event` kind alongside `bill_event`/`hearing` in the unified timeline + `committee` filter chip on `ProfileActivitySection`), follow toggle on `/meetings` rows + agenda search results (lucide/MUI bookmark IconButton). Three new digest event slugs (`committee_meeting_scheduled` / `committee_agenda_updated` / `committee_meeting_cancelled`) wired through `KY_DIGEST_EVENT_GROUPS.committee_interim`. **Design refinement same day:** activity rows on both `LandingPersonalStrip` and `ProfileActivitySection` adopt the bill-card pattern via a new shared `ActivityStatusChip` — tone-mapped status chip (`kyDigestEventChipTone`) with green ✓ on success / red ✗ on error, `body1`/500 bill or committee title, clickable committee names. Bug fix: committee_event rows in `ProfileActivitySection` no longer render the label twice. CTA on the strip points to `/profile#activity` ("View all activity") — the unified timeline, not `/feed` (bills-only). Rationale: **decisions.md § 2026-06-02 — Follow committees v1.5** + **§ 2026-06-02 — Activity timeline visual treatment**.
 - **Session milestones + interim banner (2026-06-01)** — Wave 3 sub-item. `ky-sessions.ts` gains optional `milestones` (`vetoRecessStart`, `vetoRecessEnd`, `sineDie`) on each `KYSessionRecord`, plus `getInterimPeriod()` and `getSessionPhase()` helpers. `getSessionBannerModel()` now returns a `phase` (`in_session` | `veto_recess` | `final_days` | `interim`) and a `contextLine`; `SessionBannerServer` renders the phase-aware second line so today (in interim) reads **"2026 Interim: April 16, 2026 – next session convenes"** with an interim-committees explainer instead of the previous generic after-session caption. New glossary entries: `concurrence`, `veto_recess`, `interim_period`. 2026 RS `milestones` field is intentionally left undefined (TODO comment in `KY_SESSIONS`) until the LRC-published veto-recess dates are confirmed; banner falls back to the clean session range when no milestones are set. Rationale: **decisions.md § 2026-06-01 — Session milestones + interim banner**.
 - **Voice & tone follow-up pass (2026-05-27)** — Cleared the open follow-ups from the audit below. Expanded **Legislative Research Commission (LRC)** on first use on `/meetings`, `/committees`, committee detail, member profile, and the Frankfort resources page (home banner + profile notifications already done). Confirmed **`/find-content`** is an unlinked internal tool — left as-is. Fixed a member-profile empty state that leaked an internal *"run a bills sync"* instruction → honest caveat (*"Sponsor data may lag the official record"*); reworded the resources page's internal *"Hearing scheduled"* token to plain language. **Deprecated legacy `/events`** (reads the old `ky_meetings` table; superseded by `/meetings` + `/committees`): added `events/layout.tsx` `noIndexMetadata`, dropped `/events` from the sitemap (added `/meetings` + `/committees`), removed its `BackNavigation` fallbacks → still serves by direct URL but out of search + in-app nav. Sweep otherwise clean (terms, privacy, glossary, licenses, search, feed, dashboard on-voice). Typecheck + localhost spot-check clean.
 - **Voice & tone audit + sitewide copy pass (2026-05-27)** — Audited live kyvky.com + emails. Broadened the email voice guide into a sitewide one: `docs/email-voice-and-tone.md` → **`docs/voice-and-tone.md`** (added **Honest sourcing** + **Warmth through anticipation** principles, an explicit non-partisan rule, a reference-vs-marketing register note, and naming/heading/auth conventions). Copy fixes: standardized the auth verb to **Log in** (nav, footer, login page, profile gate, follow labels); collapsed five variants of the district-map feature name to one — **Find my legislators** (nav, map H1 + tab title, both hero CTAs, followed-bills empty state); **fixed a live broken link** — `/district-map` 404 → `/members/map` (welcome-email CTA + followed-bills empty state); device-neutral **"Select"** (was "Tap"); **"Bills"** heading + tab title (was "Explore Bills"); **"Load more"** (was "Load more bills"); **"141 members"** (was "people"); expanded **Legislative Research Commission (LRC)** on the home session banner; de-jargoned About data sources ("LegiScan", dropped "GeoJSON/geocoding") and the notifications helper (dropped internal "our LRC calendar sync"); welcome-email topic card now states the automated-tagging caveat; home `<title>` + meta description de-abbreviated (**Track Kentucky legislation**, "representatives" not "reps"). Spot-checked on localhost; typecheck clean; staged on `feat/home-returning-hero-personalization`. New canon: **`docs/voice-and-tone.md`**.
@@ -157,16 +157,7 @@ Use this when continuing **Follow committees v1.5**, **Wave 3 committee/data**, 
 
 ## Up Next
 
-Roadmap priority (2026-05-26): **Follow committees v1.5** → **launch operator checklist** → **Wave 3 committee/data**. Waves 1–2 and committee calendar Phases 0–4 are shipped.
-
-### Follow committees v1.5 (next feature work)
-
-Gaps after PR **#38** v1 ship — see **Backlog → Follow committees v1.5**:
-
-- `/meetings?follows=me` filter
-- Committee-scoped events in `GET /api/me/activity` (activity is bill + hearing only today)
-- `agenda_updated` / `meeting_cancelled` event types in LRC sync (v1 only emits `meeting_scheduled`)
-- Follow affordance on individual `/meetings` rows (detail + browse cards only today)
+Roadmap priority (2026-06-02): **launch operator checklist** → **Wave 3 committee/data**. Waves 1–2, committee calendar Phases 0–4, and **Follow committees v1.5** are all shipped.
 
 ### Launch operator checklist (manual, not blocking code)
 
@@ -217,9 +208,9 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
 
 ## Backlog
 
-### Follow committees v1.5 (gaps after PR #38)
+### Follow committees v1 + v1.5 (archived reference — fully shipped)
 
-**Shipped in v1 (2026-05-22, PR #38):**
+**v1 (2026-05-22, PR #38):**
 - Migration **026**: `ky_committee_follows` + `ky_committee_events` + RLS
 - `GET/POST/DELETE /api/committees/[id]/follow`; committees on `GET /api/me/follows`
 - `FollowCommitteeButton` on `/committees/[slug]`; bookmark toggle on browse cards
@@ -228,28 +219,26 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
 - LRC sync: `meeting_scheduled` events on new meetings
 - Migration **027**: interim/statutory committee seed; `scripts/backfill-interim-calendar-2026.ts`
 
-**Still open (v1.5):**
-- `/meetings?follows=me` filter
-- Committee events in `GET /api/me/activity`
-- `agenda_updated` / `meeting_cancelled` diff capture on LRC sync
-- Follow on individual `/meetings` rows
-- Extend [docs/specs/follow-bills.md](./docs/specs/follow-bills.md) with committee vocabulary + digest rules
+**v1.5 (2026-06-02):**
+- Migration **028**: dedupe index relaxed to include `agenda_content_hash` so multiple `agenda_updated` rows per meeting persist
+- LRC sync: `agenda_updated` (hash diff) + `meeting_cancelled` (post-loop diff with empty-fetch + Wayback guards) event types
+- `/meetings?follows=me` filter (mirror of `/bills?follows=me`)
+- Committee events in `GET /api/me/activity` as `committee_event` kind; `Committees` chip on `ProfileActivitySection`
+- Follow toggle on `CommitteeMeetingCard` + agenda search rows (browse-level fetch, not per-card)
+- Three event slugs (`committee_meeting_scheduled` / `committee_agenda_updated` / `committee_meeting_cancelled`) under **Committee & interim** in `/profile` notifications
+- `EmptyState.message` widened to `ReactNode`
+- Activity-row visual refinement: shared `ActivityStatusChip` with tone-mapped icon, `body1` titles, clickable committee names; strip CTA → `/profile#activity` ("View all activity")
+- Spec: [docs/specs/follow-bills.md](./docs/specs/follow-bills.md) § "Follow committees (v1 + v1.5)"
 
 ### Follow committees (original roadmap — archived reference)
 
-**Goal:** Follow committees and get notified on schedule/agenda changes — analogous to bill follows. **Core v1 shipped PR #38**; see v1.5 above for gaps.
+**Goal:** Follow committees and get notified on schedule/agenda changes — analogous to bill follows. **Fully shipped 2026-06-02** (v1 PR #38, v1.5 follow-on).
 
-**Product sketch (status annotated):**
-- Follow / Following on `/committees/[slug]`, committee browse cards, and optionally `/meetings` rows (mirror `FollowBillButton` + `follow-labels.ts` patterns).
-- Profile section: **Followed committees** — **Done.** `/meetings?follows=me` — **open.**
-- Activity feed: committee-scoped events — **open** (bill + hearing only today).
-- Digest: committee block when followed committees change — **Done** (`meeting_scheduled`).
-
-**Original technical sketch (mostly implemented):**
-- **Schema:** `ky_committee_follows` + `ky_committee_events` — **Done (026).**
-- **Diff capture:** `meeting_scheduled` on new meetings — **Done.** `agenda_updated` / `meeting_cancelled` — **open.**
-- **API:** `/api/committees/[id]/follow` + `/api/me/follows` — **Done.**
-- **Copy/spec:** Extend follow-bills spec — **open.**
+**Original technical sketch (fully implemented):**
+- **Schema:** `ky_committee_follows` + `ky_committee_events` — **Done (026, 028).**
+- **Diff capture:** `meeting_scheduled` + `agenda_updated` + `meeting_cancelled` — **Done.**
+- **API:** `/api/committees/[id]/follow` + `/api/me/follows` + activity feed — **Done.**
+- **Copy/spec:** Extend follow-bills spec — **Done (2026-06-02).**
 
 **Prerequisites:** Committee kind tags + subcommittee parent (UI-8, UI-11) — **Done.**
 
