@@ -44,8 +44,10 @@ import {
   resolveKyCommitteeParent,
 } from '@/lib/ky-committee-display';
 import { CommitteeMembersSection } from '@/components/committees/CommitteeMembersSection';
+import { CommitteeMaterialsSection } from '@/components/committees/CommitteeMaterialsSection';
 import { FollowCommitteeButton } from '@/components/committees/FollowCommitteeButton';
 import type { CommitteeMemberDisplay } from '@/lib/ky-committee-members';
+import type { KYCommitteeMaterial } from '@/lib/ky-committee-data';
 import { classifyTopics } from '@/lib/ky-topic-classifier';
 
 export interface CommitteeDetailViewProps {
@@ -53,6 +55,8 @@ export interface CommitteeDetailViewProps {
   meetings: KYCommitteeMeeting[];
   agendaByMeetingId: Record<string, KYCommitteeAgendaItem[]>;
   members: CommitteeMemberDisplay[];
+  /** Documents posted on LRC for past meetings (agendas, minutes, etc.). */
+  materials?: KYCommitteeMaterial[];
   /** Full committee roster for subcommittee → parent links. */
   committeeRoster?: Pick<KYCommittee, 'slug' | 'name'>[];
 }
@@ -102,6 +106,7 @@ export function CommitteeDetailView({
   meetings,
   agendaByMeetingId,
   members,
+  materials = [],
   committeeRoster = [],
 }: CommitteeDetailViewProps) {
   const theme = useTheme();
@@ -256,6 +261,11 @@ export function CommitteeDetailView({
                 <MuiLink href="#committee-meetings" underline="hover" sx={{ fontWeight: 600, color: 'text.primary' }}>
                   {meetings.length} meeting{meetings.length === 1 ? '' : 's'} on record
                 </MuiLink>
+                {materials.length > 0 && (
+                  <MuiLink href="#committee-materials" underline="hover" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    {materials.length} meeting material{materials.length === 1 ? '' : 's'}
+                  </MuiLink>
+                )}
               </Stack>
 
               <Divider sx={{ my: 2 }} />
@@ -388,7 +398,18 @@ export function CommitteeDetailView({
           </Box>
         )}
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+        {/* Meeting Materials — LRC CommitteeDocuments scrape (Wave 3) */}
+        <Box
+          id="committee-materials"
+          sx={{ scrollMarginTop: '80px', mt: 4 }}
+        >
+          <CommitteeMaterialsSection
+            materials={materials}
+            committeeProfileUrl={committee.profile_url}
+          />
+        </Box>
+
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
           <Link href="/meetings">Browse all committee meetings</Link>
           {' · '}
           <Link href="/legislature/resources">Frankfort resources</Link>

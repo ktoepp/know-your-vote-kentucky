@@ -34,10 +34,13 @@
     "generate:district-thumbnails": "tsx scripts/generate-district-thumbnails.ts",
     "debug:openstates-roster": "tsx scripts/debug-openstates-roster.ts",
     "spike:lrc:calendar": "tsx scripts/lrc-calendar-spike.ts",
+    "spike:lrc:committee-materials": "tsx scripts/spike-lrc-committee-materials.ts",
     "audit:lrc:bill-refs": "tsx scripts/audit-lrc-agenda-bill-refs.ts",
     "verify:recent-ship": "tsx scripts/verify-recent-ship.ts",
     "sync:ky:lrc-calendar": "tsx scripts/manual-sync.ts lrc-calendar",
     "sync:ky:lrc-calendar:dry": "tsx scripts/manual-sync.ts lrc-calendar --dry-run",
+    "sync:ky:lrc-committee-materials": "tsx scripts/sync-lrc-committee-materials.ts",
+    "sync:ky:lrc-committee-materials:dry": "tsx scripts/sync-lrc-committee-materials.ts --dry-run",
     "backfill:lrc:calendar": "tsx scripts/backfill-lrc-calendar-wayback.ts",
     "backfill:lrc:calendar:dry": "tsx scripts/backfill-lrc-calendar-wayback.ts --dry-run"
   },
