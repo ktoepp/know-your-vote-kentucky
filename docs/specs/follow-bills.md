@@ -325,7 +325,7 @@ Idempotency: `ky_notifications_log` records the event-id set, so a crashed/retri
 **Provider:** Resend (free tier: 3k/mo, 100/day — fine for v1).
 **Domain:** **`kyvky.com`** (canonical; verify in Resend). Legacy hosts (`knowyourvotekentucky.com`, `.org`, `knowyourvoteky.com`, `www.*`) should point at Vercel; **`next.config.ts`** redirects them to `https://kyvky.com`.
 **From:** `alerts@kyvky.com` (or another address on the verified domain)
-**Reply-to:** `no-reply@kyvky.com` (or `hello@...` if desired)
+**Reply-to:** `katie@kyvky.com` (real inbox for user support)
 
 **Templates** (React Email components in `src/lib/email/templates/`):
 

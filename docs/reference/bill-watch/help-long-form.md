@@ -81,7 +81,7 @@ Terms called out: Amendment, Act, Bill, Committee, Resolution, Sponsor.
 
 Legislative Research Commission (Frankfort) — address, phone, support email.
 
-**KYVKY:** Link to LRC PIO / public info; our contact is `hello@kyvky.com` for product issues.
+**KYVKY:** Link to LRC PIO / public info; our contact is `katie@kyvky.com` for product issues.
 
 ## UX notes (long page vs modern help)
 
