@@ -40,10 +40,14 @@ const AGENDA_SELECT = `
 export type ProfileActivityItem = {
   id: string;
   kind: 'bill_event' | 'hearing' | 'committee_event';
+  event_type: string | null;
   occurred_at: string;
   bill_id: string | null;
   bill_number: string | null;
   bill_title: string | null;
+  /** Committee display name + slug for committee_event rows (also used for hearings). */
+  committee_name: string | null;
+  committee_slug: string | null;
   label: string;
   href: string;
   detail: string | null;
@@ -185,10 +189,13 @@ export async function GET(request: NextRequest) {
       items.push({
         id: `history-${row.id}`,
         kind: 'bill_event',
+        event_type: eventType,
         occurred_at: row.observed_at as string,
         bill_id: billId,
         bill_number: meta?.bill_number ?? null,
         bill_title: meta?.title ?? null,
+        committee_name: null,
+        committee_slug: null,
         label,
         href: `/bills/${billId}`,
         detail,
@@ -227,10 +234,13 @@ export async function GET(request: NextRequest) {
     items.push({
       id: `hearing-${row.id}`,
       kind: 'hearing',
+      event_type: 'hearing_scheduled',
       occurred_at: `${meetingDate}T12:00:00.000Z`,
       bill_id: billId,
       bill_number: meta?.bill_number ?? row.bill_number ?? null,
       bill_title: meta?.title ?? null,
+      committee_name: committee?.name ? committeeName : null,
+      committee_slug: committee?.slug ?? null,
       label: 'Hearing on committee agenda',
       href: `/bills/${billId}`,
       detail: `${detailParts.join(' · ')} · ${normalizeKyGaAgendaLine(row.raw_text as string)}`,
@@ -269,13 +279,18 @@ export async function GET(request: NextRequest) {
       items.push({
         id: `committee-${row.id}`,
         kind: 'committee_event',
+        event_type: row.event_type,
         occurred_at: row.observed_at,
         bill_id: null,
         bill_number: null,
         bill_title: null,
+        committee_name: committeeName,
+        committee_slug: committeeSlug || null,
         label: committeeEventLabel(row.event_type),
         href: committeeSlug ? `/committees/${encodeURIComponent(committeeSlug)}` : '/committees',
-        detail: detailBits.join(' · '),
+        detail: meetingDate
+          ? [meetingDate, timeAndLocation].filter(Boolean).join(' · ')
+          : detailBits.slice(1).join(' · ') || null,
       });
     }
   }

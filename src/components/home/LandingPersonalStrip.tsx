@@ -6,6 +6,7 @@ import {
   Button,
   Chip,
   Container,
+  Link as MuiLink,
   List,
   ListItem,
   ListItemText,
@@ -17,7 +18,9 @@ import NextLink from 'next/link';
 import { useUser } from '@/app/lib/UserContext';
 import type { ProfileActivityItem } from '@/app/api/me/activity/route';
 import { BillNumber } from '@/components/bills/BillNumber';
+import { ActivityStatusChip } from '@/components/civic/ActivityStatusChip';
 import { formatKyMeetingDate } from '@/lib/ky-committee-display';
+import { kyDigestEventChipTone } from '@/lib/ky-notification-preferences';
 import { CARD, ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE } from '@/lib/ui-tokens';
 
 /** Distinct followed bills/committees to surface in the teaser. */
@@ -114,67 +117,96 @@ export function LandingPersonalStrip() {
           </Box>
           <Button
             component={NextLink}
-            href="/feed"
+            href="/profile#activity"
             size="small"
             endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
             sx={{ textTransform: 'none' }}
           >
-            View your feed
+            View all activity
           </Button>
         </Box>
 
         <List disablePadding>
-          {items.map((item) => (
-            <ListItem key={item.id} alignItems="flex-start" sx={{ px: 0, py: 0.75 }}>
-              <ListItemText
-                disableTypography
-                primary={
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center' }}>
-                    <Chip
-                      size="small"
-                      icon={
-                        item.kind === 'hearing' ? (
-                          <Event fontSize="small" />
-                        ) : item.kind === 'committee_event' ? (
-                          <Groups fontSize="small" />
-                        ) : undefined
-                      }
-                      label={
-                        item.kind === 'hearing'
-                          ? 'Hearing'
-                          : item.kind === 'committee_event'
-                            ? 'Committee'
-                            : 'Bill update'
-                      }
-                      color={
-                        item.kind === 'hearing'
-                          ? 'info'
-                          : item.kind === 'committee_event'
-                            ? 'primary'
-                            : 'default'
-                      }
-                      variant="outlined"
-                    />
-                    {item.bill_number ? (
-                      <BillNumber billNumber={item.bill_number} size="compact" href={item.href} />
-                    ) : null}
-                    <Typography component="span" variant="caption" color="text.secondary">
-                      {item.kind === 'hearing'
-                        ? formatKyMeetingDate(item.occurred_at.slice(0, 10))
-                        : formatOccurredAt(item.occurred_at)}
-                    </Typography>
-                  </Box>
-                }
-                secondary={
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-                    {item.bill_title ? `${item.bill_title} — ` : ''}
-                    {item.label}
-                    {item.kind === 'committee_event' && item.detail ? ` — ${item.detail}` : ''}
-                  </Typography>
-                }
-              />
-            </ListItem>
-          ))}
+          {items.map((item) => {
+            const statusTone = kyDigestEventChipTone(item.event_type ?? '', item.label);
+            return (
+              <ListItem key={item.id} alignItems="flex-start" sx={{ px: 0, py: 0.75 }}>
+                <ListItemText
+                  disableTypography
+                  primary={
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center' }}>
+                      <Chip
+                        size="small"
+                        icon={
+                          item.kind === 'hearing' ? (
+                            <Event fontSize="small" />
+                          ) : item.kind === 'committee_event' ? (
+                            <Groups fontSize="small" />
+                          ) : undefined
+                        }
+                        label={
+                          item.kind === 'hearing'
+                            ? 'Hearing'
+                            : item.kind === 'committee_event'
+                              ? 'Committee'
+                              : 'Bill update'
+                        }
+                        color={
+                          item.kind === 'hearing'
+                            ? 'info'
+                            : item.kind === 'committee_event'
+                              ? 'primary'
+                              : 'default'
+                        }
+                        variant="outlined"
+                      />
+                      {item.bill_number ? (
+                        <BillNumber billNumber={item.bill_number} size="compact" href={item.href} />
+                      ) : null}
+                      <ActivityStatusChip label={item.label} tone={statusTone} />
+                      <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                        {item.kind === 'hearing'
+                          ? formatKyMeetingDate(item.occurred_at.slice(0, 10))
+                          : formatOccurredAt(item.occurred_at)}
+                      </Typography>
+                    </Box>
+                  }
+                  secondary={
+                    <Box sx={{ mt: 0.5 }}>
+                      {item.bill_title && (
+                        <Typography variant="body1" fontWeight={500} sx={{ lineHeight: 1.35 }}>
+                          {item.bill_title}
+                        </Typography>
+                      )}
+                      {item.committee_name && (
+                        item.committee_slug ? (
+                          <MuiLink
+                            component={NextLink}
+                            href={`/committees/${encodeURIComponent(item.committee_slug)}`}
+                            variant="body1"
+                            fontWeight={500}
+                            underline="hover"
+                            sx={{ lineHeight: 1.35 }}
+                          >
+                            {item.committee_name}
+                          </MuiLink>
+                        ) : (
+                          <Typography variant="body1" fontWeight={500} sx={{ lineHeight: 1.35 }}>
+                            {item.committee_name}
+                          </Typography>
+                        )
+                      )}
+                      {item.detail && (
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
+                          {item.detail}
+                        </Typography>
+                      )}
+                    </Box>
+                  }
+                />
+              </ListItem>
+            );
+          })}
         </List>
       </Paper>
     </Container>

@@ -105,6 +105,43 @@ export const KY_DIGEST_EVENT_GROUPS: {
   },
 ];
 
+/**
+ * Activity-row chip tone for a given event. `label` lets us split
+ * `signed_or_vetoed` into success vs error without a separate event type.
+ */
+export function kyDigestEventChipTone(
+  eventType: string,
+  label?: string | null,
+): 'default' | 'primary' | 'success' | 'warning' | 'error' | 'info' {
+  switch (eventType) {
+    case 'signed_or_vetoed': {
+      const lower = (label ?? '').toLowerCase();
+      if (lower.includes('veto')) return 'error';
+      return 'success';
+    }
+    case 'passed_chamber':
+    case 'committee_meeting_scheduled':
+    case 'meeting_scheduled':
+      return 'success';
+    case 'dead':
+    case 'committee_meeting_cancelled':
+    case 'meeting_cancelled':
+      return 'error';
+    case 'sent_to_governor':
+    case 'veto_override_attempt':
+      return 'primary';
+    case 'floor_vote':
+    case 'hearing_scheduled':
+    case 'committee_agenda_updated':
+    case 'agenda_updated':
+    case 'amendment_filed':
+    case 'new_cosponsor':
+      return 'info';
+    default:
+      return 'default';
+  }
+}
+
 /** Spec default — "Major milestones only" (★ in follow-bills.md). */
 export const KY_DIGEST_MAJOR_MILESTONES: KyDigestEventType[] = [
   'introduced',

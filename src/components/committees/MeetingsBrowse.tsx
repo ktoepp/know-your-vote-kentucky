@@ -415,7 +415,11 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
           filteredAgenda.length === 0 ? (
             <EmptyState message="No agenda lines match your search. Try a bill number or keyword from the LRC calendar." />
           ) : (
-            <AgendaSearchResults items={filteredAgenda} />
+            <AgendaSearchResults
+              items={filteredAgenda}
+              followedCommitteeIds={authed ? followedCommitteeIds : undefined}
+              onToggleFollow={authed ? toggleFollow : undefined}
+            />
           )
         ) : filteredMeetings.length === 0 ? (
           <EmptyState message="No committee meetings match your filters." />

@@ -18,6 +18,8 @@ import { useUser } from '@/app/lib/UserContext';
 import type { ProfileActivityItem } from '@/app/api/me/activity/route';
 import { formatKyMeetingDate } from '@/lib/ky-committee-display';
 import { BillNumber } from '@/components/bills/BillNumber';
+import { ActivityStatusChip } from '@/components/civic/ActivityStatusChip';
+import { kyDigestEventChipTone } from '@/lib/ky-notification-preferences';
 import { ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE } from '@/lib/ui-tokens';
 
 const ACTIVITY_FILTER_STORAGE_KEY = 'kyvky-profile-activity-filter';
@@ -255,75 +257,86 @@ export function ProfileActivitySection() {
 
       {!loading && items.length > 0 && (
         <List disablePadding>
-          {items.map((item) => (
-            <ListItem key={item.id} alignItems="flex-start" sx={{ px: 0, py: 1.25 }}>
-              <ListItemText
-                primary={
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center', mb: 0.5 }}>
-                    <Chip
-                      size="small"
-                      icon={
-                        item.kind === 'hearing' ? (
-                          <Event fontSize="small" />
-                        ) : item.kind === 'committee_event' ? (
-                          <Groups fontSize="small" />
-                        ) : undefined
-                      }
-                      label={
-                        item.kind === 'hearing'
-                          ? 'Hearing'
-                          : item.kind === 'committee_event'
-                            ? 'Committee'
-                            : 'Bill update'
-                      }
-                      color={
-                        item.kind === 'hearing'
-                          ? 'info'
-                          : item.kind === 'committee_event'
-                            ? 'primary'
-                            : 'default'
-                      }
-                      variant="outlined"
-                    />
-                    <Typography component="span" variant="caption" color="text.secondary">
-                      {item.kind === 'hearing' && item.occurred_at
-                        ? formatKyMeetingDate(item.occurred_at.slice(0, 10))
-                        : formatOccurredAt(item.occurred_at)}
-                    </Typography>
-                  </Box>
-                }
-                secondary={
-                  <Box component="div" sx={{ pt: 0.25 }}>
-                    <Box sx={{ display: 'block', mb: 0.25 }}>
-                      {item.bill_number ? (
-                        <>
-                          <BillNumber billNumber={item.bill_number} size="compact" href={item.href} />
-                          {item.bill_title ? (
-                            <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
-                              — {item.bill_title}
-                            </Typography>
-                          ) : null}
-                        </>
-                      ) : (
-                        <MuiLink component={NextLink} href={item.href} fontWeight={600} underline="hover">
-                          {item.label}
-                        </MuiLink>
+          {items.map((item) => {
+            const statusTone = kyDigestEventChipTone(item.event_type ?? '', item.label);
+            return (
+              <ListItem key={item.id} alignItems="flex-start" sx={{ px: 0, py: 1.25 }}>
+                <ListItemText
+                  primary={
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center', mb: 0.5 }}>
+                      <Chip
+                        size="small"
+                        icon={
+                          item.kind === 'hearing' ? (
+                            <Event fontSize="small" />
+                          ) : item.kind === 'committee_event' ? (
+                            <Groups fontSize="small" />
+                          ) : undefined
+                        }
+                        label={
+                          item.kind === 'hearing'
+                            ? 'Hearing'
+                            : item.kind === 'committee_event'
+                              ? 'Committee'
+                              : 'Bill update'
+                        }
+                        color={
+                          item.kind === 'hearing'
+                            ? 'info'
+                            : item.kind === 'committee_event'
+                              ? 'primary'
+                              : 'default'
+                        }
+                        variant="outlined"
+                      />
+                      {item.bill_number && (
+                        <BillNumber billNumber={item.bill_number} size="compact" href={item.href} />
+                      )}
+                      <ActivityStatusChip label={item.label} tone={statusTone} />
+                      <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                        {item.kind === 'hearing' && item.occurred_at
+                          ? formatKyMeetingDate(item.occurred_at.slice(0, 10))
+                          : formatOccurredAt(item.occurred_at)}
+                      </Typography>
+                    </Box>
+                  }
+                  secondary={
+                    <Box component="div" sx={{ pt: 0.25 }}>
+                      {item.bill_title && (
+                        <Typography variant="body1" fontWeight={500} sx={{ lineHeight: 1.35, mb: 0.25 }}>
+                          {item.bill_title}
+                        </Typography>
+                      )}
+                      {item.committee_name && (
+                        item.committee_slug ? (
+                          <MuiLink
+                            component={NextLink}
+                            href={`/committees/${encodeURIComponent(item.committee_slug)}`}
+                            variant="body1"
+                            fontWeight={500}
+                            underline="hover"
+                            sx={{ lineHeight: 1.35, mb: 0.25, display: 'block' }}
+                          >
+                            {item.committee_name}
+                          </MuiLink>
+                        ) : (
+                          <Typography variant="body1" fontWeight={500} sx={{ lineHeight: 1.35, mb: 0.25 }}>
+                            {item.committee_name}
+                          </Typography>
+                        )
+                      )}
+                      {item.detail && (
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
+                          {item.detail}
+                        </Typography>
                       )}
                     </Box>
-                    <Typography variant="body2" color="text.secondary">
-                      {item.label}
-                    </Typography>
-                    {item.detail && (
-                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                        {item.detail}
-                      </Typography>
-                    )}
-                  </Box>
-                }
-                secondaryTypographyProps={{ component: 'div' }}
-              />
-            </ListItem>
-          ))}
+                  }
+                  secondaryTypographyProps={{ component: 'div' }}
+                />
+              </ListItem>
+            );
+          })}
         </List>
       )}
 
