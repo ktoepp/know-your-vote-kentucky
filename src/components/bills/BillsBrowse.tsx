@@ -42,9 +42,11 @@ import {
   isDefaultKyBillSort,
   KY_BILL_SORT_OPTIONS,
   kyBillSortLabel,
+  parseKyBillSessionParam,
   parseKyBillSortDirParam,
   parseKyBillSortParam,
 } from '@/lib/ky-bills-browse-url';
+import { KY_BILL_SESSION_OPTIONS } from '@/lib/ky-sessions';
 import { withTimeout } from '@/lib/async-utils';
 import { usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
@@ -114,6 +116,17 @@ export function BillsBrowse({
     [pathname, router, searchParams],
   );
 
+  const setSessionInUrl = useCallback(
+    (next: string) => {
+      const p = new URLSearchParams(searchParams.toString());
+      if (next) p.set('session', next);
+      else p.delete('session');
+      const qs = p.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
   useEffect(() => {
     const fromUrl = searchParams.get('topic') ?? '';
     setTopicFilter((prev) => (prev === fromUrl ? prev : fromUrl));
@@ -131,6 +144,7 @@ export function BillsBrowse({
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [topicFilter, setTopicFilter] = useState<string>(initialTopic ?? '');
+  const sessionFilter = parseKyBillSessionParam(searchParams.get('session'));
   const legislators = legislatorRoster;
   const sortBy = parseKyBillSortParam(searchParams.get('sort'));
   const sortDir = parseKyBillSortDirParam(searchParams.get('dir'));
@@ -169,6 +183,7 @@ export function BillsBrowse({
       p.set('chamberFilter', chamberFilter);
       p.set('status', statusFilter);
       if (topicFilter) p.set('topic', topicFilter);
+      if (sessionFilter) p.set('session', sessionFilter);
       p.set('sortBy', sortBy);
       p.set('sortDir', sortDir);
       p.set('page', String(page));
@@ -183,6 +198,7 @@ export function BillsBrowse({
       chamberFilter,
       statusFilter,
       topicFilter,
+      sessionFilter,
       sortBy,
       sortDir,
       pageSize,
@@ -197,13 +213,14 @@ export function BillsBrowse({
         chamberFilter,
         statusFilter,
         topicFilter,
+        sessionFilter,
         followIds: [],
         sortBy,
         sortDir,
         page: 1,
         pageSize,
       }),
-    [chamberMode, chamberFilter, statusFilter, topicFilter, sortBy, sortDir, pageSize],
+    [chamberMode, chamberFilter, statusFilter, topicFilter, sessionFilter, sortBy, sortDir, pageSize],
   );
 
   useEffect(() => {
@@ -277,7 +294,7 @@ export function BillsBrowse({
     }
   }, [loadingMore, bills.length, browseTotal, pageSize, buildBrowseQuery]);
 
-  const browsePagerResetKey = `${followsParam}|${chamberFilter}|${statusFilter}|${topicFilter}|${sortBy}|${sortDir}|${pageSize}`;
+  const browsePagerResetKey = `${followsParam}|${chamberFilter}|${statusFilter}|${topicFilter}|${sessionFilter}|${sortBy}|${sortDir}|${pageSize}`;
 
   const showChamberSelect = chamberMode === 'all';
 
@@ -300,10 +317,11 @@ export function BillsBrowse({
     () =>
       statusFilter !== 'all' ||
       Boolean(topicFilter) ||
+      Boolean(sessionFilter) ||
       effectiveFollowsMe ||
       (chamberMode === 'all' && Boolean(chamberFilter)) ||
       nonDefaultSort,
-    [statusFilter, topicFilter, effectiveFollowsMe, chamberMode, chamberFilter, nonDefaultSort],
+    [statusFilter, topicFilter, sessionFilter, effectiveFollowsMe, chamberMode, chamberFilter, nonDefaultSort],
   );
 
   const saveSearch = useCallback(async () => {
@@ -457,6 +475,20 @@ export function BillsBrowse({
                 <MenuItem value="vetoed">Vetoed</MenuItem>
               </Select>
             </FormControl>
+            <FormControl size="small" sx={{ minWidth: 175 }}>
+              <InputLabel id="browse-session-label">Session</InputLabel>
+              <Select
+                labelId="browse-session-label"
+                label="Session"
+                value={sessionFilter}
+                onChange={(e) => setSessionInUrl(e.target.value)}
+              >
+                <MenuItem value="">All sessions</MenuItem>
+                {KY_BILL_SESSION_OPTIONS.map((s) => (
+                  <MenuItem key={s} value={s}>{s}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
               <FormControl size="small" sx={{ minWidth: 150 }}>
                 <InputLabel id="browse-sort-label">Sort by</InputLabel>
@@ -536,6 +568,16 @@ export function BillsBrowse({
                 variant="outlined"
               />
             )}
+            {sessionFilter && (
+              <Chip
+                label={sessionFilter}
+                size="small"
+                onDelete={() => setSessionInUrl('')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
             {nonDefaultSort && (
               <Chip
                 label={kyBillSortLabel(sortBy, sortDir)}
@@ -575,6 +617,8 @@ export function BillsBrowse({
                 p.delete('follows');
                 p.delete('sort');
                 p.delete('dir');
+                p.delete('session');
+                p.delete('topic');
                 const qs = p.toString();
                 router.replace(qs ? `${pathname}?${qs}` : pathname);
               }}

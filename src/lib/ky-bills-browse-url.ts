@@ -1,4 +1,5 @@
 import type { KyBillSortKey } from '@/lib/bill-display';
+import { isKnownKyBillSession } from '@/lib/ky-sessions';
 
 export const KY_BILL_SORT_KEYS: KyBillSortKey[] = [
   'last_action_date',
@@ -37,6 +38,13 @@ export function defaultDirForKyBillSort(sortBy: KyBillSortKey): 'asc' | 'desc' {
 
 export function isDefaultKyBillSort(sortBy: KyBillSortKey, sortDir: 'asc' | 'desc'): boolean {
   return sortBy === 'last_action_date' && sortDir === 'desc';
+}
+
+/** Empty string = "All sessions" (no filter applied). */
+export function parseKyBillSessionParam(value: string | null): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  return isKnownKyBillSession(trimmed) ? trimmed : '';
 }
 
 /** Chip / aria label for the active sort control. */
