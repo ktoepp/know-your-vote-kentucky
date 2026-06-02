@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { Instrument_Sans } from 'next/font/google';
 import ClientThemeProvider from './components/ClientThemeProvider';
 import PostHogPageviewTracker from './components/PostHogPageviewTracker';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const instrumentSans = Instrument_Sans({
   subsets: ['latin'],
@@ -114,6 +115,7 @@ export default function RootLayout({
             </TooltipProvider>
           </ClientThemeProvider>
         </UserProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
