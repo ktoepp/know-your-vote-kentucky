@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchKyBillsBrowsePage, type KyBillsBrowseQuery } from '@/lib/ky-bills-browse-server';
 import type { KyBillSortKey } from '@/lib/bill-display';
+import { parseKyBillSessionParam } from '@/lib/ky-bills-browse-url';
 
 const SORT_KEYS: KyBillSortKey[] = [
   'last_action_date',
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
     chamberFilter,
     statusFilter: sp.get('status') ?? 'all',
     topicFilter: sp.get('topic') ?? '',
+    sessionFilter: parseKyBillSessionParam(sp.get('session')),
     followIds: (sp.get('followIds') ?? '')
       .split(',')
       .map((s) => s.trim())

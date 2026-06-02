@@ -279,6 +279,7 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
   - **Investigation — official vs. inferred topic taxonomy:** **Resolved 2026-05-13.** Outcome: Option A (hybrid digest match) shipped via `src/lib/ky-topic-legiscan-mapping.ts`. Preferences UI keeps the 20 KY_TOPICS (no LegiScan-subject picker — rejected as power-user feature). AI-fallback tagging deferred unless `npm run audit:legiscan-subjects` shows bills missing from BOTH taxonomies. Coverage maintained via the audit step on the weekly workflow.
 - **Address search UX on map** — Shipped: Mapbox autocomplete on `/members/map` (2026-05-18 committee calendar ship); empty vs no-district states (2026-05-22).
 - **"How to contact your rep"** — District map accordion covers basics; expand with capitol workflows, hearings, testimony links to LRC as product needs evolve.
+- **PostHog analytics — MCP follow-up (optional)** — SDK + custom events wired on branch `feat/posthog-analytics` (2026-06-01): `instrumentation-client.ts` init, `PostHogPageviewTracker` for App Router pageviews, `src/lib/analytics.ts` rewired (autocapture on, identified-only profiles). Set `NEXT_PUBLIC_POSTHOG_KEY` in Vercel to activate. **Optional later:** run `npx @posthog/wizard mcp add` to attach the PostHog MCP to Claude Code for in-terminal querying of insights, funnels, and feature flags. Worth doing once 1–2 weeks of event data have accumulated — the MCP is data-driven and adds nothing until then.
 
 ## UX design tracker (agent)
 

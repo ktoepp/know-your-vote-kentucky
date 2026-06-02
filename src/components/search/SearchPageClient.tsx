@@ -37,6 +37,8 @@ import {
   isDigitsOnlyBillSearchQuery,
   type KyBillSearchFilters,
 } from '@/lib/ky-search-bills';
+import { parseKyBillSessionParam } from '@/lib/ky-bills-browse-url';
+import { KY_BILL_SESSION_OPTIONS } from '@/lib/ky-sessions';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
@@ -143,7 +145,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
     const qTrim = canonicalizeKyBillSearchInput(nextQuery.trim());
     if (!qTrim) return;
     params.set('q', qTrim);
-    const keys = ['chamber', 'dateRange', 'status', 'committee', 'type'] as const;
+    const keys = ['chamber', 'dateRange', 'status', 'committee', 'session', 'type'] as const;
     for (const k of keys) {
       if (overrides && k in overrides) {
         const v = overrides[k];
@@ -163,6 +165,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
   const dateRangeSelect = searchParams.get('dateRange') || '';
   const statusSelect = searchParams.get('status') || 'all';
   const committeeSelect = searchParams.get('committee') || '';
+  const sessionSelect = parseKyBillSessionParam(searchParams.get('session'));
 
   const committeeChipLabel = useMemo(() => {
     if (!committeeSelect) return '';
@@ -171,7 +174,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
   }, [committeeSelect, committeeOptions]);
 
   const hasActiveBillFilters = Boolean(
-    chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect,
+    chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect || sessionSelect,
   );
 
   const setFilterParam = (key: string, value: string) => {
@@ -267,6 +270,19 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 <MenuItem value="year">This year</MenuItem>
               </Select>
             </FormControl>
+            <FormControl size="small" sx={{ minWidth: 175 }}>
+              <InputLabel>Session</InputLabel>
+              <Select
+                label="Session"
+                value={sessionSelect}
+                onChange={(e) => setFilterParam('session', e.target.value as string)}
+              >
+                <MenuItem value="">All sessions</MenuItem>
+                {KY_BILL_SESSION_OPTIONS.map((s) => (
+                  <MenuItem key={s} value={s}>{s}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <FormControl size="small" sx={{ minWidth: 220 }}>
               <InputLabel>Committee</InputLabel>
               <Select
@@ -295,7 +311,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
           </Box>
 
           {/* Active filter chips */}
-          {(chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect) && (
+          {(chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect || sessionSelect) && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1.5, alignItems: 'center' }}>
               <Typography variant="caption" sx={{ fontWeight: 700, mr: 0.5, color: 'text.primary' }}>
                 Active filters:
@@ -319,7 +335,18 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               {committeeSelect && (
                 <Chip label={committeeChipLabel} size="small" onDelete={() => setFilterParam('committee', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
               )}
-              <Chip label="Clear all" size="small" onClick={() => { setFilterParam('chamber', ''); setFilterParam('status', 'all'); setFilterParam('dateRange', ''); setFilterParam('committee', ''); }} variant="outlined" sx={{ ml: 0.5 }} />
+              {sessionSelect && (
+                <Chip label={sessionSelect} size="small" onDelete={() => setFilterParam('session', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
+              )}
+              <Chip label="Clear all" size="small" onClick={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete('chamber');
+                params.delete('status');
+                params.delete('dateRange');
+                params.delete('committee');
+                params.delete('session');
+                router.replace(`${pathname}?${params.toString()}`);
+              }} variant="outlined" sx={{ ml: 0.5 }} />
             </Box>
           )}
           {!searched && (

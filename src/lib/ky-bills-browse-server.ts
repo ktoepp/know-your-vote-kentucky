@@ -30,6 +30,8 @@ export type KyBillsBrowseQuery = {
   chamberFilter: KyBillsBrowseChamberFilter;
   statusFilter: string;
   topicFilter: string;
+  /** Exact match against `ky_bills.session`. Empty string = all sessions. */
+  sessionFilter: string;
   followIds: string[];
   sortBy: KyBillSortKey;
   sortDir: 'asc' | 'desc';
@@ -66,6 +68,11 @@ type BillQuery = {
   range: (from: number, to: number) => BillQuery;
   select: (columns: string, opts?: { count?: 'exact'; head?: boolean }) => BillQuery;
 };
+
+/** Cast helper: PostgrestFilterBuilder has `.eq`, but adding it to BillQuery causes deep type instantiation. */
+function eqBillSession<T extends BillQuery>(query: T, session: string): T {
+  return (query as unknown as { eq: (col: string, val: string) => T }).eq('session', session);
+}
 
 function applyChamberToQuery<T extends BillQuery>(
   query: T,
@@ -107,6 +114,7 @@ function filterBrowseRows(bills: KYBill[], query: KyBillsBrowseQuery): KYBill[] 
     }
     if (!billMatchesBrowseStatusFilter(bill, query.statusFilter)) return false;
     if (query.topicFilter && !bill.topics?.includes(query.topicFilter)) return false;
+    if (query.sessionFilter && bill.session !== query.sessionFilter) return false;
     if (query.followIds.length > 0 && !query.followIds.includes(bill.id)) return false;
     if (chamber !== 'all' && effectiveBillChamber(bill) !== chamber && query.chamberMode !== 'all') {
       return false;
@@ -139,6 +147,9 @@ async function fetchChamberScopedRows(
   if (query.topicFilter) {
     q = q.contains('topics', [query.topicFilter]);
   }
+  if (query.sessionFilter) {
+    q = eqBillSession(q, query.sessionFilter);
+  }
   const { data, error } = await q.limit(limit);
   if (error) throw error;
   const rows = (data ?? []) as KYBill[];
@@ -170,6 +181,9 @@ async function fetchKyBillsBrowsePageUncached(query: KyBillsBrowseQuery): Promis
   if (query.topicFilter) {
     countQ = countQ.contains('topics', [query.topicFilter]);
   }
+  if (query.sessionFilter) {
+    countQ = countQ.eq('session', query.sessionFilter);
+  }
 
   let rowQ = supabase
     .from('ky_bills')
@@ -179,6 +193,9 @@ async function fetchKyBillsBrowsePageUncached(query: KyBillsBrowseQuery): Promis
   rowQ = applyChamberToQuery(rowQ, chamber);
   if (query.topicFilter) {
     rowQ = rowQ.contains('topics', [query.topicFilter]);
+  }
+  if (query.sessionFilter) {
+    rowQ = rowQ.eq('session', query.sessionFilter);
   }
 
   const from = (page - 1) * pageSize;
@@ -205,6 +222,7 @@ function getCachedKyBillsBrowsePage(query: KyBillsBrowseQuery): Promise<KyBillsB
       query.chamberFilter,
       query.statusFilter,
       query.topicFilter,
+      query.sessionFilter,
       query.sortBy,
       query.sortDir,
       String(query.page),
