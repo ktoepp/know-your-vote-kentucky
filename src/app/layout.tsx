@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import './globals.css';
 import type { Metadata } from 'next';
 import { Instrument_Sans } from 'next/font/google';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import ClientThemeProvider from './components/ClientThemeProvider';
 import PostHogPageviewTracker from './components/PostHogPageviewTracker';
 
@@ -114,6 +115,7 @@ export default function RootLayout({
             </TooltipProvider>
           </ClientThemeProvider>
         </UserProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
