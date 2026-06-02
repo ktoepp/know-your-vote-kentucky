@@ -104,7 +104,6 @@ All runnable tooling lives in `scripts/` and is exposed via `package.json`. Ther
 | `npm run sync:ky:dry` | Dry-run sync (no writes). |
 | `npm run bulk-seed:ky` | LegiScan bulk seed (operator). |
 | `npm run check:legiscan-quota` | Print current month LegiScan API usage vs 30k cap. |
-| `npm run clear-dataset-hashes` | Clear dataset sync hashes (see script). |
 | `npm run db:apply-sql` | Apply SQL from repo when `DATABASE_URL` or password is set. |
 | `npm run geo:ky-districts` / `geo:ky-mask` | Rebuild district GeoJSON / outside mask assets. |
 | `npm run verify:votes` | Verify LegiScan vote counts vs DB. |

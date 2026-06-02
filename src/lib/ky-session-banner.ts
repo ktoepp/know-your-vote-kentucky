@@ -18,12 +18,6 @@ export type SessionBannerModel = {
   contextLine?: string;
   /** Show the standing "check LRC for posted meetings" tail link. */
   showLrcLink: boolean;
-  /**
-   * Retained for backwards compatibility with the previous banner shape; equivalent to
-   * `phase === 'interim'`.
-   * @deprecated Prefer `phase`.
-   */
-  showAfterSessionNote: boolean;
 };
 
 function fmtDate(d: string): string {
@@ -47,7 +41,6 @@ export function getSessionBannerModel(asOf: Date = new Date()): SessionBannerMod
           `Veto recess: ${fmtDate(active.milestones.vetoRecessStart)} – ${fmtDate(active.milestones.vetoRecessEnd)}. ` +
           'The Governor has up to 10 days to act on enrolled bills before chambers reconvene to consider overrides.',
         showLrcLink: true,
-        showAfterSessionNote: false,
       };
     }
     if (phase === 'final_days') {
@@ -57,7 +50,6 @@ export function getSessionBannerModel(asOf: Date = new Date()): SessionBannerMod
         phase,
         contextLine: 'Final days: chambers reconvene to consider veto overrides before sine die adjournment.',
         showLrcLink: true,
-        showAfterSessionNote: false,
       };
     }
     return {
@@ -65,7 +57,6 @@ export function getSessionBannerModel(asOf: Date = new Date()): SessionBannerMod
       dateRange,
       phase,
       showLrcLink: false,
-      showAfterSessionNote: false,
     };
   }
 
@@ -79,7 +70,6 @@ export function getSessionBannerModel(asOf: Date = new Date()): SessionBannerMod
       contextLine:
         'Between regular sessions. Interim joint committees meet to study issues and pre-file bills for the next session.',
       showLrcLink: true,
-      showAfterSessionNote: true,
     };
   }
 
@@ -90,6 +80,5 @@ export function getSessionBannerModel(asOf: Date = new Date()): SessionBannerMod
     dateRange: `${fmtDate(session.start)} – ${fmtDate(session.end)}`,
     phase: 'interim',
     showLrcLink: true,
-    showAfterSessionNote: true,
   };
 }
