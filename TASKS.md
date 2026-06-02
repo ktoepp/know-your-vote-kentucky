@@ -54,7 +54,6 @@ Use this when continuing **Follow committees v1.5**, **Wave 3 committee/data**, 
 ### Ops / env
 
 - **Migration order (new projects):** **016 → 017 → 018 → 019 → 020 → 021 → 022 → 023 → 024 → 025 → 026 → 027** (`npm run db:apply-sql` or SQL editor). **Primary environment:** **016–027** applied (026 pre-existing; **027** applied 2026-05-26).
-- After **023** on legacy data: `npm run normalize:legislator-districts -- --apply` → `npm run cleanup:stale-legislators -- --apply` → `npm run diagnose:legislators` (~141 active).
 - After **027** on a fresh DB: run `npx tsx scripts/backfill-interim-calendar-2026.ts` (idempotent; seeds interim meetings from LRC PDF). Primary already has meetings (214 rows as of 2026-05-26).
 - Vercel: `RESEND_WEBHOOK_SECRET`; canonical `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` = `https://www.kyvky.com` (apex 307 breaks webhook POST).
 - `npm run preview:digest -- --email <addr>` — add `--inject HB1` for synthetic bill events; supports committee sections when user follows committees + opts into **Committee meeting scheduled**.
