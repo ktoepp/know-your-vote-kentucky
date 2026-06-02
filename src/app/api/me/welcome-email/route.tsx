@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: profile.email as string,
-      replyTo: 'hello@kyvky.com',
+      replyTo: 'katie@kyvky.com',
       subject: 'Your Know Your Vote Kentucky account is set up',
       html,
       text,

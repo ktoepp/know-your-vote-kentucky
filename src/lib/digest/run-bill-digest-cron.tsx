@@ -398,7 +398,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       const { data: sendData, error: sendErr } = await resend.emails.send({
         from: fromEmail,
         to: email,
-        replyTo: 'hello@kyvky.com',
+        replyTo: 'katie@kyvky.com',
         subject,
         html,
         text,

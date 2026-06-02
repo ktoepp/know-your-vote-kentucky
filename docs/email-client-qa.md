@@ -20,7 +20,7 @@ Manual pass after template copy changes (especially Bill Watch alignment). Send 
 ## Welcome email
 
 - [ ] Single-column layout; links to browse, profile, map
-- [ ] Resend from `alerts@kyvky.com`, reply-to `hello@kyvky.com`
+- [ ] Resend from `alerts@kyvky.com`, reply-to `katie@kyvky.com`
 
 ## Ops
 
