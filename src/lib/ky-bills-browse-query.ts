@@ -1,4 +1,5 @@
 import {
+  parseKyBillSessionParam,
   parseKyBillSortDirParam,
   parseKyBillSortParam,
 } from '@/lib/ky-bills-browse-url';
@@ -20,6 +21,7 @@ export function parseKyBillsBrowseQuery(
     chamberFilter,
     statusFilter: sp.get('status') ?? 'all',
     topicFilter: sp.get('topic') ?? '',
+    sessionFilter: parseKyBillSessionParam(sp.get('session')),
     followIds: [],
     sortBy: parseKyBillSortParam(sp.get('sort')),
     sortDir: parseKyBillSortDirParam(sp.get('dir')),
@@ -35,6 +37,7 @@ export function kyBillsBrowseQueryKey(query: KyBillsBrowseQuery): string {
     query.chamberFilter,
     query.statusFilter,
     query.topicFilter,
+    query.sessionFilter,
     query.sortBy,
     query.sortDir,
     String(query.pageSize),

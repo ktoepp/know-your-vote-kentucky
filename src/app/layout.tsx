@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import './globals.css';
 import type { Metadata } from 'next';
 import { Instrument_Sans } from 'next/font/google';
 import ClientThemeProvider from './components/ClientThemeProvider';
+import PostHogPageviewTracker from './components/PostHogPageviewTracker';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const instrumentSans = Instrument_Sans({
   subsets: ['latin'],
@@ -95,6 +97,9 @@ export default function RootLayout({
       </head>
       <body className="flex min-h-screen flex-col" suppressHydrationWarning>
         <a href="#main-content" className="skip-link">Skip to main content</a>
+        <Suspense fallback={null}>
+          <PostHogPageviewTracker />
+        </Suspense>
         <UserProvider>
           <ClientThemeProvider>
             <TooltipProvider>
@@ -110,6 +115,7 @@ export default function RootLayout({
             </TooltipProvider>
           </ClientThemeProvider>
         </UserProvider>
+        <SpeedInsights />
       </body>
     </html>
   );

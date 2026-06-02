@@ -15,7 +15,7 @@ async function unsubscribe(token: string): Promise<{ ok: boolean; status: number
       status: 400,
       body: page(
         'Invalid link',
-        'This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at hello@kyvky.com.',
+        'This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at katie@kyvky.com.',
         false,
       ),
     };

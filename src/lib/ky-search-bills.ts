@@ -9,6 +9,7 @@ import {
 } from '@/lib/bill-display';
 import { billMatchesCommitteeFilter } from '@/lib/ky-committee-utils';
 import { KY_BILL_SEARCH_SELECT } from '@/lib/ky-bill-search-select';
+import { parseKyBillSessionParam } from '@/lib/ky-bills-browse-url';
 
 /**
  * Set after PostgREST reports `legiscan_subjects_search` missing (migration 015 not applied or schema stale).
@@ -31,7 +32,7 @@ function isMissingKyBillsPlainSearchRpc(err: { message?: string; details?: strin
   );
 }
 
-/** Optional filters (URL: chamber, dateRange, status, committee). */
+/** Optional filters (URL: chamber, dateRange, status, committee, session). */
 export type KyBillSearchFilters = {
   chamber?: 'house' | 'senate' | 'joint';
   dateRange?: string;
@@ -45,10 +46,12 @@ export type KyBillSearchFilters = {
    * when synced, with legacy keyword fallback on title/last_action.
    */
   committee?: string;
+  /** Exact match against `ky_bills.session`; validated against {@link KY_BILL_SESSION_OPTIONS}. */
+  session?: string;
 };
 
 /**
- * Query params (same as `/search` URL): `chamber`, `dateRange`, `status`, `committee`.
+ * Query params (same as `/search` URL): `chamber`, `dateRange`, `status`, `committee`, `session`.
  * `status` values are UI buckets, resolved by {@link billMatchesBrowseStatusFilter}.
  */
 export function buildKyBillSearchFiltersFromUrlSearch(
@@ -56,11 +59,13 @@ export function buildKyBillSearchFiltersFromUrlSearch(
 ): KyBillSearchFilters {
   const ch = sp.get('chamber');
   const st = sp.get('status');
+  const session = parseKyBillSessionParam(sp.get('session'));
   return {
     chamber: ch === 'house' || ch === 'senate' || ch === 'joint' ? ch : undefined,
     dateRange: sp.get('dateRange') || undefined,
     status: st && st !== 'all' ? st : undefined,
     committee: sp.get('committee') || undefined,
+    session: session || undefined,
   };
 }
 
@@ -93,6 +98,9 @@ function kyBillsSearchSelect(supabase: SupabaseClient, filters: KyBillSearchFilt
     q = q.or(
       'bill_number.ilike.HJR%,bill_number.ilike.HCR%,bill_number.ilike.SJR%,bill_number.ilike.SCR%',
     );
+  }
+  if (filters.session) {
+    q = q.eq('session', filters.session);
   }
   return q;
 }
@@ -450,6 +458,9 @@ export async function fetchKyBillsMatchingSearch(
   }
   if (filters.status && filters.status !== 'all') {
     merged = merged.filter((b) => billMatchesBrowseStatusFilter(b, filters.status));
+  }
+  if (filters.session) {
+    merged = merged.filter((b) => b.session === filters.session);
   }
 
   const rankingTokens = relevanceTokensFromQuery(safe);

@@ -148,6 +148,19 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # Or set these directly in Vercel → Project → Environment Variables (Build step only).
 
 # =============================================================================
+# OPTIONAL — PostHog (product analytics)
+# =============================================================================
+# Create a project at https://posthog.com → Project Settings → Project API Key.
+# NEXT_PUBLIC_POSTHOG_KEY is the public project key (safe to ship in the browser bundle).
+# NEXT_PUBLIC_POSTHOG_HOST defaults to https://us.i.posthog.com — override if you
+# use the EU cloud (https://eu.i.posthog.com) or self-host.
+# NEXT_PUBLIC_POSTHOG_KEY=phc_xxxxxxxxxxxxxxxxxxxx
+# NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+#
+# Local dev does not send events to PostHog unless you opt in (keeps real dashboards clean):
+# NEXT_PUBLIC_POSTHOG_REPORT_DEV=true
+
+# =============================================================================
 # OPTIONAL — Slack notifications
 # =============================================================================
 # Incoming Webhook URLs from https://api.slack.com/apps → Incoming Webhooks.

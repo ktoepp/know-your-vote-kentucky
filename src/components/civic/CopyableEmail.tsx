@@ -53,10 +53,11 @@ export function CopyableEmail({ email, variant = 'caption', display = 'block' }:
       <Tooltip title={copied ? 'Copied' : 'Copy email'}>
         <IconButton
           type="button"
-          size="small"
           aria-label={copied ? 'Copied to clipboard' : 'Copy email to clipboard'}
           onClick={copy}
-          sx={{ p: 0.35, color: copied ? 'success.main' : 'text.secondary' }}
+          // Inherits the theme-level 44×44 touch-target floor (theme.ts MuiIconButton).
+          // Icon stays visually small via fontSize; the click region is full-size.
+          sx={{ color: copied ? 'success.main' : 'text.secondary' }}
         >
           <ContentCopy sx={{ fontSize: variant === 'body2' ? 18 : 16 }} />
         </IconButton>

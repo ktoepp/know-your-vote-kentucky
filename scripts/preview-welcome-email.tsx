@@ -106,7 +106,7 @@ async function main() {
   const { data, error: sendErr } = await resend.emails.send({
     from,
     to: profile.email as string,
-    replyTo: 'hello@kyvky.com',
+    replyTo: 'katie@kyvky.com',
     subject: 'Your Know Your Vote Kentucky account is set up',
     html,
     text,

@@ -126,7 +126,7 @@ One-click, no login. Rendered as a minimal HTML page.
 
 **Invalid/missing token (400):**
 - Title: `Invalid link`
-- Body: `This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at hello@kyvky.com.`
+- Body: `This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at katie@kyvky.com.`
 
 **Server error (500):**
 - Title: `Something went wrong`

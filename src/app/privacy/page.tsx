@@ -17,7 +17,7 @@ export default function PrivacyPage() {
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Last updated {LAST_UPDATED}. Plain language; no legal jargon. If something here is unclear,
-        email <MuiLink href="mailto:hello@kyvky.com">hello@kyvky.com</MuiLink>.
+        email <MuiLink href="mailto:katie@kyvky.com">katie@kyvky.com</MuiLink>.
       </Typography>
 
       <Stack spacing={3} component="section">
@@ -118,7 +118,7 @@ export default function PrivacyPage() {
               profile, follows, preferences, and mail log.
             </li>
             <li>
-              Email <MuiLink href="mailto:hello@kyvky.com">hello@kyvky.com</MuiLink> for a copy of
+              Email <MuiLink href="mailto:katie@kyvky.com">katie@kyvky.com</MuiLink> for a copy of
               your data or any other request.
             </li>
           </Typography>

@@ -59,6 +59,47 @@ function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * All session names present in `ky_bills.session`, newest first. Used to populate
+ * filter dropdowns (`/bills`, `/search`). Kept separate from `KY_SESSIONS` because
+ * older sessions don't need date windows — just labels to filter by. Append a new
+ * entry when a new session is seeded; the dropdown also falls back to whatever
+ * the data layer surfaces so a missed update never silently drops a session.
+ */
+export const KY_BILL_SESSION_OPTIONS: readonly string[] = [
+  '2026 Regular Session',
+  '2025 Regular Session',
+  '2024 Regular Session',
+  '2023 Regular Session',
+  '2022 Special Session',
+  '2022 Regular Session',
+  '2021 Special Session',
+  '2021 Regular Session',
+  '2020 Regular Session',
+  '2019 Special Session',
+  '2019 Regular Session',
+  '2018 Special Session',
+  '2018 Regular Session',
+  '2017 Regular Session',
+  '2016 Regular Session',
+  '2015 Regular Session',
+  '2014 Regular Session',
+  '2013 Special Session',
+  '2013 Regular Session',
+  '2012 Special Session',
+  '2012 Regular Session',
+  '2011 Special Session',
+  '2011 Regular Session',
+  '2010 Special Session',
+  '2010 Regular Session',
+];
+
+/** True when `value` is a known session label (or empty string = "All sessions"). */
+export function isKnownKyBillSession(value: string | null | undefined): value is string {
+  if (!value) return false;
+  return KY_BILL_SESSION_OPTIONS.includes(value);
+}
+
 /** Returns the currently active session, or null if today is outside all session windows. */
 export function getActiveSession(asOf: Date = new Date()): KYSessionRecord | null {
   const today = atNoon(asOf.toISOString().slice(0, 10));

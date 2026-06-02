@@ -487,8 +487,14 @@ export default function DistrictMapExplorer() {
           renderInput={(params) => (
             <TextField
               {...params}
-              size="small"
+              // WCAG 3.3.2: placeholder is not a label — provide both a
+              // screen-reader-visible label and the placeholder hint.
+              label="Address or ZIP code"
               placeholder="Enter your address or ZIP code"
+              InputLabelProps={{
+                ...params.InputLabelProps,
+                shrink: true,
+              }}
               InputProps={{
                 ...params.InputProps,
                 startAdornment: (
@@ -565,6 +571,12 @@ export default function DistrictMapExplorer() {
             height: { xs: 420, md: 560 },
             border: 1,
             borderColor: 'divider',
+            // WCAG 2.5.5: Mapbox NavigationControl buttons default to 29×29.
+            // Bump to 44×44 on touch viewports; keep compact on desktop.
+            '& .mapboxgl-ctrl-group button': {
+              width: { xs: 44, md: 29 },
+              height: { xs: 44, md: 29 },
+            },
           }}
         >
           {busy && (
