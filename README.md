@@ -1,223 +1,181 @@
-# Know Your Vote Kentucky (KYVK)
+# Know Your Vote Kentucky (KYvKY)
 
-A civic transparency platform focused on the **Kentucky General Assembly**: browse and search bills, read plain-language AI summaries where enabled, and explore the legislative roster with profiles and an interactive district map.
+A civic transparency app for the **Kentucky General Assembly**: browse bills, read AI-assisted summaries on bill detail, follow legislation, get a daily email digest, and explore the legislator roster and district map.
 
-**Product scope (2026-05):** Frankfort / GA only in active development. Sync code for Louisville/Lexington ordinances, school boards, and county Legistar calendars remains for optional manual runs but is **off Vercel Cron** and excluded from default `npm run sync:ky`. See [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md).
+**Scope:** Frankfort / GA only. Local-government sync code (Louisville/Lexington ordinances, JCPS/FCPS school boards, county Legistar) remains in the repo for manual runs but is off Vercel Cron and excluded from default `npm run sync:ky`. Executive orders are deferred — `governor.ky.gov` listings aren't reliably scrapeable; the scraper, table, and helpers stay in-repo for a future re-enable.
 
-**Deferred — executive orders:** Not part of the MVP while governor.ky.gov listings are unreliable for automated sync (404s, client-only rendering). Revisit when there is a stable index URL, an official feed/API, or a maintainable headless fetch path. The scraper (`src/lib/ky-executive-orders.ts`), DB table, `syncExecutiveOrders()`, and `generateEOSummary()` remain in the codebase for a future re-enable; they are omitted from the product surface, search, intelligence API, automated sync map, and Vercel cron until then.
+See [docs/architecture.md](./docs/architecture.md) for a visual map of routes, data flow, and the sync pipeline.
 
-## For AI Agents
+## For AI agents
 
-**Start here if you're an AI picking up this project.**
+Read first if you're picking up this project:
 
-- **Current tasks and roadmap:** `[TASKS.md](./TASKS.md)` — always check this first. **Wave 1 (Bill Watch parity)** lists saved-search and alert UI work — read before implementing those features.
-- **CLI scripts:** see **Local maintenance scripts** under [Quick Start](#local-maintenance-scripts) (`npm run sync:ky`, verify scripts, geo build, etc.)
-- **Optional dormant npm deps:** [`docs/legacy-npm-deps/`](./docs/legacy-npm-deps/README.md) — install into gitignored `optional/legacy-npm-deps/`, not the root app
-- **This is a Kentucky state legislature app**, not a federal Congress app. All terminology, chamber sizes, and process descriptions must refer to the Kentucky General Assembly (100 House members, 38 Senators, Governor not President, 3/5 veto override threshold)
-- **Primary language:** TypeScript / Next.js 15 App Router. No pages router.
-- **Styling:** MUI (Material UI) is the primary component library. Tailwind is present but used minimally for the custom tooltip layer.
-- **Database:** Supabase (PostgreSQL). Schema in `supabase/migrations/`. Bills and votes flow from LegiScan (`src/lib/ky-legiscan-client.ts`); legislators from Open States (`src/lib/ky-openstates-client.ts`). Orchestration: `src/lib/ky-sync-pipeline.ts`.
+- **[TASKS.md](./TASKS.md)** — current roadmap, what's shipped, what's next.
+- **[decisions.md](./decisions.md)** — append-only rationale log; check before changing established patterns.
+- **[docs/specs/](./docs/specs/)** — feature specs (follow-bills, committee-calendar).
+- **This is the Kentucky General Assembly**, not the US Congress. Use KY terminology: 100 House / 38 Senate, Governor (not President), 3/5 veto override.
+- **Stack:** TypeScript, Next.js 15 (App Router only), React 18, MUI (primary), Tailwind (minimal — tooltip layer), Supabase / Postgres.
+- **Data sources:** LegiScan (bills, votes), Open States (legislators), LRC HTML calendar (committee meetings + agendas + materials). Orchestrated by `src/lib/ky-sync-pipeline.ts`.
 
 ### Key files for common tasks
 
+| Task | Files |
+| --- | --- |
+| Bill card / detail | `src/components/bills/KYBillCard.tsx`, `src/app/bills/[id]/page.tsx` |
+| Bill status → tooltip mapping | `src/lib/bill-display.ts` (`billStatusToTooltipKey`, `billPrefixToTooltipKey`) |
+| Member roster / profile / map | `src/components/members/MemberCard.tsx`, `src/app/members/[slug]/page.tsx`, `src/components/members/DistrictMapExplorer.tsx` |
+| Committees / meetings | `src/app/committees/`, `src/components/committees/MeetingsBrowse.tsx`, `src/components/bills/BillHearingsSection.tsx` |
+| Profile activity feed | `src/components/profile/ProfileActivitySection.tsx`, `GET /api/me/activity` |
+| Tooltip content + toggle | `src/lib/tooltipContent.ts`, `src/lib/TooltipContext.tsx`, `src/components/ui/Tooltip.tsx` |
+| LRC calendar parser | `src/lib/lrc-legislative-calendar-parser.ts` (spike: `npm run spike:lrc:calendar`) |
+| Sync pipeline | `src/lib/ky-sync-pipeline.ts` |
+| Bill Watch UX reference | `docs/reference/bill-watch/` |
+| App shell / providers | `src/app/layout.tsx` |
 
-| Task                              | Files                                                                              |
-| --------------------------------- | ---------------------------------------------------------------------------------- |
-| Tooltip content / definitions     | `src/lib/tooltipContent.ts`                                                        |
-| Tooltip on/off toggle             | `src/lib/TooltipContext.tsx`, `src/app/components/Navigation.tsx`                  |
-| Tooltip components                | `src/components/ui/Tooltip.tsx`, `src/components/ui/LegislativeStageTooltip.tsx`   |
-| Bill status → tooltip key mapping | `src/lib/bill-display.ts` → `billStatusToTooltipKey()`, `billPrefixToTooltipKey()` |
-| Bill card (list/browse)           | `src/components/bills/KYBillCard.tsx`                                              |
-| Bill detail page                  | `src/app/bills/[id]/page.tsx`                                                      |
-| District map                      | `src/components/members/DistrictMapExplorer.tsx`                                   |
-| Map member popup                  | `src/components/members/DistrictMapMemberTooltip.tsx`                              |
-| Member card (list + map sidebar)  | `src/components/members/MemberCard.tsx`                                            |
-| Member profile page               | `src/app/members/[slug]/page.tsx`                                                  |
-| Bill stage definitions            | `src/lib/billStages.ts`                                                            |
-| Data sync pipeline                | `src/lib/ky-sync-pipeline.ts`                                                      |
-| Committee calendar spec (GA)    | `docs/specs/committee-calendar.md`                                                 |
-| Committees / meetings browse    | `src/app/committees/`, `src/components/committees/MeetingsBrowse.tsx`              |
-| Bill hearings on detail         | `src/components/bills/BillHearingsSection.tsx`                                     |
-| Profile activity feed           | `src/components/profile/ProfileActivitySection.tsx`, `GET /api/me/activity`        |
-| Legislature resources hub       | `src/app/legislature/resources/page.tsx`                                           |
-| LRC calendar parser (Phase 0)   | `src/lib/lrc-legislative-calendar-parser.ts` — `npm run spike:lrc:calendar`        |
-| Bill Watch UI reference         | `docs/reference/bill-watch/` (screenshots: add PNGs per `screenshots/INDEX.md`)    |
-| App layout / providers            | `src/app/layout.tsx`                                                               |
+### Hidden routes (no nav, `noindex`)
 
+`/dashboard` (legacy redirect target — superseded by `/profile`), `/browse`, `/find-content`, `/design-system`, `/dev/digest-history`. Reachable by URL for development. `/admin/sync-status` requires the `ADMIN_TOKEN` header.
 
-### What's hidden / not in nav
+### Tooltip taxonomy
 
-- **Events page** (`/events`) — built but hidden from nav. Has known technical debt (some federal terminology in inline term detection). Do not surface until cleaned up.
-- **Explore, table, activity, live-content, dashboard, link-dashboard** — legacy/experimental. Reachable by URL but `noindex`. Do not add to primary navigation.
-- **Admin** (`/admin/sync-status`) — requires `ADMIN_TOKEN` header. Operator-only.
+Three categories. Only the first is the system you'll likely touch.
 
-### Tooltip system architecture
-
-Tooltips fall into three categories (per the Wave 4 locked decisions in the spec). Only the first two are part of the product; the third is a small set of UI hints.
-
-| Category | What it is | Where it lives | Notes |
+| Category | What | Where | Notes |
 | --- | --- | --- | --- |
-| **Educational** | Defines a civic/legislative term (e.g. "veto", "committee", a status like "Reported"). Always tied to a `TooltipContent` entry. | `src/components/ui/Tooltip.tsx` + `src/components/ui/LegislativeStageTooltip.tsx`; content in `src/lib/tooltipContent.ts` (`governmentTooltips`) and the bill-status records in `src/lib/bill-display.ts` (`billStatusToTooltipKey`, `billPrefixToTooltipKey`). | Respects the global `tooltipsEnabled` toggle (`src/lib/TooltipContext.tsx`). Use for jargon / acronyms / process steps. The `BillStatusMetaChip` tooltip on bill cards is in this category. |
-| **Preview (removed)** | Whole-card hover popovers that previewed row-specific data (title, sponsor, next action, co-sponsors). **Do not re-introduce these.** Row data already lives on the card body and on the detail page. | Formerly `KYBillCardTooltipTitle.tsx`, `BillTooltip.tsx`, `BillNumberTooltip` — all deleted in Wave 4b. | If you find yourself building a hover popover that surfaces information already on the card, stop. Link to the detail page or surface the info on the card itself. |
-| **UI affordance** | Short labels on icon-only buttons / interactive controls (e.g. "Open in new tab" on an external-link icon, MUI `Tooltip title="…"` on an icon button). | MUI `<Tooltip />` inline at the call site. | Plain string, single sentence. Not gated by `tooltipsEnabled`. Don't use this for definitions — that's the Educational bucket. |
+| **Educational** | Civic / legislative term (e.g. "veto", "Reported"). | `src/components/ui/Tooltip.tsx`; content in `src/lib/tooltipContent.ts` (`governmentTooltips`) and bill-status records in `src/lib/bill-display.ts`. | Gated by `tooltipsEnabled` (`src/lib/TooltipContext.tsx`). Same `governmentTooltips` entries power the public [`/glossary`](./src/app/glossary/page.tsx). |
+| **UI affordance** | Short label on an icon button (e.g. "Open in new tab"). | Inline MUI `<Tooltip title="…" />`. | Always on. Not for definitions. |
+| **Preview (removed)** | Whole-card hover popovers that mirrored row data. **Do not re-introduce.** | Deleted in Wave 4b (`KYBillCardTooltipTitle`, `BillTooltip`). | If tempted, link to detail or surface the data on the card body. |
 
-Content for the Educational bucket lives in `src/lib/tooltipContent.ts` (`governmentTooltips` record). Add new terms there; use `getTooltipContent(key)` to retrieve. The same `governmentTooltips` entries are rendered as a public, link-shareable glossary at [`/glossary`](./src/app/glossary/page.tsx) (grouped + alphabetized by `category`, with stable anchors); the in-page `<Tooltip>` exposes a small "Learn more" affordance that deep-links to the matching glossary entry.
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- npm
-- Supabase project (for database)
-- Anthropic API key (for AI summaries)
-- LegiScan / OpenStates API keys (for KY legislative data)
-
-### Installation
+## Quick start
 
 ```bash
 git clone <repository-url>
 cd know-your-vote-kentucky
-
 npm install
 cp env-template.txt .env.local   # fill in your keys
 npm run dev
 ```
 
-Visit `http://localhost:3000` to see the application.
+Requires Node 18+, a Supabase project, and API keys for Anthropic, LegiScan, Open States, Mapbox (see `env-template.txt`).
 
-If `next dev` returns 500s or missing webpack chunks, stop every process on port 3000, then run `npm run dev:clean` (deletes `.next` and starts the dev server).
+If `next dev` returns 500s or missing webpack chunks: kill anything on port 3000, then `npm run dev:clean` (deletes `.next` and restarts).
 
-### Local maintenance scripts
+### Maintenance scripts
 
-All runnable tooling lives in `scripts/` and is exposed via `package.json`. There is no Jest/Vitest suite; `npm run test:env` only validates that `.env.local` has non-placeholder values for core keys.
+All tooling lives in `scripts/` and is exposed via `package.json`. There is no Jest/Vitest suite — `npm run test:env` only validates `.env.local`.
 
 | Script | Purpose |
-| ------ | ------- |
-| `npm run test:env` | Sanity-check `.env.local` (Supabase, LegiScan, OpenStates, sync secret, Anthropic, Mapbox). |
-| `npm run sync:ky` | Manual Kentucky sync (see script help / `manual-sync.ts`). |
-| `npm run sync:ky:legislators` | Legislator-only sync pass. |
-| `npm run sync:ky:sessions` | List LegiScan sessions (helper). |
-| `npm run sync:ky:quota` | Bill sync with quota backfill flag. |
-| `npm run sync:ky:dry` | Dry-run sync (no writes). |
-| `npm run bulk-seed:ky` | LegiScan bulk seed (operator). |
-| `npm run check:legiscan-quota` | Print current month LegiScan API usage vs 30k cap. |
-| `npm run db:apply-sql` | Apply SQL from repo when `DATABASE_URL` or password is set. |
-| `npm run geo:ky-districts` / `geo:ky-mask` | Rebuild district GeoJSON / outside mask assets. |
-| `npm run verify:votes` | Verify LegiScan vote counts vs DB. |
-| `npm run verify:legislator-links` | HTTP checks on stored legislator URLs. |
-| `npm run spot-check:bill-links` | Sample roll-call URLs (LegiScan API when key set) + sponsor Ballotpedia from `ky_bills`. |
+| --- | --- |
+| `npm run test:env` | Validate required env vars. |
+| `npm run sync:ky` | Manual sync (all default sources). `:legislators`, `:quota`, `:dry`, `:lrc-calendar`, `:lrc-committee-materials` for targeted runs. |
+| `npm run check:legiscan-quota` | LegiScan API usage this month (vs 30k cap). |
+| `npm run db:apply-sql` | Apply SQL when `DATABASE_URL` is set. |
+| `npm run geo:ky-districts` / `geo:ky-mask` | Rebuild district GeoJSON / outside-mask assets. |
+| `npm run verify:votes` / `verify:legislator-links` / `spot-check:bill-links` | Data integrity checks. |
+| `npm run preview:digest` / `preview:welcome` | Render digest / welcome email locally. |
+| `npm run diagnose:legislators` | Report active rows missing `legiscan_id`. |
+| `npm run generate:district-thumbnails` | Static district minimap PNGs. |
 | `npm run slack:smoke-test` | Post a test message to configured Slack webhooks. |
 
-### Optional legacy npm packages
+Full list: see `scripts` in [package.json](./package.json).
 
-Heavy dependencies removed from the root app (puppeteer, pdf tooling, GCS client, `three`, etc.) are listed in [`docs/legacy-npm-deps/`](./docs/legacy-npm-deps/README.md). Copy that manifest into **`optional/legacy-npm-deps/`** (gitignored), run `npm install` there, and use `npx` or small scripts from that directory when needed. The Next.js app does not depend on that folder.
+### Optional legacy npm stacks
 
-## Tech Stack
+Heavy deps removed from the root app (puppeteer, pdf tooling, GCS client, `three`, etc.) live in [`docs/legacy-npm-deps/`](./docs/legacy-npm-deps/README.md). Install into gitignored `optional/legacy-npm-deps/` and run with `npx` from there; the Next.js app doesn't depend on that folder.
 
-- **Framework**: Next.js 15 (App Router), React 18, TypeScript
-- **Database**: Supabase (PostgreSQL)
-- **AI**: Anthropic Claude (summaries & intelligence scoring)
-- **Data Sources**: LegiScan, OpenStates, KY LRC
-- **Deployment**: Vercel with cron-based data sync
+## Tech stack
 
-## MVP scope (public story)
+- **Framework:** Next.js 15 (App Router), React 18, TypeScript
+- **UI:** MUI (primary), Tailwind (tooltip layer only)
+- **Database:** Supabase / Postgres — schema in `supabase/migrations/`
+- **AI:** Anthropic Claude (bill-detail summaries, intelligence scoring)
+- **Data:** LegiScan, Open States, KY LRC (HTML calendar + committee materials)
+- **Email:** Resend (digests, welcome, auth)
+- **Maps:** Mapbox (House/Senate district layers, geocoding)
+- **Monitoring:** Sentry
+- **Deployment:** Vercel — cron-driven data sync; LRC calendar runs on GitHub Actions
 
-**In the app bar:** **Bills** (with House/Senate shortcuts), **Members**, **Committees**, **Meetings**, **District map**, plus a global **Search** field (bill designation or keywords; results on `/search`).
+## Public surface
 
-**Also public:** `/legislature/resources` (official LRC/KET/Bill Watch links), `/glossary` (plain-English glossary of civic / KY legislative terms, sourced from `governmentTooltips`), signed-in **`/profile`** (follows, notifications, activity timeline, digest history).
+**App bar:** Bills (with House/Senate shortcuts), Members, Committees, Meetings, District map, global search.
 
-**Footer:** **About**, **Glossary**, **Licenses** (footer links added 2026-05-21).
+**Also public:** `/legislature/resources` (LRC/KET/Bill Watch links), `/glossary` (plain-English civic terms from `governmentTooltips`), signed-in `/profile` (follows, notification preferences, activity timeline, digest history).
 
-`/about` is not yet substantive editorial content; treat it as a stub until real copy ships.
+**Footer:** About, Glossary, Licenses, Privacy, Terms. `/about` is a stub awaiting real copy.
 
-Legacy or experimental areas (**`/events`**, explore, live content, table/activity dashboards, etc.) stay reachable by direct URL for development; many use **`noindex`** so they are not promoted in search results. **`/events`** is explicitly deprioritized (hidden from nav, known federal-terminology debt) until cleaned up.
+### Headline features
 
-## Key Features (what the public UI emphasizes today)
+- **Bills** — Status, sponsors, committee context, AI summary on bill detail, follow + per-bill alerts.
+- **Members** — Roster, profiles, sponsored bills, vote summaries, outbound links (LRC, LegiScan, Ballotpedia).
+- **District map** — Mapbox House/Senate layers + address lookup (KY-biased geocoding).
+- **Committees / meetings** — Browse, follow, agenda search, hearings on bill detail.
+- **Email digest** — Daily/weekly digest of followed bills + committee meetings (factual content only — no AI summaries in email).
 
-- **Bill tracking** — Session bills with status, sponsors, committee context, and AI-assisted summaries on bill detail where configured
-- **Member roster and profiles** — Active legislators, portraits, sponsored bills, vote summaries, outbound links (LRC, LegiScan, Ballotpedia where available)
-- **District map** — Mapbox-backed House/Senate layers and address lookup (Kentucky-biased geocoding)
-- **Bill search** — Filtered search UI on `/search`; `GET /api/search` serves bill results for programmatic use
+## Data sync
 
-**Backend and APIs (not primary nav):** The **`GET /api/intelligence`** endpoint exposes multi-factor relevance scoring and related helpers from `src/lib/ky-intelligence.ts`. Paused local-government sync (ordinances, school boards, county actions) can still be triggered manually via `GET /api/sync?source=…` when needed.
+Pipeline status (data landing in Supabase). Schedules in `vercel.json` and `.github/workflows/`.
 
-## Data Sync
+| Source | Schedule | Notes |
+| --- | --- | --- |
+| bills | Daily 05:00 UTC (Vercel) | LegiScan; `useChangeHash` + `skipBillSponsorDetails` |
+| legislators | Daily 06:00 UTC (Vercel) | Open States |
+| votes | Daily 06:15 UTC (Vercel) | LegiScan; `limit=5` per run |
+| bill digest | Daily 11:00 UTC (Vercel) | `/api/cron/notify` — Resend; weekly users batched Mondays |
+| lrc-committee-materials | Daily 13:30 UTC (Vercel) | Committee meeting documents → `ky_committee_materials` |
+| health-check | Daily 14:00 UTC (Vercel) | `/api/cron/health-check` |
+| lrc-calendar | 12:00 + 18:00 UTC (GitHub Actions) | LRC HTML calendar — `.github/workflows/sync-lrc-calendar.yml` (off Vercel Cron since 2026-05-21 — Hobby plan caps cron granularity at daily) |
+| legislator-links verifier | Weekly Mondays 12:00 UTC (GitHub Actions) | `.github/workflows/legislator-links-weekly.yml` |
+| ordinances, school-boards, county-actions | **Paused** | Manual `GET /api/sync?source=…` only |
 
-Scheduled jobs are listed in `vercel.json`. The table below is **pipeline** status (data landing in Supabase), not a map of every public page.
+## API endpoints
 
-
-| Source         | Cron (Vercel) | Notes |
-| -------------- | ------------- | ----- |
-| bills          | Daily 05:00 UTC | LegiScan; `useChangeHash` + `skipBillSponsorDetails` |
-| legislators    | Daily 06:00 UTC | Open States |
-| votes          | Daily 06:15 UTC | LegiScan; `limit=5` per run |
-| ordinances     | **Paused** | Louisville + Lexington Legistar — manual `?source=ordinances` only |
-| school-boards  | **Paused** | JCPS + FCPS — manual `?source=school-boards` only |
-| county-actions | **Paused** | Jefferson/Fayette Legistar — manual `?source=county-actions` only |
-| lrc-calendar   | GitHub Actions 12:00/18:00 UTC | LRC legislative calendar HTML — scheduled in `.github/workflows/sync-lrc-calendar.yml` (off Vercel Cron since 2026-05-21, see `decisions.md`); manual run: `npm run sync:ky:lrc-calendar` (requires migration **024**) |
-
-Only **bills**, **legislators** (roster/profiles), and **district geometry** are in the main navigation today.
-
-
-## API Endpoints
-
-
-| Endpoint                | Description                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `GET /api/bills`        | Kentucky bills with filtering                                                                                |
-| `GET /api/search`       | Kentucky bill search (`q`, optional filters); returns bill-shaped results JSON                                 |
-| `GET /api/intelligence` | Top-scored items with AI analysis                                                                            |
-| `POST /api/sync`        | Trigger data sync (Bearer `SYNC_API_KEY` or `CRON_SECRET`)                                                   |
-| `GET /api/sync`         | Without `?source=`: sync status. With `?source=bills` etc.: run that source (used by Vercel Cron; same auth) |
-
+| Endpoint | Description |
+| --- | --- |
+| `GET /api/bills` | Kentucky bills with filtering |
+| `GET /api/bills/browse` | Paginated browse with slim columns (`KY_BILL_BROWSE_SELECT`) |
+| `GET /api/search` | Bill search (FTS-first via `ky_bills_plain_search`) |
+| `GET /api/intelligence` | Top-scored bills (rate-limited to 30 req/min/IP) |
+| `GET /api/roster/active` | Cached active legislator roster (CDN-cacheable) |
+| `GET /api/me/*` | Signed-in user: `follows`, `preferences`, `activity`, `saved-searches`, `digest-history`, `export`, `account`, `welcome-email` |
+| `GET/POST/DELETE /api/bills/[id]/follow` | Bill follow toggle (Bearer token) |
+| `GET/POST/DELETE /api/committees/[id]/follow` | Committee follow toggle |
+| `GET/POST /api/sync` | Trigger sync (Bearer `SYNC_API_KEY` or `CRON_SECRET`). With `?source=` runs that source; without, returns status. Also called by Vercel Cron. |
+| `POST /api/webhooks/resend` | Resend bounce / complaint webhook (Svix-signed) |
+| `GET /api/unsubscribe/[token]` | Unsubscribe (RFC 8058 one-click compatible) |
 
 ## Operations
 
-### Rate Limiting
+### Rate limiting
 
-`/api/intelligence` is rate-limited to **30 requests/min per IP** using a shared Postgres token bucket so the limit holds across all Vercel serverless instances.
-
-- **Table:** `ky_rate_limit_buckets` (migration `008_ky_rate_limit.sql`)
-- **RPC:** `ky_rate_limit_consume(p_key, p_capacity, p_refill_per_sec)`
-- **Fail-open:** if Supabase is unreachable the request is allowed through and a warning is logged — the route never hard-fails due to the limiter
-- **No new env vars** — backed by the existing `SUPABASE_SERVICE_ROLE_KEY`
-- **Deny log format:** `[rate-limit] denied route=<route> ip_hash=<sha256[:8]> remaining=0 retry_after=<n>`
+`/api/intelligence` is limited to **30 req/min/IP** via a shared Postgres token bucket (`ky_rate_limit_buckets`, RPC `ky_rate_limit_consume`, migration `008`). Fail-open: if Supabase is unreachable, the request is allowed and a warning logged.
 
 ### Observability counters
 
-All counters land in `ky_sync_state` (JSONB payload, bucketed by date) via the `ky_increment_counter` RPC (migration `009_ky_atomic_counters.sql`):
+All counters land in `ky_sync_state` (JSONB, date-bucketed) via the `ky_increment_counter` RPC (migration `009`):
 
+| Key | Bucket | Tracks |
+| --- | --- | --- |
+| `legiscan_query_counter` | `YYYY-MM` | LegiScan API calls vs 30k/month cap |
+| `rate_limit_denies` | `YYYY-MM-DD` | `/api/intelligence` 429s |
+| `anthropic_cache_hits` / `_misses` | `YYYY-MM-DD` | Anthropic response cache |
 
-| Counter key              | Bucket       | What it tracks                                |
-| ------------------------ | ------------ | --------------------------------------------- |
-| `legiscan_query_counter` | `YYYY-MM`    | LegiScan API calls this month (30k/month cap) |
-| `rate_limit_denies`      | `YYYY-MM-DD` | `/api/intelligence` 429s per day              |
-| `anthropic_cache_hits`   | `YYYY-MM-DD` | Anthropic response cache hits                 |
-| `anthropic_cache_misses` | `YYYY-MM-DD` | Anthropic response cache misses               |
+These feed `/admin/sync-status` (requires `ADMIN_TOKEN`).
 
+### Outbound mail
 
-These counters feed the **`/admin/sync-status`** operator dashboard (requires `ADMIN_TOKEN` header).
+`From: alerts@kyvky.com` (transactional only — do not reply). `Reply-To: katie@kyvky.com` (real inbox). All inbound contact and vulnerability reports go to `katie@kyvky.com`. Resend webhook posts to `https://www.kyvky.com/api/webhooks/resend` (apex 307s break POST). Every transactional send includes a plain-text fallback.
 
 ## Deployment
 
-Set `CRON_SECRET` in Vercel (16+ random characters). Vercel Cron invokes `/api/sync?source=…` with `Authorization: Bearer <CRON_SECRET>`. The sync route also accepts `SYNC_API_KEY` for manual runs. Configure at least one of `CRON_SECRET` or `SYNC_API_KEY`.
+Vercel project. Set `CRON_SECRET` (16+ random chars) — Vercel Cron invokes `/api/sync?source=…` with `Authorization: Bearer <CRON_SECRET>`. Manual operator runs can use `SYNC_API_KEY` instead. At least one of the two must be configured.
 
-Configured for Vercel with automatic cron jobs for data sync (see `vercel.json`):
+Canonical origin is `https://kyvky.com` (`NEXT_PUBLIC_APP_URL` / `APP_PUBLIC_URL`). `next.config.ts` 308-redirects `www.kyvky.com` and legacy hosts.
 
-- **Scheduled (Vercel Cron):** bills, legislators, votes, bill digest (`/api/cron/notify`), health-check
-- **Scheduled (GitHub Actions):** **lrc-calendar** (`.github/workflows/sync-lrc-calendar.yml`, 12:00/18:00 UTC); weekly **legislator-links** verifier (`.github/workflows/legislator-links-weekly.yml`)
-- **Paused:** ordinances, school-boards, county-actions (see [committee-calendar spec](./docs/specs/committee-calendar.md))
+See **[docs/launch-checklist.md](./docs/launch-checklist.md)** for the operator launch checklist (Resend DKIM, Sentry alerts, inbox routing, legal review, email-client QA, Vercel env cleanup, regression cadence).
 
-Executive-order sync is not scheduled (deferred); see the note at the top of this file.
+## Environment variables
 
-## Environment Variables
-
-See `env-template.txt` for the full list of required and optional environment variables.
-
-To show **`DataFreshnessNote`** (home, search, bills, and any other page that mounts it), the anonymous Supabase client must be allowed to **`SELECT` on `ky_sources`** (or the note is omitted silently). Civic tables used for browsing typically already allow read; add a read policy for `ky_sources` if needed.
+See `env-template.txt`. To render the `DataFreshnessNote` on public pages, the anonymous Supabase client must have `SELECT` on `ky_sources` (otherwise the note is omitted silently).
 
 ## License
 
