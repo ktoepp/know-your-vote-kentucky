@@ -426,6 +426,24 @@ export const governmentTooltips: Record<string, TooltipContent> = {
     content: "A request to hold another vote on something that was just decided. In Kentucky, only a member who voted on the winning side can make this motion."
   },
 
+  concurrence: {
+    category: 'procedures_and_voting',
+    title: "Concurrence",
+    content: "When a chamber agrees to the other chamber's changes to a bill it already passed. The originating chamber votes to 'concur' in the amendments — or to refuse, which sends the bill to a conference committee. Concurrence votes cluster near the end of session."
+  },
+
+  veto_recess: {
+    category: 'procedures_and_voting',
+    title: "Veto Recess",
+    content: "A multi-day pause near the end of a Kentucky regular session. After both chambers pass the major bills, they recess so the Governor has the constitutional 10 days to sign, veto, or let bills become law. The General Assembly then reconvenes for its final days to consider veto overrides before adjourning sine die."
+  },
+
+  interim_period: {
+    category: 'procedures_and_voting',
+    title: "Interim Period",
+    content: "The months between regular sessions when the General Assembly isn't formally in session. Interim joint committees — made up of House and Senate members — meet monthly in Frankfort to study issues, take testimony, and pre-file bills for the next session. Most lawmaking groundwork happens here."
+  },
+
   // ── Special Provisions ──────────────────────────────────────────────────────
 
   emergency_clause: {
