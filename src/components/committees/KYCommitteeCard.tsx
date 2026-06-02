@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { Avatar, Box, IconButton, Typography } from '@mui/material';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark as BookmarkFilled } from '@mui/icons-material';
+import { Bookmark } from 'lucide-react';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { MetaChip } from '@/components/ui/Chip';
 import { CommitteeTagRow } from '@/components/committees/CommitteeTagRow';
@@ -52,7 +53,7 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
       }}
     >
       {following ? (
-        <BookmarkCheck size={22} strokeWidth={1.7} />
+        <BookmarkFilled sx={{ fontSize: '1.35rem' }} />
       ) : (
         <Bookmark size={22} strokeWidth={1.7} />
       )}

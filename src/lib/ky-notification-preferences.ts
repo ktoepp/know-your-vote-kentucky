@@ -13,6 +13,8 @@ export const KY_DIGEST_EVENT_TYPES = [
   'committee_action',
   'hearing_scheduled',
   'committee_meeting_scheduled',
+  'committee_agenda_updated',
+  'committee_meeting_cancelled',
   'floor_vote',
   'passed_chamber',
   'sent_to_governor',
@@ -31,6 +33,8 @@ export const KY_DIGEST_EVENT_LABELS: Record<KyDigestEventType, string> = {
   committee_action: 'Committee action',
   hearing_scheduled: 'Agenda / hearing scheduled',
   committee_meeting_scheduled: 'Committee meeting scheduled',
+  committee_agenda_updated: 'Committee agenda updated',
+  committee_meeting_cancelled: 'Committee meeting cancelled',
   floor_vote: 'Floor action',
   passed_chamber: 'Enrolled / passed chamber',
   sent_to_governor: 'Sent to Governor',
@@ -47,6 +51,8 @@ export const KY_DIGEST_EVENT_DESCRIPTIONS: Record<KyDigestEventType, string> = {
   committee_action: 'Referred, reported, or amended in committee (LegiScan).',
   hearing_scheduled: 'Listed on an upcoming LRC committee agenda — see Meetings.',
   committee_meeting_scheduled: 'A new meeting is added to the calendar for a committee you follow.',
+  committee_agenda_updated: 'Agenda for a meeting on a committee you follow changed.',
+  committee_meeting_cancelled: 'A previously scheduled meeting was removed from the calendar.',
   floor_vote: 'Roll-call or floor vote recorded.',
   passed_chamber: 'Passed one chamber or enrolled.',
   sent_to_governor: 'Sent to the Governor for action.',
@@ -69,7 +75,13 @@ export const KY_DIGEST_EVENT_GROUPS: {
     id: 'committee_interim',
     title: 'Committee & interim',
     description: 'Hearings and committee steps — includes Bill Watch “Agenda” and interim activity.',
-    types: ['committee_action', 'hearing_scheduled', 'committee_meeting_scheduled'],
+    types: [
+      'committee_action',
+      'hearing_scheduled',
+      'committee_meeting_scheduled',
+      'committee_agenda_updated',
+      'committee_meeting_cancelled',
+    ],
   },
   {
     id: 'floor_milestones',
@@ -92,6 +104,43 @@ export const KY_DIGEST_EVENT_GROUPS: {
     types: ['amendment_filed', 'new_cosponsor'],
   },
 ];
+
+/**
+ * Activity-row chip tone for a given event. `label` lets us split
+ * `signed_or_vetoed` into success vs error without a separate event type.
+ */
+export function kyDigestEventChipTone(
+  eventType: string,
+  label?: string | null,
+): 'default' | 'primary' | 'success' | 'warning' | 'error' | 'info' {
+  switch (eventType) {
+    case 'signed_or_vetoed': {
+      const lower = (label ?? '').toLowerCase();
+      if (lower.includes('veto')) return 'error';
+      return 'success';
+    }
+    case 'passed_chamber':
+    case 'committee_meeting_scheduled':
+    case 'meeting_scheduled':
+      return 'success';
+    case 'dead':
+    case 'committee_meeting_cancelled':
+    case 'meeting_cancelled':
+      return 'error';
+    case 'sent_to_governor':
+    case 'veto_override_attempt':
+      return 'primary';
+    case 'floor_vote':
+    case 'hearing_scheduled':
+    case 'committee_agenda_updated':
+    case 'agenda_updated':
+    case 'amendment_filed':
+    case 'new_cosponsor':
+      return 'info';
+    default:
+      return 'default';
+  }
+}
 
 /** Spec default — "Major milestones only" (★ in follow-bills.md). */
 export const KY_DIGEST_MAJOR_MILESTONES: KyDigestEventType[] = [
