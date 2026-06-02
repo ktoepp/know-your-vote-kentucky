@@ -39,6 +39,7 @@ export type LrcCalendarUpsertStats = {
   meetingsSynced: number;
   agendaSynced: number;
   hearingEventsRecorded: number;
+  meetingsCancelled: number;
 };
 
 function log(msg: string) {
@@ -173,6 +174,9 @@ export async function upsertLrcCalendarMeetings(
   let meetingsSynced = 0;
   let agendaSynced = 0;
   let hearingEventsRecorded = 0;
+  let meetingsCancelled = 0;
+  const syncedMeetingIds = new Set<string>();
+  const seenMeetingDates: string[] = [];
 
   for (const meeting of scheduled) {
     const rsn = meeting.committee.lrcRsn!;
@@ -244,21 +248,48 @@ export async function upsertLrcCalendarMeetings(
     }
 
     meetingsSynced++;
+    syncedMeetingIds.add(meetingRecord.id);
+    seenMeetingDates.push(meeting.meetingDate);
 
-    // Emit a committee event when this is a newly-created meeting (no prior record).
-    // The unique index on (committee_id, event_type, meeting_id) prevents duplicates on re-sync.
-    if (!priorMeeting && !options.skipHearingEvents) {
-      await db.from('ky_committee_events').insert({
-        committee_id: committee.id,
-        meeting_id: meetingRecord.id,
-        event_type: 'meeting_scheduled',
-        event_payload: {
-          meeting_date: meeting.meetingDate,
-          time_and_location: timeAndLocation || null,
-          committee_name: committeeRow.name,
-          committee_slug: committeeRow.slug,
-        },
-      });
+    // Emit committee events on the change boundary. The unique index
+    // (committee_id, event_type, meeting_id, agenda_content_hash) prevents
+    // duplicate rows on re-sync:
+    //   - meeting_scheduled: at most one per (committee, meeting)
+    //   - agenda_updated:    one per distinct agenda hash
+    //   - meeting_cancelled: handled in the post-loop diff pass
+    if (!options.skipHearingEvents) {
+      if (!priorMeeting) {
+        await db.from('ky_committee_events').insert({
+          committee_id: committee.id,
+          meeting_id: meetingRecord.id,
+          event_type: 'meeting_scheduled',
+          event_payload: {
+            meeting_date: meeting.meetingDate,
+            time_and_location: timeAndLocation || null,
+            committee_name: committeeRow.name,
+            committee_slug: committeeRow.slug,
+          },
+        });
+      } else if (
+        priorMeeting.agenda_content_hash &&
+        priorMeeting.agenda_content_hash !== contentHash
+      ) {
+        // Hash changed and there was prior agenda content — emit agenda_updated.
+        // First-sync rows with NULL/empty prior hash never fire this branch.
+        await db.from('ky_committee_events').insert({
+          committee_id: committee.id,
+          meeting_id: meetingRecord.id,
+          event_type: 'agenda_updated',
+          event_payload: {
+            agenda_content_hash: contentHash,
+            previous_agenda_content_hash: priorMeeting.agenda_content_hash,
+            meeting_date: meeting.meetingDate,
+            time_and_location: timeAndLocation || null,
+            committee_name: committeeRow.name,
+            committee_slug: committeeRow.slug,
+          },
+        });
+      }
     }
 
     await db.from('ky_committee_agenda_items').delete().eq('meeting_id', meetingRecord.id);
@@ -312,7 +343,61 @@ export async function upsertLrcCalendarMeetings(
     }
   }
 
-  return { meetingsSynced, agendaSynced, hearingEventsRecorded };
+  // Cancellation diff pass: any DB meeting whose date falls in the parse window
+  // but isn't in this run's `syncedMeetingIds` was previously scheduled and is
+  // no longer on the LRC calendar — mark it cancelled and emit a digest event.
+  // Skipped when no meetings were parsed (avoids the obvious foot-gun of
+  // mass-cancelling on a transient empty/error fetch) and during Wayback backfill
+  // (`skipHearingEvents`), where partial historical windows would false-positive.
+  if (!options.skipHearingEvents && seenMeetingDates.length > 0) {
+    const sortedDates = [...seenMeetingDates].sort();
+    const windowStart = sortedDates[0]!;
+    const windowEnd = sortedDates[sortedDates.length - 1]!;
+
+    const { data: dbMeetingsInWindow, error: diffErr } = await db
+      .from('ky_committee_meetings')
+      .select(
+        'id, committee_id, meeting_date, time_and_location, ky_committees ( name, slug )',
+      )
+      .gte('meeting_date', windowStart)
+      .lte('meeting_date', windowEnd)
+      .eq('status', 'scheduled');
+
+    if (diffErr) {
+      logError(`Cancellation diff query failed: ${diffErr.message}`);
+    } else {
+      const nowIso = new Date().toISOString();
+      for (const dbMeeting of dbMeetingsInWindow ?? []) {
+        const id = dbMeeting.id as string;
+        if (syncedMeetingIds.has(id)) continue;
+
+        const { error: updErr } = await db
+          .from('ky_committee_meetings')
+          .update({ status: 'cancelled', scraped_at: nowIso })
+          .eq('id', id);
+        if (updErr) {
+          logError(`Cancel update failed (${id}): ${updErr.message}`);
+          continue;
+        }
+
+        const ky_c = dbMeeting.ky_committees as { name?: string; slug?: string } | null;
+        await db.from('ky_committee_events').insert({
+          committee_id: dbMeeting.committee_id,
+          meeting_id: id,
+          event_type: 'meeting_cancelled',
+          event_payload: {
+            meeting_date: dbMeeting.meeting_date,
+            time_and_location: dbMeeting.time_and_location || null,
+            committee_name: ky_c?.name ?? null,
+            committee_slug: ky_c?.slug ?? null,
+          },
+        });
+        meetingsCancelled++;
+      }
+    }
+  }
+
+  return { meetingsSynced, agendaSynced, hearingEventsRecorded, meetingsCancelled };
 }
 
 export async function syncKyLrcCalendar(
@@ -345,14 +430,14 @@ export async function syncKyLrcCalendar(
 
     log(`Parsed ${parsed.stats.dayCount} days, ${scheduled.length} scheduled meetings`);
 
-    const { meetingsSynced, agendaSynced, hearingEventsRecorded } = await upsertLrcCalendarMeetings(
-      db,
-      scheduled,
-      { ...options, sourceUrl: LRC_LEGISLATIVE_CALENDAR_URL },
-    );
+    const { meetingsSynced, agendaSynced, hearingEventsRecorded, meetingsCancelled } =
+      await upsertLrcCalendarMeetings(db, scheduled, {
+        ...options,
+        sourceUrl: LRC_LEGISLATIVE_CALENDAR_URL,
+      });
 
     log(
-      `Synced ${meetingsSynced} meetings, ${agendaSynced} agenda lines, ${hearingEventsRecorded} hearing_scheduled digest events`,
+      `Synced ${meetingsSynced} meetings, ${agendaSynced} agenda lines, ${hearingEventsRecorded} hearing_scheduled events, ${meetingsCancelled} cancellations`,
     );
     return {
       source: SOURCE,

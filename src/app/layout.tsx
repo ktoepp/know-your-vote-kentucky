@@ -3,6 +3,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Instrument_Sans } from 'next/font/google';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/next';
 import ClientThemeProvider from './components/ClientThemeProvider';
 import PostHogPageviewTracker from './components/PostHogPageviewTracker';
 
@@ -116,6 +117,7 @@ export default function RootLayout({
           </ClientThemeProvider>
         </UserProvider>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );

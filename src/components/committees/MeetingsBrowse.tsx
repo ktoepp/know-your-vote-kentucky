@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Container,
@@ -17,7 +18,15 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { CalendarMonth, Cancel, Clear, Search } from '@mui/icons-material';
+import {
+  Bookmark,
+  BookmarkBorder,
+  CalendarMonth,
+  Cancel,
+  Clear,
+  Search,
+} from '@mui/icons-material';
+import { useFollowedCommittees } from '@/lib/use-followed-committees';
 import { supabase } from '@/app/lib/supabaseClient';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
@@ -50,8 +59,25 @@ export interface MeetingsBrowseProps {
 }
 
 export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
-  const { chamber, setChamber, range, setRange, agendaQuery, setAgendaQuery } = useGaMeetingsBrowseUrlState();
+  const {
+    chamber,
+    setChamber,
+    range,
+    setRange,
+    agendaQuery,
+    setAgendaQuery,
+    followsMe,
+    setFollowsMe,
+  } = useGaMeetingsBrowseUrlState();
   const [agendaInput, setAgendaInput] = useState(agendaQuery);
+  const {
+    followedCommitteeIds,
+    authed,
+    ready: followsReady,
+    toggleFollow,
+  } = useFollowedCommittees();
+  const effectiveFollowsMe = authed && followsMe;
+  const followsAwaiting = effectiveFollowsMe && !followsReady;
 
   const [meetings, setMeetings] = useState<KYCommitteeMeetingBrowse[]>(initialMeetings ?? []);
   const [agendaHits, setAgendaHits] = useState<KYCommitteeAgendaItemWithMeeting[]>([]);
@@ -130,9 +156,14 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
       if (range === 'upcoming' && m.meeting_date < today) return false;
       if (range === 'recent' && m.meeting_date >= today) return false;
       if (chamber && m.ky_committees?.chamber !== chamber) return false;
+      if (
+        effectiveFollowsMe &&
+        !followedCommitteeIds.has(String(m.ky_committees?.id ?? ''))
+      )
+        return false;
       return true;
     });
-  }, [meetings, chamber, range]);
+  }, [meetings, chamber, range, effectiveFollowsMe, followedCommitteeIds]);
 
   const filteredAgenda = useMemo(() => {
     const today = kyTodayIso();
@@ -141,11 +172,17 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
       if (range === 'upcoming' && meeting?.meeting_date && meeting.meeting_date < today) return false;
       if (range === 'recent' && meeting?.meeting_date && meeting.meeting_date >= today) return false;
       if (chamber && meeting?.ky_committees?.chamber !== chamber) return false;
+      if (
+        effectiveFollowsMe &&
+        !followedCommitteeIds.has(String(meeting?.ky_committees?.id ?? ''))
+      )
+        return false;
       return true;
     });
-  }, [agendaHits, chamber, range]);
+  }, [agendaHits, chamber, range, effectiveFollowsMe, followedCommitteeIds]);
 
-  const hasActiveFilters = Boolean(chamber) || range !== 'upcoming' || Boolean(agendaQuery);
+  const hasActiveFilters =
+    Boolean(chamber) || range !== 'upcoming' || Boolean(agendaQuery) || followsMe;
   const isAgendaMode = Boolean(agendaQuery.trim());
   const resultCount = isAgendaMode ? filteredAgenda.length : filteredMeetings.length;
   const summary =
@@ -231,18 +268,39 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
             flexWrap: 'wrap',
           }}
         >
-          <ToggleButtonGroup
-            value={range}
-            exclusive
-            size="small"
-            onChange={(_, v) => {
-              if (v !== null) setRange(v);
-            }}
-            aria-label="Filter by date range"
-          >
-            <ToggleButton value="upcoming">Upcoming</ToggleButton>
-            <ToggleButton value="recent">Recent</ToggleButton>
-          </ToggleButtonGroup>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <ToggleButtonGroup
+              value={range}
+              exclusive
+              size="small"
+              onChange={(_, v) => {
+                if (v !== null) setRange(v);
+              }}
+              aria-label="Filter by date range"
+            >
+              <ToggleButton value="upcoming">Upcoming</ToggleButton>
+              <ToggleButton value="recent">Recent</ToggleButton>
+            </ToggleButtonGroup>
+
+            {authed && (
+              <Button
+                size="small"
+                variant={followsMe ? 'contained' : 'outlined'}
+                startIcon={
+                  followsMe ? (
+                    <Bookmark fontSize="small" aria-hidden />
+                  ) : (
+                    <BookmarkBorder fontSize="small" aria-hidden />
+                  )
+                }
+                onClick={() => setFollowsMe(!followsMe)}
+                sx={{ borderRadius: 999, textTransform: 'none', px: 1.5 }}
+                aria-pressed={followsMe}
+              >
+                {followsMe ? 'Following committees' : 'Your committees'}
+              </Button>
+            )}
+          </Box>
 
           <GaChamberFilterBar value={chamber} onChange={setChamber} />
         </Box>
@@ -252,6 +310,16 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
               Active filters:
             </Typography>
+            {followsMe && (
+              <Chip
+                label="Following committees"
+                size="small"
+                onDelete={() => setFollowsMe(false)}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
             {agendaQuery && (
               <Chip
                 label={`Agenda: "${agendaQuery}"`}
@@ -293,6 +361,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
                 setChamber('');
                 setAgendaInput('');
                 setAgendaQuery('');
+                setFollowsMe(false);
               }}
               variant="outlined"
               sx={{ ml: 0.5 }}
@@ -313,7 +382,32 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
           </Alert>
         )}
 
-        {loading ? (
+        {followsMe && !authed && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Log in to filter meetings by committees you follow.{' '}
+            <Button component={Link} href="/auth/login?next=/meetings%3Ffollows%3Dme" size="small" sx={{ ml: 1 }}>
+              Log in
+            </Button>
+          </Alert>
+        )}
+
+        {followsAwaiting ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }} aria-busy="true" aria-label="Loading followed committees">
+            <CircularProgress />
+          </Box>
+        ) : effectiveFollowsMe && followedCommitteeIds.size === 0 ? (
+          <EmptyState
+            message={
+              <>
+                You haven&rsquo;t followed any committees yet. Browse{' '}
+                <MuiLink component={Link} href="/committees" fontWeight={600}>
+                  committees
+                </MuiLink>{' '}
+                and select Follow on ones you want to track.
+              </>
+            }
+          />
+        ) : loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />
           </Box>
@@ -321,7 +415,11 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
           filteredAgenda.length === 0 ? (
             <EmptyState message="No agenda lines match your search. Try a bill number or keyword from the LRC calendar." />
           ) : (
-            <AgendaSearchResults items={filteredAgenda} />
+            <AgendaSearchResults
+              items={filteredAgenda}
+              followedCommitteeIds={authed ? followedCommitteeIds : undefined}
+              onToggleFollow={authed ? toggleFollow : undefined}
+            />
           )
         ) : filteredMeetings.length === 0 ? (
           <EmptyState message="No committee meetings match your filters." />
@@ -331,7 +429,11 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
               <CardGrid>
                 {visible.map((meeting) => (
                   <CardGridItem key={meeting.id}>
-                    <CommitteeMeetingCard meeting={meeting} />
+                    <CommitteeMeetingCard
+                      meeting={meeting}
+                      following={followedCommitteeIds.has(String(meeting.ky_committees?.id ?? ''))}
+                      onToggleFollow={authed ? toggleFollow : undefined}
+                    />
                   </CardGridItem>
                 ))}
               </CardGrid>
