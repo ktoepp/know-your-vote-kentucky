@@ -33,12 +33,9 @@ Browser review closed **2026-05-22**; **Follow committees v1** shipped in PR **#
 - **Email digest** — `/api/cron/notify` runs daily 11:00 UTC via Vercel Cron (weekly users batched on Mondays). Suppressed users skipped. Failures + per-user-error spikes captured in Sentry (tags `route:cron/notify` and `route:webhooks/resend`).
 - **Outbound mail policy** — `From: alerts@kyvky.com` (transactional only, do not reply); `Reply-To: katie@kyvky.com` (real inbox). All inbound contact / vulnerability reports go to `katie@kyvky.com`. Webhook deliveries from Resend → `https://www.kyvky.com/api/webhooks/resend` (apex 307s break POST). Plain-text fallback included on every transactional send.
 
-## Operator follow-ups (not blocking, but recommended before public launch)
+## Operator launch checklist
 
-- **Resend → Domains → kyvky.com** — confirm SPF / DKIM / DMARC are all green. Cold-start sends to Gmail otherwise land in Junk.
-- **Sentry → Alerts** — add two rules: (1) any event tagged `route:cron/notify` → notify; (2) ≥5 events tagged `route:webhooks/resend` in 5 min → notify.
-- **Inbox routing** — confirm `katie@kyvky.com` lands somewhere a human reads (privacy/terms pages and email Reply-To all point there).
-- **Legal review** — `/privacy` and `/terms` are honest practical drafts (`src/app/privacy/page.tsx` + `src/app/terms/page.tsx`); a lawyer should review before scaling beyond a small audience.
+Consolidated into **[docs/launch-checklist.md](./docs/launch-checklist.md)** (2026-06-02) — single source of truth for the not-blocking-but-recommended-before-launch items (Resend DKIM, Sentry alerts, inbox routing, legal review, email-client QA, Vercel env cleanup, regression cadence).
 
 ## Handoff — next agent (committee follow v1.5 + Wave 3)
 
@@ -161,11 +158,7 @@ Roadmap priority (2026-06-02): **launch operator checklist** → **Wave 3 commit
 
 ### Launch operator checklist (manual, not blocking code)
 
-- **Resend domain** — SPF / DKIM / DMARC green on `kyvky.com`
-- **Sentry alerts** — `route:cron/notify` any event; ≥5 `route:webhooks/resend` in 5 min
-- **Email client QA** — [docs/email-client-qa.md](./docs/email-client-qa.md) (~2 hr manual)
-- **Legal review** — `/privacy` + `/terms` before scaling audience
-- **Regression cadence** — After large syncs: `npm run verify:legislator-links`, `npm run spot-check:bill-links`, optional `npm run diagnose:legislators`
+See **[docs/launch-checklist.md](./docs/launch-checklist.md)**.
 
 ### Wave 1 — Bill Watch parity (shipped 2026-05-19 — verified PASS 2026-05-21)
 
