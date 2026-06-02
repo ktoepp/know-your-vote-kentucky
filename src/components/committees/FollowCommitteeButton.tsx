@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button, CircularProgress } from '@mui/material';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkBorder } from '@mui/icons-material';
 import NextLink from 'next/link';
 import { useUser } from '@/app/lib/UserContext';
 
@@ -71,7 +71,7 @@ export function FollowCommitteeButton({ committeeId, size = 'small' }: Props) {
         href={`/auth/login?next=${encodeURIComponent(next)}`}
         variant="outlined"
         size={size}
-        startIcon={<Bookmark size={14} aria-hidden />}
+        startIcon={<BookmarkBorder fontSize="small" aria-hidden />}
         sx={{ borderRadius: 999, px: 1.5 }}
       >
         Log in to follow
@@ -112,9 +112,9 @@ export function FollowCommitteeButton({ committeeId, size = 'small' }: Props) {
         busy ? (
           <CircularProgress size={14} thickness={5} color="inherit" />
         ) : following ? (
-          <BookmarkCheck size={14} aria-hidden />
+          <Bookmark fontSize="small" aria-hidden />
         ) : (
-          <Bookmark size={14} aria-hidden />
+          <BookmarkBorder fontSize="small" aria-hidden />
         )
       }
       aria-pressed={following}

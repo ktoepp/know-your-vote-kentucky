@@ -249,9 +249,21 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       return billMatchesTopicFilters(bill.topics, bill.legiscan_subjects, topicFilters);
     });
 
-    // Fetch committee follows + events when the user has opted into committee_meeting_scheduled.
+    // Fetch committee follows + events for whichever committee event types the user opted into.
+    // v1 had a single `committee_meeting_scheduled` toggle; v1.5 adds `committee_agenda_updated`
+    // and `committee_meeting_cancelled` as separate toggles (mapped to the matching DB
+    // event_type values minus the `committee_` prefix).
     const committeeGroups: BillDigestGroup[] = [];
-    if (allowedTypes.has('committee_meeting_scheduled')) {
+    const committeeEventTypeMap: Record<string, KyDigestEventType> = {
+      meeting_scheduled: 'committee_meeting_scheduled',
+      agenda_updated: 'committee_agenda_updated',
+      meeting_cancelled: 'committee_meeting_cancelled',
+    };
+    const wantedCommitteeTypes = (
+      Object.keys(committeeEventTypeMap) as Array<keyof typeof committeeEventTypeMap>
+    ).filter((k) => allowedTypes.has(committeeEventTypeMap[k]));
+
+    if (wantedCommitteeTypes.length > 0) {
       const { data: committeeFollows } = await supabaseAdmin
         .from('ky_committee_follows')
         .select('committee_id')
@@ -263,11 +275,11 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           .from('ky_committee_events')
           .select('id, committee_id, event_type, event_payload, observed_at')
           .in('committee_id', [...followedCommitteeIds])
-          .eq('event_type', 'meeting_scheduled')
+          .in('event_type', wantedCommitteeTypes)
           .gte('observed_at', windowStart)
           .lt('observed_at', windowEnd)
           .order('observed_at', { ascending: false })
-          .limit(20);
+          .limit(40);
 
         const origin = publicSiteOrigin();
         for (const ev of (committeeEvents ?? []) as CommitteeEventRow[]) {
@@ -276,12 +288,28 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           const committeeSlug = String(payload.committee_slug ?? ev.committee_id);
           const meetingDate = String(payload.meeting_date ?? '');
           const timeAndLocation = payload.time_and_location ? String(payload.time_and_location) : null;
-          const detail = timeAndLocation
-            ? `New meeting: ${meetingDate} — ${timeAndLocation}`
-            : `New meeting: ${meetingDate}`;
+          const locSuffix = timeAndLocation ? ` — ${timeAndLocation}` : '';
+
+          let title: string;
+          let detail: string;
+          switch (ev.event_type) {
+            case 'agenda_updated':
+              title = 'Agenda updated';
+              detail = `Updated agenda for ${meetingDate}${locSuffix}`;
+              break;
+            case 'meeting_cancelled':
+              title = 'Meeting cancelled';
+              detail = `Cancelled: ${meetingDate}${locSuffix}`;
+              break;
+            case 'meeting_scheduled':
+            default:
+              title = 'New meeting added to the calendar';
+              detail = `New meeting: ${meetingDate}${locSuffix}`;
+              break;
+          }
           committeeGroups.push({
             billNumber: committeeName,
-            billTitle: 'New meeting added to the calendar',
+            billTitle: title,
             billHref: `${origin}/committees/${encodeURIComponent(committeeSlug)}`,
             lines: [{ detail, observedAt: formatObserved(ev.observed_at) }],
           });

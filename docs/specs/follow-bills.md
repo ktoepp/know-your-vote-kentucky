@@ -360,6 +360,65 @@ APP_PUBLIC_URL=https://kyvky.com
 
 ---
 
+## Follow committees (v1 + v1.5)
+
+Mirrors the bill-follow loop for committees. **v1** shipped in PR #38 (2026-05-22); **v1.5** closes the gaps below.
+
+### Vocabulary
+
+- **`ky_committee_follows`** — per-user committee subscriptions. Mirror of `ky_bill_follows`.
+- **`ky_committee_events`** — append-only event log. Dedupe key (since migration **028**) is `(committee_id, event_type, meeting_id, coalesce(event_payload->>'agenda_content_hash', ''))` so `agenda_updated` can fire once per distinct agenda version, while `meeting_scheduled` and `meeting_cancelled` stay one-per-meeting.
+
+### Event types
+
+| Slug | Source | When it fires | Dedupe payload field |
+| --- | --- | --- | --- |
+| `meeting_scheduled` | LRC calendar sync | New meeting row inserted (no prior `(committee, date, time/loc)` match). | none |
+| `agenda_updated` | LRC calendar sync | Existing meeting's `agenda_content_hash` changed since last sync (prior hash non-empty). | `agenda_content_hash` |
+| `meeting_cancelled` | LRC calendar sync | Meeting present in DB for a date inside the parse window is *not* present in the current parse. The meeting row is also flipped to `status='cancelled'`. | none |
+
+The cancellation diff is gated: it only runs when at least one meeting was parsed (avoids mass-cancelling on a transient empty/error fetch) and is skipped during Wayback backfill (`skipHearingEvents=true`).
+
+### Notification preferences
+
+Three preference toggles map 1:1 to the DB event types (DB type → pref slug):
+
+- `meeting_scheduled` → `committee_meeting_scheduled`
+- `agenda_updated` → `committee_agenda_updated`
+- `meeting_cancelled` → `committee_meeting_cancelled`
+
+All three live in the **Committee & interim** group on `/profile` notifications. None are in the "Major milestones" preset (which is bill-event only). Defaults to *off*; users opt in.
+
+### Digest rendering
+
+Per committee event, the digest groups by committee and renders one line per event:
+
+| Event | Title | Detail |
+| --- | --- | --- |
+| `meeting_scheduled` | "New meeting added to the calendar" | `New meeting: YYYY-MM-DD — time/location` |
+| `agenda_updated` | "Agenda updated" | `Updated agenda for YYYY-MM-DD — time/location` |
+| `meeting_cancelled` | "Meeting cancelled" | `Cancelled: YYYY-MM-DD — time/location` |
+
+Committee groups share the same `DIGEST_CAP` with bill groups (10 total). Per-window query cap on committee events is **40** to keep the email scannable.
+
+### UX surfaces (v1 + v1.5)
+
+- `/committees/[slug]` — `FollowCommitteeButton` (v1).
+- `/committees` — bookmark toggle on `KYCommitteeCard` (v1).
+- `/meetings` — bookmark toggle on `CommitteeMeetingCard`; **`?follows=me`** filter scopes the list to followed committees (v1.5).
+- `/profile` — **Followed committees** section (v1) + committee-kind chip in activity (v1.5).
+- `GET /api/me/activity` — emits `kind: 'committee_event'` rows for the user's followed committees alongside bill events / hearings (v1.5).
+- Home `LandingPersonalStrip` — surfaces the most-recent event per followed committee inline with bill updates (v1.5).
+
+### Out of scope (v1.5)
+
+- Per-committee snooze or per-committee digest frequency overrides.
+- Materials/handouts events (Wave 3, `ky_committee_materials` not yet built).
+- Diffing individual agenda lines (the digest reports "agenda changed" but doesn't list adds/removes).
+- Follow affordance on agenda-search results (only the meeting card surface gets the toggle).
+
+---
+
 ## Resolved decisions
 
 1. **DST handling for cron** — single Vercel cron at **11:00 UTC** daily (7 AM EDT / 6 AM EST). Accept the 1h shift across DST. Weekly digest: `0 11 * * 1`. **Follow-up:** verify this is the right send time after the first DST transition or once open-rate data exists (task in TASKS.md).

@@ -12,7 +12,7 @@ import {
   ListItemText,
   Typography,
 } from '@mui/material';
-import { Event, HistoryOutlined } from '@mui/icons-material';
+import { Event, Groups, HistoryOutlined } from '@mui/icons-material';
 import NextLink from 'next/link';
 import { useUser } from '@/app/lib/UserContext';
 import type { ProfileActivityItem } from '@/app/api/me/activity/route';
@@ -23,12 +23,13 @@ import { ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE } from '@/lib/ui-tokens';
 const ACTIVITY_FILTER_STORAGE_KEY = 'kyvky-profile-activity-filter';
 const ACTIVITY_TOPIC_FILTER_STORAGE_KEY = 'kyvky-profile-activity-topic-filter';
 
-export type ActivityKindFilter = 'all' | 'bill' | 'hearing';
+export type ActivityKindFilter = 'all' | 'bill' | 'hearing' | 'committee';
 
 const FILTER_OPTIONS: { value: ActivityKindFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'bill', label: 'Bill updates' },
   { value: 'hearing', label: 'Hearings' },
+  { value: 'committee', label: 'Committees' },
 ];
 
 function formatOccurredAt(iso: string): string {
@@ -46,7 +47,7 @@ function formatOccurredAt(iso: string): string {
 function readStoredFilter(): ActivityKindFilter {
   if (typeof window === 'undefined') return 'all';
   const v = window.localStorage.getItem(ACTIVITY_FILTER_STORAGE_KEY);
-  if (v === 'bill' || v === 'hearing' || v === 'all') return v;
+  if (v === 'bill' || v === 'hearing' || v === 'committee' || v === 'all') return v;
   return 'all';
 }
 
@@ -81,6 +82,17 @@ function EmptyState({
           Notifications
         </MuiLink>
         .
+      </Typography>
+    );
+  }
+  if (filter === 'committee') {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        No recent updates from committees you follow. Browse{' '}
+        <MuiLink component={NextLink} href="/committees" fontWeight={600}>
+          committees
+        </MuiLink>{' '}
+        and select Follow on ones you want to track.
       </Typography>
     );
   }
@@ -250,9 +262,27 @@ export function ProfileActivitySection() {
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center', mb: 0.5 }}>
                     <Chip
                       size="small"
-                      icon={item.kind === 'hearing' ? <Event fontSize="small" /> : undefined}
-                      label={item.kind === 'hearing' ? 'Hearing' : 'Bill update'}
-                      color={item.kind === 'hearing' ? 'info' : 'default'}
+                      icon={
+                        item.kind === 'hearing' ? (
+                          <Event fontSize="small" />
+                        ) : item.kind === 'committee_event' ? (
+                          <Groups fontSize="small" />
+                        ) : undefined
+                      }
+                      label={
+                        item.kind === 'hearing'
+                          ? 'Hearing'
+                          : item.kind === 'committee_event'
+                            ? 'Committee'
+                            : 'Bill update'
+                      }
+                      color={
+                        item.kind === 'hearing'
+                          ? 'info'
+                          : item.kind === 'committee_event'
+                            ? 'primary'
+                            : 'default'
+                      }
                       variant="outlined"
                     />
                     <Typography component="span" variant="caption" color="text.secondary">

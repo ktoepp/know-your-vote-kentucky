@@ -12,7 +12,7 @@ import {
   Paper,
   Typography,
 } from '@mui/material';
-import { ArrowForward, Event, NotificationsActiveOutlined } from '@mui/icons-material';
+import { ArrowForward, Event, Groups, NotificationsActiveOutlined } from '@mui/icons-material';
 import NextLink from 'next/link';
 import { useUser } from '@/app/lib/UserContext';
 import type { ProfileActivityItem } from '@/app/api/me/activity/route';
@@ -20,17 +20,20 @@ import { BillNumber } from '@/components/bills/BillNumber';
 import { formatKyMeetingDate } from '@/lib/ky-committee-display';
 import { CARD, ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE } from '@/lib/ui-tokens';
 
-/** Distinct followed bills to surface in the teaser. */
-const STRIP_BILLS = 3;
-/** Pull extra events so we can collapse multiple updates per bill down to one. */
+/** Distinct followed bills/committees to surface in the teaser. */
+const STRIP_ITEMS = 3;
+/** Pull extra events so we can collapse multiple updates per bill/committee down to one. */
 const ACTIVITY_FETCH = 12;
 
-/** Keep the most-recent event per bill; items arrive already sorted desc. */
-function distinctByBill(items: ProfileActivityItem[], max: number): ProfileActivityItem[] {
+/**
+ * Keep the most-recent event per bill (bill events) or per committee
+ * (committee events). Hearings dedupe by bill. Items arrive sorted desc.
+ */
+function distinctByTarget(items: ProfileActivityItem[], max: number): ProfileActivityItem[] {
   const seen = new Set<string>();
   const out: ProfileActivityItem[] = [];
   for (const item of items) {
-    const key = item.bill_id ?? item.id;
+    const key = item.bill_id ?? item.href ?? item.id;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(item);
@@ -66,7 +69,7 @@ export function LandingPersonalStrip() {
       });
       if (!res.ok) return;
       const body = (await res.json().catch(() => ({}))) as { items?: ProfileActivityItem[] };
-      setItems(distinctByBill(body.items ?? [], STRIP_BILLS));
+      setItems(distinctByTarget(body.items ?? [], STRIP_ITEMS));
     } catch {
       // Supplementary surface — fail silent and stay hidden.
     }
@@ -106,7 +109,7 @@ export function LandingPersonalStrip() {
               fontWeight={TYPE.sectionTitle.fontWeight}
               sx={SECTION_TITLE_DISPLAY_SX}
             >
-              Updates on bills you follow
+              Updates on what you follow
             </Typography>
           </Box>
           <Button
@@ -129,9 +132,27 @@ export function LandingPersonalStrip() {
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center' }}>
                     <Chip
                       size="small"
-                      icon={item.kind === 'hearing' ? <Event fontSize="small" /> : undefined}
-                      label={item.kind === 'hearing' ? 'Hearing' : 'Bill update'}
-                      color={item.kind === 'hearing' ? 'info' : 'default'}
+                      icon={
+                        item.kind === 'hearing' ? (
+                          <Event fontSize="small" />
+                        ) : item.kind === 'committee_event' ? (
+                          <Groups fontSize="small" />
+                        ) : undefined
+                      }
+                      label={
+                        item.kind === 'hearing'
+                          ? 'Hearing'
+                          : item.kind === 'committee_event'
+                            ? 'Committee'
+                            : 'Bill update'
+                      }
+                      color={
+                        item.kind === 'hearing'
+                          ? 'info'
+                          : item.kind === 'committee_event'
+                            ? 'primary'
+                            : 'default'
+                      }
                       variant="outlined"
                     />
                     {item.bill_number ? (
@@ -148,6 +169,7 @@ export function LandingPersonalStrip() {
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
                     {item.bill_title ? `${item.bill_title} — ` : ''}
                     {item.label}
+                    {item.kind === 'committee_event' && item.detail ? ` — ${item.detail}` : ''}
                   </Typography>
                 }
               />

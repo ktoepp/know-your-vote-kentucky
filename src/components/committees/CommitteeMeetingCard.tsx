@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography } from '@mui/material';
-import { CalendarToday, LocationOn } from '@mui/icons-material';
+import { Box, IconButton, Typography } from '@mui/material';
+import { Bookmark as BookmarkFilled, CalendarToday, LocationOn } from '@mui/icons-material';
+import { Bookmark } from 'lucide-react';
 import { CommitteeTagRow } from '@/components/committees/CommitteeTagRow';
 import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import { CivicCard } from '@/components/ui/CivicCard';
@@ -21,16 +22,46 @@ export interface CommitteeMeetingCardProps {
   /** When set, committee name is omitted (committee detail page). */
   hideCommitteeName?: boolean;
   agendaPreview?: string[];
+  /** Follow state for the parent committee (drives bookmark icon). */
+  following?: boolean;
+  /** When set, render an inline follow toggle for the parent committee. */
+  onToggleFollow?: (committeeId: string) => void;
 }
 
 export function CommitteeMeetingCard({
   meeting,
   hideCommitteeName = false,
   agendaPreview,
+  following = false,
+  onToggleFollow,
 }: CommitteeMeetingCardProps) {
   const committee = meeting.ky_committees;
   const committeeName = committee ? normalizeKyGaDisplayName(committee.name) : '';
   const committeeHref = committee?.slug ? `/committees/${encodeURIComponent(committee.slug)}` : undefined;
+  const followControl = onToggleFollow && committee?.id ? (
+    <IconButton
+      size="small"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggleFollow(committee.id);
+      }}
+      aria-pressed={following}
+      aria-label={following ? 'Unfollow this committee' : 'Follow this committee'}
+      sx={{
+        color: following ? 'primary.main' : 'text.secondary',
+        p: 0.25,
+        flexShrink: 0,
+        ml: 'auto',
+      }}
+    >
+      {following ? (
+        <BookmarkFilled sx={{ fontSize: '1.25rem' }} />
+      ) : (
+        <Bookmark size={20} strokeWidth={1.7} />
+      )}
+    </IconButton>
+  ) : null;
 
   return (
     <CivicCard
@@ -47,6 +78,7 @@ export function CommitteeMeetingCard({
           {meeting.status === 'cancelled' && (
             <MetaChip label="Cancelled" tone="error" size="small" variant="filled" />
           )}
+          {followControl}
         </Box>
       }
       body={
