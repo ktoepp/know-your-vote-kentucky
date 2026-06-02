@@ -59,6 +59,7 @@
     "@turf/bbox": "^7.3.5",
     "@turf/boolean-point-in-polygon": "^7.3.5",
     "@turf/helpers": "^7.3.5",
+    "@vercel/speed-insights": "^2.0.0",
     "autoprefixer": "^10.4.21",
     "axios": "^1.10.0",
     "cheerio": "^1.1.0",
