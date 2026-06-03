@@ -27,10 +27,15 @@ interface ReviewVerdict {
   ok?: boolean;
 }
 
+/**
+ * LLM verdicts are advisory (semantic judgment, out of scope for the
+ * deterministic agent — see decisions.md § 2026-06-03), so they are capped at
+ * `warn` and never hard-fail the run. The model's "fail" is recorded as a warn
+ * for triage; only deterministic source diffs produce `fail`.
+ */
 function normalizeSeverity(raw: string | undefined): Severity {
   const s = (raw || '').toLowerCase();
-  if (s === 'fail') return 'fail';
-  if (s === 'warn') return 'warn';
+  if (s === 'fail' || s === 'warn') return 'warn';
   return 'info';
 }
 

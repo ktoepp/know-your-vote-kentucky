@@ -16,8 +16,10 @@ export interface AuditSummary {
   failures: number;
   /** Checkers that crashed (result.error set). */
   erroredDomains: string[];
-  /** True when any hard failure or checker error occurred. */
+  /** True when any content `fail` finding occurred (reported, but does not fail CI). */
   hasHardFailures: boolean;
+  /** True when a checker crashed — an operational problem that DOES fail the run. */
+  hasOperationalError: boolean;
   /** Sampling seed used for this run (rerun with the same seed to reproduce). */
   seed: number;
   startedAt: string;
@@ -47,6 +49,7 @@ export function summarizeAudit(results: CheckerResult[], startedAtMs: number, se
     failures,
     erroredDomains,
     hasHardFailures: failures > 0 || erroredDomains.length > 0,
+    hasOperationalError: erroredDomains.length > 0,
     seed,
     startedAt: new Date(startedAtMs).toISOString(),
     durationMs: Date.now() - startedAtMs,

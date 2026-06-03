@@ -404,7 +404,13 @@ export async function notifyHealthCheckFailureSlack(details: string): Promise<vo
  */
 export async function notifyAccuracyAuditSlack(params: {
   body: string;
-  hasHardFailures: boolean;
+  /**
+   * Escalate the report to the #errors webhook. Reserved for OPERATIONAL
+   * problems (a checker crashed, or LegiScan quota blocked the run) — NOT for
+   * content findings. Content findings (even deterministic `fail`s) are
+   * reported to the status digest only and do not page #errors.
+   */
+  escalateToAlerts: boolean;
   fromCli?: boolean;
 }): Promise<void> {
   if (params.fromCli === true && process.env.SLACK_SYNC_NOTIFY_CLI !== 'true') {
@@ -419,7 +425,7 @@ export async function notifyAccuracyAuditSlack(params: {
     await postSlackIncomingWebhook(syncUrl, params.body);
     posted.add(syncUrl);
   }
-  if (params.hasHardFailures && alertUrl && !posted.has(alertUrl)) {
+  if (params.escalateToAlerts && alertUrl && !posted.has(alertUrl)) {
     await postSlackIncomingWebhook(alertUrl, params.body);
   }
 }
