@@ -36,8 +36,11 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Education: ['school', 'education', 'student', 'teacher', 'university', 'college', 'curriculum', 'tuition', 'charter', 'jcps', 'fcps', 'superintendent'],
   Healthcare: ['health', 'hospital', 'medicaid', 'medicare', 'insurance', 'mental health', 'opioid', 'drug', 'pharmacy', 'nurse', 'doctor', 'clinic'],
   Infrastructure: ['road', 'bridge', 'highway', 'water', 'sewer', 'broadband', 'internet', 'transit', 'transportation', 'construction', 'dam'],
-  Taxation: ['tax', 'revenue', 'property tax', 'sales tax', 'income tax', 'levy', 'assessment', 'fiscal'],
-  'Public Safety': ['police', 'fire', 'emergency', 'safety', 'crime', '911', 'sheriff', 'ems', 'disaster', 'flood'],
+  // 'fiscal' removed: it matches "fiscal court" (local gov) and "fiscal note/year/impact" boilerplate, not tax policy.
+  Taxation: ['tax', 'revenue', 'property tax', 'sales tax', 'income tax', 'levy', 'assessment'],
+  // Bare 'emergency'/'safety' removed: they match the "emergency clause"/"declares an emergency" boilerplate present
+  // in many bills, and generic "safety". Use specific public-safety phrasing instead.
+  'Public Safety': ['police', 'fire', 'emergency management', 'emergency services', 'first responder', 'state of emergency', 'public safety', 'crime', '911', 'sheriff', 'ems', 'disaster', 'flood'],
   Environment: ['environment', 'pollution', 'clean water', 'air quality', 'climate', 'conservation', 'wildlife', 'recycling', 'waste', 'coal ash'],
   Labor: ['worker', 'wage', 'employment', 'union', 'labor', 'workforce', 'unemployment', 'minimum wage', 'workplace'],
   Housing: ['housing', 'rent', 'affordable housing', 'zoning', 'landlord', 'tenant', 'homeless', 'eviction', 'mortgage'],
@@ -45,7 +48,9 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Energy: ['energy', 'coal', 'natural gas', 'solar', 'wind', 'utility', 'electric', 'pipeline', 'power plant', 'renewable'],
   'Criminal Justice': ['prison', 'jail', 'sentencing', 'parole', 'probation', 'felony', 'misdemeanor', 'incarceration', 'juvenile', 'expungement'],
   'Voting Rights': ['voting', 'election', 'ballot', 'voter', 'registration', 'redistricting', 'poll', 'absentee', 'primary'],
-  'Local Government': ['county', 'city council', 'metro council', 'mayor', 'commissioner', 'ordinance', 'municipal', 'annexation', 'fiscal court', 'planning commission', 'zoning board', 'louisville metro', 'lexington-fayette', 'special district', 'library district'],
+  // Bare 'commissioner' removed: it matches state offices (Commissioner of Agriculture, Insurance Commissioner),
+  // not local government. 'fiscal court' / 'magistrate' / 'county judge-executive' are the KY local-gov signals.
+  'Local Government': ['county', 'city council', 'metro council', 'mayor', 'magistrate', 'county judge-executive', 'ordinance', 'municipal', 'annexation', 'fiscal court', 'planning commission', 'zoning board', 'louisville metro', 'lexington-fayette', 'special district', 'library district'],
   Budget: ['budget', 'appropriation', 'spending', 'deficit', 'surplus', 'general fund', 'pension', 'bond'],
   Corrections: ['department of corrections', 'corrections officer', 'inmate', 'warden', 'reentry', 'halfway house', 'correctional facility', 'parole board'],
   Elections: ['election administration', 'county clerk', 'poll worker', 'voting machine', 'canvass', 'secretary of state', 'election board', 'precinct', 'election official'],
