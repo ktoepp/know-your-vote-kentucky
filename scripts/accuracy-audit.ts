@@ -167,17 +167,25 @@ async function main() {
 
   const summary = summarizeAudit(results, startedAtMs, cfg.seed);
 
+  // Operational problems (a checker crashed, or LegiScan quota blocked the run)
+  // fail the job and page #errors. Content findings — even deterministic `fail`s
+  // — are reported to the status digest but do NOT fail CI (see decisions.md).
+  const hasOperationalError = summary.hasOperationalError || legiscanBlockedReason != null;
+
   if (args.json) {
     console.log(JSON.stringify(summary, null, 2));
   } else {
     console.log(formatConsoleReport(summary));
+    if (summary.hasHardFailures && !hasOperationalError) {
+      console.log('\n(content findings reported to Slack; not failing the run)');
+    }
   }
 
   if (!cfg.dryRun) {
     try {
       await notifyAccuracyAuditSlack({
         body: formatSlackReport(summary),
-        hasHardFailures: summary.hasHardFailures,
+        escalateToAlerts: hasOperationalError,
         fromCli: true,
       });
     } catch (e) {
@@ -185,7 +193,7 @@ async function main() {
     }
   }
 
-  process.exit(summary.hasHardFailures ? 1 : 0);
+  process.exit(hasOperationalError ? 1 : 0);
 }
 
 main().catch((e) => {
