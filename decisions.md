@@ -258,3 +258,21 @@ Follow Bills + Email Digests — spec scope and v1 boundaries. Full spec: [docs/
 - **No converting activity rows into `CivicCard`-based cards.** Same reason — see boundary constraint above.
 
 **Revisit if:** the green ✓ / red ✗ icon visual signal proves insufficient at typical scanning distance (the chip border stays slate per the theme override — only the icon and text are colored); the next-step indicator is requested again in user feedback after launch.
+
+---
+
+## 2026-06-03 — Accuracy-audit agent: seeded random sampling + scope boundaries
+
+**The weekly content-accuracy agent (`audit:accuracy`, `.github/workflows/accuracy-audit.yml`) now samples a *different* slice of data each run, reproducibly.** Records the sampling design and the deliberate scope boundaries (what this deterministic agent checks vs. what is delegated to an LLM/data agent).
+
+### Sampling design
+
+- **Seeded random sampling, not "most recent."** `src/lib/accuracy-audit/sampling.ts` exposes `makeRng` (mulberry32), `seededShuffle`, and `sampleTable`. Bills, votes, and committee-materials checkers now pull a random window via one `COUNT` + one bounded `range()` fetch, then seed-shuffle and slice the per-domain limit. **Optimization:** rotating coverage across the *entire* corpus over many runs (old sessions included), not just whatever changed in the last N days. **Trade-off:** a single run no longer guarantees the freshest rows are checked; freshness is covered by the existing sync workflows, and full-corpus coverage accrues across weekly runs.
+- **Seed is printed on every run and surfaced in the report** (console `[accuracy-audit] seed=…`, plus `seed=` in the console/Slack summary). Default = random per run (`Math.random`); pin with `--seed=N` or `ACCURACY_SEED`. **Why:** "different every time" for coverage, but any flagged run is reproducible for debugging/triage.
+- **Per-domain seed streams** are derived by XOR-ing the base seed with fixed constants (e.g. bill-text link sample uses `seed ^ 0x9e3779b9`, topics uses `seed ^ 0x85ebca6b`, glossary uses `seed ^ 0xc2b2ae35`) so two samples in the same run don't pick correlated offsets while staying reproducible.
+- **Legislators stay full-coverage (no sampling).** The Open States roster is a single fetch and the table is ~141 rows, so every active legislator is checked each run. Added lightweight `email` / `phone` (digit-normalized) / `photo` presence diffs vs. Open States — zero extra API calls since the roster is already fetched. **`ACCURACY_DAYS` is now effectively reserved** (committees use live calendar data; bills/votes seed-sample) rather than a hard lookback filter.
+
+### Deterministic vs. LLM scope (boundary)
+
+- **In scope for this agent (deterministic, source-of-truth diffs):** bill metadata + sponsor *identity* (people_id set, not just count) vs LegiScan `getBill`; roll-call tallies vs `getRollCall`; legislator roster/contact vs Open States; committee-material + agenda drift vs live LRC; static link-shape validation (live probing opt-in via `ACCURACY_PROBE_LINKS`).
+- **Out of scope here — delegated (see `TASKS.md` → Backlog → "Accuracy-audit follow-ups"):** anything requiring semantic judgment or heavy fetches — `ai_summary` faithfulness, `topics[]` plausibility, and glossary correctness (the `--no-llm`-gated `llm-review.ts` pass), plus full bill-text/amendment body diffs and committee-membership deep reconciliation. **Why:** keep the always-on agent cheap, deterministic, and free of false positives from LLM variance; route fuzzy/expensive verification to a dedicated pass that a human or separate agent triages. LLM findings are advisory and must be cross-checked against primary sources before any content edit (cf. the 2026-06-03 glossary corrections, where the model's suggested veto/emergency-clause thresholds were themselves wrong).

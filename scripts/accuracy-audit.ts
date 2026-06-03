@@ -49,17 +49,22 @@ function parseArgs(argv: string[]): {
   dryRun: boolean;
   skipLlm: boolean;
   domains: Set<string> | null;
+  seed: number | undefined;
 } {
   let json = false;
   let dryRun = false;
   let skipLlm = false;
   let domains: Set<string> | null = null;
+  let seed: number | undefined;
 
   for (const arg of argv) {
     if (arg === '--json') json = true;
     else if (arg === '--dry-run') dryRun = true;
     else if (arg === '--no-llm') skipLlm = true;
-    else if (arg.startsWith('--domain=') || arg.startsWith('--domains=')) {
+    else if (arg.startsWith('--seed=')) {
+      const n = parseInt(arg.split('=')[1] ?? '', 10);
+      if (Number.isFinite(n)) seed = n >>> 0;
+    } else if (arg.startsWith('--domain=') || arg.startsWith('--domains=')) {
       const list = arg.split('=')[1] ?? '';
       const parsed = list
         .split(',')
@@ -68,7 +73,7 @@ function parseArgs(argv: string[]): {
       if (parsed.length > 0) domains = new Set(parsed);
     }
   }
-  return { json, dryRun, skipLlm, domains };
+  return { json, dryRun, skipLlm, domains, seed };
 }
 
 function skippedResult(domain: string, reason: string): CheckerResult {
@@ -103,7 +108,9 @@ async function main() {
     dryRun: args.dryRun,
     skipLlm: args.skipLlm,
     domains: args.domains,
+    seed: args.seed,
   });
+  console.log(`[accuracy-audit] seed=${cfg.seed} (reproduce this run with --seed=${cfg.seed})`);
 
   const db = supabaseAdmin;
   if (!db) {
@@ -158,7 +165,7 @@ async function main() {
     }
   }
 
-  const summary = summarizeAudit(results, startedAtMs);
+  const summary = summarizeAudit(results, startedAtMs, cfg.seed);
 
   if (args.json) {
     console.log(JSON.stringify(summary, null, 2));

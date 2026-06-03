@@ -11,6 +11,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { governmentTooltips } from '../../tooltipContent';
+import { makeRng, sampleTable, seededShuffle } from '../sampling';
 import {
   summarizeResult,
   type AuditConfig,
@@ -70,15 +71,20 @@ async function reviewSummaries(
   client: Anthropic,
   findings: Finding[],
 ): Promise<number> {
-  const { data } = await db
-    .from('ky_bills')
-    .select('bill_number, title, description, ai_summary, updated_from_legiscan_at')
-    .not('ai_summary', 'is', null)
-    .neq('ai_summary', '')
-    .order('updated_from_legiscan_at', { ascending: false, nullsFirst: false })
-    .limit(cfg.llmSample);
+  const data = await sampleTable<{
+    bill_number: string;
+    title: string;
+    description: string | null;
+    ai_summary: string | null;
+  }>(db, {
+    table: 'ky_bills',
+    select: 'bill_number, title, description, ai_summary',
+    seed: cfg.seed,
+    limit: cfg.llmSample,
+    filter: (q) => q.not('ai_summary', 'is', null).neq('ai_summary', ''),
+  });
 
-  const items = (data ?? []).map((b) => ({
+  const items = data.map((b) => ({
     key: b.bill_number as string,
     title: clip(b.title as string, 300),
     description: clip(b.description as string),
@@ -120,14 +126,21 @@ async function reviewTopics(
   client: Anthropic,
   findings: Finding[],
 ): Promise<number> {
-  const { data } = await db
-    .from('ky_bills')
-    .select('bill_number, title, description, topics, legiscan_subjects, updated_from_legiscan_at')
-    .not('topics', 'is', null)
-    .order('updated_from_legiscan_at', { ascending: false, nullsFirst: false })
-    .limit(cfg.llmSample);
+  const data = await sampleTable<{
+    bill_number: string;
+    title: string;
+    description: string | null;
+    topics: string[] | null;
+    legiscan_subjects: unknown;
+  }>(db, {
+    table: 'ky_bills',
+    select: 'bill_number, title, description, topics, legiscan_subjects',
+    seed: cfg.seed ^ 0x85ebca6b, // distinct stream from the summary sample
+    limit: cfg.llmSample,
+    filter: (q) => q.not('topics', 'is', null),
+  });
 
-  const items = (data ?? [])
+  const items = data
     .map((b) => {
       const subjects = Array.isArray(b.legiscan_subjects)
         ? (b.legiscan_subjects as Array<{ subject_name?: string }>)
@@ -173,16 +186,6 @@ ${JSON.stringify(items, null, 2)}`;
   return items.length;
 }
 
-/** Rotate the glossary slice weekly so coverage spreads across runs. */
-function rotatingSlice<T>(arr: T[], size: number): T[] {
-  if (arr.length <= size) return arr;
-  const week = Math.floor(Date.now() / (7 * 86_400_000));
-  const offset = (week * size) % arr.length;
-  const out: T[] = [];
-  for (let i = 0; i < size; i++) out.push(arr[(offset + i) % arr.length]!);
-  return out;
-}
-
 async function reviewGlossary(
   cfg: AuditConfig,
   client: Anthropic,
@@ -193,10 +196,11 @@ async function reviewGlossary(
     title: t.title,
     content: clip(t.content, 600),
   }));
-  const items = rotatingSlice(entries, cfg.llmSample);
+  // Seed-shuffle so the sampled glossary terms vary per run (reproducible by seed).
+  const items = seededShuffle(entries, makeRng(cfg.seed ^ 0xc2b2ae35)).slice(0, cfg.llmSample);
   if (items.length === 0) return 0;
 
-  const prompt = `You are auditing civic glossary definitions for a Kentucky General Assembly transparency website. Kentucky has 100 House members and 38 Senators; a gubernatorial veto can be overridden by a 3/5 majority; there is no filibuster or cloture. Flag any definition that is factually incorrect or misleading for the Kentucky General Assembly (not the U.S. Congress).
+  const prompt = `You are auditing civic glossary definitions for a Kentucky General Assembly transparency website. Kentucky has 100 House members and 38 Senators; a gubernatorial veto is overridden by a majority of the members elected to each chamber (51 House, 20 Senate) per Ky. Constitution § 88; there is no filibuster or cloture. Flag any definition that is factually incorrect or misleading for the Kentucky General Assembly (not the U.S. Congress).
 
 Return ONLY a JSON array, one object per entry:
 { "key": "<key>", "ok": true|false, "severity": "fail"|"warn"|"info", "issue": "<short reason, empty if ok>" }

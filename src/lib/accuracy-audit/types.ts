@@ -49,8 +49,14 @@ export interface AuditConfig {
   votesLimit: number;
   /** Max committees re-scraped for materials per run. */
   materialsCommitteeLimit: number;
-  /** Max stored URLs probed for reachability per run. */
+  /** Max stored URLs checked per run. */
   linkSampleLimit: number;
+  /**
+   * When true, links are checked with live HTTP probes (slower, network-bound).
+   * Default false: links are validated statically against expected canonical
+   * hosts / URL shape (a cheap, deterministic source-of-truth check).
+   */
+  probeLinks: boolean;
   /** Sample size for each LLM review pass. */
   llmSample: number;
   /** Skip the Anthropic LLM pass entirely. */
@@ -63,6 +69,8 @@ export interface AuditConfig {
   dryRun: boolean;
   /** When set, only run these domains. `null` runs all. */
   domains: Set<string> | null;
+  /** Seed for randomized sampling; reuse to reproduce a run's exact selection. */
+  seed: number;
 }
 
 export const ALL_DOMAINS = [
@@ -91,19 +99,32 @@ export interface AuditConfigOverrides {
   dryRun?: boolean;
   skipLlm?: boolean;
   domains?: Set<string> | null;
+  seed?: number;
+}
+
+function resolveSeed(override?: number): number {
+  if (override != null && Number.isFinite(override)) return override >>> 0;
+  const env = process.env.ACCURACY_SEED?.trim();
+  if (env) {
+    const n = parseInt(env, 10);
+    if (Number.isFinite(n)) return n >>> 0;
+  }
+  return Math.floor(Math.random() * 0xffffffff) >>> 0;
 }
 
 /** Build an {@link AuditConfig} from `ACCURACY_*` env vars, applying CLI overrides. */
 export function buildAuditConfig(overrides: AuditConfigOverrides = {}): AuditConfig {
   return {
+    seed: resolveSeed(overrides.seed),
     lookbackDays: envInt('ACCURACY_DAYS', 14),
     billsLimit: envInt('ACCURACY_BILLS_LIMIT', 40),
     votesLimit: envInt('ACCURACY_VOTES_LIMIT', 15),
     materialsCommitteeLimit: envInt('ACCURACY_MATERIALS_COMMITTEE_LIMIT', 12),
     linkSampleLimit: envInt('ACCURACY_LINK_SAMPLE', 25),
+    probeLinks: envBool('ACCURACY_PROBE_LINKS'),
     llmSample: envInt('ACCURACY_LLM_SAMPLE', 8),
     skipLlm: overrides.skipLlm ?? envBool('ACCURACY_SKIP_LLM'),
-    llmModel: process.env.ACCURACY_LLM_MODEL?.trim() || 'claude-3-5-sonnet-20241022',
+    llmModel: process.env.ACCURACY_LLM_MODEL?.trim() || 'claude-sonnet-4-6',
     legiscanQuotaStopPct: envInt('ACCURACY_LEGISCAN_QUOTA_STOP_PCT', 95),
     dryRun: overrides.dryRun ?? false,
     domains: overrides.domains ?? null,

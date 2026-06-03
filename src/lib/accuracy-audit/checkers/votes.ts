@@ -1,5 +1,6 @@
 /**
- * Votes accuracy checker — recent `ky_votes` roll calls vs LegiScan `getRollCall`.
+ * Votes accuracy checker — a seeded random sample of `ky_votes` roll calls vs
+ * LegiScan `getRollCall`.
  *
  * Re-fetches each roll call by `roll_call_id` and compares the authoritative
  * yea/nay/absent summary to the stored counts, and tallies the stored per-member
@@ -11,6 +12,7 @@ import {
   mismatchesAgainstRollCallSummary,
   tallyRollCallVoteRows,
 } from '../../legiscan-vote-tally';
+import { sampleTable } from '../sampling';
 import {
   diffFinding,
   summarizeResult,
@@ -45,26 +47,27 @@ function billLabel(row: VoteRow): string {
 export async function checkVotes(db: SupabaseClient, cfg: AuditConfig): Promise<CheckerResult> {
   const started = Date.now();
   const findings: Finding[] = [];
-  const since = new Date(Date.now() - cfg.lookbackDays * 86_400_000).toISOString().slice(0, 10);
 
-  const { data, error } = await db
-    .from('ky_votes')
-    .select(
-      'id, roll_call_id, date, description, yea_count, nay_count, absent_count, roll_call, ky_bills ( bill_number )',
-    )
-    .gte('date', since)
-    .order('date', { ascending: false })
-    .limit(cfg.votesLimit);
-
-  if (error) {
-    return summarizeResult('votes', 0, findings, started, { error: error.message });
+  let rows: VoteRow[];
+  try {
+    rows = await sampleTable<VoteRow>(db, {
+      table: 'ky_votes',
+      select:
+        'id, roll_call_id, date, description, yea_count, nay_count, absent_count, roll_call, ky_bills ( bill_number )',
+      seed: cfg.seed,
+      limit: cfg.votesLimit,
+      filter: (q) => q.not('roll_call_id', 'is', null),
+    });
+  } catch (e) {
+    return summarizeResult('votes', 0, findings, started, {
+      error: e instanceof Error ? e.message : String(e),
+    });
   }
 
-  const rows = (data ?? []) as VoteRow[];
   if (rows.length === 0) {
     return summarizeResult('votes', 0, findings, started, {
       skipped: true,
-      skipReason: `no roll calls dated within last ${cfg.lookbackDays}d`,
+      skipReason: 'no roll calls with roll_call_id to sample',
     });
   }
 

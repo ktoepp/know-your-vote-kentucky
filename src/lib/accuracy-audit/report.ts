@@ -18,11 +18,13 @@ export interface AuditSummary {
   erroredDomains: string[];
   /** True when any hard failure or checker error occurred. */
   hasHardFailures: boolean;
+  /** Sampling seed used for this run (rerun with the same seed to reproduce). */
+  seed: number;
   startedAt: string;
   durationMs: number;
 }
 
-export function summarizeAudit(results: CheckerResult[], startedAtMs: number): AuditSummary {
+export function summarizeAudit(results: CheckerResult[], startedAtMs: number, seed: number): AuditSummary {
   let checked = 0;
   let passed = 0;
   let warnings = 0;
@@ -45,6 +47,7 @@ export function summarizeAudit(results: CheckerResult[], startedAtMs: number): A
     failures,
     erroredDomains,
     hasHardFailures: failures > 0 || erroredDomains.length > 0,
+    seed,
     startedAt: new Date(startedAtMs).toISOString(),
     durationMs: Date.now() - startedAtMs,
   };
@@ -75,7 +78,7 @@ export function formatConsoleReport(summary: AuditSummary): string {
   lines.push('KYVKY content accuracy audit');
   lines.push(
     `checked=${summary.checked} ok=${summary.passed} fail=${summary.failures} warn=${summary.warnings} ` +
-      `(${(summary.durationMs / 1000).toFixed(1)}s)`,
+      `seed=${summary.seed} (${(summary.durationMs / 1000).toFixed(1)}s)`,
   );
   lines.push('');
   for (const r of summary.results) {
@@ -97,7 +100,7 @@ export function formatSlackReport(summary: AuditSummary, maxFindingsPerDomain = 
   const header = `*KY Vote — content accuracy audit* (${status})`;
   const totals =
     `checked \`${summary.checked}\` · ok \`${summary.passed}\` · ` +
-    `fail \`${summary.failures}\` · warn \`${summary.warnings}\` · ${(summary.durationMs / 1000).toFixed(0)}s`;
+    `fail \`${summary.failures}\` · warn \`${summary.warnings}\` · seed \`${summary.seed}\` · ${(summary.durationMs / 1000).toFixed(0)}s`;
 
   const sections: string[] = [header, totals, '', summary.results.map(domainStatusLine).join('\n')];
 
