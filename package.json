@@ -29,6 +29,8 @@
     "preview:digest": "tsx scripts/preview-bill-digest.ts",
     "verify:digest-state": "tsx scripts/verify-digest-state.ts",
     "preview:welcome": "tsx scripts/preview-welcome-email.tsx",
+    "audit:accuracy": "tsx scripts/accuracy-audit.ts",
+    "audit:accuracy:dry": "tsx scripts/accuracy-audit.ts --dry-run",
     "audit:legiscan-subjects": "tsx scripts/audit-legiscan-subjects.ts",
     "diagnose:legislators": "tsx scripts/diagnose-legislators.ts",
     "generate:district-thumbnails": "tsx scripts/generate-district-thumbnails.ts",

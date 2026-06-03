@@ -1,0 +1,72 @@
+# Weekly content-accuracy audit: re-fetches primary sources (LegiScan, Open States,
+# LRC) to diff against Supabase, runs an Anthropic LLM pass over fuzzy content, and
+# posts a report to Slack. See scripts/accuracy-audit.ts.
+#
+# Requires repository secrets (Settings -> Secrets and variables -> Actions):
+#   NEXT_PUBLIC_SUPABASE_URL  - or set SUPABASE_URL instead (either works)
+#   SUPABASE_SERVICE_ROLE_KEY - service_role JWT (not anon)
+# Recommended:
+#   LEGISCAN_API_KEY    - bill/vote diffs (skipped near the monthly quota cap)
+#   OPENSTATES_API_KEY  - legislator roster diff
+#   ANTHROPIC_API_KEY   - LLM review pass (omit or set ACCURACY_SKIP_LLM=true to skip)
+# Optional Slack (same Incoming Webhooks as the sync workflows - see env-template.txt):
+#   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL
+#   SLACK_SYNC_NOTIFY_CLI=true   (set below so the audit posts from CI)
+#
+# Node: opt into Actions' Node 24 for JS-based actions before Node 20 is removed.
+name: Content accuracy audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly - Sundays 07:00 UTC.
+    - cron: '0 7 * * 0'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  accuracy-audit:
+    name: Content accuracy audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+      OPENSTATES_API_KEY: ${{ secrets.OPENSTATES_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+      SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+      SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SLACK_SYNC_NOTIFY_CLI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run content accuracy audit
+        run: npm run audit:accuracy
+
+      - name: Slack notify on workflow failure
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+        run: |
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
+            exit 0
+          fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"*KY Vote - content accuracy audit failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$WEBHOOK"

@@ -207,5 +207,21 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # SLACK_LEGISCAN_QUOTA_ALERT_PCT=90
 # LEGISCAN_MONTHLY_QUERY_LIMIT=30000
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Content accuracy audit (npm run audit:accuracy — weekly via
+# .github/workflows/accuracy-audit.yml). Re-fetches LegiScan / Open States / LRC,
+# diffs against Supabase, runs an Anthropic LLM pass over fuzzy content, posts to
+# the same Slack webhooks (gated by SLACK_SYNC_NOTIFY_CLI=true from CI). Defaults
+# shown; all optional.
+# ACCURACY_DAYS=14                      — only check content changed/active within N days.
+# ACCURACY_BILLS_LIMIT=40               — max bills re-fetched from LegiScan per run.
+# ACCURACY_VOTES_LIMIT=15               — max roll calls re-fetched from LegiScan per run.
+# ACCURACY_MATERIALS_COMMITTEE_LIMIT=12 — max committees re-scraped for materials per run.
+# ACCURACY_LINK_SAMPLE=25               — max stored URLs probed for reachability per run.
+# ACCURACY_LLM_SAMPLE=8                 — sample size per LLM review pass.
+# ACCURACY_SKIP_LLM=false               — set true (or --no-llm) to skip the Anthropic pass.
+# ACCURACY_LLM_MODEL=claude-3-5-sonnet-20241022
+# ACCURACY_LEGISCAN_QUOTA_STOP_PCT=95   — skip LegiScan-backed checks at/above this monthly usage %.
+
 # Note: Replace all "your_*_here" placeholders with actual values.
 # Keep this file secure and never commit it to version control.

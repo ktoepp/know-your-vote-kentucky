@@ -391,3 +391,35 @@ export async function notifyHealthCheckFailureSlack(details: string): Promise<vo
   const clipped = details.length > 2000 ? `${details.slice(0, 2000)}…` : details;
   await postToAlertsAndSupport(`*KY Vote health check failed*\n${clipped}`);
 }
+
+/**
+ * Posts the content-accuracy audit report.
+ *
+ * Digest body → status-reports webhook (always, when configured), so the weekly
+ * run is visible even when clean. When `hasHardFailures` is true, the same body
+ * is also escalated to the errors webhook (deduped if both point to the same URL).
+ *
+ * From CLI / GitHub Actions, gated by SLACK_SYNC_NOTIFY_CLI=true (same flag as
+ * the sync + legislator-link verifiers).
+ */
+export async function notifyAccuracyAuditSlack(params: {
+  body: string;
+  hasHardFailures: boolean;
+  fromCli?: boolean;
+}): Promise<void> {
+  if (params.fromCli === true && process.env.SLACK_SYNC_NOTIFY_CLI !== 'true') {
+    return;
+  }
+
+  const syncUrl = webhookUrlForSyncDigest();
+  const alertUrl = webhookUrlForAlerts();
+
+  const posted = new Set<string>();
+  if (syncUrl) {
+    await postSlackIncomingWebhook(syncUrl, params.body);
+    posted.add(syncUrl);
+  }
+  if (params.hasHardFailures && alertUrl && !posted.has(alertUrl)) {
+    await postSlackIncomingWebhook(alertUrl, params.body);
+  }
+}
