@@ -49,7 +49,8 @@ export interface BillTooltipContent extends Omit<TooltipContent, 'category'> {
 // ─────────────────────────────────────────────────────────────────────────────
 // All definitions below are specific to the KENTUCKY GENERAL ASSEMBLY,
 // not the U.S. Congress. Kentucky has 100 House members and 38 Senators;
-// vetoes require a 3/5 override; there is no filibuster or cloture.
+// a veto is overridden by a majority of the members elected to each chamber
+// (51 House, 20 Senate) per Ky. Const. § 88; there is no filibuster or cloture.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const governmentTooltips: Record<string, TooltipContent> = {
@@ -223,13 +224,13 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   vetoed: {
     category: 'bill_status_and_stages',
     title: "Vetoed",
-    content: "The Governor rejected the bill. The General Assembly can attempt to override the veto — which requires 3/5 of the members elected to each chamber (61 House members and 23 Senators)."
+    content: "The Governor rejected the bill. The General Assembly can attempt to override the veto — which requires a majority of the members elected to each chamber (51 House members and 20 Senators) under Ky. Constitution § 88."
   },
 
   veto_override: {
     category: 'bill_status_and_stages',
     title: "Veto Override",
-    content: "The General Assembly voted to pass the bill despite the Governor's veto. Kentucky requires 3/5 of elected members in each chamber (61 in the House, 23 in the Senate) to override."
+    content: "The General Assembly voted to pass the bill despite the Governor's veto. Kentucky requires only a majority of the members elected in each chamber (51 in the House, 20 in the Senate) to override — a notably lower bar than the federal two-thirds (Ky. Constitution § 88)."
   },
 
   tabled: {
@@ -435,13 +436,13 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   veto_recess: {
     category: 'procedures_and_voting',
     title: "Veto Recess",
-    content: "A multi-day pause near the end of a Kentucky regular session. After both chambers pass the major bills, they recess so the Governor has the constitutional 10 days to sign, veto, or let bills become law. The General Assembly then reconvenes for its final days to consider veto overrides before adjourning sine die."
+    content: "A multi-day pause near the end of a Kentucky regular session. After both chambers pass the major bills, they recess so the Governor has the constitutional 10 days to sign, veto, or let bills become law. The General Assembly then reconvenes for its final days to consider veto overrides — each requiring a majority of the members elected to each chamber — before adjourning sine die."
   },
 
   interim_period: {
     category: 'procedures_and_voting',
     title: "Interim Period",
-    content: "The months between regular sessions when the General Assembly isn't formally in session. Interim joint committees — made up of House and Senate members — meet monthly in Frankfort to study issues, take testimony, and pre-file bills for the next session. Most lawmaking groundwork happens here."
+    content: "The months between regular sessions when the General Assembly isn't formally in session. Interim joint committees — made up of House and Senate members — meet monthly in Frankfort to study issues and take testimony, and legislators may pre-file bills for the next session. Much of the groundwork for upcoming legislation is laid here."
   },
 
   // ── Special Provisions ──────────────────────────────────────────────────────
@@ -449,13 +450,13 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   emergency_clause: {
     category: 'procedures_and_voting',
     title: "Emergency Clause",
-    content: "A provision that makes a law take effect as soon as the Governor signs it, instead of waiting 90 days. It takes a supermajority — 3/5 of the members elected to each chamber — to add one."
+    content: "A provision that makes a law take effect as soon as it becomes law, instead of waiting until its normal effective date later that year. Adding one requires the concurrence of a majority of the members elected to each chamber, with the reasons for the emergency entered in each chamber's journal (Ky. Constitution § 55)."
   },
 
   fiscal_note: {
     category: 'procedures_and_voting',
     title: "Fiscal Note",
-    content: "An official estimate of how much a bill would cost (or save) the state if it becomes law. It's prepared by the Legislative Research Commission or the Governor's Office for Policy and Management."
+    content: "An official estimate of how much a bill would cost (or save) the state if it becomes law. In Kentucky it's prepared by the nonpartisan staff of the Legislative Research Commission (LRC), on request by a bill's sponsor, a committee chair, or a vote of the chamber."
   },
 
   // ── Timeline Stage Labels ───────────────────────────────────────────────────

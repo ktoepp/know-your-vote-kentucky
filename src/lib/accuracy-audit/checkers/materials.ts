@@ -12,6 +12,7 @@ import {
   lrcCommitteeDocumentsUrl,
   parseCommitteeMaterialsHtml,
 } from '../../lrc-committee-materials-parser';
+import { sampleTable } from '../sampling';
 import {
   norm,
   summarizeResult,
@@ -40,6 +41,83 @@ interface MaterialRow {
   url: string;
 }
 
+type LinkKind = 'material' | 'bill';
+
+interface LinkTarget {
+  kind: LinkKind;
+  label: string;
+  url: string;
+}
+
+/** Known Kentucky legislature web hosts (current + legacy LRC domain). */
+function isKyLegislatureHost(host: string): boolean {
+  return host === 'lrc.ky.gov' || host === 'ky.gov' || host.endsWith('legislature.ky.gov');
+}
+
+/**
+ * Static source-of-truth check: validate URL shape and host against the known
+ * canonical hosts for each kind (no network). Returns a Finding or null when OK.
+ */
+function validateLinkShape(target: LinkTarget): Finding | null {
+  let host: string;
+  let path: string;
+  try {
+    const u = new URL(target.url);
+    host = u.hostname.replace(/^www\./i, '').toLowerCase();
+    path = u.pathname.replace(/^\/+|\/+$/g, '');
+    if (!/^https?:$/.test(u.protocol)) {
+      return {
+        severity: 'fail',
+        domain: 'materials',
+        entity: target.label,
+        field: 'url',
+        message: `non-http(s) URL scheme "${u.protocol}"`,
+        url: target.url,
+      };
+    }
+  } catch {
+    return {
+      severity: 'fail',
+      domain: 'materials',
+      entity: target.label,
+      field: 'url',
+      message: 'malformed URL',
+      url: target.url,
+    };
+  }
+
+  if (!path) {
+    return {
+      severity: 'warn',
+      domain: 'materials',
+      entity: target.label,
+      field: 'url',
+      message: 'URL has no path (likely not a real document/bill link)',
+      url: target.url,
+    };
+  }
+
+  const allowed =
+    target.kind === 'material'
+      ? isKyLegislatureHost(host)
+      : host === 'legiscan.com' || isKyLegislatureHost(host);
+
+  if (!allowed) {
+    return {
+      severity: 'warn',
+      domain: 'materials',
+      entity: target.label,
+      field: 'url',
+      message: `unexpected host "${host}" (expected ${
+        target.kind === 'material' ? 'a ky.gov legislature host' : 'legiscan.com or a ky.gov legislature host'
+      })`,
+      url: target.url,
+    };
+  }
+
+  return null;
+}
+
 async function probeUrl(url: string): Promise<{ ok: boolean; status: number }> {
   const attempt = async (method: 'head' | 'get') => {
     const res = await axios.request({
@@ -52,10 +130,19 @@ async function probeUrl(url: string): Promise<{ ok: boolean; status: number }> {
     });
     return res.status;
   };
-  try {
+  const once = async () => {
     let status = await attempt('head');
     if (status === 405 || status === 501 || status === 403) {
       status = await attempt('get');
+    }
+    return status;
+  };
+  try {
+    let status = await once();
+    // One retry for transient timeouts/connection resets (status 0).
+    if (status === 0) {
+      await new Promise((r) => setTimeout(r, 500 + Math.random() * 500));
+      status = await once();
     }
     return { ok: status >= 200 && status < 400, status };
   } catch {
@@ -63,36 +150,41 @@ async function probeUrl(url: string): Promise<{ ok: boolean; status: number }> {
   }
 }
 
+/** Run async tasks with a small concurrency cap + jitter to avoid burst timeouts. */
+async function mapWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const item = items[cursor++]!;
+      await new Promise((r) => setTimeout(r, Math.random() * 250));
+      await fn(item);
+    }
+  });
+  await Promise.all(workers);
+}
+
 async function checkMaterialsDiff(
   db: SupabaseClient,
   cfg: AuditConfig,
   findings: Finding[],
 ): Promise<number> {
-  const sinceIso = new Date(Date.now() - cfg.lookbackDays * 86_400_000).toISOString();
-
-  // Committees with recently-scraped materials are the "active" ones worth re-checking.
-  const { data: recent } = await db
-    .from('ky_committee_materials')
-    .select('committee_id, scraped_at')
-    .gte('scraped_at', sinceIso)
-    .order('scraped_at', { ascending: false })
-    .limit(500);
-
-  const committeeIds = [...new Set((recent ?? []).map((r) => r.committee_id as string))].slice(
-    0,
-    cfg.materialsCommitteeLimit,
-  );
-  if (committeeIds.length === 0) return 0;
-
-  const { data: committees } = await db
-    .from('ky_committees')
-    .select('id, name, lrc_rsn, committee_type')
-    .in('id', committeeIds)
-    .not('lrc_rsn', 'is', null);
+  // Seed-sample committees that have an LRC documents page.
+  const committees = await sampleTable<CommitteeRow>(db, {
+    table: 'ky_committees',
+    select: 'id, name, lrc_rsn, committee_type',
+    seed: cfg.seed,
+    limit: cfg.materialsCommitteeLimit,
+    filter: (q) => q.not('lrc_rsn', 'is', null),
+  });
+  if (committees.length === 0) return 0;
 
   let processed = 0;
 
-  for (const committee of (committees ?? []) as CommitteeRow[]) {
+  for (const committee of committees) {
     if (committee.lrc_rsn == null) continue;
     const url = lrcCommitteeDocumentsUrl(committee.lrc_rsn);
 
@@ -160,39 +252,47 @@ async function checkMaterialsDiff(
   return processed;
 }
 
-async function checkLinkReachability(
-  db: SupabaseClient,
-  cfg: AuditConfig,
-  findings: Finding[],
-): Promise<number> {
+async function checkLinks(db: SupabaseClient, cfg: AuditConfig, findings: Finding[]): Promise<number> {
   const half = Math.max(1, Math.floor(cfg.linkSampleLimit / 2));
 
-  const { data: materials } = await db
-    .from('ky_committee_materials')
-    .select('title, url')
-    .order('scraped_at', { ascending: false })
-    .limit(half);
+  const materials = await sampleTable<{ title: string | null; url: string }>(db, {
+    table: 'ky_committee_materials',
+    select: 'title, url',
+    seed: cfg.seed,
+    limit: half,
+  });
 
-  const { data: bills } = await db
-    .from('ky_bills')
-    .select('bill_number, bill_text_url')
-    .not('bill_text_url', 'is', null)
-    .order('updated_from_legiscan_at', { ascending: false, nullsFirst: false })
-    .limit(half);
+  const bills = await sampleTable<{ bill_number: string; bill_text_url: string }>(db, {
+    table: 'ky_bills',
+    select: 'bill_number, bill_text_url',
+    seed: cfg.seed ^ 0x9e3779b9, // distinct stream from the materials sample
+    limit: half,
+    filter: (q) => q.not('bill_text_url', 'is', null),
+  });
 
-  const targets: { label: string; url: string }[] = [];
-  for (const m of materials ?? []) {
-    if (m.url) targets.push({ label: `material: ${m.title ?? m.url}`, url: m.url as string });
+  const targets: LinkTarget[] = [];
+  for (const m of materials) {
+    if (m.url) targets.push({ kind: 'material', label: `material: ${m.title ?? m.url}`, url: m.url });
   }
-  for (const b of bills ?? []) {
-    if (b.bill_text_url) targets.push({ label: `bill text: ${b.bill_number}`, url: b.bill_text_url as string });
+  for (const b of bills) {
+    if (b.bill_text_url) {
+      targets.push({ kind: 'bill', label: `bill text: ${b.bill_number}`, url: b.bill_text_url });
+    }
   }
 
-  let probed = 0;
-  for (const t of targets) {
+  // Default: static source-of-truth validation (no network).
+  if (!cfg.probeLinks) {
+    for (const t of targets) {
+      const finding = validateLinkShape(t);
+      if (finding) findings.push(finding);
+    }
+    return targets.length;
+  }
+
+  // Opt-in (ACCURACY_PROBE_LINKS=true): live HTTP reachability, concurrency-limited.
+  await mapWithConcurrency(targets, 4, async (t) => {
     const { ok, status } = await probeUrl(t.url);
-    probed += 1;
-    if (ok) continue;
+    if (ok) return;
     findings.push({
       severity: status === 404 ? 'fail' : 'warn',
       domain: 'materials',
@@ -201,9 +301,9 @@ async function checkLinkReachability(
       message: status === 0 ? 'request failed / timed out' : `HTTP ${status}`,
       url: t.url,
     });
-  }
+  });
 
-  return probed;
+  return targets.length;
 }
 
 export async function checkMaterials(db: SupabaseClient, cfg: AuditConfig): Promise<CheckerResult> {
@@ -222,12 +322,12 @@ export async function checkMaterials(db: SupabaseClient, cfg: AuditConfig): Prom
   }
 
   try {
-    checked += await checkLinkReachability(db, cfg, findings);
+    checked += await checkLinks(db, cfg, findings);
   } catch (e) {
     findings.push({
       severity: 'warn',
       domain: 'materials',
-      message: `link reachability pass failed: ${e instanceof Error ? e.message : String(e)}`,
+      message: `link check pass failed: ${e instanceof Error ? e.message : String(e)}`,
     });
   }
 

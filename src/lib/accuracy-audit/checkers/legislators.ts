@@ -7,6 +7,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  extractOpenStatesContactDetails,
   getKyOpenStatesClient,
   openStatesCurrentRole,
   type OpenStatesLegislator,
@@ -29,7 +30,15 @@ interface LegislatorRow {
   chamber: 'house' | 'senate' | null;
   district: string | null;
   openstates_id: string | null;
+  email: string | null;
+  phone: string | null;
+  photo_url: string | null;
   active: boolean;
+}
+
+/** Compare phone numbers by digits only (formatting varies between sources). */
+function phoneDigits(v: string | null | undefined): string {
+  return (v ?? '').replace(/\D/g, '');
 }
 
 function partyCode(party: string | null | undefined): string {
@@ -48,9 +57,16 @@ function chamberFromOrgClass(orgClass: string | undefined): 'house' | 'senate' |
   return null;
 }
 
-function districtString(d: string | number | null | undefined): string {
+/**
+ * Normalize a district to its numeric value for comparison.
+ * Stored districts are prefixed/zero-padded ("HD-032", "SD-06"); Open States
+ * returns the bare number ("32", "6"). Strip the chamber prefix + leading zeros
+ * so they compare equal. Chamber is verified separately via org_classification.
+ */
+function districtNumber(d: string | number | null | undefined): string {
   if (d == null) return '';
-  return String(d).replace(/[^0-9a-z]/gi, '').toLowerCase();
+  const m = String(d).match(/\d+/);
+  return m ? String(parseInt(m[0], 10)) : String(d).trim().toLowerCase();
 }
 
 export async function checkLegislators(db: SupabaseClient, cfg: AuditConfig): Promise<CheckerResult> {
@@ -59,7 +75,7 @@ export async function checkLegislators(db: SupabaseClient, cfg: AuditConfig): Pr
 
   const { data, error } = await db
     .from('ky_legislators')
-    .select('id, name, party, chamber, district, openstates_id, active')
+    .select('id, name, party, chamber, district, openstates_id, email, phone, photo_url, active')
     .eq('active', true);
 
   if (error) {
@@ -140,13 +156,31 @@ export async function checkLegislators(db: SupabaseClient, cfg: AuditConfig): Pr
       findings.push(diffFinding('fail', 'legislators', label, 'chamber', osChamber, row.chamber));
     }
 
-    const osDistrict = districtString(role?.district);
-    if (osDistrict && districtString(row.district) && osDistrict !== districtString(row.district)) {
+    const osDistrict = districtNumber(role?.district);
+    const dbDistrict = districtNumber(row.district);
+    if (osDistrict && dbDistrict && osDistrict !== dbDistrict) {
       findings.push(diffFinding('fail', 'legislators', label, 'district', String(role?.district), row.district));
     }
 
     if (norm(os.name) && norm(os.name) !== norm(row.name)) {
       findings.push(diffFinding('warn', 'legislators', label, 'name', os.name, row.name));
+    }
+
+    const contact = extractOpenStatesContactDetails(os);
+    if (contact.email && norm(contact.email) !== norm(row.email)) {
+      findings.push(diffFinding('warn', 'legislators', label, 'email', contact.email, row.email));
+    }
+    if (contact.phone && phoneDigits(contact.phone) !== phoneDigits(row.phone)) {
+      findings.push(diffFinding('warn', 'legislators', label, 'phone', contact.phone, row.phone));
+    }
+    if (os.image && !row.photo_url) {
+      findings.push({
+        severity: 'warn',
+        domain: 'legislators',
+        entity: label,
+        field: 'photo_url',
+        message: 'Open States has a photo but none is stored',
+      });
     }
   }
 
