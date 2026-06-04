@@ -47,7 +47,15 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Agriculture: ['farm', 'agriculture', 'crop', 'livestock', 'tobacco', 'bourbon', 'hemp', 'rural', 'usda'],
   Energy: ['energy', 'coal', 'natural gas', 'solar', 'wind', 'utility', 'electric', 'pipeline', 'power plant', 'renewable'],
   'Criminal Justice': ['prison', 'jail', 'sentencing', 'parole', 'probation', 'felony', 'misdemeanor', 'incarceration', 'juvenile', 'expungement'],
-  'Voting Rights': ['voting', 'election', 'ballot', 'voter', 'registration', 'redistricting', 'poll', 'absentee', 'primary'],
+  // Bare 'registration'/'primary' removed: 'registration' matched generic vehicle/business/
+  // professional/motorboat/firearm registration boilerplate (radon contractors, metal detectors,
+  // pharmacy techs, optometrists), and 'primary' matched 'primary care'/'primary school'/'primary
+  // residence'/'heart attack response'. Replaced with voter-specific phrasing. Plural 'elections'/
+  // 'voters' are added because the word-boundary match means singular 'election'/'voter' miss the
+  // plurals that genuine "AN ACT relating to elections" bills use (KRS 116/118/120). 'elections'/
+  // 'voters' are unambiguous (rarely appear outside an actual elections context), unlike the bare
+  // 'registration'/'primary' they replace. (2026-06-03 accuracy-audit follow-up.)
+  'Voting Rights': ['voting', 'election', 'elections', 'ballot', 'voter', 'voters', 'voter registration', 'redistricting', 'poll', 'absentee', 'primary election'],
   // Bare 'commissioner' removed: it matches state offices (Commissioner of Agriculture, Insurance Commissioner),
   // not local government. 'fiscal court' / 'magistrate' / 'county judge-executive' are the KY local-gov signals.
   'Local Government': ['county', 'city council', 'metro council', 'mayor', 'magistrate', 'county judge-executive', 'ordinance', 'municipal', 'annexation', 'fiscal court', 'planning commission', 'zoning board', 'louisville metro', 'lexington-fayette', 'special district', 'library district'],
