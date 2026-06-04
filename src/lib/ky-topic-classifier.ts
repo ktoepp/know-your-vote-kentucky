@@ -27,6 +27,7 @@ export const KY_TOPICS = [
   'Veterans Affairs',
   'Alcohol & Cannabis',
   'Gambling',
+  'Transportation',
 ] as const;
 
 export type KYTopicTag = (typeof KY_TOPICS)[number];
@@ -35,14 +36,23 @@ export type KYTopicTag = (typeof KY_TOPICS)[number];
 const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Education: ['school', 'education', 'student', 'teacher', 'university', 'college', 'curriculum', 'tuition', 'charter', 'jcps', 'fcps', 'superintendent'],
   Healthcare: ['health', 'hospital', 'medicaid', 'medicare', 'insurance', 'mental health', 'opioid', 'drug', 'pharmacy', 'nurse', 'doctor', 'clinic'],
-  Infrastructure: ['road', 'bridge', 'highway', 'water', 'sewer', 'broadband', 'internet', 'transit', 'transportation', 'construction', 'dam'],
+  // Transport keywords (road/highway/transit/transportation/motor vehicle/etc.) moved to the
+  // dedicated 'Transportation' topic below. Bare 'construction' removed: it matched finance/legal
+  // boilerplate ("construction loans", "construction contracts", "statutory construction") far more
+  // than actual public works. Genuine state construction still hits road/highway/water/sewer.
+  // (2026-06-04 accuracy-audit follow-up.)
+  Infrastructure: ['water', 'sewer', 'wastewater', 'sewage', 'stormwater', 'broadband', 'internet', 'dam'],
   // 'fiscal' removed: it matches "fiscal court" (local gov) and "fiscal note/year/impact" boilerplate, not tax policy.
   Taxation: ['tax', 'revenue', 'property tax', 'sales tax', 'income tax', 'levy', 'assessment'],
   // Bare 'emergency'/'safety' removed: they match the "emergency clause"/"declares an emergency" boilerplate present
   // in many bills, and generic "safety". Use specific public-safety phrasing instead.
   'Public Safety': ['police', 'fire', 'emergency management', 'emergency services', 'first responder', 'state of emergency', 'public safety', 'crime', '911', 'sheriff', 'ems', 'disaster', 'flood'],
   Environment: ['environment', 'pollution', 'clean water', 'air quality', 'climate', 'conservation', 'wildlife', 'recycling', 'waste', 'coal ash'],
-  Labor: ['worker', 'wage', 'employment', 'union', 'labor', 'workforce', 'unemployment', 'minimum wage', 'workplace'],
+  // Bare singular 'worker' removed: it matched incidental "health care worker"/"social worker"
+  // mentions in non-labor bills (e.g. a born-alive-infant bill tagged Labor). Plural 'workers'
+  // ("essential workers", "workers' rights/compensation") is the genuine labor signal; real labor
+  // bills also hit employment/wage/labor/union. (2026-06-04 accuracy-audit follow-up.)
+  Labor: ['workers', 'wage', 'employment', 'union', 'labor', 'workforce', 'unemployment', 'minimum wage', 'workplace'],
   Housing: ['housing', 'rent', 'affordable housing', 'zoning', 'landlord', 'tenant', 'homeless', 'eviction', 'mortgage'],
   Agriculture: ['farm', 'agriculture', 'crop', 'livestock', 'tobacco', 'bourbon', 'hemp', 'rural', 'usda'],
   Energy: ['energy', 'coal', 'natural gas', 'solar', 'wind', 'utility', 'electric', 'pipeline', 'power plant', 'renewable'],
@@ -58,7 +68,7 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   'Voting Rights': ['voting', 'election', 'elections', 'ballot', 'voter', 'voters', 'voter registration', 'redistricting', 'poll', 'absentee', 'primary election'],
   // Bare 'commissioner' removed: it matches state offices (Commissioner of Agriculture, Insurance Commissioner),
   // not local government. 'fiscal court' / 'magistrate' / 'county judge-executive' are the KY local-gov signals.
-  'Local Government': ['county', 'city council', 'metro council', 'mayor', 'magistrate', 'county judge-executive', 'ordinance', 'municipal', 'annexation', 'fiscal court', 'planning commission', 'zoning board', 'louisville metro', 'lexington-fayette', 'special district', 'library district'],
+  'Local Government': ['county', 'city council', 'metro council', 'mayor', 'magistrate', 'county judge-executive', 'ordinance', 'municipal', 'annexation', 'fiscal court', 'planning commission', 'zoning board', 'louisville metro', 'lexington-fayette', 'special district', 'library district', 'area development district', 'area development districts'],
   Budget: ['budget', 'appropriation', 'spending', 'deficit', 'surplus', 'general fund', 'pension', 'bond'],
   Corrections: ['department of corrections', 'corrections officer', 'inmate', 'warden', 'reentry', 'halfway house', 'correctional facility', 'parole board'],
   Elections: ['election administration', 'county clerk', 'poll worker', 'voting machine', 'canvass', 'secretary of state', 'election board', 'precinct', 'election official'],
@@ -66,6 +76,12 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   'Veterans Affairs': ['veteran', 'veterans', 'military', 'national guard', 'gi bill', 'armed forces', 'servicemember', 'veterans affairs', 'veterans benefits'],
   'Alcohol & Cannabis': ['alcohol', 'liquor', 'distillery', 'brewery', 'wet-dry', 'cannabis', 'marijuana', 'medical marijuana', 'thc', 'delta-8'],
   Gambling: ['gambling', 'casino', 'sports betting', 'lottery', 'wagering', 'historical horse racing', 'pari-mutuel', 'charitable gaming', 'racing commission'],
+  // Un-conflated from Infrastructure (2026-06-04 accuracy-audit follow-up): roads/highways/transit
+  // and motor-vehicle/licensing/railroad bills were repeatedly mis-tagged as "Infrastructure" or
+  // matched it only incidentally ("private road" in a railroad bill, "Transportation Cabinet" agency
+  // name in a vehicle bill). Bare 'bridge' deliberately NOT included here — it matched financial
+  // "bridge loans"; genuine bridge bills are still surfaced via the LegiScan /bridge/ subject mapping.
+  Transportation: ['road', 'highway', 'transit', 'transportation', 'motor vehicle', 'license plate', 'railroad', 'railway', 'vehicle registration', "driver's license", 'school bus', 'toll road', 'public transit', 'mass transit'],
 };
 
 /** Escape regex metacharacters in a keyword before embedding in a pattern. */

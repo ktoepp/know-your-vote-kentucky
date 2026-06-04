@@ -456,7 +456,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   fiscal_note: {
     category: 'procedures_and_voting',
     title: "Fiscal Note",
-    content: "An official estimate of how much a bill would cost (or save) the state if it becomes law. In Kentucky it's prepared by the nonpartisan staff of the Legislative Research Commission (LRC), on request by a bill's sponsor, a committee chair, or a vote of the chamber."
+    content: "An official estimate of how much a bill would cost (or save) state or local government if it becomes law. In Kentucky it's prepared by the nonpartisan staff of the Legislative Research Commission (LRC). A bill's sponsor, a committee or its chair, or the chamber can request one (Legislative Rule 52), and a fiscal statement examining any provision with fiscal effects is typically attached to the measure before the chamber takes final action."
   },
 
   // ── Timeline Stage Labels ───────────────────────────────────────────────────
@@ -621,7 +621,12 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
   topic_infrastructure: {
     category: 'subject_topics',
     title: "Infrastructure",
-    content: "Roads, bridges, highways, water and sewer systems, broadband, transit, and major construction projects funded by the state."
+    content: "Water and sewer systems, wastewater and stormwater, dams, and broadband and internet access funded by the state. (Roads, transit, and motor-vehicle matters are under Transportation.)"
+  },
+  topic_transportation: {
+    category: 'subject_topics',
+    title: "Transportation",
+    content: "Roads, highways, and bridges; public transit; motor vehicles, driver licensing and registration; railroads; and traffic safety, including the Transportation Cabinet."
   },
   topic_taxation: {
     category: 'subject_topics',
