@@ -1,5 +1,5 @@
 /**
- * Map Kentucky internal topics (`KY_TOPICS`, the 20-category bucket users follow
+ * Map Kentucky internal topics (`KY_TOPICS`, the bucket of categories users follow
  * in their notification preferences) to LegiScan official subject patterns.
  *
  * Why this exists: the digest cron filters bills by `ky_bills.topics`, which is
@@ -39,11 +39,8 @@ const TOPIC_TO_SUBJECT_PATTERNS: Record<KYTopicTag, SubjectPattern[]> = {
     /opioid|substance abuse|addiction/i,
   ],
   Infrastructure: [
-    /transportation/i,
-    /highway|road|bridge/i,
     /\bwater\b|sewer|wastewater/i,
     /broadband|telecommunication/i,
-    /\btransit\b/i,
     /\bdam\b/i,
   ],
   Taxation: [/\btax(es|ation|ing)?\b/i, /\brevenue\b/i, /assessment/i, /\bfiscal\b/i, /\blevy\b/i],
@@ -189,6 +186,15 @@ const TOPIC_TO_SUBJECT_PATTERNS: Record<KYTopicTag, SubjectPattern[]> = {
     /\blottery/i,
     /pari-?mutuel|horse racing/i,
     /charitable gaming/i,
+  ],
+  Transportation: [
+    /transportation/i,
+    /highway|\broad|bridge/i,
+    /\btransit\b/i,
+    /motor vehicle|motorcycle/i,
+    /license plate|driver'?s? licen[sc]e|vehicle registration/i,
+    /railroad|railway/i,
+    /\btraffic\b/i,
   ],
 };
 
