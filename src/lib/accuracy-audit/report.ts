@@ -93,27 +93,76 @@ export function formatConsoleReport(summary: AuditSummary): string {
   return lines.join('\n');
 }
 
+/** Status word for the Slack header — bolded inline with the totals. */
+function slackStatusLabel(summary: AuditSummary): string {
+  if (summary.hasHardFailures) return 'failures';
+  if (summary.warnings > 0) return 'warnings';
+  return 'all clear';
+}
+
+/** Totals line. Zero `fail`/`warn` counts are omitted to keep clean runs uncluttered. */
+function slackTotalsLine(summary: AuditSummary): string {
+  const parts = [
+    `*${slackStatusLabel(summary)}*`,
+    `checked \`${summary.checked}\``,
+    `ok \`${summary.passed}\``,
+  ];
+  if (summary.failures > 0) parts.push(`fail \`${summary.failures}\``);
+  if (summary.warnings > 0) parts.push(`warn \`${summary.warnings}\``);
+  parts.push(`seed \`${summary.seed}\``);
+  parts.push(`${(summary.durationMs / 1000).toFixed(0)}s`);
+  return parts.join(' · ');
+}
+
+/** Compact "1 fail, 2 warn" label for a domain's notable findings. */
+function notableCountLabel(findings: Finding[]): string {
+  const fail = findings.filter((f) => f.severity === 'fail').length;
+  const warn = findings.filter((f) => f.severity === 'warn').length;
+  const bits: string[] = [];
+  if (fail > 0) bits.push(`${fail} fail`);
+  if (warn > 0) bits.push(`${warn} warn`);
+  return bits.join(', ');
+}
+
+/**
+ * Slack finding line. Drops the `[WARN]`/`[FAIL]` bracket (severity is conveyed
+ * by the per-domain count + overall status); only the rarer `fail` keeps a bold
+ * tag. Expected/stored values move to an indented sub-line for readability.
+ */
+function slackFindingLine(f: Finding): string {
+  const where = [f.entity, f.field].filter(Boolean).join(' · ');
+  const tag = f.severity === 'fail' ? '*fail* ' : '';
+  const head = `${tag}${where ? `${where} — ` : ''}${f.message}`;
+  if (f.expected != null || f.actual != null) {
+    return `  • ${head}\n     expected \`${f.expected ?? '∅'}\` · stored \`${f.actual ?? '∅'}\``;
+  }
+  return `  • ${head}`;
+}
+
 /** Slack message body. Caps findings per domain to keep the message readable. */
 export function formatSlackReport(summary: AuditSummary, maxFindingsPerDomain = 8): string {
-  const status = summary.hasHardFailures
-    ? 'FAILURES'
-    : summary.warnings > 0
-      ? 'warnings'
-      : 'all clear';
-  const header = `*KY Vote — content accuracy audit* (${status})`;
-  const totals =
-    `checked \`${summary.checked}\` · ok \`${summary.passed}\` · ` +
-    `fail \`${summary.failures}\` · warn \`${summary.warnings}\` · seed \`${summary.seed}\` · ${(summary.durationMs / 1000).toFixed(0)}s`;
-
-  const sections: string[] = [header, totals, '', summary.results.map(domainStatusLine).join('\n')];
+  const sections: string[] = [
+    '*KY Vote — content accuracy audit*',
+    slackTotalsLine(summary),
+    '',
+    summary.results.map(domainStatusLine).join('\n'),
+  ];
 
   const flagged = summary.results.filter((r) => r.findings.some((f) => f.severity !== 'info'));
   for (const r of flagged) {
-    const notable = r.findings.filter((f) => f.severity !== 'info');
+    // Surface failures before warnings within each domain.
+    const notable = r.findings
+      .filter((f) => f.severity !== 'info')
+      .sort((a, b) =>
+        a.severity === b.severity ? 0 : a.severity === 'fail' ? -1 : 1,
+      );
     if (notable.length === 0) continue;
-    const shown = notable.slice(0, maxFindingsPerDomain).map((f) => `  • ${findingLine(f)}`);
-    const more = notable.length > maxFindingsPerDomain ? `\n  _…and ${notable.length - maxFindingsPerDomain} more_` : '';
-    sections.push(`\n*${r.domain}*\n${shown.join('\n')}${more}`);
+    const shown = notable.slice(0, maxFindingsPerDomain).map(slackFindingLine);
+    const more =
+      notable.length > maxFindingsPerDomain
+        ? `\n  _…and ${notable.length - maxFindingsPerDomain} more_`
+        : '';
+    sections.push(`\n*${r.domain}* (${notableCountLabel(notable)})\n${shown.join('\n')}${more}`);
   }
 
   const body = sections.join('\n');
