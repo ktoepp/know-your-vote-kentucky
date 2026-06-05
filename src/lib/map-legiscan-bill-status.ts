@@ -65,6 +65,17 @@ export function mapLegiScanBillStatus(statusCode: number, lastAction: string): s
   if (action.includes('third reading, passed') || (action.includes('passed') && action.includes('third reading'))) {
     return 'Passed Chamber';
   }
+
+  // Bills with a "chamber-passed" status code (Engrossed=2, Enrolled=3, Passed=4) must not be
+  // regressed to "In Committee" by a post-session interim-referral action text such as
+  // "To: Interim Joint Committee on Health and Welfare". The status code is the authoritative
+  // milestone record; the latest action just reflects the most-recent procedural step.
+  const CHAMBER_PASSED_CODES = new Set([2, 3, 4]);
+  if (CHAMBER_PASSED_CODES.has(statusCode) &&
+      (action.includes('committee') || action.includes('referred to'))) {
+    return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';
+  }
+
   if (action.includes('committee') || action.includes('referred to')) return 'In Committee';
   if (action.includes('introduced') || action.includes('filed')) return 'Introduced';
 

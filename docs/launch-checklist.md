@@ -7,12 +7,40 @@ public launch. Replaces the three previously-scattered lists in
 
 Items A–F are the actual launch gates. G is post-launch hygiene.
 
+> **Code-side pre-flight (verified 2026-06-04).** Everything that can be
+> confirmed in the repo/config has been:
+> - **F is done** — `SENTRY_ENABLE_EXAMPLE_PAGE` is absent from both the Vercel
+>   project env (`vercel env ls`) and `.env.local`.
+> - **B tags are emitted** — `route:cron/notify` (`src/app/api/cron/notify/route.ts`)
+>   and `route:webhooks/resend` (`src/app/api/webhooks/resend/route.ts`) fire on
+>   both partial-failure `captureMessage` and thrown `captureException`. Only the
+>   two Sentry **alert rules** remain (UI-only).
+> - **E (code-checkable parts)** — both templates render an HTML *and* a
+>   plain-text part; every link uses canonical `https://kyvky.com` (0 legacy
+>   `knowyourvoteky.com` refs); digest footer carries preferences/unsubscribe/
+>   privacy/terms; unsubscribe route serves GET (HTML) + POST (RFC 8058
+>   one-click) and the send sets `List-Unsubscribe[-Post]`; sender defaults to
+>   `alerts@kyvky.com`, Reply-To `katie@kyvky.com`; welcome is single-column with
+>   browse/profile/find-my-legislators links.
+> - **A (code side)** — webhook handler verifies Svix signatures; the `www`
+>   requirement is a Resend-dashboard setting, not code.
+>
+> **Still genuinely manual (no repo/CLI access):** A (Resend SPF/DKIM/DMARC +
+> webhook URL config), B (create the 2 Sentry alert rules), C (inbox routing),
+> D (legal review), and the E visual pass + real test sends across the 4 clients.
+
 ---
 
 ## A. Resend (email deliverability)
 
-- [ ] **Resend → Domains → `kyvky.com`** — SPF / DKIM / DMARC all green.
+- [x] **Resend → Domains → `kyvky.com`** — SPF / DKIM / DMARC all green.
       Cold-start sends to Gmail land in Junk otherwise.
+      **2026-06-04:** Resend reported `verified`, but the **DKIM TXT at
+      `resend._domainkey.kyvky.com` was missing from live DNS** (stale
+      verification) — the actual cause of poor delivery. Re-added in Hostinger
+      DNS (zone host = `*.dns-parking.com`); confirmed propagating (Google
+      `8.8.8.8` resolves the `p=…` key; Cloudflare/local lag is normal). SPF
+      MX/TXT on `send` were already correct.
 - [ ] Sender = `alerts@kyvky.com`; Reply-To = `katie@kyvky.com`
       (transactional-only From; real-inbox Reply-To)
 - [ ] Webhook = **`https://www.kyvky.com/api/webhooks/resend`**
@@ -29,9 +57,10 @@ to be configured in Sentry's Alerts UI.
 
 ## C. Inbox routing
 
-- [ ] Confirm `katie@kyvky.com` lands somewhere a human reads.
+- [x] Confirm `katie@kyvky.com` lands somewhere a human reads.
       Used in `/privacy`, `/terms`, every email Reply-To, and the
       vulnerability-report inbox.
+      **Done 2026-06-04 — test sent & received (Hostinger mailbox, MX = `mx1/mx2.hostinger.com`).**
 
 ## D. Legal review
 
@@ -49,6 +78,11 @@ Test sends:
 npm run preview:digest -- --email you@example.com --send
 npm run preview:welcome
 ```
+
+**2026-06-04 — test sends fired** to `katietoepp@gmail.com` (welcome Resend id
+`ff570d6d…`; digest `emailsSent:1` via synthetic HB1 `committee_action`). Now do
+the visual + deliverability pass below in each client (confirm inbox not spam,
+and `dkim=pass` in the raw headers now that the DKIM record is republished).
 
 In each client below, verify the checklist for both bill digest and welcome.
 
@@ -76,9 +110,10 @@ In each client below, verify the checklist for both bill digest and welcome.
 
 ## F. Vercel env cleanup
 
-- [ ] Remove `SENTRY_ENABLE_EXAMPLE_PAGE` from the Vercel project (and
+- [x] Remove `SENTRY_ENABLE_EXAMPLE_PAGE` from the Vercel project (and
       `.env.local` if set). The `/sentry-example-page` route is already
       deleted; the var is harmless but stale.
+      **Done 2026-06-04 — verified absent in `vercel env ls` and `.env.local` (nothing to remove).**
 
 ---
 
