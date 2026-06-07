@@ -321,41 +321,96 @@ Direct triage of the `Voting Rights` tag (surfaced while scanning the topic corp
 
 ---
 
-## 2026-06-07 — Accuracy-audit triage pass #3 (status mapper + bill data + glossary)
+## 2026-06-04 — Accuracy-audit triage pass #3 (add `Transportation` topic; Infrastructure/Labor/Local-Gov precision)
 
-Resolved all hard failures and addressed glossary/topic advisory warnings from the seed-1189243192 audit report (`fail=2, warn=8`). Final state after this pass: **fail=0, warn=6** (all remaining warns are LLM advisory; no deterministic failures).
+**Third pass on the advisory `llm-review.ts` topic warnings** (the two runs in the launch terminal: seeds `1714552507` + `474419580`, 9 distinct `topics` warnings). Each flagged bill was traced to the exact keyword that fired (read-only DB diagnostic, since `bill_number` repeats across sessions). The warnings fell into three buckets and resolved as follows.
 
-### Status mapper — two structural fixes (`src/lib/map-legiscan-bill-status.ts`)
+### ADD a 21st topic: `Transportation` (reverses the default-decline posture *for this cluster only*)
+- **Why this clears the bar that "Natural Resources" (§ 2026-06-03 pass #2) failed.** Five of the nine warnings (`HB354` railroads, `SB14` school-bus lighting, `HB209` special license plates, `SB142` motor-vehicle recycling, plus the recurring "Infrastructure is a catch-all" theme) point at one coherent, high-volume cluster. The classifier *already had* `road / highway / bridge / transit / transportation` — they were just bucketed under `Infrastructure`, so transport bills either got the vague tag or matched it only incidentally ("private **road**" in a railroad bill; "**Transportation** Cabinet" agency name in a vehicle bill). Unlike Natural Resources, this is not a name-vs-subject misread and there *is* a clean unmet cluster.
+- **Moved** transport keywords out of `Infrastructure` into a new `Transportation` topic: `road, highway, transit, transportation, motor vehicle, license plate, railroad, railway, vehicle registration, driver's license, school bus, toll road, public transit, mass transit`. `Infrastructure` now means water/sewer/wastewater/stormwater/sewage/broadband/internet/dams only.
+- **Bare `bridge` deliberately NOT a classifier keyword** — it matched financial "bridge loans" (`HB284`). Genuine bridge bills are still surfaced to topic-followers via the LegiScan `/bridge/` **subject** mapping (structured subjects are reliable; free-text `bridge` is not). Same split rationale as the `registration`/`primary` pass.
+- **Blast radius (no migration needed — `topic_filters` is a free `TEXT[]`, no DB CHECK):** `KY_TOPICS` + keywords (`ky-topic-classifier.ts`); `TOPIC_TO_SUBJECT_PATTERNS` gained a `Transportation` key and lost the transport patterns from `Infrastructure` (`ky-topic-legiscan-mapping.ts` — `Record<KYTopicTag>` so TS enforces completeness); new `topic_transportation` glossary entry + trimmed `topic_infrastructure` copy (`tooltipContent.ts`). The notification-prefs grid derives from `KY_TOPICS` automatically.
 
-1. **KY committee-referral pattern.** The mapper only recognised "committee" or "referred to" in the action text. KY LRC action strings use `to [Committee Name] (H)` / `to [Committee Name] (S)` — e.g. `"to State & Local Government (S)"`, `"to Judiciary (H)"` — where the committee name never contains the word "committee". Added `/\([hs]\)\s*$/` regex check as a third branch of `isCommitteeReferral`. This fixes bills like SB17 that were stored as `Introduced` when their last_action was a KY-style referral.
+### Precision fixes (no taxonomy change)
+- **`Infrastructure`: removed bare `construction`.** It matched finance/legal boilerplate ("construction loans", "construction contracts", "statutory construction") more than public works; genuine state construction still hits road/highway/water/sewer. Fixes `HB284` (high-cost home loans) → now correctly **untagged** (no `Finance`/`Banking` topic exists, so no tag is the honest outcome).
+- **`Labor`: `worker` → `workers` (plural).** Singular matched incidental "health care **worker**"/"social worker" in non-labor bills (`SB9` born-alive-infant bill was tagged `Labor`). Plural is the genuine signal ("essential workers", "workers' rights/compensation"); real labor bills also hit employment/wage/labor/union. **Bonus:** because `\bworker\b` never matched the plural, this also *recovered* worker-focused resolutions the singular keyword had been silently missing (e.g. `SR45`, `SR152`) — same plural-gap mechanic as the `elections`/`voters` fix.
+- **`Local Government`: added `area development district` + `area development districts`.** Fixes `HB431` (Joint Funding Administration → ADDs) → now `["Local Government","Budget"]`. The plural form was required separately because the text says "Area Development District**s**".
 
-2. **Don't downgrade past Engrossed.** When a bill passes one chamber (LegiScan status code 2–8), the next action is often a referral to the second chamber's committee. The old mapper's action-text branch would override the status code, regressing `Engrossed` → `In Committee` on every subsequent sync. Added `passedAChamber = [2,3,4,5,7,8].includes(statusCode)` guard: committee-action text is only trusted when the bill hasn't yet passed a chamber. Fixes SB100 (LegiScan status 2 / `Engrossed` stored as `In Committee`).
+### Deliberately LEFT (core-signal limits, documented not fixed)
+- **`SB146`** (coal-miner state-hiring preference) keeps `Energy` via `coal` — `coal` is a core Energy signal; the bill is a job-qualifier mention. Primary topic `Labor` is correct; the extra tag is the same accepted class as "agriculture matches incidental 'Commissioner of Agriculture'."
+- **`SCR64`** (water/wastewater task force) keeps `Energy` via the agency name "**Energy** and Environment Cabinet." `energy` is a core signal with no clean word-boundary exclusion; the bill correctly keeps `Infrastructure` (water), which the LLM accepted. Removing bare `coal`/`energy` would gut the Energy topic — not worth it for two incidental tags.
+
+### Verification
+- `npx tsc --noEmit` clean (confirms every `Record<KYTopicTag>` map got the new key). `ReadLints` clean.
+- **Backfill:** `npm run topics:reclassify` — **22,547 scanned, 2,227 changed** (Transportation un-conflation + precision), then a follow-up **15 changed** for the ADDs plural. Direct read-back confirmed the 9 flagged bills: `HB354 → [Transportation]`, `SB14 → [Education,Transportation]`, `HB209 → [Veterans Affairs,Transportation]`, `SB142 → [Transportation,Environment]`, `SB9 → [Healthcare]`, `HB284 → null`, `HB431 → [Local Government,Budget]` (7 resolved); `SB146`/`SCR64` as noted above.
+- **Re-running the audit on the same two seeds samples *different* bills now** — changing `topics` on ~2.2k rows shifts the `topics is not null` population that `sampleTable` draws from, so exact reproduction isn't possible. `SB9` still surfaces but its complaint flipped from "`Labor` is clearly irrelevant" (fixed) to wanting `Abortion`/`Child Protection` topics that don't exist (non-actionable, Natural-Resources class).
+- **Next-pass candidates surfaced by the rotated sample (NOT fixed here — out of scope for the referenced warnings):** `HB162` `Voting Rights` on a corporate-income-tax bill; `HB411` `Environment` on firearms disposal; `HB104` `Education` on art-therapist licensure; `HB167` `Voting Rights`/`Public Safety` on a pension bill. The persistent `Fiscal Note` glossary flag (KRS 6.350 makes it not solely request-driven) is a *glossary* item — pass #2 verified other entries but not this one; worth a dedicated glossary check.
+- **Trade-off / limits:** keyword precision, not perfection (unchanged stance). `Transportation` is the first taxonomy expansion; future single-bill "missing topic X" flags still default to **decline** unless they show a comparable coherent cluster.
+
+---
+
+## 2026-06-04 — Accuracy-audit: reproducible sampling + keyword-precision floor + Fiscal Note glossary
+
+**Follow-up to pass #3 the same day.** Two problems: (1) re-running the audit with the same `--seed` returned *different* bills after the pass-#3 backfill, making fixes hard to confirm; (2) the rotated re-run surfaced a fresh batch of `topics` warnings to triage.
+
+### Sampling is now stable across data changes (`sampling.ts` rewrite)
+- **Root cause:** the old `sampleTable` chose `offset = rng(seed) * (total - poolSize)` over the **filtered row COUNT**, then read a contiguous `range()` window. Any change to the filtered population — a `topics` backfill, a sync adding/removing rows, even a different `topics is not null` count — shifts `offset` and returns a completely different window for the *same* seed. That's why pass #3's reclassify (which changed ~2.2k `topics` values, moving the `topics is not null` count) made the same two seeds sample different bills.
+- **Fix — bottom-k hash sampling.** Select rows by a deterministic `hashKey(seed, stableKey)` (FNV-1a + avalanche over the row's `id`) and keep the lowest-`limit` hashes. A row's membership depends only on its own key + the seed, **not** on how many other rows exist, so the same seed re-selects the same rows even after the table mutates — a previously-sampled row only drops out if *it* stops matching the filter, and the next-lowest hash takes its place. Mechanics: page the filtered table for just the key column (cheap, indexed), hash + bottom-k in process, then one `IN (...)` fetch for the full rows. Costs more requests than the old one-COUNT-one-window approach (a paged id scan), negligible for a weekly job and dwarfed by the LegiScan/Open States fetches.
+- **Verified:** same seed → identical sample (`identical(A,B)=true`); different seed → different sample (rotation preserved, `differs(A,C)=true`); and the n=8 sample is exactly the lowest-hash subset of the n=16 sample (`A ⊆ sample(n=16)=true`), proving selection is population-size-independent. `npx tsc` + lint clean.
+- **One-time effect:** because the seed→rows *mapping* changed with the algorithm, old seeds no longer reproduce their pre-rewrite bills. Reproducibility holds **going forward**; the glossary sampler (in-memory `seededShuffle` over `governmentTooltips`) was already stable and is unchanged.
+
+### Topic warnings from the rotated re-run — the keyword-precision FLOOR (no classifier change)
+Traced every newly-flagged bill to its keyword. Unlike pass #3's clean false positives (noise keywords like `construction`), these are **core-signal incidental matches** that keyword precision cannot fix without gutting the topic:
+- **`election` / `elections` / `ballot` in the legal/financial sense** (a formal *choice*, not a vote): `HB162/2012` "files an **election** for a consolidated income tax return" → Voting Rights; `HB167/2017` retirement-system board "elections"/proxy "ballot" → Voting Rights; plus retirement-benefit and employment "elections" across the corpus.
+- **Quantified before deciding:** **188 of 1,102** Voting-Rights-tagged bills (17%) are tagged *only* via singular `election` with no strong voting keyword. But a sample shows they split ~50/50 between **genuine** (campaign finance, "election of Justices of the Supreme Court", Registry of Election Finance confirmations) and **false** (retirement/employment/tax "election"). Removing singular `election` would drop roughly as many real voting bills as false ones — **not a net win**, which is exactly why pass #2 kept it. **Decision: leave `election`.**
+- **Agency-name incidentals:** `HB411/2018` "destruction of firearms" → Environment via "**wildlife**" (Fish & Wildlife is the agency holding confiscated guns); same class as pass #3's "Energy and Environment Cabinet." `HB104/2013` art-therapy licensure → Education via "education" (continuing-ed boilerplate). Core signals, left as-is.
+- **Conclusion:** the cleanly keyword-fixable false positives are now exhausted; what remains is the **semantic long tail** (distinguishing a vote from a legal "election", or a subject from an administering agency's name), which the scope boundary (§ 2026-06-03) delegates to the advisory LLM lane. This matches pass #2's finding of ~0 warnings at scale once noise keywords were removed. **Declined** adding `criminal history` → Criminal Justice for the `HB267` "ban-the-box-in-admissions" miss: it would mis-tag employment/childcare background-check bills (e.g. `HB267/2020`), a net negative.
+
+### Fiscal Note glossary — corrected, and the LLM's flag was itself partly wrong
+- The recurring LLM warning claimed "**KRS 6.350** requires a fiscal note on any bill with fiscal impact; it is not solely request-driven." **Cross-check against primary sources: KRS 6.350 is about actuarial analysis for public retirement systems, not fiscal notes** — the model cited the wrong statute (the same class of LLM error that produced the bad veto/emergency thresholds in § 2026-06-03). Kentucky's fiscal-note process is governed by **Legislative Rule 52** + KRS 6.950–6.970/13A, and Rule 52 says a "sponsor, committee or its chair, or a chamber **may request** a fiscal analysis" — so the existing "on request" framing was **accurate**, not the error the LLM asserted. (Correcting the note in pass #3's entry above, which repeated the model's wrong `KRS 6.350` citation.)
+- **Real, smaller improvement made:** broadened "cost (or save) **the state**" → "**state or local government**" (KRS 6.965 covers local-mandate notes) and added that a fiscal statement "examining any provision with fiscal effects is typically attached to the measure before the chamber takes final action" (Rule 52), so readers don't think it's purely discretionary. Kept the accurate request-based language and the LRC nonpartisan-staff attribution; did **not** adopt the incorrect statutory-mandate framing.
+- **Other persistent glossary flags left as-is** (verified borderline-phrasing, not errors, consistent with pass #2): `Passed a Chamber` ("committee review" in the second chamber), `Referred to Committee` ("will hold hearings"), `Engrossed` (clean-copy vs transmittal), `Kentucky Senate` (staggered 4-year terms). These read as the model preferring different emphasis, not factual corrections.
+
+---
+
+## 2026-06-04 — Status mapper: preserve furthest-progress milestone
+
+**Closes the TASKS.md backlog item "Status mapper doesn't preserve furthest progress."** ~4% of sampled bills were affected (first surfaced on HB21 in the bills accuracy checker).
+
+- **Root cause:** `mapLegiScanBillStatus` keyed off latest action text before checking the LegiScan status code. For post-session bills referred to interim committees the action reads "To: Interim Joint Committee on…", which contains the word "committee" and triggered the `'In Committee'` branch — even when the LegiScan status code was `2` (Engrossed), meaning the bill had already passed at least one chamber.
+- **Fix:** Added a `CHAMBER_PASSED_CODES = {2, 3, 4}` guard in `src/lib/map-legiscan-bill-status.ts`. When the status code is Engrossed (2), Enrolled (3), or Passed (4), an action text containing "committee" or "referred to" no longer overrides it; the code's milestone label is returned instead. Terminal-state checks (veto, signing, chaptered, failure) still take full precedence. **Example:** HB21, statusCode=2 + action="To: Interim Joint Committee on Health and Welfare" → now correctly returns `Engrossed` instead of `In Committee`.
+- **Effect on audit:** The `expectedStatus` computed in `checkers/bills.ts` uses the same mapper, so the false-positive `fail` findings for post-session bills disappear immediately. Rows still stored with the incorrect status in the DB will be corrected on the next scheduled sync run (bills workflow runs every 6 hours).
+- **Effect on sync:** Future syncs write the correct milestone status; no separate backfill script needed.
+- **No effect on terminal states:** Codes 5 (Vetoed), 6 (Failed), 7 (Veto Override), 8 (Chaptered) are all already caught by explicit action-text guards earlier in the function (veto/signed/failed/chaptered checks) and are unaffected by this change.
+
+---
+
+## 2026-06-07 — Accuracy-audit triage pass #4 (status mapper + bill data + glossary)
+
+Resolved all hard failures and addressed glossary/topic advisory warnings from the seed-1189243192 audit report (`fail=2, warn=8`). Final state after this pass: **fail=0, warn=6** (all remaining warns are LLM advisory; no deterministic failures). Builds on the 2026-06-04 status-mapper guard (`CHAMBER_PASSED_CODES`) and Transportation/Labor precision from main.
+
+### Status mapper — KY `(H)`/`(S)` committee-referral pattern (`src/lib/map-legiscan-bill-status.ts`)
+
+The 2026-06-04 guard preserved Engrossed/Enrolled/Passed when action text contains "committee", but KY LRC action strings like `"to State & Local Government (S)"` or `"to Judiciary (H)"` never contain that word. Added `/\([hs]\)\s*$/` to `isCommitteeReferral` and wired it into the existing `CHAMBER_PASSED_CODES` check. Fixes SB17 (`Introduced` when last_action was a KY-style referral) and SB100 (`Engrossed` stored as `In Committee`).
 
 ### `sync:ky:bills:status` pipeline — two fixes (`src/lib/ky-sync-pipeline.ts`)
 
-- **Null-title guard.** `getMasterListRaw` returns only `bill_id / number / change_hash` (no `title`, `status`, `last_action`). The status-sync path that used `raw.title` was hitting the DB's NOT-NULL constraint and silently writing 0 rows. Root cause: `--skip-bill-sponsor-details` was skipping the entire `getBillDetail` call, leaving all row fields null. **Fix:** always call `getBillDetail` for changed bills; `skipBillSponsorDetails` now only controls whether sponsor data is *included in the upserted row*, not whether the detail fetch happens.
+- **`getMasterListRaw` carries no title/status.** The status-sync path used `raw.title` and hit the DB NOT-NULL constraint, silently writing 0 rows. Root cause: `--skip-bill-sponsor-details` skipped the entire `getBillDetail` call. **Fix:** always fetch detail; `skipBillSponsorDetails` only controls whether sponsor data is written.
+- **Last-action alignment.** Sync now derives `last_action` from `history[]` the same way the accuracy checker does.
 
-- **Last-action source alignment.** The sync now derives `last_action` from the detail's `history[]` array via the same `latestAction` reconstruction the accuracy checker uses — removing the divergence that caused the checker and sync to disagree on which action string to map.
-
-- **Backfill:** `npm run sync:ky:bills:status` — **22,547 scanned, 207 changed, 207 upserted** (previously 0 due to the null-title bug).
+- **Backfill:** `npm run sync:ky:bills:status` — **207/207 upserted** (was 0/207).
 
 ### Data correction — 8,288 stale `Introduced` rows (`scripts/remap-committee-referral-statuses.ts`)
 
-Bills synced before the mapper fix had `status = 'Introduced'` because the KY `(H)`/`(S)` action pattern was unrecognised; they weren't in the 207-bill changed set and wouldn't be re-synced automatically. One-time script (`scripts/remap-committee-referral-statuses.ts`) queried `status = 'Introduced'` AND `last_action ILIKE '%(h)'` OR `ILIKE '%(s)'` (paginated), verified all 8,288 matches were genuine committee referrals, and updated them to `In Committee` in batches of 200. Post-correction audit: **bills 40/40 ok, 0 fail**.
+One-time script for bills stored before the `(H)`/`(S)` mapper fix. Post-correction audit: **bills 40/40 ok, 0 fail**.
 
 ### Glossary corrections (`src/lib/tooltipContent.ts`)
 
-- **`fiscal_note`:** Corrected wrong attribution. Kentucky fiscal notes are prepared by the **Governor's Office for Policy and Management (GOPM)** in the executive branch per KRS 6.350, not by the LRC. LRC provides bill drafting and research; GOPM provides fiscal impact analysis.
-- **`lrc`:** "drafts bills" → "provides bill drafting services" (more accurate; the Office of Legal Services within LRC is the specific division, but the LRC as an organisation correctly owns the function).
-- **`tabled`:** Softened "effectively ends the bill's progress" → "almost always signals the end … though it stops short of a direct up-or-down vote." Tabling in KY is procedurally reversible; characterising it as definitively terminal was an overstatement.
-- **`majority_leader`:** Removed "Works with the Speaker or Senate President to set the agenda" — this overstated the Senate Majority Leader's agenda-setting role (the Senate President holds dominant scheduling authority in KY). Replaced with "Coordinates party members during debate and works to advance the majority's legislative priorities on the floor."
-- **`passed`, `timeline_passed`:** Changed "will go through its own committee review and floor vote" → "may be referred to a committee before being scheduled for a floor vote" (committee referral and a floor vote aren't guaranteed in the second chamber).
-- **`referred` (Referred to Committee), `committee_hearing`:** Softened "hold hearings" and "hears testimony" to acknowledge that KY committees frequently vote on bills without scheduling formal public testimony sessions.
+- **`fiscal_note`:** Branch initially adopted GOPM/KRS 6.350 per an LLM audit flag; **retained main's § 2026-06-04 definition** (LRC staff + Legislative Rule 52) after primary-source cross-check showed KRS 6.350 is retirement actuarial, not fiscal notes.
+- **`lrc`, `tabled`, `majority_leader`, `passed`, `timeline_passed`, `referred`, `committee_hearing`:** Wording tightened per audit flags (see branch diff).
 
 ### Topic classifier additions (`src/lib/ky-topic-classifier.ts`)
 
-- **`employment` removed from Labor:** matched "employment of pharmacists", "employment of teachers", "employer-sponsored insurance" — too generic. Replaced with `employer`, `labor law`, `employment law` (unambiguous Labor signals). Real Labor bills still fire on `worker`, `wage`, `union`, `labor`, `workforce`, `unemployment`, `minimum wage`, `workplace`.
-- **`law enforcement` added to Public Safety:** covers game-warden and boating-officer bills that don't mention police/sheriff explicitly.
-- **`diabetes` added to Healthcare:** student health and chronic-disease screening bills may not use the word "health" in their short title.
+- **Labor:** merged main's `worker` → `workers` plural fix with branch's removal of bare `employment` (replaced with `employer`, `labor law`, `employment law`).
+- **`law enforcement` added to Public Safety; `diabetes` added to Healthcare.**
 - **Backfill:** `npm run topics:reclassify` — **22,547 scanned, 344 changed (14 tags removed, 280 added).**
-

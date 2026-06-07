@@ -87,11 +87,17 @@ export function mapLegiScanBillStatus(statusCode: number, lastAction: string): s
     action.includes('referred to') ||
     /\([hs]\)\s*$/.test(action);
 
-  // Bills at or past first-chamber passage (status codes 2–5, 7, 8) should not be downgraded
-  // to `In Committee` just because the latest action is a referral in the receiving chamber.
-  const passedAChamber = [2, 3, 4, 5, 7, 8].includes(statusCode);
+  // Bills with a "chamber-passed" status code (Engrossed=2, Enrolled=3, Passed=4) must not be
+  // regressed to "In Committee" by a post-session interim-referral action text such as
+  // "To: Interim Joint Committee on Health and Welfare" or a second-chamber "(H)"/"(S)" referral.
+  // The status code is the authoritative milestone record; the latest action reflects the
+  // most-recent procedural step.
+  const CHAMBER_PASSED_CODES = new Set([2, 3, 4]);
+  if (CHAMBER_PASSED_CODES.has(statusCode) && isCommitteeReferral) {
+    return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';
+  }
 
-  if (isCommitteeReferral && !passedAChamber) return 'In Committee';
+  if (isCommitteeReferral) return 'In Committee';
   if (action.includes('introduced') || action.includes('filed')) return 'Introduced';
 
   return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';
