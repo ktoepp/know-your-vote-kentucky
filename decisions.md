@@ -382,3 +382,35 @@ Traced every newly-flagged bill to its keyword. Unlike pass #3's clean false pos
 - **Effect on audit:** The `expectedStatus` computed in `checkers/bills.ts` uses the same mapper, so the false-positive `fail` findings for post-session bills disappear immediately. Rows still stored with the incorrect status in the DB will be corrected on the next scheduled sync run (bills workflow runs every 6 hours).
 - **Effect on sync:** Future syncs write the correct milestone status; no separate backfill script needed.
 - **No effect on terminal states:** Codes 5 (Vetoed), 6 (Failed), 7 (Veto Override), 8 (Chaptered) are all already caught by explicit action-text guards earlier in the function (veto/signed/failed/chaptered checks) and are unaffected by this change.
+
+---
+
+## 2026-06-07 — Accuracy-audit triage pass #4 (status mapper + bill data + glossary)
+
+Resolved all hard failures and addressed glossary/topic advisory warnings from the seed-1189243192 audit report (`fail=2, warn=8`). Final state after this pass: **fail=0, warn=6** (all remaining warns are LLM advisory; no deterministic failures). Builds on the 2026-06-04 status-mapper guard (`CHAMBER_PASSED_CODES`) and Transportation/Labor precision from main.
+
+### Status mapper — KY `(H)`/`(S)` committee-referral pattern (`src/lib/map-legiscan-bill-status.ts`)
+
+The 2026-06-04 guard preserved Engrossed/Enrolled/Passed when action text contains "committee", but KY LRC action strings like `"to State & Local Government (S)"` or `"to Judiciary (H)"` never contain that word. Added `/\([hs]\)\s*$/` to `isCommitteeReferral` and wired it into the existing `CHAMBER_PASSED_CODES` check. Fixes SB17 (`Introduced` when last_action was a KY-style referral) and SB100 (`Engrossed` stored as `In Committee`).
+
+### `sync:ky:bills:status` pipeline — two fixes (`src/lib/ky-sync-pipeline.ts`)
+
+- **`getMasterListRaw` carries no title/status.** The status-sync path used `raw.title` and hit the DB NOT-NULL constraint, silently writing 0 rows. Root cause: `--skip-bill-sponsor-details` skipped the entire `getBillDetail` call. **Fix:** always fetch detail; `skipBillSponsorDetails` only controls whether sponsor data is written.
+- **Last-action alignment.** Sync now derives `last_action` from `history[]` the same way the accuracy checker does.
+
+- **Backfill:** `npm run sync:ky:bills:status` — **207/207 upserted** (was 0/207).
+
+### Data correction — 8,288 stale `Introduced` rows (`scripts/remap-committee-referral-statuses.ts`)
+
+One-time script for bills stored before the `(H)`/`(S)` mapper fix. Post-correction audit: **bills 40/40 ok, 0 fail**.
+
+### Glossary corrections (`src/lib/tooltipContent.ts`)
+
+- **`fiscal_note`:** Branch initially adopted GOPM/KRS 6.350 per an LLM audit flag; **retained main's § 2026-06-04 definition** (LRC staff + Legislative Rule 52) after primary-source cross-check showed KRS 6.350 is retirement actuarial, not fiscal notes.
+- **`lrc`, `tabled`, `majority_leader`, `passed`, `timeline_passed`, `referred`, `committee_hearing`:** Wording tightened per audit flags (see branch diff).
+
+### Topic classifier additions (`src/lib/ky-topic-classifier.ts`)
+
+- **Labor:** merged main's `worker` → `workers` plural fix with branch's removal of bare `employment` (replaced with `employer`, `labor law`, `employment law`).
+- **`law enforcement` added to Public Safety; `diabetes` added to Healthcare.**
+- **Backfill:** `npm run topics:reclassify` — **22,547 scanned, 344 changed (14 tags removed, 280 added).**

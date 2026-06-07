@@ -43,6 +43,21 @@ export function legiscanHistoryIndicatesVetoOverride(
  * Map LegiScan status code + last_action into `ky_bills.status` display text.
  * Kentucky: filing with the Secretary of State follows both governor signing and veto override,
  * so it must not be stored as `Signed` unless the action explicitly says the governor signed.
+ *
+ * Two KY-specific patterns are handled here:
+ *
+ * 1. KY committee-referral format — LRC action strings like "to State & Local Government (S)"
+ *    or "to Appropriations & Revenue (H)" don't contain the word "committee" or "referred to",
+ *    but they always end with a chamber suffix "(H)" or "(S)". We detect these as committee
+ *    referrals so they map to `In Committee` rather than falling through to the status code.
+ *
+ * 2. Don't downgrade past Engrossed/Enrolled/Passed — when a bill passes one chamber
+ *    (LegiScan status code 2–5, 7, 8) and is then referred to the second chamber's committee,
+ *    the latest action contains "committee" or a "(H)"/"(S)" suffix. Allowing that to override
+ *    the status code would silently regress `Engrossed` → `In Committee` every sync cycle.
+ *    Instead, once the status code indicates passage of at least one chamber, we let the code
+ *    win over the action text. (Documented in TASKS.md § "Status mapper doesn't preserve
+ *    furthest progress".)
  */
 export function mapLegiScanBillStatus(statusCode: number, lastAction: string): string {
   const action = (lastAction || '').toLowerCase();
@@ -66,17 +81,23 @@ export function mapLegiScanBillStatus(statusCode: number, lastAction: string): s
     return 'Passed Chamber';
   }
 
+  // Detect committee referrals: explicit keywords OR KY-specific "(H)"/"(S)" chamber suffix.
+  const isCommitteeReferral =
+    action.includes('committee') ||
+    action.includes('referred to') ||
+    /\([hs]\)\s*$/.test(action);
+
   // Bills with a "chamber-passed" status code (Engrossed=2, Enrolled=3, Passed=4) must not be
   // regressed to "In Committee" by a post-session interim-referral action text such as
-  // "To: Interim Joint Committee on Health and Welfare". The status code is the authoritative
-  // milestone record; the latest action just reflects the most-recent procedural step.
+  // "To: Interim Joint Committee on Health and Welfare" or a second-chamber "(H)"/"(S)" referral.
+  // The status code is the authoritative milestone record; the latest action reflects the
+  // most-recent procedural step.
   const CHAMBER_PASSED_CODES = new Set([2, 3, 4]);
-  if (CHAMBER_PASSED_CODES.has(statusCode) &&
-      (action.includes('committee') || action.includes('referred to'))) {
+  if (CHAMBER_PASSED_CODES.has(statusCode) && isCommitteeReferral) {
     return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';
   }
 
-  if (action.includes('committee') || action.includes('referred to')) return 'In Committee';
+  if (isCommitteeReferral) return 'In Committee';
   if (action.includes('introduced') || action.includes('filed')) return 'Introduced';
 
   return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';

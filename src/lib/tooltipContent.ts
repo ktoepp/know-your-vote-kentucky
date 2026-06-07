@@ -122,7 +122,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   referred: {
     category: 'bill_status_and_stages',
     title: "Referred to Committee",
-    content: "The bill has been assigned to a smaller group of legislators who specialize in this policy area. The committee will review it, hold hearings, and decide whether to advance it."
+    content: "The bill has been assigned to a smaller group of legislators who specialize in this policy area. The committee will review it and decide whether to advance it — hearings with outside testimony may or may not be scheduled."
   },
 
   first_reading: {
@@ -182,7 +182,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   passed: {
     category: 'bill_status_and_stages',
     title: "Passed",
-    content: "The full House or Senate voted to approve the bill. It now moves to the other chamber, where it will go through its own committee review and floor vote."
+    content: "The full House or Senate voted to approve the bill. It now moves to the other chamber, where it may be referred to a committee before being scheduled for a floor vote."
   },
 
   passed_chamber: {
@@ -206,19 +206,19 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   enacted: {
     category: 'bill_status_and_stages',
     title: "Enacted / Became Law",
-    content: "The Governor signed the bill, or it became law without the Governor's signature. It is now a Kentucky state law."
+    content: "The Governor signed the bill, or it became law without the Governor's signature. Most enacted laws don't take effect immediately — they become effective 90 days after the General Assembly adjourns, unless the bill included an emergency clause or specified a different date (Ky. Constitution § 55)."
   },
 
   signed_by_governor: {
     category: 'bill_status_and_stages',
     title: "Signed by Governor",
-    content: "The Governor has approved and signed the bill. It still must be enrolled, delivered to the Secretary of State, and chaptered in the Kentucky Revised Statutes before it is fully on the books as state law."
+    content: "The Governor has approved and signed the bill. It will be delivered to the Secretary of State and chaptered in the Kentucky Revised Statutes. Most laws take effect 90 days after the session adjourns — unless the bill included an emergency clause or specified a different effective date."
   },
 
   chaptered: {
     category: 'bill_status_and_stages',
     title: "Chaptered",
-    content: "The bill has been assigned a chapter number in the Kentucky Revised Statutes (KRS) and filed with the Secretary of State. Chaptering is the final formal step — the measure is now part of Kentucky law."
+    content: "The bill has been assigned a chapter number in the Kentucky Revised Statutes (KRS) and filed with the Secretary of State. Chaptering is the final publishing step — but most laws don't take effect until 90 days after the General Assembly adjourns, unless an emergency clause or a specific effective date was included."
   },
 
   vetoed: {
@@ -236,7 +236,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   tabled: {
     category: 'bill_status_and_stages',
     title: "Tabled",
-    content: "The bill has been set aside indefinitely. This effectively ends the bill's progress for this session without a direct up-or-down vote."
+    content: "The bill has been set aside. In practice, tabling almost always signals the end of a bill's progress for the session — though it stops short of a direct up-or-down vote on the bill's merits."
   },
 
   /** Minor / routine docket line — LegiScan flags these with importance 0. */
@@ -300,7 +300,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   lrc: {
     category: 'legislative_bodies_and_people',
     title: "Legislative Research Commission (LRC)",
-    content: "The nonpartisan staff agency that supports the Kentucky General Assembly. The LRC drafts bills, does research, and runs the legislature's day-to-day operations. It's overseen by a committee of legislative leaders."
+    content: "The nonpartisan staff agency that supports the Kentucky General Assembly. The LRC provides bill drafting services, conducts policy research, and handles the legislature's day-to-day operations. It's overseen by a committee of legislative leaders."
   },
 
   sponsor: {
@@ -330,7 +330,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   majority_leader: {
     category: 'legislative_bodies_and_people',
     title: "Majority Leader",
-    content: "The floor leader for the party that holds the most seats in the chamber. Works with the Speaker or Senate President to set the agenda and guide their party's members."
+    content: "The floor leader for the party that holds the most seats in the chamber. Coordinates party members during debate and works to advance the majority's legislative priorities on the floor."
   },
 
   minority_leader: {
@@ -400,7 +400,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   hearing: {
     category: 'procedures_and_voting',
     title: "Committee Hearing",
-    content: "A formal meeting where a committee hears testimony from experts, advocates, affected residents, or state agencies about a bill before deciding whether to advance it."
+    content: "A formal committee meeting to consider a bill. The committee may hear testimony from experts, advocates, state agencies, or the public — though Kentucky committees can also vote on bills without scheduling formal testimony sessions."
   },
 
   floorVote: {
@@ -436,7 +436,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   veto_recess: {
     category: 'procedures_and_voting',
     title: "Veto Recess",
-    content: "A multi-day pause near the end of a Kentucky regular session. After both chambers pass the major bills, they recess so the Governor has the constitutional 10 days to sign, veto, or let bills become law. The General Assembly then reconvenes for its final days to consider veto overrides — each requiring a majority of the members elected to each chamber — before adjourning sine die."
+    content: "A multi-day pause near the end of a Kentucky regular session. After both chambers finish passing bills, they recess so the Governor has 10 days — Sundays not counted — to sign, veto, or let bills become law without a signature (Ky. Constitution § 88). The General Assembly then reconvenes for its final days to consider veto overrides — each requiring a majority of the members elected to each chamber — before adjourning sine die."
   },
 
   interim_period: {
@@ -488,7 +488,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   timeline_passed: {
     category: 'bill_status_and_stages',
     title: "Passed a Chamber",
-    content: "The bill cleared one chamber and has been sent to the other. It now has to go through committee review and a floor vote in that second chamber."
+    content: "The bill cleared one chamber and has been sent to the other. It may be referred to a committee before a floor vote in that second chamber."
   },
 
   timeline_signed: {
