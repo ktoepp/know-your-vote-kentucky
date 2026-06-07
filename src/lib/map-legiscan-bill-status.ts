@@ -43,6 +43,21 @@ export function legiscanHistoryIndicatesVetoOverride(
  * Map LegiScan status code + last_action into `ky_bills.status` display text.
  * Kentucky: filing with the Secretary of State follows both governor signing and veto override,
  * so it must not be stored as `Signed` unless the action explicitly says the governor signed.
+ *
+ * Two KY-specific patterns are handled here:
+ *
+ * 1. KY committee-referral format — LRC action strings like "to State & Local Government (S)"
+ *    or "to Appropriations & Revenue (H)" don't contain the word "committee" or "referred to",
+ *    but they always end with a chamber suffix "(H)" or "(S)". We detect these as committee
+ *    referrals so they map to `In Committee` rather than falling through to the status code.
+ *
+ * 2. Don't downgrade past Engrossed/Enrolled/Passed — when a bill passes one chamber
+ *    (LegiScan status code 2–5, 7, 8) and is then referred to the second chamber's committee,
+ *    the latest action contains "committee" or a "(H)"/"(S)" suffix. Allowing that to override
+ *    the status code would silently regress `Engrossed` → `In Committee` every sync cycle.
+ *    Instead, once the status code indicates passage of at least one chamber, we let the code
+ *    win over the action text. (Documented in TASKS.md § "Status mapper doesn't preserve
+ *    furthest progress".)
  */
 export function mapLegiScanBillStatus(statusCode: number, lastAction: string): string {
   const action = (lastAction || '').toLowerCase();
@@ -65,7 +80,18 @@ export function mapLegiScanBillStatus(statusCode: number, lastAction: string): s
   if (action.includes('third reading, passed') || (action.includes('passed') && action.includes('third reading'))) {
     return 'Passed Chamber';
   }
-  if (action.includes('committee') || action.includes('referred to')) return 'In Committee';
+
+  // Detect committee referrals: explicit keywords OR KY-specific "(H)"/"(S)" chamber suffix.
+  const isCommitteeReferral =
+    action.includes('committee') ||
+    action.includes('referred to') ||
+    /\([hs]\)\s*$/.test(action);
+
+  // Bills at or past first-chamber passage (status codes 2–5, 7, 8) should not be downgraded
+  // to `In Committee` just because the latest action is a referral in the receiving chamber.
+  const passedAChamber = [2, 3, 4, 5, 7, 8].includes(statusCode);
+
+  if (isCommitteeReferral && !passedAChamber) return 'In Committee';
   if (action.includes('introduced') || action.includes('filed')) return 'Introduced';
 
   return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';

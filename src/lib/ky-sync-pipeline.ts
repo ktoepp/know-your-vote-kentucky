@@ -650,34 +650,51 @@ async function syncKyBillsByHash(
     const rows: Record<string, unknown>[] = [];
     for (let i = 0; i < changedOrNew.length; i++) {
       const raw = changedOrNew[i];
-      const topics = classifyTopics(raw.title, raw.description || '');
+      // `getMasterListRaw` returns only bill_id / number / change_hash — it does NOT carry
+      // title, status, last_action, etc.  We must call getBillDetail for every changed bill to
+      // get the full record.  `skipSponsors` controls whether sponsor data is *written* to the
+      // row, not whether the detail fetch happens at all.
       let sponsors: unknown = null;
       let introducedDate: string | null = null;
       let detailFetched = false;
       let detail: LegiScanBillDetail | null = null;
-      if (!skipSponsors) {
-        try {
-          detail = await client.fetchBillDetail(raw.bill_id);
-          if (detail) {
-            detailFetched = true;
-            if (detail.sponsors?.length) sponsors = detail.sponsors;
-            introducedDate = deriveIntroducedDate(detail);
-          }
-        } catch (err: any) {
-          log(source, `Sponsor fetch failed for ${raw.number}: ${err?.message || err}`);
+      try {
+        detail = await client.fetchBillDetail(raw.bill_id);
+        if (detail) {
+          detailFetched = true;
+          if (!skipSponsors && detail.sponsors?.length) sponsors = detail.sponsors;
+          introducedDate = deriveIntroducedDate(detail);
         }
+      } catch (err: any) {
+        log(source, `Detail fetch failed for ${raw.number}: ${err?.message || err}`);
       }
+      if (!detail) continue; // skip if detail fetch failed entirely
+      const topics = classifyTopics(detail.title || '', detail.description || '');
+      // Build the last_action string the same way the accuracy checker does — from the
+      // detail's history array — so the status mapper gets consistent input.
+      const lastActionFromDetail = (() => {
+        if (detail.last_action) return detail.last_action;
+        const history = Array.isArray(detail.history) ? detail.history : [];
+        let latest: { action?: string; date?: string } | null = null;
+        for (const h of history) {
+          if (!h?.action) continue;
+          if (!latest || new Date(h.date ?? '').getTime() >= new Date(latest.date ?? '').getTime()) {
+            latest = h;
+          }
+        }
+        return latest?.action ?? '';
+      })();
       const row: Record<string, unknown> = {
         legiscan_id: raw.bill_id,
-        bill_number: raw.number,
-        title: raw.title,
-        description: raw.description || null,
+        bill_number: detail.number || raw.number,
+        title: detail.title,
+        description: detail.description || null,
         session: session.session_name,
-        status: mapLegiScanBillStatus(raw.status, raw.last_action || ''),
+        status: mapLegiScanBillStatus(detail.status ?? raw.status, lastActionFromDetail),
         chamber: chamberFromBillNumber(raw.number),
-        last_action: raw.last_action || null,
-        last_action_date: raw.last_action_date || null,
-        bill_text_url: raw.url || null,
+        last_action: lastActionFromDetail || null,
+        last_action_date: detail.last_action_date || null,
+        bill_text_url: detail.url || raw.url || null,
         topics: topics.length > 0 ? topics : null,
         source: 'legiscan',
         change_hash: raw.change_hash || null,
@@ -685,19 +702,11 @@ async function syncKyBillsByHash(
         updated_from_legiscan_at: new Date().toISOString(),
       };
       if (!skipSponsors) row.sponsors = sponsors;
-      if (detailFetched) {
-        row.introduced_date = introducedDate;
-        Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
-        Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
-      } else {
-        const prev = existingSubjectsForBatch.get(raw.bill_id);
-        if (prev !== undefined) {
-          row.legiscan_subjects = prev.legiscan_subjects;
-          row.legiscan_subjects_search = prev.legiscan_subjects_search;
-        }
-      }
+      row.introduced_date = introducedDate;
+      Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
+      Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
       rows.push(row);
-      if (!skipSponsors && (i + 1) % 25 === 0) {
+      if ((i + 1) % 25 === 0) {
         log(source, `Hash-gated enrich ${i + 1}/${changedOrNew.length}`);
       }
     }

@@ -34,15 +34,23 @@ export type KYTopicTag = (typeof KY_TOPICS)[number];
 /** Keyword map for fast classification */
 const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Education: ['school', 'education', 'student', 'teacher', 'university', 'college', 'curriculum', 'tuition', 'charter', 'jcps', 'fcps', 'superintendent'],
-  Healthcare: ['health', 'hospital', 'medicaid', 'medicare', 'insurance', 'mental health', 'opioid', 'drug', 'pharmacy', 'nurse', 'doctor', 'clinic'],
+  // 'diabetes' added 2026-06-07: student health / chronic disease screening bills may not use the word 'health'.
+  Healthcare: ['health', 'hospital', 'medicaid', 'medicare', 'insurance', 'mental health', 'opioid', 'drug', 'pharmacy', 'nurse', 'doctor', 'clinic', 'diabetes'],
   Infrastructure: ['road', 'bridge', 'highway', 'water', 'sewer', 'broadband', 'internet', 'transit', 'transportation', 'construction', 'dam'],
   // 'fiscal' removed: it matches "fiscal court" (local gov) and "fiscal note/year/impact" boilerplate, not tax policy.
   Taxation: ['tax', 'revenue', 'property tax', 'sales tax', 'income tax', 'levy', 'assessment'],
   // Bare 'emergency'/'safety' removed: they match the "emergency clause"/"declares an emergency" boilerplate present
   // in many bills, and generic "safety". Use specific public-safety phrasing instead.
-  'Public Safety': ['police', 'fire', 'emergency management', 'emergency services', 'first responder', 'state of emergency', 'public safety', 'crime', '911', 'sheriff', 'ems', 'disaster', 'flood'],
+  // 'law enforcement' added 2026-06-07: covers game warden, boating officer, and similar sworn-officer bills
+  // that don't mention police/sheriff explicitly.
+  'Public Safety': ['police', 'fire', 'emergency management', 'emergency services', 'first responder', 'state of emergency', 'public safety', 'crime', '911', 'sheriff', 'ems', 'disaster', 'flood', 'law enforcement'],
   Environment: ['environment', 'pollution', 'clean water', 'air quality', 'climate', 'conservation', 'wildlife', 'recycling', 'waste', 'coal ash'],
-  Labor: ['worker', 'wage', 'employment', 'union', 'labor', 'workforce', 'unemployment', 'minimum wage', 'workplace'],
+  // 'employment' removed: it matched any bill mentioning "employment of pharmacists", "employment
+  // of teachers", "employer-sponsored insurance", etc. — too generic. Replaced with 'employer'
+  // (more specific to labor-law context) and 'labor law'/'employment law' (unambiguous signals).
+  // Remaining broad signals (worker, wage, union, labor, workforce, unemployment, minimum wage,
+  // workplace) are sufficient to capture genuine Labor bills. (2026-06-07 accuracy-audit fix.)
+  Labor: ['worker', 'wage', 'employer', 'labor law', 'employment law', 'union', 'labor', 'workforce', 'unemployment', 'minimum wage', 'workplace'],
   Housing: ['housing', 'rent', 'affordable housing', 'zoning', 'landlord', 'tenant', 'homeless', 'eviction', 'mortgage'],
   Agriculture: ['farm', 'agriculture', 'crop', 'livestock', 'tobacco', 'bourbon', 'hemp', 'rural', 'usda'],
   Energy: ['energy', 'coal', 'natural gas', 'solar', 'wind', 'utility', 'electric', 'pipeline', 'power plant', 'renewable'],

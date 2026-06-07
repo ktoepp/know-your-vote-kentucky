@@ -318,3 +318,44 @@ Direct triage of the `Voting Rights` tag (surfaced while scanning the topic corp
 - The LegiScan-subject mapping (`ky-topic-legiscan-mapping.ts`) was **already** correctly scoped (`/voter.*registration/`, `/election law|election integrity/`, no bare `primary`), confirming the classifier's bare keywords were the outlier; **mapping left unchanged.**
 - **Backfill:** `npm run topics:reclassify` — **22,547 scanned, 648 changed (343 tags removed, 227 added).** Two-directional verification on the new keywords: **179** bills newly/again carry `Voting Rights`, **0** of them non-vote-related (no new false positives from the plurals); the 343 removals are non-voting bills (vehicles, firearms, radon, marijuana-program registration, etc.). `npx tsc --noEmit` clean.
 - **Trade-off / limits:** still keyword precision, not perfection. The plural gap is patched only for the two highest-impact terms (`elections`/`voters`); other singular keywords across the taxonomy may have analogous plural blind spots, addressed when a specific finding warrants it. Deeper semantic tagging stays advisory/delegated per the scope boundary.
+
+---
+
+## 2026-06-07 — Accuracy-audit triage pass #3 (status mapper + bill data + glossary)
+
+Resolved all hard failures and addressed glossary/topic advisory warnings from the seed-1189243192 audit report (`fail=2, warn=8`). Final state after this pass: **fail=0, warn=6** (all remaining warns are LLM advisory; no deterministic failures).
+
+### Status mapper — two structural fixes (`src/lib/map-legiscan-bill-status.ts`)
+
+1. **KY committee-referral pattern.** The mapper only recognised "committee" or "referred to" in the action text. KY LRC action strings use `to [Committee Name] (H)` / `to [Committee Name] (S)` — e.g. `"to State & Local Government (S)"`, `"to Judiciary (H)"` — where the committee name never contains the word "committee". Added `/\([hs]\)\s*$/` regex check as a third branch of `isCommitteeReferral`. This fixes bills like SB17 that were stored as `Introduced` when their last_action was a KY-style referral.
+
+2. **Don't downgrade past Engrossed.** When a bill passes one chamber (LegiScan status code 2–8), the next action is often a referral to the second chamber's committee. The old mapper's action-text branch would override the status code, regressing `Engrossed` → `In Committee` on every subsequent sync. Added `passedAChamber = [2,3,4,5,7,8].includes(statusCode)` guard: committee-action text is only trusted when the bill hasn't yet passed a chamber. Fixes SB100 (LegiScan status 2 / `Engrossed` stored as `In Committee`).
+
+### `sync:ky:bills:status` pipeline — two fixes (`src/lib/ky-sync-pipeline.ts`)
+
+- **Null-title guard.** `getMasterListRaw` returns only `bill_id / number / change_hash` (no `title`, `status`, `last_action`). The status-sync path that used `raw.title` was hitting the DB's NOT-NULL constraint and silently writing 0 rows. Root cause: `--skip-bill-sponsor-details` was skipping the entire `getBillDetail` call, leaving all row fields null. **Fix:** always call `getBillDetail` for changed bills; `skipBillSponsorDetails` now only controls whether sponsor data is *included in the upserted row*, not whether the detail fetch happens.
+
+- **Last-action source alignment.** The sync now derives `last_action` from the detail's `history[]` array via the same `latestAction` reconstruction the accuracy checker uses — removing the divergence that caused the checker and sync to disagree on which action string to map.
+
+- **Backfill:** `npm run sync:ky:bills:status` — **22,547 scanned, 207 changed, 207 upserted** (previously 0 due to the null-title bug).
+
+### Data correction — 8,288 stale `Introduced` rows (`scripts/remap-committee-referral-statuses.ts`)
+
+Bills synced before the mapper fix had `status = 'Introduced'` because the KY `(H)`/`(S)` action pattern was unrecognised; they weren't in the 207-bill changed set and wouldn't be re-synced automatically. One-time script (`scripts/remap-committee-referral-statuses.ts`) queried `status = 'Introduced'` AND `last_action ILIKE '%(h)'` OR `ILIKE '%(s)'` (paginated), verified all 8,288 matches were genuine committee referrals, and updated them to `In Committee` in batches of 200. Post-correction audit: **bills 40/40 ok, 0 fail**.
+
+### Glossary corrections (`src/lib/tooltipContent.ts`)
+
+- **`fiscal_note`:** Corrected wrong attribution. Kentucky fiscal notes are prepared by the **Governor's Office for Policy and Management (GOPM)** in the executive branch per KRS 6.350, not by the LRC. LRC provides bill drafting and research; GOPM provides fiscal impact analysis.
+- **`lrc`:** "drafts bills" → "provides bill drafting services" (more accurate; the Office of Legal Services within LRC is the specific division, but the LRC as an organisation correctly owns the function).
+- **`tabled`:** Softened "effectively ends the bill's progress" → "almost always signals the end … though it stops short of a direct up-or-down vote." Tabling in KY is procedurally reversible; characterising it as definitively terminal was an overstatement.
+- **`majority_leader`:** Removed "Works with the Speaker or Senate President to set the agenda" — this overstated the Senate Majority Leader's agenda-setting role (the Senate President holds dominant scheduling authority in KY). Replaced with "Coordinates party members during debate and works to advance the majority's legislative priorities on the floor."
+- **`passed`, `timeline_passed`:** Changed "will go through its own committee review and floor vote" → "may be referred to a committee before being scheduled for a floor vote" (committee referral and a floor vote aren't guaranteed in the second chamber).
+- **`referred` (Referred to Committee), `committee_hearing`:** Softened "hold hearings" and "hears testimony" to acknowledge that KY committees frequently vote on bills without scheduling formal public testimony sessions.
+
+### Topic classifier additions (`src/lib/ky-topic-classifier.ts`)
+
+- **`employment` removed from Labor:** matched "employment of pharmacists", "employment of teachers", "employer-sponsored insurance" — too generic. Replaced with `employer`, `labor law`, `employment law` (unambiguous Labor signals). Real Labor bills still fire on `worker`, `wage`, `union`, `labor`, `workforce`, `unemployment`, `minimum wage`, `workplace`.
+- **`law enforcement` added to Public Safety:** covers game-warden and boating-officer bills that don't mention police/sheriff explicitly.
+- **`diabetes` added to Healthcare:** student health and chronic-disease screening bills may not use the word "health" in their short title.
+- **Backfill:** `npm run topics:reclassify` — **22,547 scanned, 344 changed (14 tags removed, 280 added).**
+
