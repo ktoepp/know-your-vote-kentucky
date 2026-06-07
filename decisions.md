@@ -414,3 +414,16 @@ One-time script for bills stored before the `(H)`/`(S)` mapper fix. Post-correct
 - **Labor:** merged main's `worker` → `workers` plural fix with branch's removal of bare `employment` (replaced with `employer`, `labor law`, `employment law`).
 - **`law enforcement` added to Public Safety; `diabetes` added to Healthcare.**
 - **Backfill:** `npm run topics:reclassify` — **22,547 scanned, 344 changed (14 tags removed, 280 added).**
+
+---
+
+## 2026-06-07 — Removed orphaned `/find-content` tool
+
+Closure pass on Slack-canvas review-queue row #20. `/find-content` was an internal-only content-discovery page (`src/app/find-content/page.tsx`) that called `/api/discover-content`. Pre-flight grep confirmed:
+
+- No inbound code references anywhere in the repo
+- No nav links, no sitemap entry
+- `noIndexMetadata` already applied via `src/app/find-content/layout.tsx`
+- The `/api/discover-content` endpoint it called **doesn't exist on `main`** — the page has been fetching a 404 since whatever cleanup removed the API previously
+
+Deleted the directory rather than gating behind admin/internal flags — there's nothing to gate to, and dead surface area is a security and onboarding tax. If the tool is needed again, it should be rebuilt against a defined product surface, not resurrected.
