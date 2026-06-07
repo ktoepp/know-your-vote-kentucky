@@ -35,6 +35,7 @@ import {
   type DigestFrequency,
   type KyDigestEventType,
 } from '@/lib/ky-notification-preferences';
+import { trackPreferencesSaved } from '@/lib/analytics';
 
 type PrefsResponse = {
   digest_frequency: DigestFrequency;
@@ -125,6 +126,10 @@ export function ProfileNotificationsSection() {
       const data = await patchPrefs({
         digest_frequency: digestFrequency,
         event_types: eventTypes,
+      });
+      trackPreferencesSaved({
+        digest_frequency: digestFrequency,
+        event_type_count: eventTypes.length,
       });
       setUnsubscribedAt(data.unsubscribed_all_at ?? null);
       if (digestFrequency === 'off' && !prevOff) {

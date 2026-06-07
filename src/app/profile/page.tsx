@@ -35,6 +35,7 @@ import { ProfileActivitySection } from '@/components/profile/ProfileActivitySect
 import { ProfileDigestHistorySection } from '@/components/profile/ProfileDigestHistorySection';
 import { ProfileSavedSearchesSection } from '@/components/profile/ProfileSavedSearchesSection';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
+import { trackAccountDeleted } from '@/lib/analytics';
 
 const PROFILE_SECTION_SCROLL_MARGIN = { scrollMarginTop: { xs: '7.5rem', sm: '8rem' } };
 
@@ -255,6 +256,7 @@ export default function ProfilePage() {
         setDeleteBusy(false);
         return;
       }
+      trackAccountDeleted();
       await supabase?.auth.signOut();
       router.push('/');
     } catch {

@@ -15,6 +15,7 @@ import {
 import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
+import { trackUserRegistered } from '@/lib/analytics';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -59,10 +60,12 @@ export default function RegisterPage() {
     }
     // No session until the user confirms — hosted/local with email confirmations on.
     if (data.session) {
+      trackUserRegistered({ needs_verification: false });
       router.refresh();
       router.push('/profile');
       return;
     }
+    trackUserRegistered({ needs_verification: true });
     setSuccess(true);
   };
 
