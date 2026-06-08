@@ -414,3 +414,54 @@ One-time script for bills stored before the `(H)`/`(S)` mapper fix. Post-correct
 - **Labor:** merged main's `worker` → `workers` plural fix with branch's removal of bare `employment` (replaced with `employer`, `labor law`, `employment law`).
 - **`law enforcement` added to Public Safety; `diabetes` added to Healthcare.**
 - **Backfill:** `npm run topics:reclassify` — **22,547 scanned, 344 changed (14 tags removed, 280 added).**
+
+---
+
+## 2026-06-07 — Cron schedule audit + heartbeat retired (canvas knockout)
+
+Closure pass on Slack-canvas review-queue rows #12, #13, #18, #21 (see prior session). Scheduled-job landscape was last documented piecemeal across workflow YAMLs and TASKS.md; consolidating here so future agents (and onboarding reviewers) can confirm coverage without re-deriving it.
+
+### Cron landscape — current state
+
+**Vercel Cron (`vercel.json`):**
+
+| Path | Schedule (UTC) |
+|---|---|
+| `/api/sync?source=bills&useChangeHash=true&skipBillSponsorDetails=true&historicSessions=1` | `0 5 * * *` |
+| `/api/sync?source=legislators` | `0 6 * * *` |
+| `/api/sync?source=votes&limit=5` | `15 6 * * *` |
+| `/api/cron/notify` | `0 11 * * *` |
+| `/api/sync?source=lrc-committee-materials` | `30 13 * * *` |
+| `/api/cron/health-check` | `0 14 * * *` |
+
+**GitHub Actions (`.github/workflows/`):**
+
+| Workflow | Schedule (UTC) | Command |
+|---|---|---|
+| `sync-ky-bills-status.yml` | `0 */6 * * *` | `npm run sync:ky:bills:status` (hash-gated, no `getBill`) |
+| `sync-lrc-calendar.yml` (live) | `0 12 * * *` + `0 18 * * *` | `npm run sync:ky:lrc-calendar` |
+| `sync-lrc-calendar.yml` (backfill) | `0 6 * * 0` | `npm run backfill:lrc:calendar` + refresh |
+| `legislator-links-weekly.yml` | `0 12 * * 1` | `sync:ky:legislators` → `verify:legislator-links` → `audit:legiscan-subjects` |
+| `accuracy-audit.yml` | `0 7 * * 0` | `npm run audit:accuracy` |
+
+### Removed as redundant
+
+`.github/workflows/verify-outbound-links.yml` (Mondays 06:00 UTC) — deleted. `legislator-links-weekly.yml` already runs `verify:legislator-links --json` as a job step and is the source of truth for the weekly link-health report. The standalone workflow was a dry-run wrapper with no Slack notification.
+
+### Intentionally distinct (not duplicates)
+
+- **Vercel `/api/sync?source=lrc-committee-materials` (13:30 daily) vs. GH Actions `sync-lrc-calendar.yml` (12:00 + 18:00 daily).** Different LRC surfaces — `lrc-committee-materials` scrapes per-committee document pages into `ky_committee_materials`; `lrc-calendar` parses the LRC weekly-calendar HTML into `ky_committee_meetings` + agenda. Same data source (`apps.legislature.ky.gov`), different endpoints, different tables.
+- **Vercel bills sync (05:00 daily, full bills with `--skip-bill-sponsor-details`) vs. GH Actions `sync-ky-bills-status.yml` (every 6h, `sync:ky:bills:status`).** Different command shapes: Vercel run skips sponsor *fetch* but still calls `getBill`; GH Actions run is hash-gated and never calls `getBill`. The every-6h cadence is conservative intra-day refresh; Vercel's 05:00 run is the guaranteed daily baseline.
+- **Vercel does NOT run `lrc-calendar`** (retired in Wave 4a; GH Actions is sole scheduler). Stale comment in `sync-lrc-calendar.yml` header reflecting the old setup was corrected in this pass.
+
+### Heartbeat mode retired — `SLACK_SYNC_CLI_DIGEST_ALWAYS`
+
+The temporary flag that made CLI sync jobs post a Slack digest on *every* run (regardless of activity) was removed from `sync-ky-bills-status.yml`, `legislator-links-weekly.yml`, and both `sync-lrc-calendar.yml` legs. **Trigger for retirement:** 2+ weeks of clean sync digests since the heartbeat went in (Katie's read 2026-06-07). Workflows now Slack on change/error only — the default behavior in `src/lib/slack-webhook.ts`. The flag itself remains supported in code; re-enable on a per-workflow basis if validation noise returns.
+
+### 2026 RS milestones pending LRC publication
+
+`KY_SESSIONS[0].milestones` (`src/lib/ky-sessions.ts`) is intentionally left undefined for the 2026 Regular Session pending LRC publication of the session-calendar joint resolution that sets veto-recess (start/end) and sine die dates. **Banner behavior under the gap:** `getSessionBannerModel()` falls back to the session date range when `milestones` is undefined — verified during the 2026-06-01 session milestones + interim banner work (§ 2026-06-01). **Refresh trigger:** when LRC publishes the 2026 RS joint resolution, populate `vetoRecessStart`, `vetoRecessEnd`, and `sineDie` on the 2026 RS record. Replaced a code-level `TODO` with a one-line pointer to this entry so future agents landing in `ky-sessions.ts` aren't tempted to fabricate dates.
+
+### Status mapper — already closed, re-verified
+
+Canvas row #18 ("Status mapper doesn't preserve furthest progress") was already resolved in PR #74 — see § 2026-06-04 — Status mapper: preserve furthest-progress milestone. Re-verified during this knockout pass: `CHAMBER_PASSED_CODES = {2, 3, 4}` guard is live at `src/lib/map-legiscan-bill-status.ts:95-98`; TASKS.md backlog entry updated to mark resolved. DB-level spot-check on HB21 deferred to Katie's next Supabase-connected session as belt-and-suspenders confirmation.
