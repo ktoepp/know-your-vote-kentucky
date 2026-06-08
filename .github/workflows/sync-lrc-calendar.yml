@@ -3,8 +3,8 @@
 # Live sync (~5 days visible on LRC): npm run sync:ky:lrc-calendar
 # Historical backfill (Internet Archive): npm run backfill:lrc:calendar
 #
-# Vercel Cron also runs lrc-calendar once daily (Hobby plan limit). This workflow adds
-# a second live pass and a weekly Wayback backfill so committee meetings stay current.
+# Sole scheduler for the LRC calendar — two daily live passes + weekly Wayback backfill.
+# (Vercel Cron entry retired; see decisions.md.)
 #
 # Secrets (Settings → Secrets and variables → Actions):
 #   NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL
@@ -12,7 +12,6 @@
 #
 # Optional Slack (see env-template.txt):
 #   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL, SLACK_SYNC_NOTIFY_CLI=true
-#   SLACK_SYNC_CLI_DIGEST_ALWAYS=true — every-run sync digest (heartbeat; disable when stable)
 name: Sync LRC committee calendar
 
 on:
@@ -79,7 +78,6 @@ jobs:
           SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_SYNC_NOTIFY_CLI: 'true'
-          SLACK_SYNC_CLI_DIGEST_ALWAYS: 'true'
         run: npm run sync:ky:lrc-calendar
 
       - name: Slack notify on workflow failure
@@ -155,7 +153,6 @@ jobs:
           SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_SYNC_NOTIFY_CLI: 'true'
-          SLACK_SYNC_CLI_DIGEST_ALWAYS: 'true'
         run: npm run sync:ky:lrc-calendar
 
       - name: Slack notify on workflow failure
