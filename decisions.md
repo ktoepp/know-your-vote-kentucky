@@ -470,7 +470,7 @@ Canvas row #18 ("Status mapper doesn't preserve furthest progress") was already 
 
 ## 2026-06-08 — /api/intelligence LLM call security
 
-**Branch: `llm-call-security`.** Two hardening changes to `src/app/api/intelligence/route.ts` and `src/lib/rate-limit.ts`.
+**PR #80.** Two hardening changes to `src/app/api/intelligence/route.ts` and `src/lib/rate-limit.ts`.
 
 ### `getClientIp` — fix XFF spoofability (`src/lib/rate-limit.ts`)
 
@@ -497,3 +497,24 @@ Canvas row #18 ("Status mapper doesn't preserve furthest progress") was already 
 **Signed-in-only considered and declined for now.** Making the route require `Authorization: Bearer` (via `getAuthedUser`) would eliminate all anonymous abuse, but the intelligence panel is intended as a publicly accessible civic surface. The fixed IP key + global ceiling makes the exposure bounded and the cost manageable. **Revisit if:** Anthropic spend regularly approaches the daily ceiling, or if a product decision gates the intelligence panel behind login (at which point switching to `getAuthedUser` is a small diff).
 
 **Revisit if:** the 200-call daily ceiling proves too tight under normal traffic. The `ky_sync_state` counter table already tracks `anthropic_cache_hits` and `anthropic_cache_misses` — query those by day to establish a baseline before adjusting capacity.
+
+---
+
+## 2026-06-08 — Sentry DSN: no hardcoded fallback
+
+**PR #79.** Removed the DSN literal fallback from `sentry.server.config.ts` and `sentry.edge.config.ts`.
+
+- **Problem:** a committed DSN is trivially available to anyone with repo access and allows fake event injection into the Sentry project.
+- **Fix:** read `SENTRY_DSN || NEXT_PUBLIC_SENTRY_DSN` from env only; `enabled: !!dsn && (production || reportInDev)` so Sentry stays silent when neither var is set. Same pattern on server and edge configs.
+- **Ops:** ensure `SENTRY_DSN` (or `NEXT_PUBLIC_SENTRY_DSN`) remains set in Vercel production — removing the fallback does not remove the need for the env var in deployed environments.
+
+---
+
+## 2026-06-08 — PostHog named user-action events
+
+**PR #78.** Adds stable, client-side event names in `src/lib/analytics.ts` so PostHog Action subscriptions (Slack notifications, daily digests) survive UI refactors.
+
+- **Events shipped:** `user_registered` (register page, both immediate-session and pending-verification paths, tagged `needs_verification`); `bill_followed` / `bill_unfollowed` (`FollowBillButton`, fired only after the API call succeeds — failures revert state without emit); `preferences_saved` (`ProfileNotificationsSection` digest + event-types save); `account_deleted` (profile delete flow, fired before `signOut` so the identity is still attached).
+- **Intentionally not instrumented:** per-topic toggle clicks on `/profile` — would spam one event per checkbox click; the explicit save path for frequency/event-types is the stable signal.
+- **Client-only:** all via `posthog-js`; no `posthog-node` dependency added.
+- **Revisit if:** product wants committee-follow or saved-search events for the same Action-subscription use case — follow the same "named helper, fire after API success" pattern.
