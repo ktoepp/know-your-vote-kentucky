@@ -90,17 +90,25 @@ export async function rateLimit(
 }
 
 /**
- * Extract a client IP from a Next.js request. Prefers `x-forwarded-for`
- * (Vercel pattern), falls back to `x-real-ip`, then a sentinel.
+ * Extract a client IP from a Next.js request.
+ *
+ * Priority:
+ *  1. `x-real-ip` — Vercel's edge sets this to the connecting IP; clients
+ *     cannot forge it because the edge overwrites any client-supplied value.
+ *  2. Last entry of `x-forwarded-for` — Vercel appends the real client IP at
+ *     the end of the chain, so the last entry is trustworthy. The first entry
+ *     may be client-supplied and must not be used for rate-limiting.
  */
 export function getClientIp(headers: Headers): string {
-  const xff = headers.get('x-forwarded-for');
-  if (xff) {
-    const first = xff.split(',')[0]?.trim();
-    if (first) return first;
-  }
   const real = headers.get('x-real-ip');
   if (real) return real.trim();
+
+  const xff = headers.get('x-forwarded-for');
+  if (xff) {
+    const parts = xff.split(',');
+    const last = parts[parts.length - 1]?.trim();
+    if (last) return last;
+  }
   return 'unknown';
 }
 
