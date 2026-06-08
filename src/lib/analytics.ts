@@ -118,6 +118,33 @@ export const trackMobileInteraction = (
   capture("mobile_interaction", { action, device_type: deviceType });
 };
 
+// Named user-action events. Stable names so PostHog Action subscriptions
+// (e.g. Slack notifications) keep working across UI refactors.
+
+export const trackUserRegistered = (
+  props?: { method?: "email"; needs_verification?: boolean },
+): void => {
+  capture("user_registered", { method: "email", ...props });
+};
+
+export const trackBillFollowed = (billId: string): void => {
+  capture("bill_followed", { bill_id: billId });
+};
+
+export const trackBillUnfollowed = (billId: string): void => {
+  capture("bill_unfollowed", { bill_id: billId });
+};
+
+export const trackPreferencesSaved = (
+  props?: Record<string, unknown>,
+): void => {
+  capture("preferences_saved", props ?? {});
+};
+
+export const trackAccountDeleted = (): void => {
+  capture("account_deleted", {});
+};
+
 /**
  * Identify a signed-in user so events stitch into a single PostHog person profile.
  * Call from the auth flow once a session is established. Distinct ID should be

@@ -11,6 +11,7 @@ import {
   followBillButtonLabel,
   type FollowBillButtonState,
 } from '@/lib/follow-labels';
+import { trackBillFollowed, trackBillUnfollowed } from '@/lib/analytics';
 
 type Props = {
   /** UUID or bill number (e.g. "HB1") — same shape the bill page receives. */
@@ -89,6 +90,8 @@ export function FollowBillButton({ billId }: Props) {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error || 'Request failed');
+      if (next) trackBillFollowed(billId);
+      else trackBillUnfollowed(billId);
       setState('idle');
     } catch (err: unknown) {
       setFollowing(prev);
