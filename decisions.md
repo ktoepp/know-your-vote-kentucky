@@ -465,3 +465,35 @@ The temporary flag that made CLI sync jobs post a Slack digest on *every* run (r
 ### Status mapper — already closed, re-verified
 
 Canvas row #18 ("Status mapper doesn't preserve furthest progress") was already resolved in PR #74 — see § 2026-06-04 — Status mapper: preserve furthest-progress milestone. Re-verified during this knockout pass: `CHAMBER_PASSED_CODES = {2, 3, 4}` guard is live at `src/lib/map-legiscan-bill-status.ts:95-98`; TASKS.md backlog entry updated to mark resolved. DB-level spot-check on HB21 deferred to Katie's next Supabase-connected session as belt-and-suspenders confirmation.
+
+---
+
+## 2026-06-08 — /api/intelligence LLM call security
+
+**Branch: `llm-call-security`.** Two hardening changes to `src/app/api/intelligence/route.ts` and `src/lib/rate-limit.ts`.
+
+### `getClientIp` — fix XFF spoofability (`src/lib/rate-limit.ts`)
+
+**Bug:** the previous implementation took `x-forwarded-for.split(',')[0]` as the rate-limit key. Vercel's edge *appends* the real client IP to the XFF chain, so `[0]` is the first client-supplied value — a client can send `x-forwarded-for: 1.2.3.4` and the rate limiter keys on `1.2.3.4` regardless of the actual connecting IP, making per-IP limits trivially bypassable.
+
+**Fix:** reversed priority.
+1. `x-real-ip` — Vercel's edge sets this to the actual connecting IP; clients cannot forge it because the edge overwrites any incoming value.
+2. Last entry of `x-forwarded-for` — Vercel appends the real client IP at the *end* of the chain. The last entry is trustworthy; first entries may be client-controlled.
+
+**Effect:** the Supabase-backed token-bucket rate limiter now keys on the true connecting IP, restoring the 30 req/min-per-IP guarantee documented in the rate-limit module.
+
+### Global daily LLM ceiling (`src/app/api/intelligence/route.ts`)
+
+**Problem:** per-IP rate limiting alone does not bound Anthropic spend when many distinct IPs (or VPN rotators) hit the route simultaneously. `generateWhyItMatters` calls `claude-sonnet-4-6` with `max_tokens: 150`; up to 3 calls per request; no cross-IP ceiling existed.
+
+**Decision: rolling 24h cap via the existing token-bucket rate limiter with a shared key.**
+- Key: `anthropic:llm:daily` (single global bucket, not per-IP)
+- Capacity: **200 individual LLM calls** per rolling 24h window
+- Refill: `200 / 86400 ≈ 0.0023 tokens/sec` (one full refill every 24h)
+- Worst-case cost at current Sonnet pricing (~$0.003/call): **~$0.60/day**
+
+**Failure mode:** graceful degradation — when the ceiling is hit, items are returned without `whyItMatters` rather than a 429. The ceiling is only relevant when the in-memory cache is cold across many serverless instances simultaneously; under normal load the 15-min TTL cache absorbs most requests.
+
+**Signed-in-only considered and declined for now.** Making the route require `Authorization: Bearer` (via `getAuthedUser`) would eliminate all anonymous abuse, but the intelligence panel is intended as a publicly accessible civic surface. The fixed IP key + global ceiling makes the exposure bounded and the cost manageable. **Revisit if:** Anthropic spend regularly approaches the daily ceiling, or if a product decision gates the intelligence panel behind login (at which point switching to `getAuthedUser` is a small diff).
+
+**Revisit if:** the 200-call daily ceiling proves too tight under normal traffic. The `ky_sync_state` counter table already tracks `anthropic_cache_hits` and `anthropic_cache_misses` — query those by day to establish a baseline before adjusting capacity.

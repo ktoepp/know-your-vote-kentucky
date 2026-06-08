@@ -65,6 +65,20 @@ export async function GET(request: NextRequest) {
     scored.sort((a: any, b: any) => b.relevance.score - a.relevance.score);
     const topItems = scored.slice(0, limit);
 
+    // Global daily ceiling for Anthropic LLM calls across all IPs.
+    // Capacity 200 ≈ 200 individual generateWhyItMatters calls per rolling 24h
+    // window (~$0.30 worst-case at Sonnet pricing). When the ceiling is hit,
+    // items are returned without LLM analysis rather than returning 429.
+    const LLM_DAILY_CAPACITY = 200;
+    const llmCeiling = await rateLimit('anthropic:llm:daily', {
+      capacity: LLM_DAILY_CAPACITY,
+      refillPerSec: LLM_DAILY_CAPACITY / 86400,
+      route: 'intelligence:llm-global',
+    });
+    if (!llmCeiling.allowed) {
+      console.warn('[Intelligence API] daily LLM ceiling reached, serving without analysis');
+    }
+
     // Generate "why it matters" for the top 3, with a short-TTL cache.
     let cacheHits = 0;
     let cacheMisses = 0;
@@ -84,6 +98,7 @@ export async function GET(request: NextRequest) {
           cacheHits += 1;
           return { ...item, whyItMatters: cached };
         }
+        if (!llmCeiling.allowed) return item;
         cacheMisses += 1;
         const whyItMatters = await generateWhyItMatters(item);
         setCached(cacheKey, whyItMatters);
