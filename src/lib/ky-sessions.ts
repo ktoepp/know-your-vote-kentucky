@@ -29,8 +29,7 @@ export interface KYSessionRecord {
 }
 
 export const KY_SESSIONS: KYSessionRecord[] = [
-  // TODO: populate 2026 RS milestones from the LRC-published session calendar
-  // (veto recess + sine die dates set by joint resolution each year).
+  // 2026 RS `milestones` left undefined pending LRC publication of the session-calendar joint resolution; see decisions.md § 2026-06-07.
   { name: '2026 Regular Session', start: '2026-01-06', end: '2026-04-15', type: 'regular' },
   { name: '2025 Regular Session', start: '2025-01-07', end: '2025-04-15', type: 'regular' },
 ];

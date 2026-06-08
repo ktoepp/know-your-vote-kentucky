@@ -103,7 +103,6 @@ export const Timeline: React.FC<TimelineProps> = ({ stages, title = "Timeline" }
             );
           })}
         </List>
-        {/* TODO: Add interactive features (expand/collapse, click for details, etc.) */}
       </Box>
     </Box>
   );
