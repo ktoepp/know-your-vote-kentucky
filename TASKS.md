@@ -13,7 +13,8 @@
 ### Ops notes (2026-06-09 health check)
 
 - **Sentry alert rules** — DSN is now env-only (PR #79). Confirm `SENTRY_DSN` is set in Vercel production, then configure `route:cron/notify` and `route:webhooks/resend` alert rules in Sentry. Still on the launch checklist (docs/launch-checklist.md).
-- **Legislator links — 2026-06-01 failure** — Scheduled run `26771103370` failed; root cause unknown (job logs not fetched). 2026-06-08 scheduled run clean. Investigate if next Monday run fails again: https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/26771103370
+- **Legislator links — 2026-06-01 failure** — ✅ Root cause confirmed (2026-06-09): `ReferenceError: parseArgs is not defined` at `scripts/verify-legislator-external-links.ts:268`. The fix was already in place by the 2026-06-08 run (success). No further action needed unless next Monday fails.
+- **Node.js 20 → 24 migration** — ✅ Fixed 2026-06-09. `legislator-links-weekly.yml` was the last workflow still on Node 20 — bumped to `node-version: '24'` and added `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` to match the other three workflows. GitHub Actions forces Node 24 from **2026-06-16** (7 days). See decisions.md § 2026-06-09 health check.
 - **2026 RS milestones** — ✅ Populated 2026-06-09 in `src/lib/ky-sessions.ts` (vetoRecessStart 2026-04-02, vetoRecessEnd 2026-04-14, sineDie 2026-04-15). See decisions.md § 2026-06-09.
 
 **Roadmap priority (2026-06-02):** [operator launch checklist](./docs/launch-checklist.md) (Resend DKIM, Sentry alerts, legal review, email QA) → optional **Phase 5b — `sync:lrc:enrollment-actions`** (see [session-record-spike-report.md](./docs/specs/session-record-spike-report.md)) → mobile a11y profile/feed/follow sweep (deferred from 2026-06-01 scope).

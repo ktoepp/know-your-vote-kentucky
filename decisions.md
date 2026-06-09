@@ -611,3 +611,35 @@ Added a post-fetch name-based dedup in `fetchKyCommitteesBrowseEnriched`: after 
 - **DB-level committee dedup:** identify the specific RSN pairs where migration 027 and the live sync created duplicate rows (same real-world committee, different `lrc_rsn` or `committee_type`); write a one-time migration to reassign child rows (`ky_committee_meetings`, `ky_committee_follows`, `ky_committee_materials`) from the lower-quality row to the higher-quality one and delete the stub. The JS-layer dedup is the interim solution.
 - **Interim member roster population:** all 16 `interim-joint-*` committees still show 0 members because `member_refs` on meeting rows is empty — the LRC calendar HTML lists committees and times but not rosters. The authoritative source is the LRC committee-detail page per committee. A one-time scrape of each `profile_url` to parse the member table (Chair + Members list) and write to `member_refs` on the next scheduled meeting would close this gap. See `legislature.ky.gov/Committees/committee-detail?CommitteeRSN={rsn}&CommitteeType=IJ`.
 - **"Meeting materials" count caveat:** the quick-facts panel shows "N meeting materials" counted from the DB, not from live LRC. Consider adding "(some may be unavailable)" or capping the display to reflect only recently-probed-live docs once the per-link probe job ships.
+
+---
+
+## 2026-06-09 — Health check: GitHub Actions + Vercel
+
+Scheduled health check across connected monitoring services.
+
+### GitHub Actions — all workflows nominal
+
+| Workflow | Most recent run | Result |
+|---|---|---|
+| Sync KY bill statuses | `27198206457` 2026-06-09T09:52Z | ✅ success |
+| Sync LRC committee calendar | `27164586628` 2026-06-08T20:21Z | ✅ success |
+| Legislator links — weekly sync + verify | `27149284051` 2026-06-08T15:43Z | ✅ success |
+| Content accuracy audit | `27089178669` 2026-06-07T09:53Z | ✅ success |
+| Slack — commits & PRs | `27182555863` 2026-06-09T03:47Z | ✅ success |
+
+**30/30 runs in the current page** returned `success` — no active failures.
+
+### Resolved: 2026-06-01 legislator-links failure
+
+Root cause confirmed from job logs: `ReferenceError: parseArgs is not defined` at `scripts/verify-legislator-external-links.ts:268` (step "Verify outbound links"). The sync step (141 legislators) and LegiScan-subjects audit both succeeded; only the link-verify script crashed. The 2026-06-08 run passed cleanly, confirming the fix was already in place. No data loss — the legislator sync step completed before the crash, and the artifact upload captured the partial JSON report.
+
+### Fixed: Node.js 20 → 24 migration in `legislator-links-weekly.yml`
+
+Three of four scheduled workflows (`accuracy-audit.yml`, `sync-ky-bills-status.yml`, `sync-lrc-calendar.yml`) had already migrated to `node-version: '24'` + `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true`. `legislator-links-weekly.yml` was the outlier — still on Node 20. **GitHub Actions forces Node 24 by default from 2026-06-16** (7 days from this check). Fixed in this session: bumped to `node-version: '24'` and added the `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'` env var to match the other workflows.
+
+**Secondary warning from June 1 logs:** `@react-email/*` packages (all sub-packages) show `npm warn deprecated` — "Package no longer supported." These are the React Email v1 sub-packages superseded by the monorepo `react-email` v2 package. Non-urgent (still functional), but should be addressed when email templates are next touched. Also: 1 moderate-severity `npm audit` finding — unknown severity/package from the log excerpt alone; check `npm audit` output when convenient.
+
+### Vercel — limited visibility
+
+The Vercel MCP `list_projects` call returned an empty array for team `team_gmP71OjnH1pcPVIH72YLmfMX` ("Katie's projects"). This is likely an API token scope issue rather than a real outage — PRs #78–#80 (2026-06-08) all reflect successful Vercel deployments via the normal push-to-main flow. Runtime logs and cron execution history are therefore not included in this check. **Action:** if Vercel monitoring is desired in future health checks, confirm the MCP token has `project:read` scope and that the project is linked to this team in the Vercel dashboard.
