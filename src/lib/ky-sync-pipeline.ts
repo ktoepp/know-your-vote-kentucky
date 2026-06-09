@@ -1200,20 +1200,59 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
     const syncedOpenStatesIds = new Set(
       rows.map((r) => r.openstates_id).filter((id): id is string => typeof id === 'string' && id.length > 0),
     );
+
+    // First pass: deactivate rows whose openstates_id is absent from the current OS response.
+    // Grace period: require 2 consecutive misses before deactivating to survive transient OS data
+    // gaps (e.g. a temporary API blip that omits a legislator for one sync run).
+    // Miss streaks are tracked in ky_sync_state under LEGISLATORS_OS_MISS_STREAK_KEY.
+    const LEGISLATORS_OS_MISS_STREAK_KEY = 'legislators_os_miss_streak';
+    const OS_MISS_THRESHOLD = 2;
     if (syncedOpenStatesIds.size > 0) {
       const { data: withOs, error: osFetchErr } = await db
         .from('ky_legislators')
         .select('id, openstates_id')
-        .not('openstates_id', 'is', null);
+        .not('openstates_id', 'is', null)
+        .eq('active', true);
       if (osFetchErr) {
         logError(source, `Could not read legislators for active cleanup: ${osFetchErr.message}`);
       } else {
-        const staleIds = (withOs || [])
-          .filter((r) => {
-            const oid = r.openstates_id as string | null;
-            return Boolean(oid && !syncedOpenStatesIds.has(oid));
-          })
-          .map((r) => r.id as string);
+        // Load current miss-streak map from sync state.
+        const { data: streakRow } = await db
+          .from('ky_sync_state')
+          .select('payload')
+          .eq('key', LEGISLATORS_OS_MISS_STREAK_KEY)
+          .maybeSingle();
+        const missMap: Record<string, number> =
+          (streakRow?.payload as Record<string, number> | null) ?? {};
+
+        const staleIds: string[] = [];
+        const warnedIds: string[] = [];
+
+        for (const r of withOs || []) {
+          const oid = r.openstates_id as string | null;
+          if (!oid) continue;
+          if (syncedOpenStatesIds.has(oid)) {
+            // Back in OS response — reset streak.
+            delete missMap[oid];
+          } else {
+            const streak = (missMap[oid] ?? 0) + 1;
+            if (streak >= OS_MISS_THRESHOLD) {
+              staleIds.push(r.id as string);
+              delete missMap[oid];
+            } else {
+              missMap[oid] = streak;
+              warnedIds.push(oid);
+            }
+          }
+        }
+
+        if (warnedIds.length) {
+          log(
+            source,
+            `${warnedIds.length} legislator openstates_id(s) missing from OS response (streak 1/${OS_MISS_THRESHOLD} — will deactivate on next miss): ${warnedIds.slice(0, 5).join(', ')}${warnedIds.length > 5 ? '…' : ''}`,
+          );
+        }
+
         const CHUNK = 100;
         for (let i = 0; i < staleIds.length; i += CHUNK) {
           const chunk = staleIds.slice(i, i + CHUNK);
@@ -1224,8 +1263,14 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
           if (deactErr) logError(source, `Mark inactive chunk failed: ${deactErr.message}`);
         }
         if (staleIds.length) {
-          log(source, `Marked ${staleIds.length} legislator row(s) inactive (Open States id not in current chamber list)`);
+          log(source, `Marked ${staleIds.length} legislator row(s) inactive (absent from Open States ${OS_MISS_THRESHOLD} consecutive syncs)`);
         }
+
+        // Persist updated streak map.
+        await db.from('ky_sync_state').upsert(
+          { key: LEGISLATORS_OS_MISS_STREAK_KEY, payload: missMap, updated_at: nowIso },
+          { onConflict: 'key' },
+        );
       }
     }
 
