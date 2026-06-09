@@ -29,8 +29,19 @@ export interface KYSessionRecord {
 }
 
 export const KY_SESSIONS: KYSessionRecord[] = [
-  // 2026 RS `milestones` left undefined pending LRC publication of the session-calendar joint resolution; see decisions.md § 2026-06-07.
-  { name: '2026 Regular Session', start: '2026-01-06', end: '2026-04-15', type: 'regular' },
+  {
+    name: '2026 Regular Session',
+    start: '2026-01-06',
+    end: '2026-04-15',
+    type: 'regular',
+    milestones: {
+      // Concurrence days: Mar 31–Apr 1; veto recess Apr 2–13; reconvened Apr 14–15.
+      // Source: LRC session calendar (legislature.ky.gov/Documents/RS_Calendar.pdf, updated 04.13.26).
+      vetoRecessStart: '2026-04-02',
+      vetoRecessEnd: '2026-04-14',
+      sineDie: '2026-04-15',
+    },
+  },
   { name: '2025 Regular Session', start: '2025-01-07', end: '2025-04-15', type: 'regular' },
 ];
 
