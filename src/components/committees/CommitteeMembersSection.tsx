@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Typography } from '@mui/material';
+import { Box, Link as MuiLink, Typography } from '@mui/material';
 import { EmptyState } from '@/components/civic/EmptyState';
 import { MemberCompactCard } from '@/components/members/MemberCompactCard';
 import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
@@ -21,9 +21,17 @@ export function CommitteeMembersSection({ members, committeeProfileUrl }: Commit
     return (
       <EmptyState
         message={
-          committeeProfileUrl
-            ? 'No members synced yet. Check the LRC committee profile or run a calendar sync after the next listed meeting.'
-            : 'No members synced yet. Run a legislative calendar sync after this committee appears on the LRC calendar.'
+          committeeProfileUrl ? (
+            <>
+              Member roster not yet available.{' '}
+              <MuiLink href={committeeProfileUrl} target="_blank" rel="noopener noreferrer">
+                View the official LRC committee profile
+              </MuiLink>{' '}
+              for the current membership.
+            </>
+          ) : (
+            'Member roster not yet available. Check back after this committee\'s next scheduled meeting.'
+          )
         }
       />
     );

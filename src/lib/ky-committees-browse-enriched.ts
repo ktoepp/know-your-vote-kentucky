@@ -74,7 +74,7 @@ export async function fetchKyCommitteesBrowseEnriched(): Promise<KYCommitteeBrow
     meetingsByCommittee.set(m.committee_id, list);
   }
 
-  return committees.map((committee) => {
+  const cards = committees.map((committee) => {
     const committeeMeetings = meetingsByCommittee.get(committee.id) ?? [];
     const members = buildCommitteeMemberDisplay(committee, committeeMeetings, roster);
     const leadershipNames = leadershipFromMembers(members);
@@ -84,6 +84,24 @@ export async function fetchKyCommitteesBrowseEnriched(): Promise<KYCommitteeBrow
       ...committee,
       leadershipNames,
       topicTags,
+      _memberCount: members.length,
     };
   });
+
+  // Suppress zero-member entries when an identically-named committee with members exists.
+  // This deduplicates pairs that arise when migration seeds and calendar sync create separate
+  // rows for the same real-world committee (same name, different lrc_rsn or committee_type).
+  const nameToMaxMembers = new Map<string, number>();
+  for (const c of cards) {
+    const key = c.name.trim().toLowerCase();
+    nameToMaxMembers.set(key, Math.max(nameToMaxMembers.get(key) ?? 0, c._memberCount));
+  }
+
+  return cards
+    .filter((c) => {
+      const key = c.name.trim().toLowerCase();
+      const max = nameToMaxMembers.get(key) ?? 0;
+      return max === 0 || c._memberCount > 0;
+    })
+    .map(({ _memberCount: _mc, ...c }) => c);
 }

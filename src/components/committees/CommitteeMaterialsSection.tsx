@@ -64,7 +64,19 @@ export function CommitteeMaterialsSection({
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Documents posted by the Legislative Research Commission (LRC) for past committee meetings —
-        agendas, minutes, presentations, and supporting exhibits. Files open on LRC.
+        agendas, minutes, presentations, and supporting exhibits. Files open on LRC.{' '}
+        {committeeProfileUrl ? (
+          <>
+            Links may become unavailable after a session ends — if a document can&rsquo;t be opened,
+            try the{' '}
+            <MuiLink href={committeeProfileUrl} target="_blank" rel="noopener noreferrer">
+              LRC committee profile
+            </MuiLink>
+            .
+          </>
+        ) : (
+          'Links may become unavailable after a session ends.'
+        )}
       </Typography>
 
       {groups.length === 0 ? (

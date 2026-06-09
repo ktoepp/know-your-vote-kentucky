@@ -585,3 +585,29 @@ Closed the `TODO` in `src/lib/ky-sessions.ts` (§ 2026-06-07). Dates sourced fro
 - **sineDie:** 2026-04-15 — final adjournment (already matched `session.end`; confirmed by LRC legislative-record fixture).
 
 **Banner effect:** `getSessionPhase()` now correctly returns `'interim'` for today (we are past `session.end`), but `veto_recess` and `final_days` will render correctly if `asOf` is backfilled to an April date for QA or screenshot purposes. The `SessionBannerServer` copy for each phase was already implemented in the 2026-06-01 milestones work.
+
+---
+
+## 2026-06-08 — /committees data quality: empty-state copy, PDF staleness note, browse dedup
+
+**Context:** `/design-critique` audit of `kyvky.com/committees` found three data-quality issues affecting user trust: (1) 27 of 69 committee cards (39%) showed no member data with operator-facing error text; (2) PDF document links from the LRC `CommitteeDocuments` server silently 404 in a new tab with a raw IIS error page; (3) some committee entries were duplicated — a seeded placeholder (migration 027 / calendar sync) and a synced entry with the same name but different `lrc_rsn` or `committee_type`, causing both to appear in the browse grid.
+
+### Empty state copy (`src/components/committees/CommitteeMembersSection.tsx`)
+Replaced the operator-facing strings ("No members synced yet. Check the LRC committee profile or run a calendar sync after the next listed meeting." / "…Run a legislative calendar sync…") with user-facing copy that links to the LRC committee profile when one is available, and a plain honest fallback otherwise. **Why:** the old strings exposed internal tooling vocabulary to constituents. **New pattern:** "Member roster not yet available. [View the official LRC committee profile →] for the current membership."
+
+### PDF staleness note (`src/components/committees/CommitteeMaterialsSection.tsx`)
+Extended the existing section description to include: "Links may become unavailable after a session ends — if a document can't be opened, try the [LRC committee profile ↗]." When no profile URL is available the fallback drops the link. **Why:** LRC rotates `CommitteeDocuments/{rsn}` file paths after each session; the quick-facts "8 meeting materials" count is accurate for what's stored but doesn't reflect whether those URLs are still live. **Trade-off:** a visible staleness note is less precise than per-link status badges; per-link status would require adding a `link_status` column to `ky_committee_materials` and a background probe job — deferred (see backlog below).
+
+### Browse dedup (`src/lib/ky-committees-browse-enriched.ts`)
+Added a post-fetch name-based dedup in `fetchKyCommitteesBrowseEnriched`: after building member counts, group by lowercase-trimmed name; if multiple entries share the same name and at least one has members, suppress all zero-member duplicates. **Why:** migration 027 seeds IJ/S-type committees that sometimes already exist under a different `lrc_rsn` or `committee_type` from the live calendar sync — the unique constraint is `(lrc_rsn, committee_type)` so both rows survive and both appear on the browse page. **Trade-off:** if the calendar-synced version is itself empty (no meetings yet), both would still show; the filter only suppresses the zero-member entry when a populated twin exists. This handles the Budget Review Subcommittee duplicate pairs and the `Administrative Regulation(s) Review Subcommittee` near-duplicates. **Intentionally not deduped at DB level:** the seeded rows carry correct `profile_url` values and are used by the detail page; deleting them would break follows + materials links. The JS-layer filter is the correct surface.
+
+### Syncs run (2026-06-08)
+- `npm run sync:ky:lrc-calendar` — refreshed 6 meetings, 21 agenda lines; `member_refs` updated for this week's calendar window.
+- `npm run sync:ky:lrc-committee-materials` — 20 new docs inserted, 1,050 updated across 39 committees; 30 committees have no materials page on LRC yet (interim period committees awaiting first meeting).
+- `npm run backfill:lrc:calendar` — Wayback backfill run to pull historical `member_refs` from prior calendar snapshots.
+
+### Deferred / backlog items (not built this session)
+- **Per-link 404 detection:** add `link_status TEXT` + `link_checked_at TIMESTAMPTZ` columns to `ky_committee_materials`; extend the weekly accuracy-audit `ACCURACY_PROBE_LINKS` pass to HEAD-check stored material URLs and mark broken ones. Render broken links with an `(unavailable)` suffix on the detail page. LRC rotates paths after each session, so this will keep recurring.
+- **DB-level committee dedup:** identify the specific RSN pairs where migration 027 and the live sync created duplicate rows (same real-world committee, different `lrc_rsn` or `committee_type`); write a one-time migration to reassign child rows (`ky_committee_meetings`, `ky_committee_follows`, `ky_committee_materials`) from the lower-quality row to the higher-quality one and delete the stub. The JS-layer dedup is the interim solution.
+- **Interim member roster population:** all 16 `interim-joint-*` committees still show 0 members because `member_refs` on meeting rows is empty — the LRC calendar HTML lists committees and times but not rosters. The authoritative source is the LRC committee-detail page per committee. A one-time scrape of each `profile_url` to parse the member table (Chair + Members list) and write to `member_refs` on the next scheduled meeting would close this gap. See `legislature.ky.gov/Committees/committee-detail?CommitteeRSN={rsn}&CommitteeType=IJ`.
+- **"Meeting materials" count caveat:** the quick-facts panel shows "N meeting materials" counted from the DB, not from live LRC. Consider adding "(some may be unavailable)" or capping the display to reflect only recently-probed-live docs once the per-link probe job ships.
