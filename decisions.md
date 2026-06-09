@@ -518,3 +518,15 @@ Canvas row #18 ("Status mapper doesn't preserve furthest progress") was already 
 - **Intentionally not instrumented:** per-topic toggle clicks on `/profile` — would spam one event per checkbox click; the explicit save path for frequency/event-types is the stable signal.
 - **Client-only:** all via `posthog-js`; no `posthog-node` dependency added.
 - **Revisit if:** product wants committee-follow or saved-search events for the same Action-subscription use case — follow the same "named helper, fire after API success" pattern.
+
+---
+
+## 2026-06-09 — 2026 RS milestones populated
+
+Closed the `TODO` in `src/lib/ky-sessions.ts` (§ 2026-06-07). Dates sourced from the LRC published session calendar (`legislature.ky.gov/Documents/RS_Calendar.pdf`, updated 2026-04-13) and confirmed by NKYTribune coverage of the session close.
+
+- **vetoRecessStart:** 2026-04-02 — chambers adjourned after concurrence days (Mar 31–Apr 1); governor's 10-day window began.
+- **vetoRecessEnd:** 2026-04-14 — chambers reconvened to consider veto overrides.
+- **sineDie:** 2026-04-15 — final adjournment (already matched `session.end`; confirmed by LRC legislative-record fixture).
+
+**Banner effect:** `getSessionPhase()` now correctly returns `'interim'` for today (we are past `session.end`), but `veto_recess` and `final_days` will render correctly if `asOf` is backfilled to an April date for QA or screenshot purposes. The `SessionBannerServer` copy for each phase was already implemented in the 2026-06-01 milestones work.
