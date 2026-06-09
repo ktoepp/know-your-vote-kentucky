@@ -72,13 +72,13 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   hjr: {
     category: 'bill_types',
     title: "House Joint Resolution (HJR)",
-    content: "A formal action that needs approval from both the House and Senate. Often used to propose constitutional amendments or make official statements."
+    content: "A formal action that requires approval from both the House and Senate. Commonly used for interim study requests, adjourning the session, ratifying federal constitutional amendments, or making official statements. Joint resolutions that have the force of law must be presented to the Governor; purely procedural ones (such as adjournment) do not (Ky. Const. § 56)."
   },
 
   sjr: {
     category: 'bill_types',
     title: "Senate Joint Resolution (SJR)",
-    content: "A formal action requiring approval from both the Senate and House. Often used to propose constitutional amendments or make official statements. Introduced in the Senate."
+    content: "A formal action requiring approval from both the Senate and House. Commonly used for interim study requests, adjourning the session, ratifying federal constitutional amendments, or making official statements. Joint resolutions that have the force of law must be presented to the Governor; purely procedural ones (such as adjournment) do not (Ky. Const. § 56). Introduced in the Senate."
   },
 
   hcr: {
@@ -96,7 +96,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   hr: {
     category: 'bill_types',
     title: "House Resolution (HR)",
-    content: "A resolution that only affects the House of Representatives itself — such as internal rules or ceremonial recognitions. The Senate doesn't have to approve it."
+    content: "A resolution that only affects the Kentucky House itself — such as internal rules or ceremonial recognitions. The Senate doesn't have to approve it."
   },
 
   sr: {
@@ -128,7 +128,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   first_reading: {
     category: 'bill_status_and_stages',
     title: "First Reading",
-    content: "Kentucky law requires each bill to be read aloud three times before a final vote. The first reading is a procedural step — usually just the bill's title — that officially starts the process."
+    content: "Ky. Constitution § 46 requires each bill to be read on three separate days before a final vote — a genuine constitutional constraint. The first reading is a procedural step, usually just the bill's title, that officially starts the process."
   },
 
   second_reading: {
@@ -140,7 +140,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   third_reading: {
     category: 'bill_status_and_stages',
     title: "Third Reading",
-    content: "The final required reading before the full chamber votes. A bill that passes on third reading moves to the other chamber."
+    content: "The final required reading before the full chamber votes. In the first chamber, a bill that passes on third reading moves to the other chamber; in the second, it moves to enrollment and the Governor."
   },
 
   in_committee: {
@@ -176,7 +176,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   floor_amendment: {
     category: 'bill_status_and_stages',
     title: "Floor Amendment",
-    content: "A change proposed to the bill while it is being debated by the full chamber — not in committee. Any member can offer a floor amendment."
+    content: "A change proposed to the bill while it is being debated by the full chamber — not in committee. Any member of that chamber can offer a floor amendment."
   },
 
   passed: {
@@ -194,7 +194,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   engrossed: {
     category: 'bill_status_and_stages',
     title: "Engrossed",
-    content: "The bill passed one chamber and has been printed in its final, amended form — ready to be formally sent to the other chamber."
+    content: "The bill has been formally printed in its final, amended form following passage in one chamber — the clean copy prepared for official transmittal to the other chamber."
   },
 
   enrolled: {
@@ -206,19 +206,19 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   enacted: {
     category: 'bill_status_and_stages',
     title: "Enacted / Became Law",
-    content: "The Governor signed the bill, or it became law without the Governor's signature. Most enacted laws don't take effect immediately — they become effective 90 days after the General Assembly adjourns, unless the bill included an emergency clause or specified a different date (Ky. Constitution § 55)."
+    content: "The bill became law — by the Governor's signature, by the General Assembly overriding the Governor's veto, or by the Governor taking no action within the required timeframe. Most enacted laws don't take effect immediately — they become effective 90 days after the General Assembly adjourns, unless the bill included an emergency clause or specified a different date (Ky. Constitution § 55)."
   },
 
   signed_by_governor: {
     category: 'bill_status_and_stages',
     title: "Signed by Governor",
-    content: "The Governor has approved and signed the bill. It will be delivered to the Secretary of State and chaptered in the Kentucky Revised Statutes. Most laws take effect 90 days after the session adjourns — unless the bill included an emergency clause or specified a different effective date."
+    content: "The Governor has approved and signed the bill. It will be delivered to the Secretary of State and assigned a chapter number in the Acts of the Kentucky General Assembly. Most laws take effect 90 days after the session adjourns — unless the bill included an emergency clause or specified a different effective date."
   },
 
   chaptered: {
     category: 'bill_status_and_stages',
     title: "Chaptered",
-    content: "The bill has been assigned a chapter number in the Kentucky Revised Statutes (KRS) and filed with the Secretary of State. Chaptering is the final publishing step — but most laws don't take effect until 90 days after the General Assembly adjourns, unless an emergency clause or a specific effective date was included."
+    content: "The bill has been assigned a chapter number in the Acts of the Kentucky General Assembly (session law) and filed with the Secretary of State. The LRC separately codifies the changes into the Kentucky Revised Statutes (KRS). Most laws don't take effect until 90 days after the General Assembly adjourns, unless an emergency clause or a specific effective date was included."
   },
 
   vetoed: {
@@ -300,31 +300,31 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   lrc: {
     category: 'legislative_bodies_and_people',
     title: "Legislative Research Commission (LRC)",
-    content: "The nonpartisan staff agency that supports the Kentucky General Assembly. The LRC provides bill drafting services, conducts policy research, and handles the legislature's day-to-day operations. It's overseen by a committee of legislative leaders."
+    content: "The nonpartisan staff agency that supports the Kentucky General Assembly. The LRC provides bill drafting services, conducts policy research, and handles the legislature's day-to-day operations. It is overseen by a statutory committee of House and Senate leaders (KRS 7.090)."
   },
 
   sponsor: {
     category: 'legislative_bodies_and_people',
     title: "Sponsor",
-    content: "The legislator who wrote and introduced the bill. They're the bill's main advocate as it moves through the process."
+    content: "The legislator who introduced the bill. They're its main advocate as it moves through the process — though the actual drafting is often done by Legislative Research Commission staff."
   },
 
   cosponsor: {
     category: 'legislative_bodies_and_people',
     title: "Co-sponsor",
-    content: "A legislator who formally signs on to support a bill someone else wrote. Co-sponsors show that a bill has broader support, but they didn't author it."
+    content: "A legislator who formally signs on to support a bill someone else introduced. Co-sponsors show that a bill has broader support, but they didn't introduce it."
   },
 
   speaker: {
     category: 'legislative_bodies_and_people',
     title: "Speaker of the House",
-    content: "The elected leader of the Kentucky House of Representatives. The Speaker decides which bills get floor time, assigns members to committees, and keeps order during debate."
+    content: "The leader of the Kentucky House of Representatives, chosen by House members from among themselves. The Speaker decides which bills get floor time, assigns members to committees, and keeps order during debate."
   },
 
   senate_president: {
     category: 'legislative_bodies_and_people',
     title: "President of the Senate",
-    content: "The elected leader of the Kentucky Senate. The President sets the Senate's agenda, assigns members to committees, and runs floor proceedings."
+    content: "The leader of the Kentucky Senate, chosen by Senate members from among themselves. The President sets the Senate's agenda, assigns members to committees, and runs floor proceedings."
   },
 
   majority_leader: {
@@ -382,7 +382,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   unanimous_consent: {
     category: 'procedures_and_voting',
     title: "Unanimous Consent",
-    content: "When every member agrees to something without holding a formal vote — for example, skipping a procedural reading or extending debate time. Any single member can object and block it."
+    content: "When every member agrees to something without holding a formal vote — for example, skipping a procedural reading or waiving a rule. Any single member can object and block it."
   },
 
   discharge_petition: {
@@ -406,7 +406,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   floorVote: {
     category: 'procedures_and_voting',
     title: "Floor Vote",
-    content: "A vote by the full chamber — all 100 House members or all 38 Senators — on whether to pass a bill. This is the chamber's official decision."
+    content: "A vote in which the full House or Senate — members present — votes on whether to pass a bill, as opposed to a vote only in committee. This is the chamber's official decision."
   },
 
   conference_committee: {
@@ -424,13 +424,13 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   motion_to_reconsider: {
     category: 'procedures_and_voting',
     title: "Motion to Reconsider",
-    content: "A request to hold another vote on something that was just decided. In Kentucky, only a member who voted on the winning side can make this motion."
+    content: "A request to hold another vote on something that was just decided. Under chamber rules, typically only a member who voted on the prevailing side may make this motion."
   },
 
   concurrence: {
     category: 'procedures_and_voting',
     title: "Concurrence",
-    content: "When a chamber agrees to the other chamber's changes to a bill it already passed. The originating chamber votes to 'concur' in the amendments — or to refuse, which sends the bill to a conference committee. Concurrence votes cluster near the end of session."
+    content: "A vote in which a chamber accepts the other chamber's amendments to a bill it already passed. If it concurs, the bill advances to the Governor. If it refuses, the chamber may recede from its own amendments, the bill may die, or both chambers can agree to form a conference committee to negotiate a compromise. Concurrence votes cluster near the end of session."
   },
 
   veto_recess: {
@@ -456,7 +456,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   fiscal_note: {
     category: 'procedures_and_voting',
     title: "Fiscal Note",
-    content: "An official estimate of how much a bill would cost (or save) state or local government if it becomes law. In Kentucky it's prepared by the nonpartisan staff of the Legislative Research Commission (LRC). A bill's sponsor, a committee or its chair, or the chamber can request one (Legislative Rule 52), and a fiscal statement examining any provision with fiscal effects is typically attached to the measure before the chamber takes final action."
+    content: "An official estimate of how much a bill would cost (or save) state or local government if it becomes law, prepared under KRS 6.955–6.960. A bill's sponsor, a committee or its chair, or the chamber can request one; when prepared, it is attached to the measure before the chamber takes final action."
   },
 
   // ── Timeline Stage Labels ───────────────────────────────────────────────────
@@ -464,7 +464,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   timeline_introduced: {
     category: 'bill_status_and_stages',
     title: "Introduced",
-    content: "A legislator has formally filed this bill with the General Assembly. It now has a bill number and will be assigned to a committee."
+    content: "A legislator has formally filed this bill with the General Assembly. It now has a bill number and is typically referred to a committee by the Speaker or Senate President."
   },
 
   timeline_committee: {
@@ -526,7 +526,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   ballotpedia: {
     category: 'external_references',
     title: "Ballotpedia",
-    content: "A nonpartisan, nonprofit online encyclopedia of American politics. Ballotpedia profiles include a legislator's background, campaign history, and voting record."
+    content: "An online encyclopedia of American politics. Ballotpedia profiles include a legislator's background and campaign history."
   },
 };
 
@@ -588,7 +588,7 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
   yea: {
     category: 'procedures_and_voting',
     title: "Yea (Yes) Votes",
-    content: "The number of legislators who voted for the bill or amendment. A bill usually needs a simple majority of members present to pass."
+    content: "The number of legislators who voted for the bill or amendment. Final passage of a bill requires a majority of all members elected to that chamber — 51 in the House, 20 in the Senate (Ky. Const. § 46). Some procedural votes need only a majority of those present."
   },
   nay: {
     category: 'procedures_and_voting',
@@ -598,12 +598,12 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
   nv: {
     category: 'procedures_and_voting',
     title: "Not Voting (NV)",
-    content: "Legislators who were present but didn't cast a vote, or who were absent. Not-voting members don't count toward the total needed to pass."
+    content: "Legislators who were present for the vote but chose not to cast a vote. They are not counted as No votes, but because passage requires a majority of all members elected (51 House / 20 Senate), each not-voting member is one fewer Yes vote available."
   },
   absent: {
     category: 'procedures_and_voting',
     title: "Absent",
-    content: "Legislators who weren't present during the vote. Absent members don't affect the outcome."
+    content: "Legislators who were not present during the vote. They are not counted as No votes, but because passage requires a majority of all members elected (51 House / 20 Senate), each absent member is one fewer Yes vote available."
   },
 
   // ── Subject Topics (KY_TOPICS taxonomy) ─────────────────────────────────────

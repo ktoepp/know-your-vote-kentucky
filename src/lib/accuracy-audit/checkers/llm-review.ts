@@ -10,7 +10,7 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { governmentTooltips } from '../../tooltipContent';
+import { governmentTooltips, voteCountTooltips } from '../../tooltipContent';
 import { makeRng, sampleTable, seededShuffle } from '../sampling';
 import {
   summarizeResult,
@@ -196,11 +196,9 @@ async function reviewGlossary(
   client: Anthropic,
   findings: Finding[],
 ): Promise<number> {
-  const entries = Object.entries(governmentTooltips).map(([key, t]) => ({
-    key,
-    title: t.title,
-    content: clip(t.content, 600),
-  }));
+  const entries = [...Object.entries(governmentTooltips), ...Object.entries(voteCountTooltips)].map(
+    ([key, t]) => ({ key, title: t.title, content: clip(t.content, 600) }),
+  );
   // Seed-shuffle so the sampled glossary terms vary per run (reproducible by seed).
   const items = seededShuffle(entries, makeRng(cfg.seed ^ 0xc2b2ae35)).slice(0, cfg.llmSample);
   if (items.length === 0) return 0;

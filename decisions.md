@@ -521,6 +521,61 @@ Canvas row #18 ("Status mapper doesn't preserve furthest progress") was already 
 
 ---
 
+## 2026-06-08 — LLM glossary review: extend coverage to voteCountTooltips
+
+**Change:** `src/lib/accuracy-audit/checkers/llm-review.ts` `reviewGlossary` previously built its entry pool from `governmentTooltips` only. Extended to merge both `governmentTooltips` (76 entries) and `voteCountTooltips` (25 entries — 4 vote-count labels + 21 `topic_*` subject descriptions) into a single 101-entry pool that is seed-shuffled and sampled each run.
+
+**Why it was a gap:** `voteCountTooltips` is the same shape (`{title, content}`) as `governmentTooltips` and is user-visible on the vote-tally UI and the bill-detail topic chips, yet was silently excluded from all LLM review passes.
+
+**First-run findings (seed=3525153774):** two `voteCountTooltips` entries flagged as `warn` — confirm against primary sources before editing:
+- `yea`: "majority of members present" is accurate for some procedural votes but misleading for final passage, which Ky. Const. § 46 requires a majority of all members elected (51 House / 20 Senate).
+- `nv`: conflates "present but not voting" and "absent" as a single status (KY roll calls record them separately); the claim they "don't count toward the total needed to pass" is misleading because passage requires a majority of members elected, making NV/absent votes effectively count against. See TASKS.md backlog § "NEEDS TRIAGE 2026-06-08."
+
+**Scope of advisory cap:** LLM findings remain capped at `warn` and never hard-fail the run per the 2026-06-03 decision. Verify `yea`/`nv` wording against Ky. Const. §§ 46, 88 before making edits.
+
+**Tooltip content fixes applied (2026-06-08):** six entries in `src/lib/tooltipContent.ts` were corrected based on the first-run findings and two additional seeds (3525153774, 42):
+
+| Entry | Change |
+|---|---|
+| `yea` | "majority of members present" → "majority of all members elected (51/20), some procedural votes need only members present" (Ky. Const. § 46) |
+| `nv` | Removed conflation with absent; "same effect as No" → "one fewer Yes available" |
+| `absent` | Same framing fix as `nv` |
+| `concurrence` | Fixed logic inversion (conference follows refusal, not agreement); added "bill may die" as an outcome |
+| `floorVote` | "all 100 members / all 38 Senators" → "members present" |
+| `lrc` | "a committee of legislative leaders" → "co-chaired by the Speaker of the House and the Senate President, along with other designated legislative leaders" |
+
+**Residual LLM warnings after iteration:** `Concurrence` and `Introduced` continued to generate warns on seed=3525153774 after multiple rounds. The `Introduced` warn cited a phrase ("will be assigned") that does not appear in the entry — confirmed hallucination. The `Concurrence` warn became self-contradictory across iterations (the model alternately criticized and endorsed the same phrasing). Both are dismissed as advisory noise consistent with the 2026-06-03 decision; the remaining topic-classifier warns (HB426, HB546, HB739) are data issues for the classifier, not content edits.
+
+**Full 8-seed triage pass (2026-06-08):** Extended the session to resolve all remaining glossary issues across seeds 1/2/3/7/11/99/1234/5678. Additional entries corrected beyond the first-run findings above:
+
+| Entry | Change |
+|---|---|
+| `hjr` / `sjr` | Ky. Const. § 56: substantive JRs must go to Governor; purely procedural ones (adjournment) don't — blanket "no Governor signature" was wrong |
+| `first_reading` | Removed "rapid succession" claim — Ky. Const. § 46 three-separate-days is a genuine constraint, not routinely collapsed |
+| `third_reading` | "moves to the other chamber" is only true in first chamber; second-chamber passage goes to enrollment and Governor |
+| `sponsor` | "wrote" → "introduced"; LRC staff typically draft the text |
+| `cosponsor` | "wrote" → "introduced" |
+| `speaker` / `senate_president` | "elected leader" → "chosen by [chamber] members from among themselves" (internal election, not public) |
+| `unanimous_consent` | Removed "extending debate time" example — that's a US Congress / filibuster concept with no KY equivalent |
+| `fiscal_note` | Removed attribution to specific preparer (LLM gave 3 contradictory answers across seeds); cite KRS 6.955–6.960; "when prepared" not "typically attached" |
+| `chaptered` | "Kentucky Revised Statutes" → "Acts of the Kentucky General Assembly"; LRC codifies into KRS as a separate step |
+| `signed_by_governor` | Same Acts-of-GA fix |
+| `enacted` | Added veto override as a third enactment path (Governor's signature / inaction / override) |
+| `floor_amendment` | "Any member" → "Any member of that chamber" |
+| `motion_to_reconsider` | "winning side" → "prevailing side under chamber rules" (softened; KY-specific rule uncertain) |
+| `timeline_introduced` | "will be assigned" → "typically referred … by the Speaker or Senate President" (leadership controls referral) |
+| `engrossed` | Reframed as clean-copy preparation rather than post-passage confirmation |
+| `ballotpedia` | Removed "nonprofit" (nonprofit status disputed) and "voting record" (KY leg profiles unreliable for that) |
+| `concurrence` | Added recede option and "bill may die" as alternatives to conference committee |
+
+**Deliberate non-fixes after iteration:**
+- `chaptered` 90-day effective date: LLM gave contradictory verdicts across seeds; Ky. Const. § 55 is explicit that 90 days runs from adjournment; current text is correct.
+- `fiscal_note` preparer: three distinct, contradictory attributions across seeds — stripped to statute citation only rather than risk introducing a new error.
+- `topic_education` SEEK→SFCC: seed=99 hallucinated this claim twice (SFCC is the *School Facilities Construction Commission*, not a per-pupil formula); SEEK reverted.
+- `passed`, `concurrence`, `senate_president`, `alcohol_cannabis`: remaining warns are marginal omissions or editorial hedging, not factual errors; all capped at advisory per the 2026-06-03 decision.
+
+---
+
 ## 2026-06-09 — 2026 RS milestones populated
 
 Closed the `TODO` in `src/lib/ky-sessions.ts` (§ 2026-06-07). Dates sourced from the LRC published session calendar (`legislature.ky.gov/Documents/RS_Calendar.pdf`, updated 2026-04-13) and confirmed by NKYTribune coverage of the session close.
