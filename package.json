@@ -35,6 +35,8 @@
     "topics:reclassify:dry": "tsx scripts/reclassify-bill-topics.ts --dry-run",
     "audit:legiscan-subjects": "tsx scripts/audit-legiscan-subjects.ts",
     "diagnose:legislators": "tsx scripts/diagnose-legislators.ts",
+    "reconcile:committee-memberships": "tsx scripts/reconcile-committee-memberships.ts",
+    "remap:recommittal-statuses": "tsx scripts/remap-recommittal-statuses.ts",
     "generate:district-thumbnails": "tsx scripts/generate-district-thumbnails.ts",
     "debug:openstates-roster": "tsx scripts/debug-openstates-roster.ts",
     "spike:lrc:calendar": "tsx scripts/lrc-calendar-spike.ts",

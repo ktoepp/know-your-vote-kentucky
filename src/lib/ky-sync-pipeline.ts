@@ -14,7 +14,11 @@ import {
 } from './ky-data-sources';
 import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 import { classifyTopics } from './ky-topic-classifier';
-import { extractCommitteeMembershipSlugsFromOpenStatesPerson } from './ky-committee-utils';
+import {
+  committeeSlugFromName,
+  extractCanonicalCommitteeSlugsFromOpenStatesPerson,
+  extractCommitteeMembershipSlugsFromOpenStatesPerson,
+} from './ky-committee-utils';
 import { legislatorNameMatchesLegiscanSessionPerson } from './ky-member-committees';
 import { legiscanSubjectColumnsFromDetail } from './ky-legiscan-subjects';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
@@ -1119,6 +1123,15 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       return { source, status: 'success', itemsSynced: legislators.length, duration: Date.now() - start };
     }
     const db = getSupabase();
+
+    // Build canonical slug map from ky_committees so committee_memberships stores
+    // slugs that exactly match ky_committees.slug (eliminating substring-matching fragility).
+    const { data: committeeRows } = await db.from('ky_committees').select('slug, name');
+    const canonicalCommitteeMap = new Map<string, string>();
+    for (const row of committeeRows ?? []) {
+      if (row.slug && row.name) canonicalCommitteeMap.set(committeeSlugFromName(row.name), row.slug);
+    }
+
     const rows = legislators.map((leg) => {
       const cr = openStatesCurrentRole(leg);
       const org = cr?.org_classification;
@@ -1128,7 +1141,10 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
       const { lrcProfileUrl, otherWebsiteUrl } = extractOpenStatesLegislatorWebLinks(leg);
       const { first_name, last_name } = openStatesLegislatorNames(leg);
       const { email, phone } = extractOpenStatesContactDetails(leg);
-      const committee_memberships = extractCommitteeMembershipSlugsFromOpenStatesPerson(leg);
+      const committee_memberships =
+        canonicalCommitteeMap.size > 0
+          ? extractCanonicalCommitteeSlugsFromOpenStatesPerson(leg, canonicalCommitteeMap)
+          : extractCommitteeMembershipSlugsFromOpenStatesPerson(leg); // fallback when ky_committees not yet seeded
       const external_links = buildLegislatorExternalLinks(leg.links);
       return {
         openstates_id: leg.id,
