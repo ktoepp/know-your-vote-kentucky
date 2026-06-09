@@ -92,8 +92,15 @@ export function mapLegiScanBillStatus(statusCode: number, lastAction: string): s
   // "To: Interim Joint Committee on Health and Welfare" or a second-chamber "(H)"/"(S)" referral.
   // The status code is the authoritative milestone record; the latest action reflects the
   // most-recent procedural step.
+  //
+  // Exception: recommittals ("recommitted to House A&R (H)") are genuine backward steps — the bill
+  // returns to the originating chamber's committee, so "In Committee" is correct. The guard does
+  // not apply when the action text contains "recommit".
+  // Expected: mapLegiScanBillStatus(2, 'recommitted to House Appropriations & Revenue (H)') → 'In Committee'
+  //           mapLegiScanBillStatus(2, 'to Senate Agriculture (S)') → 'Engrossed'  (forward referral)
   const CHAMBER_PASSED_CODES = new Set([2, 3, 4]);
-  if (CHAMBER_PASSED_CODES.has(statusCode) && isCommitteeReferral) {
+  const isRecommittal = /recommit/i.test(action);
+  if (CHAMBER_PASSED_CODES.has(statusCode) && isCommitteeReferral && !isRecommittal) {
     return LEGISCAN_STATUS_MAP[statusCode] || 'Introduced';
   }
 

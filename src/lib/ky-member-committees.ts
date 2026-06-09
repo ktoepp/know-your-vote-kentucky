@@ -122,8 +122,9 @@ function assignmentsFromLrcCalendar(
 }
 
 /**
- * Committee assignments for a member profile: Open States slugs when synced,
- * otherwise LRC legislative calendar `member_refs` on committee meetings.
+ * Committee assignments for a member profile: LRC legislative calendar `member_refs` first
+ * (provides role labels — Chair, Vice Chair, etc.), Open States slugs as fallback when the
+ * legislator hasn't appeared in any calendar meeting yet (e.g. newly assigned before first meeting).
  */
 export async function fetchCommitteeAssignmentsForLegislator(
   leg: KYLegislator,
@@ -131,11 +132,11 @@ export async function fetchCommitteeAssignmentsForLegislator(
 ): Promise<MemberCommitteeAssignment[]> {
   if (leg.chamber !== 'house' && leg.chamber !== 'senate') return [];
 
-  const fromOs = assignmentsFromOpenStatesSlugs(leg, committees);
-  if (fromOs.length > 0) return fromOs;
-
   const meetings = await fetchCalendarCommitteeMeetingRows();
-  return assignmentsFromLrcCalendar(leg, meetings);
+  const fromLrc = assignmentsFromLrcCalendar(leg, meetings);
+  if (fromLrc.length > 0) return fromLrc;
+
+  return assignmentsFromOpenStatesSlugs(leg, committees);
 }
 
 /** Exported for sync backfill: map LRC district number → committee slugs seen on calendar. */
