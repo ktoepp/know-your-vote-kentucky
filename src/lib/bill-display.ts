@@ -74,6 +74,25 @@ export function formatKyIsoDateShort(iso: string | null | undefined): string {
   return formatCivicDate(iso, { month: 'short', day: 'numeric', year: 'numeric' }) ?? '';
 }
 
+/**
+ * True when the status indicates a bill is still pending legislative action.
+ * Used to decide whether to show "Adjourned Sine Die" once the session has ended.
+ */
+export function isActivePendingBillStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  if (!s) return false;
+  return (
+    s === 'introduced' ||
+    s === 'in committee' ||
+    s === 'referred' ||
+    s === 'reported' ||
+    s === 'draft' ||
+    s.includes('prefiled') ||
+    (s.includes('committee') && !s.includes('failed') && !s.includes('substitute'))
+  );
+}
+
 /** Governor has signed the bill (KY sync often stores short label "Signed"). */
 export function isSignedByGovernorBillStatus(status: string | null | undefined): boolean {
   if (status == null) return false;

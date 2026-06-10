@@ -11,9 +11,11 @@ import {
   billStatusToTooltipKey,
   classifyKyBillBrowseBucket,
   formatBillLabelText,
+  isActivePendingBillStatus,
   isSignedByGovernorBillStatus,
 } from '@/lib/bill-display';
 import { governmentTooltips } from '@/lib/tooltipContent';
+import { sessionHasEnded } from '@/lib/ky-sessions';
 
 const STATUS_TOOLTIP_POPPER_SX = {
   maxWidth: 340,
@@ -69,9 +71,15 @@ type BillStatusMetaChipProps = {
 };
 
 export function BillStatusMetaChip({ bill, statusOverride, variant = 'card' }: BillStatusMetaChipProps) {
-  const status = statusOverride ?? bill.status;
+  const rawStatus = statusOverride ?? bill.status;
   const billForBucket = statusOverride != null && statusOverride !== bill.status ? { ...bill, status: statusOverride } : bill;
-  if (!status) return null;
+  if (!rawStatus) return null;
+
+  // Bills still "In Committee" (or similarly pending) when the session adjourned are dead.
+  const status =
+    sessionHasEnded(bill.session) && isActivePendingBillStatus(rawStatus)
+      ? 'Adjourned Sine Die'
+      : rawStatus;
 
   const signed = isSignedByGovernorBillStatus(status);
   const chaptered = status.trim().toLowerCase().includes('chaptered');

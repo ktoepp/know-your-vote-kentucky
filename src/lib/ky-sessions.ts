@@ -176,6 +176,19 @@ export function getInterimPeriod(asOf: Date = new Date()): KYInterimPeriod | nul
   return { name, start, end, previousSession: previous, nextSession: next };
 }
 
+/**
+ * True when the named session's sine die (or end) date has passed.
+ * Returns false for unknown session names so we never silently mislabel bills.
+ */
+export function sessionHasEnded(sessionName: string | null | undefined, asOf: Date = new Date()): boolean {
+  if (!sessionName) return false;
+  const normalized = sessionName.trim();
+  const session = KY_SESSIONS.find((s) => s.name.toLowerCase() === normalized.toLowerCase());
+  if (!session) return false;
+  const cutoff = session.milestones?.sineDie ?? session.end;
+  return atNoon(asOf.toISOString().slice(0, 10)) > atEndOfDay(cutoff);
+}
+
 /** Ongoing window → that session; otherwise the most recent session (for bill/vote display). */
 export function getCivicDataSessionName(asOf: Date = new Date()): string {
   return (getActiveSession(asOf) ?? KY_SESSIONS[0]!).name;
