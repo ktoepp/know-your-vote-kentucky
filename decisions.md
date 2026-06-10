@@ -643,3 +643,49 @@ Three of four scheduled workflows (`accuracy-audit.yml`, `sync-ky-bills-status.y
 ### Vercel — limited visibility
 
 The Vercel MCP `list_projects` call returned an empty array for team `team_gmP71OjnH1pcPVIH72YLmfMX` ("Katie's projects"). This is likely an API token scope issue rather than a real outage — PRs #78–#80 (2026-06-08) all reflect successful Vercel deployments via the normal push-to-main flow. Runtime logs and cron execution history are therefore not included in this check. **Action:** if Vercel monitoring is desired in future health checks, confirm the MCP token has `project:read` scope and that the project is linked to this team in the Vercel dashboard.
+
+---
+
+## 2026-06-09 — Committee membership reconciliation + recommittal mapper bug (PR #84)
+
+Closes the long-deferred accuracy-audit backlog item "Committee membership deep reconciliation vs. Open States roles (normalization-heavy, false-positive-prone)." Addresses three classes of discrepancy plus a related mapper bug discovered during analysis.
+
+### Recommittal mapper bug (`src/lib/map-legiscan-bill-status.ts`)
+
+**Root cause:** the `CHAMBER_PASSED_CODES` guard added in PR #74 (2026-06-04) prevented bills with status code 2/3/4 from being regressed to `In Committee` when the latest action looked like a committee referral. This was correct for forward second-chamber referrals (e.g. `"to Senate Agriculture (S)"` after House engrossment), but it incorrectly blocked recommittals — e.g. `"recommitted to House Appropriations & Revenue (H)"`. A recommittal is a genuine backward step; the bill is back in the originating chamber's committee.
+
+**Fix:** added `isRecommittal = /recommit/i.test(action)` and changed the guard to `CHAMBER_PASSED_CODES.has(statusCode) && isCommitteeReferral && !isRecommittal`. The intent of the original guard is preserved for forward referrals; only recommittals bypass it.
+
+**One-time data correction:** `scripts/remap-recommittal-statuses.ts` (`npm run remap:recommittal-statuses`) — fetches bills in `Engrossed`/`Enrolled`/`Passed` whose `last_action` contains "recommit", re-applies the fixed mapper, and updates to `In Committee`. Idempotent. The existing `scripts/remap-committee-referral-statuses.ts` (PR #74) was the pattern.
+
+### Slug normalization — canonical slugs at sync time (`src/lib/ky-sync-pipeline.ts`, `src/lib/ky-committee-utils.ts`)
+
+**Problem:** `syncKyLegislators` wrote raw Open States-normalized slugs to `committee_memberships` (e.g. `"committee-on-transportation-h"` from a Popolo org name like `"Committee on Transportation (H)"`). `ky_committees.slug` for the same committee is `"transportation-h"` (from the LRC calendar sync). The gap was bridged by `committeeMembershipSlugMatchesFilter()` using fragile substring matching — works for most cases but fails when org names diverge in prepositions or word order.
+
+**Fix:** `syncKyLegislators` now pre-fetches `ky_committees` (one query, ~45 rows) at the start of each sync and builds a canonical `committeeSlugFromName(name) → slug` map. New function `extractCanonicalCommitteeSlugsFromOpenStatesPerson(leg, canonicalMap)` in `ky-committee-utils.ts` resolves each OS Popolo org name to a canonical `ky_committees.slug` — trying exact match, then stripping the Popolo `"committee-on-"` prefix, then substring scan against canonical keys. Org names that don't resolve to any known committee are silently dropped. **This is the false-positive guard** that was the primary reason for deferral: transient bodies, subcommittees, and non-GA commissions only survive if they are already seeded in `ky_committees`.
+
+**Fallback:** if `ky_committees` is empty (fresh DB before migrations 024/027), the old extractor is used — prevents wiping all memberships on a first-run environment.
+
+**TODO left in code:** `committeeMembershipSlugMatchesFilter` can be simplified to exact equality once all DB rows carry canonical slugs (after the first full sync post-PR-merge). The function is kept as-is for backward compat with any rows that haven't been re-synced; the comment marks it for simplification.
+
+### Member profile priority inversion (`src/lib/ky-member-committees.ts`)
+
+**Problem:** `fetchCommitteeAssignmentsForLegislator` tried Open States slugs first and fell back to LRC calendar. But OS slugs produce `roleLabel: null` — no Chair/Vice Chair labels. LRC calendar produces real role labels from the `member_refs` display name format (`"Sen. Jane Doe (Chair)"`). So the member profile showed committees without role labels whenever OS had data, and showed them correctly only when OS was empty (which is most of the time currently, since `roles` may not be returned by the OS v3 bulk endpoint).
+
+**Fix:** inverted to LRC-calendar-primary / OS-fallback. This matches what `buildCommitteeMemberDisplay` in `ky-committee-members.ts` already does for the committee detail page (unchanged). Role labels now appear on member profiles when LRC calendar data is available. OS path activates only when a legislator has not appeared in any meeting's `member_refs` — e.g. newly assigned before their first meeting of the session.
+
+### Audit coverage (`src/lib/accuracy-audit/checkers/legislators.ts`)
+
+Added `committee_memberships` comparison to `checkLegislators`. The checker already fetches the full OS roster; it now re-extracts raw OS slugs for each legislator and diffs against the stored array.
+
+**Severity: `warn`** — per the CI policy established in § 2026-06-03, content findings never fail the build. Committee membership drift is normal between sessions and across OS data update cycles.
+
+**Guard: `osSlugs.size > 0`** — the comparison is skipped entirely when OS returns no roles data. This is the key false-positive protection: if the OS v3 `/people` endpoint doesn't include `roles` in its response (which appears to be the current state), the checker produces zero committee membership findings rather than flagging every legislator as having "unexpected" DB memberships. The guard means the checker becomes useful precisely when OS starts returning roles — at which point drift becomes detectable.
+
+**Format mismatch note:** the checker compares raw OS slugs against DB slugs. Before the first sync post-PR-merge, DB rows may have canonical slugs while the checker computes raw OS slugs — a transient mismatch that resolves automatically on the next scheduled sync. The finding message includes a reminder: `(run sync:ky:legislators to resolve format mismatches)`.
+
+### Diagnostic script (`scripts/reconcile-committee-memberships.ts`)
+
+`npm run reconcile:committee-memberships [--only-mismatches] [--legislator=Name]` — read-only; no DB writes. Fetches DB legislators, OS roster, and `ky_committees`; reports per-legislator slug state by category: OK, OS roles empty, missing from DB, extra in DB, format mismatch. Also prints all unresolvable OS org name slugs (the transient/subcommittee set) so future operators can decide if any standing committee needs to be added to the canonical map.
+
+**Intended use:** run before and after `sync:ky:legislators` to confirm canonical slug writing is working correctly. `FORMAT_MISMATCH` count should drop to 0 after the first post-deploy sync.

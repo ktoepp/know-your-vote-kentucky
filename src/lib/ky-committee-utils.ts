@@ -114,6 +114,43 @@ export function extractCommitteeMembershipSlugsFromOpenStatesPerson(leg: unknown
   return [...slugs];
 }
 
+/**
+ * Like extractCommitteeMembershipSlugsFromOpenStatesPerson but resolves each OS organization name
+ * to a canonical ky_committees.slug using the provided map.
+ * Map keys: committeeSlugFromName(committee.name) → value: committee.slug.
+ * Drops org names that don't resolve to a known committee — the false-positive guard that prevents
+ * transient bodies, subcommittees, and commissions from polluting committee_memberships.
+ * TODO: once all DB rows carry canonical slugs (post-sync), committeeMembershipSlugMatchesFilter
+ * can be simplified to exact equality comparison.
+ */
+export function extractCanonicalCommitteeSlugsFromOpenStatesPerson(
+  leg: unknown,
+  canonicalMap: Map<string, string>, // committeeSlugFromName(name) → db slug
+): string[] {
+  const raw = extractCommitteeMembershipSlugsFromOpenStatesPerson(leg);
+  if (!raw.length) return [];
+  const resolved = new Set<string>();
+  for (const osSlug of raw) {
+    const direct = canonicalMap.get(osSlug);
+    if (direct) { resolved.add(direct); continue; }
+    // Strip "committee-on-" prefix (Open States Popolo convention for KY standing committees)
+    const stripped = osSlug.replace(/^committee-on-/, '');
+    const strippedMatch = canonicalMap.get(stripped);
+    if (strippedMatch) { resolved.add(strippedMatch); continue; }
+    // Substring scan: catch minor name variants and "(H)"/"(S)" suffix differences
+    const osPhrase = osSlug.replace(/-/g, ' ');
+    for (const [canonKey, canonSlug] of canonicalMap) {
+      const canonPhrase = canonKey.replace(/-/g, ' ');
+      if (canonPhrase.length >= 8 && osPhrase.includes(canonPhrase)) {
+        resolved.add(canonSlug);
+        break;
+      }
+    }
+    // No match → silently dropped (transient, subcommittee, or non-standing body)
+  }
+  return [...resolved];
+}
+
 /** Loose slug match for comparing synced membership tokens to browse/search committee filter slugs. */
 export function committeeMembershipSlugMatchesFilter(memberSlug: string, filterSlug: string): boolean {
   const f = filterSlug.trim().toLowerCase();

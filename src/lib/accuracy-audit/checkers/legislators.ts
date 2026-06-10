@@ -12,6 +12,7 @@ import {
   openStatesCurrentRole,
   type OpenStatesLegislator,
 } from '../../ky-openstates-client';
+import { extractCommitteeMembershipSlugsFromOpenStatesPerson } from '../../ky-committee-utils';
 import {
   diffFinding,
   norm,
@@ -33,6 +34,7 @@ interface LegislatorRow {
   email: string | null;
   phone: string | null;
   photo_url: string | null;
+  committee_memberships: string[] | null;
   active: boolean;
 }
 
@@ -75,7 +77,7 @@ export async function checkLegislators(db: SupabaseClient, cfg: AuditConfig): Pr
 
   const { data, error } = await db
     .from('ky_legislators')
-    .select('id, name, party, chamber, district, openstates_id, email, phone, photo_url, active')
+    .select('id, name, party, chamber, district, openstates_id, email, phone, photo_url, committee_memberships, active')
     .eq('active', true);
 
   if (error) {
@@ -181,6 +183,29 @@ export async function checkLegislators(db: SupabaseClient, cfg: AuditConfig): Pr
         field: 'photo_url',
         message: 'Open States has a photo but none is stored',
       });
+    }
+
+    // Committee membership drift — warn only (content finding per CI policy § 2026-06-03).
+    // Guard on osSlugs.size > 0: if OS returns no roles the check is skipped entirely to
+    // avoid false positives when the API doesn't include roles in the response.
+    // Note: after the first sync with canonical slug writing, DB slugs will match ky_committees.slug
+    // rather than raw OS slugs — a transient mismatch is expected until that sync runs.
+    const osSlugs = new Set(extractCommitteeMembershipSlugsFromOpenStatesPerson(os));
+    if (osSlugs.size > 0) {
+      const dbSlugs = new Set(row.committee_memberships ?? []);
+      const onlyInOs = [...osSlugs].filter((s) => !dbSlugs.has(s));
+      const onlyInDb = [...dbSlugs].filter((s) => !osSlugs.has(s));
+      if (onlyInOs.length > 0 || onlyInDb.length > 0) {
+        findings.push({
+          severity: 'warn',
+          domain: 'legislators',
+          entity: label,
+          field: 'committee_memberships',
+          message: `committee memberships differ: +OS [${onlyInOs.join(', ')}] -DB [${onlyInDb.join(', ')}] (run sync:ky:legislators to resolve format mismatches)`,
+          expected: [...osSlugs].sort().join(', '),
+          actual: [...dbSlugs].sort().join(', '),
+        });
+      }
     }
   }
 
