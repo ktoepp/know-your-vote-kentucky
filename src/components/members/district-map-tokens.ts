@@ -25,6 +25,10 @@ function hexToRgba(hex: string, alpha: number): string {
 export const HOUSE_HOVER_OVERLAY = hexToRgba(HOUSE_OUTLINE, HOVER_OVERLAY_ALPHA);
 export const SENATE_HOVER_OVERLAY = hexToRgba(SENATE_OUTLINE, HOVER_OVERLAY_ALPHA);
 
+/** Fill tint for a selected (clicked) district — stronger alpha than hover overlay. */
+export const HOUSE_SELECTED_FILL = hexToRgba(HOUSE_OUTLINE, 0.22);
+export const SENATE_SELECTED_FILL = hexToRgba(SENATE_OUTLINE, 0.22);
+
 /** Lucide MapPin: stroke, fill (RGBA), pixel size, stroke width */
 export const MAP_MARKER_PIN = {
   color: '#1e40af',

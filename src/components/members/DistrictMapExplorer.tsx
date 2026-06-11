@@ -38,20 +38,19 @@ import {
 } from '@/lib/ky-district-geo';
 import { MemberCard } from '@/components/members/MemberCard';
 import { memberProfilePath } from '@/lib/ky-member-utils';
-import {
-  DistrictMapMemberTooltip,
-  type DistrictMapTooltipModel,
-} from '@/components/members/DistrictMapMemberTooltip';
+import type { DistrictMapTooltipModel } from '@/components/members/DistrictMapMemberTooltip';
 import {
   DISTRICT_LABEL,
   HOUSE_FILL,
   HOUSE_HOVER_OVERLAY,
   HOUSE_OUTLINE,
+  HOUSE_SELECTED_FILL,
   MAP_MARKER_PIN,
   OUTSIDE_KY_MASK_FILL,
   SENATE_FILL,
   SENATE_HOVER_OVERLAY,
   SENATE_OUTLINE,
+  SENATE_SELECTED_FILL,
 } from '@/components/members/district-map-tokens';
 import { KY_DISTRICT_MAPBOX_STYLE } from '@/lib/ky-district-mapbox-style';
 import { mapboxGeocodeAddress, mapboxGeocodeSuggest, type MapboxGeocodeSuggestion } from '@/lib/mapbox-geocode';
@@ -125,8 +124,75 @@ function featureGeoid(f: Feature | undefined): string | undefined {
   return String(g);
 }
 
+function DistrictMapHoverChip({ model }: { model: DistrictMapTooltipModel }) {
+  return (
+    <Box
+      sx={{
+        bgcolor: 'background.paper',
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1.5,
+        px: 1.25,
+        py: 0.625,
+        boxShadow: 2,
+        pointerEvents: 'none',
+        maxWidth: 220,
+      }}
+    >
+      {model.sections.map((sec) => (
+        <Box key={sec.chamberLabel}>
+          <Typography
+            variant="caption"
+            fontWeight={700}
+            color="text.secondary"
+            sx={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
+          >
+            {sec.districtSummary}
+          </Typography>
+          {sec.leg && (
+            <Typography variant="body2" fontWeight={600} noWrap>
+              {sec.leg.first_name} {sec.leg.last_name}
+            </Typography>
+          )}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function DistrictMapAnimatedMemberCard({
+  leg,
+  legislatorRoster,
+}: {
+  leg: KYLegislator;
+  legislatorRoster: KYLegislator[];
+}) {
+  return (
+    <Box
+      sx={{
+        opacity: 1,
+        transform: 'translateY(0)',
+        transition: 'opacity 0.18s ease, transform 0.18s ease',
+        '@keyframes fadeSlideUp': {
+          from: { opacity: 0, transform: 'translateY(6px)' },
+          to: { opacity: 1, transform: 'translateY(0)' },
+        },
+        animation: 'fadeSlideUp 0.18s ease',
+      }}
+    >
+      <MemberCard
+        leg={leg}
+        showDistrictInSubtitle={false}
+        profileHref={memberProfilePath(leg)}
+        legislatorRoster={legislatorRoster}
+      />
+    </Box>
+  );
+}
+
 export default function DistrictMapExplorer() {
   const mapRef = useRef<MapRef>(null);
+  const rafRef = useRef<number | null>(null);
   const hoverHouseGeoidRef = useRef<string | null>(null);
   const hoverSenateGeoidRef = useRef<string | null>(null);
   const { roster: legislators, loading: legLoading, error: legError } = useKyMembersBrowseRoster();
@@ -161,6 +227,8 @@ export default function DistrictMapExplorer() {
     lat: number;
     model: DistrictMapTooltipModel;
   } | null>(null);
+  const [hoveredHouseLeg, setHoveredHouseLeg] = useState<KYLegislator | null>(null);
+  const [hoveredSenateLeg, setHoveredSenateLeg] = useState<KYLegislator | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -231,6 +299,10 @@ export default function DistrictMapExplorer() {
   const selectedSenateLeg = selectedSenateDistrictKey
     ? senateByDistrict.get(selectedSenateDistrictKey)
     : undefined;
+
+  const displayHouseLeg = selectedHouseLeg ?? hoveredHouseLeg ?? null;
+  const displaySenateLeg = selectedSenateLeg ?? hoveredSenateLeg ?? null;
+  const isHoverPreview = !marker && (hoveredHouseLeg != null || hoveredSenateLeg != null);
 
   const fitToKy = useCallback(() => {
     const map = mapRef.current?.getMap();
@@ -345,83 +417,108 @@ export default function DistrictMapExplorer() {
 
   const onMouseMove = useCallback(
     (e: MapMouseEvent) => {
-      const map = mapRef.current?.getMap();
-      if (!map) return;
-      const layers: string[] = [];
-      if (showHouseLayer) layers.push(`${SL_SOURCE_HOUSE}-fill`);
-      if (showSenateLayer) layers.push(`${SL_SOURCE_SENATE}-fill`);
-      if (layers.length === 0) {
-        clearHoverFeatureState();
-        map.getCanvas().style.cursor = '';
-        setHoverPopup(null);
-        return;
-      }
-      const feats = map.queryRenderedFeatures(e.point, { layers });
-      const hasHit = feats.length > 0;
-      map.getCanvas().style.cursor = hasHit ? 'pointer' : '';
+      if (rafRef.current != null) return;
+      const point = e.point;
+      const lngLat = e.lngLat;
 
-      if (!hasHit) {
-        clearHoverFeatureState();
-        setHoverPopup(null);
-        return;
-      }
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const map = mapRef.current?.getMap();
+        if (!map) return;
+        const layers: string[] = [];
+        if (showHouseLayer) layers.push(`${SL_SOURCE_HOUSE}-fill`);
+        if (showSenateLayer) layers.push(`${SL_SOURCE_SENATE}-fill`);
+        if (layers.length === 0) {
+          clearHoverFeatureState();
+          map.getCanvas().style.cursor = '';
+          setHoverPopup(null);
+          setHoveredHouseLeg(null);
+          setHoveredSenateLeg(null);
+          return;
+        }
+        const feats = map.queryRenderedFeatures(point, { layers });
+        const hasHit = feats.length > 0;
+        map.getCanvas().style.cursor = hasHit ? 'pointer' : '';
 
-      const houseFeat = feats.find((f) => f.layer?.id === `${SL_SOURCE_HOUSE}-fill`) as Feature | undefined;
-      const senateFeat = feats.find((f) => f.layer?.id === `${SL_SOURCE_SENATE}-fill`) as Feature | undefined;
-      if (!houseFeat && !senateFeat) {
-        clearHoverFeatureState();
-        setHoverPopup(null);
-        return;
-      }
+        if (!hasHit) {
+          clearHoverFeatureState();
+          setHoverPopup(null);
+          setHoveredHouseLeg(null);
+          setHoveredSenateLeg(null);
+          return;
+        }
 
-      const newHouseId = showHouseLayer ? featureGeoid(houseFeat) : undefined;
-      const newSenateId = showSenateLayer ? featureGeoid(senateFeat) : undefined;
+        const houseFeat = feats.find((f) => f.layer?.id === `${SL_SOURCE_HOUSE}-fill`) as Feature | undefined;
+        const senateFeat = feats.find((f) => f.layer?.id === `${SL_SOURCE_SENATE}-fill`) as Feature | undefined;
+        if (!houseFeat && !senateFeat) {
+          clearHoverFeatureState();
+          setHoverPopup(null);
+          setHoveredHouseLeg(null);
+          setHoveredSenateLeg(null);
+          return;
+        }
 
-      if (hoverHouseGeoidRef.current !== newHouseId) {
-        if (hoverHouseGeoidRef.current) {
-          try {
-            map.setFeatureState({ source: SL_SOURCE_HOUSE, id: hoverHouseGeoidRef.current }, { hover: false });
-          } catch {
-            /* ignore */
+        const newHouseId = showHouseLayer ? featureGeoid(houseFeat) : undefined;
+        const newSenateId = showSenateLayer ? featureGeoid(senateFeat) : undefined;
+
+        if (hoverHouseGeoidRef.current !== newHouseId) {
+          if (hoverHouseGeoidRef.current) {
+            try {
+              map.setFeatureState({ source: SL_SOURCE_HOUSE, id: hoverHouseGeoidRef.current }, { hover: false });
+            } catch {
+              /* ignore */
+            }
+          }
+          hoverHouseGeoidRef.current = null;
+          if (newHouseId) {
+            try {
+              map.setFeatureState({ source: SL_SOURCE_HOUSE, id: newHouseId }, { hover: true });
+              hoverHouseGeoidRef.current = newHouseId;
+            } catch {
+              /* ignore */
+            }
           }
         }
-        hoverHouseGeoidRef.current = null;
-        if (newHouseId) {
-          try {
-            map.setFeatureState({ source: SL_SOURCE_HOUSE, id: newHouseId }, { hover: true });
-            hoverHouseGeoidRef.current = newHouseId;
-          } catch {
-            /* ignore */
-          }
-        }
-      }
 
-      if (hoverSenateGeoidRef.current !== newSenateId) {
-        if (hoverSenateGeoidRef.current) {
-          try {
-            map.setFeatureState({ source: SL_SOURCE_SENATE, id: hoverSenateGeoidRef.current }, { hover: false });
-          } catch {
-            /* ignore */
+        if (hoverSenateGeoidRef.current !== newSenateId) {
+          if (hoverSenateGeoidRef.current) {
+            try {
+              map.setFeatureState({ source: SL_SOURCE_SENATE, id: hoverSenateGeoidRef.current }, { hover: false });
+            } catch {
+              /* ignore */
+            }
+          }
+          hoverSenateGeoidRef.current = null;
+          if (newSenateId) {
+            try {
+              map.setFeatureState({ source: SL_SOURCE_SENATE, id: newSenateId }, { hover: true });
+              hoverSenateGeoidRef.current = newSenateId;
+            } catch {
+              /* ignore */
+            }
           }
         }
-        hoverSenateGeoidRef.current = null;
-        if (newSenateId) {
-          try {
-            map.setFeatureState({ source: SL_SOURCE_SENATE, id: newSenateId }, { hover: true });
-            hoverSenateGeoidRef.current = newSenateId;
-          } catch {
-            /* ignore */
-          }
-        }
-      }
 
-      const model = tooltipModelFromFeatures(houseFeat, senateFeat, houseByDistrict, senateByDistrict);
-      if (!model) {
-        setHoverPopup(null);
-        return;
-      }
-      const { lng, lat } = e.lngLat;
-      setHoverPopup({ lng, lat, model });
+        const model = tooltipModelFromFeatures(houseFeat, senateFeat, houseByDistrict, senateByDistrict);
+        if (!model) {
+          setHoverPopup(null);
+          setHoveredHouseLeg(null);
+          setHoveredSenateLeg(null);
+          return;
+        }
+
+        const hHouseId = houseFeat
+          ? parseKyDistrictNumber(districtNameFromCensusFeature(houseFeat))
+          : null;
+        const hSenateId = senateFeat
+          ? parseKyDistrictNumber(districtNameFromCensusFeature(senateFeat))
+          : null;
+        setHoveredHouseLeg(hHouseId ? houseByDistrict.get(hHouseId) ?? null : null);
+        setHoveredSenateLeg(hSenateId ? senateByDistrict.get(hSenateId) ?? null : null);
+
+        const { lng, lat } = lngLat;
+        setHoverPopup({ lng, lat, model });
+      });
     },
     [showHouseLayer, showSenateLayer, houseByDistrict, senateByDistrict, clearHoverFeatureState],
   );
@@ -596,10 +693,32 @@ export default function DistrictMapExplorer() {
           )}
           {mapReady && (
             <Box
-              sx={{ width: '100%', height: '100%', minHeight: 0 }}
+              sx={{
+                width: '100%',
+                height: '100%',
+                minHeight: 0,
+                '& .district-map-hover-popup.mapboxgl-popup': {
+                  maxWidth: 'none !important',
+                },
+                '& .district-map-hover-popup .mapboxgl-popup-content': {
+                  background: 'transparent',
+                  padding: 0,
+                  boxShadow: 'none',
+                  borderRadius: 0,
+                },
+                '& .district-map-hover-popup .mapboxgl-popup-tip': {
+                  display: 'none',
+                },
+              }}
               onMouseLeave={() => {
+                if (rafRef.current != null) {
+                  cancelAnimationFrame(rafRef.current);
+                  rafRef.current = null;
+                }
                 clearHoverFeatureState();
                 setHoverPopup(null);
+                setHoveredHouseLeg(null);
+                setHoveredSenateLeg(null);
               }}
             >
             <MapGL
@@ -643,12 +762,15 @@ export default function DistrictMapExplorer() {
                   paint={{
                     'fill-color': [
                       'case',
+                      ['==', ['to-string', ['get', 'NAME']], selectedHouseName ?? '__none__'],
+                      HOUSE_SELECTED_FILL,
                       ['boolean', ['feature-state', 'hover'], false],
                       HOUSE_HOVER_OVERLAY,
                       HOUSE_FILL,
                     ],
                     'fill-opacity': 1,
-                  }}
+                    'fill-color-transition': { duration: 120, delay: 0 },
+                  } as mapboxgl.FillPaint}
                   layout={{ visibility: showHouseLayer ? 'visible' : 'none' }}
                 />
                 <Layer
@@ -706,12 +828,15 @@ export default function DistrictMapExplorer() {
                   paint={{
                     'fill-color': [
                       'case',
+                      ['==', ['to-string', ['get', 'NAME']], selectedSenateName ?? '__none__'],
+                      SENATE_SELECTED_FILL,
                       ['boolean', ['feature-state', 'hover'], false],
                       SENATE_HOVER_OVERLAY,
                       SENATE_FILL,
                     ],
                     'fill-opacity': 1,
-                  }}
+                    'fill-color-transition': { duration: 120, delay: 0 },
+                  } as mapboxgl.FillPaint}
                   layout={{ visibility: showSenateLayer ? 'visible' : 'none' }}
                 />
                 <Layer
@@ -776,15 +901,16 @@ export default function DistrictMapExplorer() {
               )}
               {hoverPopup && (
                 <Popup
+                  className="district-map-hover-popup"
                   longitude={hoverPopup.lng}
                   latitude={hoverPopup.lat}
                   closeButton={false}
                   closeOnClick={false}
                   anchor="bottom"
-                  offset={[0, -6]}
-                  maxWidth="360px"
+                  offset={[0, -10]}
+                  maxWidth="none"
                 >
-                  <DistrictMapMemberTooltip model={hoverPopup.model} legislatorRoster={legislators} />
+                  <DistrictMapHoverChip model={hoverPopup.model} />
                 </Popup>
               )}
             </MapGL>
@@ -848,21 +974,35 @@ export default function DistrictMapExplorer() {
             </Paper>
           )}
 
-          {selectedHouseLeg && (
-            <MemberCard
-              leg={selectedHouseLeg}
-              showDistrictInSubtitle={false}
-              profileHref={memberProfilePath(selectedHouseLeg)}
-              legislatorRoster={legislators}
-            />
-          )}
-          {selectedSenateLeg && (
-            <MemberCard
-              leg={selectedSenateLeg}
-              showDistrictInSubtitle={false}
-              profileHref={memberProfilePath(selectedSenateLeg)}
-              legislatorRoster={legislators}
-            />
+          {isHoverPreview ? (
+            <Box sx={{ opacity: 0.65, transition: 'opacity 0.15s ease' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                Hover preview — click to select
+              </Typography>
+              {displayHouseLeg && (
+                <Box key={displayHouseLeg.id}>
+                  <DistrictMapAnimatedMemberCard leg={displayHouseLeg} legislatorRoster={legislators} />
+                </Box>
+              )}
+              {displaySenateLeg && (
+                <Box key={displaySenateLeg.id}>
+                  <DistrictMapAnimatedMemberCard leg={displaySenateLeg} legislatorRoster={legislators} />
+                </Box>
+              )}
+            </Box>
+          ) : (
+            <>
+              {displayHouseLeg && (
+                <Box key={displayHouseLeg.id}>
+                  <DistrictMapAnimatedMemberCard leg={displayHouseLeg} legislatorRoster={legislators} />
+                </Box>
+              )}
+              {displaySenateLeg && (
+                <Box key={displaySenateLeg.id}>
+                  <DistrictMapAnimatedMemberCard leg={displaySenateLeg} legislatorRoster={legislators} />
+                </Box>
+              )}
+            </>
           )}
 
           <Accordion elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, '&:before': { display: 'none' } }}>
