@@ -37,6 +37,8 @@
     "diagnose:legislators": "tsx scripts/diagnose-legislators.ts",
     "reconcile:committee-memberships": "tsx scripts/reconcile-committee-memberships.ts",
     "remap:recommittal-statuses": "tsx scripts/remap-recommittal-statuses.ts",
+    "refresh:bill-status": "tsx scripts/refresh-bill-status-from-legiscan.ts",
+    "refresh:bill-status:dry": "tsx scripts/refresh-bill-status-from-legiscan.ts --dry-run",
     "generate:district-thumbnails": "tsx scripts/generate-district-thumbnails.ts",
     "debug:openstates-roster": "tsx scripts/debug-openstates-roster.ts",
     "spike:lrc:calendar": "tsx scripts/lrc-calendar-spike.ts",
@@ -50,7 +52,10 @@
     "backfill:lrc:calendar": "tsx scripts/backfill-lrc-calendar-wayback.ts",
     "backfill:lrc:calendar:dry": "tsx scripts/backfill-lrc-calendar-wayback.ts --dry-run",
     "backfill:lrc:committee-materials": "tsx scripts/backfill-lrc-committee-materials-history.ts",
-    "backfill:lrc:committee-materials:dry": "tsx scripts/backfill-lrc-committee-materials-history.ts --dry-run"
+    "backfill:lrc:committee-materials:dry": "tsx scripts/backfill-lrc-committee-materials-history.ts --dry-run",
+    "sync:ky:lrc-enrollment-actions": "tsx scripts/sync-lrc-enrollment-actions.ts",
+    "sync:ky:lrc-enrollment-actions:dry": "tsx scripts/sync-lrc-enrollment-actions.ts --dry-run",
+    "spike:lrc:enrollment-actions": "tsx scripts/sync-lrc-enrollment-actions.ts --spike"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

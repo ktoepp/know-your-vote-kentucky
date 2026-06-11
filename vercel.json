@@ -46,6 +46,7 @@
     { "path": "/api/sync?source=votes&limit=5", "schedule": "15 6 * * *" },
     { "path": "/api/cron/notify", "schedule": "0 11 * * *" },
     { "path": "/api/sync?source=lrc-committee-materials", "schedule": "30 13 * * *" },
-    { "path": "/api/cron/health-check", "schedule": "0 14 * * *" }
+    { "path": "/api/cron/health-check", "schedule": "0 14 * * *" },
+    { "path": "/api/sync?source=lrc-enrollment-actions", "schedule": "45 14 * * *" }
   ]
 }

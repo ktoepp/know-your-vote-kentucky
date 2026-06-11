@@ -9,7 +9,15 @@
  */
 import './load-env';
 import { createClient } from '@supabase/supabase-js';
-import { mapLegiScanBillStatus } from '../src/lib/map-legiscan-bill-status';
+import { mapLegiScanBillStatus, LEGISCAN_STATUS_MAP } from '../src/lib/map-legiscan-bill-status';
+
+/** Reverse lookup: stored status label → LegiScan numeric code (when unambiguous). */
+function statusCodeFromLabel(status: string): number | null {
+  for (const [code, label] of Object.entries(LEGISCAN_STATUS_MAP)) {
+    if (label === status) return Number(code);
+  }
+  return null;
+}
 
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
@@ -19,13 +27,13 @@ async function main() {
 
   // Fetch bills in a passed-milestone status whose last_action contains "recommit".
   async function fetchCandidates(status: string) {
-    const rows: Array<{ id: string; bill_number: string; session: string; status_code: number; last_action: string }> = [];
+    const rows: Array<{ id: string; bill_number: string; session: string; status: string; last_action: string }> = [];
     const PAGE = 1000;
     let from = 0;
     for (;;) {
       const { data, error } = await db
         .from('ky_bills')
-        .select('id, bill_number, session, status_code, last_action')
+        .select('id, bill_number, session, status, last_action')
         .eq('status', status)
         .ilike('last_action', '%recommit%')
         .range(from, from + PAGE - 1);
@@ -46,7 +54,11 @@ async function main() {
   console.log(`Found ${all.length} candidate bills (${engrossed.length} Engrossed, ${enrolled.length} Enrolled, ${passed.length} Passed)`);
 
   // Confirm that the fixed mapper maps each to 'In Committee'.
-  const toFix = all.filter(r => mapLegiScanBillStatus(r.status_code, r.last_action) === 'In Committee');
+  const toFix = all.filter((r) => {
+    const code = statusCodeFromLabel(r.status);
+    if (code == null) return false;
+    return mapLegiScanBillStatus(code, r.last_action) === 'In Committee';
+  });
   const skipped = all.length - toFix.length;
   if (skipped > 0) console.log(`Skipped ${skipped} rows (mapper did not return 'In Committee')`);
 

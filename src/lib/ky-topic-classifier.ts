@@ -34,9 +34,11 @@ export type KYTopicTag = (typeof KY_TOPICS)[number];
 
 /** Keyword map for fast classification */
 const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
-  Education: ['school', 'education', 'student', 'teacher', 'university', 'college', 'curriculum', 'tuition', 'charter', 'jcps', 'fcps', 'superintendent'],
+  Education: ['school', 'education', 'student', 'teacher', 'university', 'college', 'curriculum', 'tuition', 'charter', 'jcps', 'fcps', 'superintendent', 'financial literacy'],
   // 'diabetes' added 2026-06-07: student health / chronic disease screening bills may not use the word 'health'.
-  Healthcare: ['health', 'hospital', 'medicaid', 'medicare', 'insurance', 'mental health', 'opioid', 'drug', 'pharmacy', 'nurse', 'doctor', 'clinic', 'diabetes'],
+  // Bare 'drug' removed (2026-06-11): matched controlled-substance language in criminal /
+  // search-warrant bills. Use specific healthcare phrasing instead.
+  Healthcare: ['health', 'hospital', 'medicaid', 'medicare', 'insurance', 'mental health', 'opioid', 'prescription drug', 'pharmacy', 'nurse', 'doctor', 'clinic', 'diabetes'],
   // Transport keywords (road/highway/transit/transportation/motor vehicle/etc.) moved to the
   // dedicated 'Transportation' topic below. Bare 'construction' removed: it matched finance/legal
   // boilerplate ("construction loans", "construction contracts", "statutory construction") far more
@@ -49,7 +51,7 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   // in many bills, and generic "safety". Use specific public-safety phrasing instead.
   // 'law enforcement' added 2026-06-07: covers game warden, boating officer, and similar sworn-officer bills
   // that don't mention police/sheriff explicitly.
-  'Public Safety': ['police', 'fire', 'emergency management', 'emergency services', 'first responder', 'state of emergency', 'public safety', 'crime', '911', 'sheriff', 'ems', 'disaster', 'flood', 'law enforcement'],
+  'Public Safety': ['police', 'fire', 'emergency management', 'emergency services', 'first responder', 'state of emergency', 'public safety', 'crime', '911', 'sheriff', 'ems', 'disaster', 'flood', 'law enforcement', 'body-worn camera', 'body worn camera', 'search warrant', 'electrical shock', 'swimming pool'],
   Environment: ['environment', 'pollution', 'clean water', 'air quality', 'climate', 'conservation', 'wildlife', 'recycling', 'waste', 'coal ash'],
   // Bare singular 'worker' removed (2026-06-04): matched incidental "health care worker"/"social worker"
   // in non-labor bills. Bare 'employment' removed (2026-06-07): matched "employment of pharmacists",
@@ -58,7 +60,7 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Housing: ['housing', 'rent', 'affordable housing', 'zoning', 'landlord', 'tenant', 'homeless', 'eviction', 'mortgage'],
   Agriculture: ['farm', 'agriculture', 'crop', 'livestock', 'tobacco', 'bourbon', 'hemp', 'rural', 'usda'],
   Energy: ['energy', 'coal', 'natural gas', 'solar', 'wind', 'utility', 'electric', 'pipeline', 'power plant', 'renewable'],
-  'Criminal Justice': ['prison', 'jail', 'sentencing', 'parole', 'probation', 'felony', 'misdemeanor', 'incarceration', 'juvenile', 'expungement'],
+  'Criminal Justice': ['prison', 'jail', 'sentencing', 'parole', 'probation', 'felony', 'misdemeanor', 'incarceration', 'juvenile', 'expungement', 'warrantless', 'no-knock'],
   // Bare 'registration'/'primary' removed: 'registration' matched generic vehicle/business/
   // professional/motorboat/firearm registration boilerplate (radon contractors, metal detectors,
   // pharmacy techs, optometrists), and 'primary' matched 'primary care'/'primary school'/'primary

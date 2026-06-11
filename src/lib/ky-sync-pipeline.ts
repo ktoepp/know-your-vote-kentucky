@@ -24,6 +24,7 @@ import { legiscanSubjectColumnsFromDetail } from './ky-legiscan-subjects';
 import { normalizeLegistarOrdinanceText } from './legistar-text';
 import { syncKyLrcCalendar } from './ky-lrc-calendar-sync';
 import { syncKyLrcCommitteeMaterials } from './ky-lrc-committee-materials-sync';
+import { syncKyLrcEnrollmentActions } from './ky-lrc-enrollment-actions-sync';
 import {
   fetchBillHistorySnapshots,
   recordBillStatusHistoryForBuiltBatch,
@@ -1818,6 +1819,48 @@ export const SYNC_SOURCES: Record<string, (options: SyncOptions) => Promise<Sync
       const status = stats.errors > 0 ? 'error' : 'success';
       const errorMsg =
         stats.errors > 0 ? `${stats.errors} committee fetch/parse error(s)` : undefined;
+      if (!opts.dryRun) {
+        await updateSourceStatus(source, status, itemsSynced, errorMsg);
+      }
+      return {
+        source,
+        status,
+        itemsSynced,
+        error: errorMsg,
+        duration: Date.now() - start,
+      };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      logError(source, message);
+      if (!opts.dryRun) await updateSourceStatus(source, 'error', 0, message);
+      return {
+        source,
+        status: 'error',
+        itemsSynced: 0,
+        error: message,
+        duration: Date.now() - start,
+      };
+    }
+  },
+  /**
+   * LRC legislative record enrollment/executive actions — date-stamped governor
+   * sign/veto/override rows in ky_bill_status_history. Zero LegiScan quota.
+   * See docs/specs/session-record-spike-report.md § Phase 5b.
+   */
+  'lrc-enrollment-actions': async (opts) => {
+    const start = Date.now();
+    const source = 'lrc-enrollment-actions';
+    try {
+      const db = getSupabase();
+      const stats = await syncKyLrcEnrollmentActions(db, { dryRun: opts.dryRun });
+      const itemsSynced = stats.historyInserted;
+      const status = stats.errors > 0 ? 'error' : 'success';
+      const errorMsg =
+        stats.errors > 0
+          ? `${stats.errors} session fetch error(s); unresolved bills=${stats.unresolvedBills}`
+          : stats.unresolvedBills > 0
+            ? `${stats.unresolvedBills} bill ref(s) could not be resolved`
+            : undefined;
       if (!opts.dryRun) {
         await updateSourceStatus(source, status, itemsSynced, errorMsg);
       }

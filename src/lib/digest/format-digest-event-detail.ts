@@ -16,6 +16,8 @@ export function formatDigestEventLabel(
     const kind = (eventPayload ?? {}).kind;
     if (kind === 'signed') return 'Signed into law';
     if (kind === 'vetoed') return 'Vetoed';
+    if (kind === 'line_item_vetoed') return 'Line items vetoed';
+    if (kind === 'signed_without_signature') return 'Became law without signature';
   }
   return KY_DIGEST_EVENT_LABELS[eventType as KyDigestEventType] ?? eventType;
 }

@@ -598,12 +598,12 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
   nv: {
     category: 'procedures_and_voting',
     title: "Not Voting (NV)",
-    content: "Legislators who were present for the vote but chose not to cast a vote. They are not counted as No votes, but because passage requires a majority of all members elected (51 House / 20 Senate), each not-voting member is one fewer Yes vote available."
+    content: "Legislators who were present for the vote but chose not to cast a vote. They are not counted as No votes. On final passage (third reading), a bill needs a majority of all members elected — 51 in the House, 20 in the Senate (Ky. Const. § 46) — so each not-voting member is one fewer Yes vote toward that threshold. On most procedural votes, only a majority of members present and voting is required."
   },
   absent: {
     category: 'procedures_and_voting',
     title: "Absent",
-    content: "Legislators who were not present during the vote. They are not counted as No votes, but because passage requires a majority of all members elected (51 House / 20 Senate), each absent member is one fewer Yes vote available."
+    content: "Legislators who were not present during the vote. They are not counted as No votes. On final passage (third reading), a bill needs a majority of all members elected — 51 in the House, 20 in the Senate (Ky. Const. § 46) — so each absent member is one fewer Yes vote toward that threshold. On most procedural votes, only a majority of members present and voting is required."
   },
 
   // ── Subject Topics (KY_TOPICS taxonomy) ─────────────────────────────────────
