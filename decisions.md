@@ -689,3 +689,77 @@ Added `committee_memberships` comparison to `checkLegislators`. The checker alre
 `npm run reconcile:committee-memberships [--only-mismatches] [--legislator=Name]` — read-only; no DB writes. Fetches DB legislators, OS roster, and `ky_committees`; reports per-legislator slug state by category: OK, OS roles empty, missing from DB, extra in DB, format mismatch. Also prints all unresolvable OS org name slugs (the transient/subcommittee set) so future operators can decide if any standing committee needs to be added to the canonical map.
 
 **Intended use:** run before and after `sync:ky:legislators` to confirm canonical slug writing is working correctly. `FORMAT_MISMATCH` count should drop to 0 after the first post-deploy sync.
+
+---
+
+## 2026-06-11 — Phase 5b enrollment-actions sync + accuracy backfill pass
+
+Shipped the Phase 5b recommendation from [docs/specs/session-record-spike-report.md](./docs/specs/session-record-spike-report.md): parse LRC `enrollment_actions.html` and write date-stamped executive-action rows into `ky_bill_status_history`. Same session: topic/glossary precision fixes, committee-materials historical backfill on primary, and operator tooling for post-mapper bill-status drift.
+
+### Phase 5b — `sync:lrc:enrollment-actions`
+
+**Source:** `apps.legislature.ky.gov/record/{session}/enrollment_actions.html` (session slug from `kySessionToLrcRecordSlug`, e.g. `26rs`).
+
+**Parser:** `src/lib/lrc-enrollment-actions-parser.ts` — walks `<h4>` date → `<h5>` action → `<p>` bill links. Fixture: `fixtures/lrc/legislative-record-enrollment-actions-26rs-live.html`.
+
+**Sync:** `src/lib/ky-lrc-enrollment-actions-sync.ts` + `scripts/sync-lrc-enrollment-actions.ts`. Resolves bills via `(bill_number, session)`; dedupes via `legiscan_change_hash = sha256('lrc-record|{action}|{bill_id}|{action_date}')`.
+
+**Event types (v1):** reuses existing digest slugs only — no new `KY_DIGEST_EVENT_TYPES` entries yet:
+- `signed_or_vetoed` with `event_payload.kind`: `signed`, `vetoed`, `line_item_vetoed`, `signed_without_signature`
+- `veto_override_attempt` for "Veto Overridden In House/Senate"
+- Skipped in v1: `Delivered To Governor`, enrollment signing lines, per-status bill-list pages (redundant with LegiScan / `ky_bills.status`)
+
+**`observed_at = action_date` (not `now()`).** Executive actions are stamped at noon UTC on the LRC action date so digest grouping and profile timelines reflect when the governor acted, not when our scrape ran. This is the main departure from LegiScan-driven history rows.
+
+**Scheduler:** Vercel Cron — `/api/sync?source=lrc-enrollment-actions` at **`45 14 * * *` UTC** (after committee materials 13:30 and health-check 14:00). Wired through `SYNC_SOURCES['lrc-enrollment-actions']` in `ky-sync-pipeline.ts`. **Not** a GitHub Actions workflow — same split as committee materials (Vercel daily) vs calendar/agenda (GH Actions 2× daily + Wayback). Page is ~100 KB and changes only when the governor acts; daily is sufficient in interim.
+
+**Primary backfill (2026-06-11):** 466 rows inserted (292 × 2026 RS, 174 × 2025 RS); 0 unresolved bill refs.
+
+**Digest labels:** `formatDigestEventLabel` extended for `line_item_vetoed` and `signed_without_signature` kinds under `signed_or_vetoed`.
+
+### Data-layer map — what this does *not* cover
+
+| Surface | Table(s) | Scheduler |
+|---|---|---|
+| Meeting schedule + cancellations | `ky_committee_meetings` | GH Actions `sync-lrc-calendar.yml` (12:00 + 18:00 UTC live; Sun 06:00 Wayback backfill) |
+| Agenda line items + bill refs | `ky_committee_agenda_items` | Same calendar sync |
+| Committee PDFs / docs | `ky_committee_materials` | Vercel 13:30 UTC daily + one-time `backfill:lrc:committee-materials` |
+| Governor sign/veto/override history | `ky_bill_status_history` | Vercel 14:45 UTC daily (**new**) |
+
+Enrollment actions fill a **LegiScan gap** (date-stamped executive actions, line-item-veto distinction). They do not replace or backfill meeting/agenda rows.
+
+### Committee materials historical backfill
+
+`npm run backfill:lrc:committee-materials` — walks each committee's `Other Meeting Years` chain (same idempotent `(committee_id, url)` upsert as daily sync). Primary run 2026-06-11: **12 inserted, 1,002 updated** across 69 committees / 40 prior-year pages. Some LRC year-page URLs 404 (expected — LRC rotates paths); script skips and continues.
+
+### Accuracy / topic pass
+
+**Topic classifier (`src/lib/ky-topic-classifier.ts`):** removed bare `drug` from Healthcare; added `financial literacy`; Public Safety + Criminal Justice keywords for law-enforcement / warrant bills mis-tagged as Healthcare or Alcohol & Cannabis. Backfill: `npm run topics:reclassify` — **22,547 scanned, 2,392 changed**.
+
+**Glossary NV/absent:** scoped 51/20 threshold language to **final passage (third reading)** with procedural-vote caveat — follow-up to § 2026-06-08 (LLM flagged conflation with veto-override framing on generic votes).
+
+**Bill status drift tool:** `scripts/refresh-bill-status-from-legiscan.ts` (`npm run refresh:bill-status`) — re-fetches LegiScan `getBill` detail, derives `last_action` from `history[]`, re-applies `mapLegiScanBillStatus`. Use after mapper fixes when hash-gated sync skips unchanged bills (`change_hash` unchanged on LegiScan side). 2026 RS full pass: 1,737 scanned, 0 updates (DB already matched detail + current mapper).
+
+**Recommittal remap fix:** `scripts/remap-recommittal-statuses.ts` referenced non-existent `ky_bills.status_code` — fixed to derive numeric code from stored status label via `LEGISCAN_STATUS_MAP`. Run on primary: 0 candidates (recommittal rows already correct or absent).
+
+### Cron landscape update (supersedes § 2026-06-07 table for Vercel)
+
+**Vercel Cron (`vercel.json`):**
+
+| Path | Schedule (UTC) |
+|---|---|
+| `/api/sync?source=bills&useChangeHash=true&skipBillSponsorDetails=true&historicSessions=1` | `0 5 * * *` |
+| `/api/sync?source=legislators` | `0 6 * * *` |
+| `/api/sync?source=votes&limit=5` | `15 6 * * *` |
+| `/api/cron/notify` | `0 11 * * *` |
+| `/api/sync?source=lrc-committee-materials` | `30 13 * * *` |
+| `/api/cron/health-check` | `0 14 * * *` |
+| `/api/sync?source=lrc-enrollment-actions` | **`45 14 * * *`** |
+
+**GitHub Actions:** unchanged from § 2026-06-07 (`sync-ky-bills-status.yml`, `sync-lrc-calendar.yml`, `legislator-links-weekly.yml`, `accuracy-audit.yml`). **Future agent note:** if enrollment-actions ever moves to GH Actions (e.g. for Slack CLI notify parity with calendar sync), add a workflow mirroring `sync-lrc-calendar.yml` secrets block — Vercel cron path has no `SLACK_SYNC_NOTIFY_CLI` hook today; failures surface via `ky_sources` + health-check only.
+
+### Open follow-ups
+
+- **`delivered_to_sos` event slug** — deferred; payload-only under `signed_or_vetoed` or future slug when bill-detail countdown ships.
+- **Committee materials link 404 detection** — `link_status` column + accuracy-audit HEAD probe (see § 2026-06-09 committee materials notes).
+- **Historical enrollment sessions** — extend `KY_SESSIONS` + one-time sync when older record slugs are needed beyond 2025/2026 RS.

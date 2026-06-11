@@ -67,7 +67,7 @@ All tooling lives in `scripts/` and is exposed via `package.json`. There is no J
 | Script | Purpose |
 | --- | --- |
 | `npm run test:env` | Validate required env vars. |
-| `npm run sync:ky` | Manual sync (all default sources). `:legislators`, `:quota`, `:dry`, `:lrc-calendar`, `:lrc-committee-materials` for targeted runs. |
+| `npm run sync:ky` | Manual sync (all default sources). `:legislators`, `:quota`, `:dry`, `:lrc-calendar`, `:lrc-committee-materials`, `:lrc-enrollment-actions` for targeted runs. |
 | `npm run check:legiscan-quota` | LegiScan API usage this month (vs 30k cap). |
 | `npm run db:apply-sql` | Apply SQL when `DATABASE_URL` is set. |
 | `npm run geo:ky-districts` / `geo:ky-mask` | Rebuild district GeoJSON / outside-mask assets. |
