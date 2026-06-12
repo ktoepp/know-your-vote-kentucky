@@ -8,7 +8,35 @@
 
 ## In Progress
 
-(none — 2026-06-11 accuracy + Phase 5b enrollment-actions shipped; see Recently completed.)
+### Design + a11y pass — never-reviewed surfaces (2026-06-12)
+
+Combined `/design-critique` + `/accessibility-review` (WCAG 2.1 AA) sweep of live `kyvky.com` at ~1280px + ~500px (xs breakpoint active). Scope: `/committees`, committee detail, `/meetings`, `/search`, `/glossary`, `/about`, signed-out auth pages — the surfaces the 2026-06-01 pass did not cover. Signed-out only (signed-in profile/feed/follow sweep **still deferred** — needs an authenticated session). Rationale: decisions.md § 2026-06-12.
+
+**Critical**
+
+- [ ] **Split committee records (data)** — `/committees` lists seed-vs-LRC duplicates: confirmed `administrative-regulation-review-subcommittee` (8 members, "No upcoming meetings") vs `admin-regs-review` (0 members, 7 meetings incl. upcoming Jul 8); suspected same-class pairs: "Budget Review Sub. on Economic Development and Tourism" vs "…, Tourism, and Environmental Protection", "…General Government" vs "…General Government, Finance, Personnel, and Public Retirement". Needs a reconciliation/merge pass (precedent: `reconcile:committee-memberships`), slug redirects, and a near-dupe-name check in `audit:accuracy`. **Not in the 2026-06-12 UI PR — separate data task.**
+- [x] **Mobile nav: no Log in / Search** — header Log in is `display:none` at xs, Search link 0×0, neither in the drawer; only paths were 21px footer links. Fixed: both added to the mobile drawer.
+- [x] **Committee bookmark on browse cards** — signed-out, `KYCommitteeCard` rendered a decorative bookmark (`IconButton component="span"` + `aria-hidden`, click-through) that *looked* interactive — a fake affordance, inconsistent with bill cards (bookmark only when followed, per decisions.md § 2026-05-11). Interactive variant (signed-in) was correctly labeled with `aria-pressed` but ~32px. Fixed: decorative bookmark removed; interactive toggle gets a 44px floor at xs (here + `CommitteeMeetingCard`).
+
+**Major (all fixed in the 2026-06-12 PR)**
+
+- [x] `/search` main input + `/meetings` agenda input: placeholder-only, no label (3.3.2/4.1.2).
+- [x] `/search` four filter Selects (Status/Date range/Session/Committee): no accessible name — `/bills`' 2026-06-01 `labelId` fix was never applied here (4.1.2).
+- [x] `/search`: no live region — result counts never announced (4.1.3); "Bills (N)" results header was a `<p>` (1.3.1).
+- [x] `/search` xs filter layout: stair-stepped right-aligned stack (visual bug).
+- [x] Sub-44px mobile targets: `GaChamberFilterBar` pills 33px (used on `/committees` + `/meetings`), Upcoming/Recent toggle 39px, subject chips 20px (2.5.5).
+- [x] Committee detail: meeting-materials date headers `<h6>` directly under `<h2>` (1.3.1).
+- [x] Meeting cards: location-pin icon next to the time — replaced with clock.
+
+**Minor (open — fold into future polish passes)**
+
+- [ ] Auth pages: generic `<title>` (no "Log in" / "Create account") (2.4.2); register doesn't state password rules up-front (3.3.2); no password-reveal toggle.
+- [ ] `/search` "Popular LegiScan subjects this session": "Try:" fallback chips contradict the label; loading state is literal "…" chips; "LegiScan" jargon survives the 2026-05-27 de-jargon pass here.
+- [ ] Committee detail: inconsistent new-tab announcement on external links.
+- [ ] Glossary: no in-page term filter / back-to-top on a 76-term page.
+- [ ] Search relevance: appointment resolutions outrank substantive bills for "education"; "500 results" reads as a cap.
+
+**Strong baseline confirmed:** skip link first in tab order, visible 2px `:focus-visible` ring (keyboard-verified), `aria-pressed` on chamber pills, glossary heading structure (H1 → 7×H2 → 76×H3), labeled auth forms with correct `autocomplete`, honest empty/signed-out states, no horizontal overflow at xs.
 
 ### Ops notes (2026-06-09 health check)
 

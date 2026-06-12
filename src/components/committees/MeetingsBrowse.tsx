@@ -233,6 +233,8 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
             placeholder="Search agenda text…"
             value={agendaInput}
             onChange={(e) => setAgendaInput(e.target.value)}
+            inputProps={{ 'aria-label': 'Search agenda text' }}
+            sx={{ '& .MuiInputBase-root': { minHeight: { xs: 44, sm: 'auto' } } }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -277,6 +279,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
                 if (v !== null) setRange(v);
               }}
               aria-label="Filter by date range"
+              sx={{ '& .MuiToggleButtonGroup-grouped': { minHeight: { xs: 44, sm: 'auto' } } }}
             >
               <ToggleButton value="upcoming">Upcoming</ToggleButton>
               <ToggleButton value="recent">Recent</ToggleButton>

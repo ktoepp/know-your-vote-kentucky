@@ -203,6 +203,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
             placeholder="Example: HB 23, SB 6, Medicaid, budgets…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            inputProps={{ 'aria-label': 'Search Kentucky bills' }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -217,7 +218,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
             <Box component="span" sx={{ fontWeight: 600 }}>only a number</Box> finds every designation with that
             numeral (House, Senate, and resolutions together).
           </Typography>
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2, flexWrap: 'wrap', alignItems: { xs: 'stretch', sm: 'flex-end' } }}>
             <Box>
               <Typography
                 variant="caption"
@@ -240,8 +241,9 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               />
             </Box>
             <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel>Status</InputLabel>
+              <InputLabel id="search-filter-status-label">Status</InputLabel>
               <Select
+                labelId="search-filter-status-label"
                 label="Status"
                 value={statusSelect}
                 onChange={(e) => setFilterParam('status', e.target.value as string)}
@@ -256,8 +258,9 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>Date range</InputLabel>
+              <InputLabel id="search-filter-date-range-label">Date range</InputLabel>
               <Select
+                labelId="search-filter-date-range-label"
                 label="Date range"
                 value={dateRangeSelect}
                 onChange={(e) => setFilterParam('dateRange', e.target.value as string)}
@@ -271,8 +274,9 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 175 }}>
-              <InputLabel>Session</InputLabel>
+              <InputLabel id="search-filter-session-label">Session</InputLabel>
               <Select
+                labelId="search-filter-session-label"
                 label="Session"
                 value={sessionSelect}
                 onChange={(e) => setFilterParam('session', e.target.value as string)}
@@ -284,8 +288,9 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 220 }}>
-              <InputLabel>Committee</InputLabel>
+              <InputLabel id="search-filter-committee-label">Committee</InputLabel>
               <Select
+                labelId="search-filter-committee-label"
                 label="Committee"
                 value={committeeSelect}
                 onChange={(e) => setFilterParam('committee', e.target.value as string)}
@@ -360,7 +365,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                 {suggestionsLoading &&
                   [1, 2, 3, 4].map((k) => (
-                    <Chip key={k} label="…" size="small" sx={{ opacity: 0.4 }} />
+                    <Chip key={k} label="…" size="small" aria-hidden sx={{ opacity: 0.4, '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }} />
                   ))}
                 {!suggestionsLoading &&
                   subjectSuggestions.map((s) => (
@@ -374,7 +379,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                         setQuery(s.subject_name);
                         pushSearchUrl(s.subject_name);
                       }}
-                      sx={{ cursor: 'pointer' }}
+                      sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
                     />
                   ))}
                 {!suggestionsLoading && subjectSuggestions.length === 0 && (
@@ -387,7 +392,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                         setQuery('education');
                         pushSearchUrl('education');
                       }}
-                      sx={{ cursor: 'pointer' }}
+                      sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
                     />
                     <Chip
                       label="Try: Medicaid"
@@ -397,7 +402,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                         setQuery('Medicaid');
                         pushSearchUrl('Medicaid');
                       }}
-                      sx={{ cursor: 'pointer' }}
+                      sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
                     />
                   </>
                 )}
@@ -409,7 +414,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                     setQuery('23');
                     pushSearchUrl('23');
                   }}
-                  sx={{ cursor: 'pointer' }}
+                  sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
                 />
                 <Chip
                   label="HB 1"
@@ -419,7 +424,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                     setQuery('HB 1');
                     pushSearchUrl('HB 1');
                   }}
-                  sx={{ cursor: 'pointer' }}
+                  sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
                 />
               </Box>
             </Box>
@@ -456,7 +461,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
 
         {searched && !loading && bills && (
           <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary" role="status" sx={{ mb: 1 }}>
               {totalResults} result{totalResults !== 1 ? 's' : ''} for &quot;{query}&quot;
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -470,7 +475,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
             {totalResults === 0 && (
               <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
                 <Search sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-                <Typography variant="h6" color="text.secondary">
+                <Typography variant="h6" component="h2" color="text.secondary">
                   No results found
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 560, mx: 'auto' }}>
@@ -514,7 +519,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               <Box sx={{ mb: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <Gavel color="primary" />
-                  <Typography variant="h6" fontWeight={600}>Bills ({bills.length})</Typography>
+                  <Typography variant="h6" component="h2" fontWeight={600}>Bills ({bills.length})</Typography>
                 </Box>
                 <PaginatedSection
                   items={bills}
