@@ -73,6 +73,33 @@ export async function getKyCommitteeBySlug(slug: string): Promise<KYCommittee | 
   )();
 }
 
+async function fetchKyCommitteeSlugByAliasUncached(slug: string): Promise<string | null> {
+  const supabase = createAnonClient();
+  if (!supabase) return null;
+  const decoded = decodeURIComponent(slug).trim();
+  const { data, error } = await supabase
+    .from('ky_committees')
+    .select('slug')
+    .contains('aliases', [decoded])
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data as { slug: string }).slug;
+}
+
+/**
+ * Resolve a merged-away committee slug to its canonical slug via
+ * ky_committees.aliases (migration 030). Returns null when the slug is not an
+ * alias of any committee.
+ */
+export async function getKyCommitteeSlugByAlias(slug: string): Promise<string | null> {
+  return unstable_cache(
+    () => fetchKyCommitteeSlugByAliasUncached(slug),
+    ['ky-committee-slug-alias', slug],
+    { revalidate: COMMITTEE_DETAIL_REVALIDATE_SECONDS },
+  )();
+}
+
 async function fetchKyCommitteeMeetingsForCommitteeUncached(
   committeeId: string,
   limit: number,
