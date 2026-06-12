@@ -587,6 +587,28 @@ export default function Navigation() {
                   </ListItemButton>
                 </ListItem>
               ))}
+              <ListItem sx={{ px: 2, py: 0 }}>
+                <ListItemButton
+                  component={Link}
+                  href="/search"
+                  onClick={() => setMobileMenuOpen(false)}
+                  sx={{
+                    borderRadius: 2,
+                    mb: 0.5,
+                    color: isActive('/search') ? mobileNav.colorActive : mobileNav.color,
+                    backgroundColor: isActive('/search') ? mobileNav.activeBg : 'transparent',
+                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                    <SearchIcon aria-hidden />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Search"
+                    sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem', color: 'inherit' } }}
+                  />
+                </ListItemButton>
+              </ListItem>
               <Divider sx={{ my: 1 }} />
               <ListItem sx={{ px: 2, py: 0 }}>
                 <ListItemButton
@@ -612,6 +634,28 @@ export default function Navigation() {
                   />
                 </ListItemButton>
               </ListItem>
+              {!loading && !user && (
+                <>
+                  <Divider sx={{ my: 1 }} />
+                  <ListItem sx={{ px: 2, py: 0 }}>
+                    <ListItemButton
+                      component={Link}
+                      href={`/auth/login?next=${encodeURIComponent(pathname && !pathname.startsWith('/auth') ? pathname : '/')}`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      sx={{
+                        borderRadius: 2,
+                        color: mobileNav.color,
+                        '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
+                      }}
+                    >
+                      <ListItemText
+                        primary="Log in"
+                        sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem' } }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                </>
+              )}
             </List>
           </Container>
         </Box>

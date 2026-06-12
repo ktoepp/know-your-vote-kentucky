@@ -50,6 +50,8 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
         mr: -0.25,
         mt: -0.25,
         flexShrink: 0,
+        minWidth: { xs: 44, sm: 32 },
+        minHeight: { xs: 44, sm: 32 },
       }}
     >
       {following ? (
@@ -58,24 +60,7 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
         <Bookmark size={22} strokeWidth={1.7} />
       )}
     </IconButton>
-  ) : (
-    <IconButton
-      component="span"
-      aria-hidden
-      tabIndex={-1}
-      size="small"
-      sx={{
-        color: 'text.secondary',
-        p: 0.25,
-        mr: -0.25,
-        mt: -0.25,
-        pointerEvents: 'none',
-        flexShrink: 0,
-      }}
-    >
-      <Bookmark size={22} strokeWidth={1.7} />
-    </IconButton>
-  );
+  ) : null;
 
   return (
     <CivicCard

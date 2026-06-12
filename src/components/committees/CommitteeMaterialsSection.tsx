@@ -101,7 +101,7 @@ export function CommitteeMaterialsSection({
           {groups.map((group, i) => (
             <Box key={group.key}>
               {i > 0 && <Divider sx={{ mb: 2 }} />}
-              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+              <Typography variant="subtitle1" component="h3" fontWeight={700} sx={{ mb: 1 }}>
                 {group.dateLabel}
               </Typography>
               <Box component="ul" sx={{ listStyle: 'none', pl: 0, m: 0, display: 'grid', gap: 0.75 }}>

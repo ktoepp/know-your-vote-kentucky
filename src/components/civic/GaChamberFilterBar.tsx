@@ -35,6 +35,7 @@ export function GaChamberFilterBar({
           borderRadius: '999px !important',
           px: 1.75,
           py: 0.5,
+          minHeight: { xs: 44, sm: 'auto' },
           bgcolor: 'background.paper',
           color: 'text.secondary',
           textTransform: 'none',

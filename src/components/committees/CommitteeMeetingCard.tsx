@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Box, IconButton, Typography } from '@mui/material';
-import { Bookmark as BookmarkFilled, CalendarToday, LocationOn } from '@mui/icons-material';
+import { Bookmark as BookmarkFilled, CalendarToday, Schedule } from '@mui/icons-material';
 import { Bookmark } from 'lucide-react';
 import { CommitteeTagRow } from '@/components/committees/CommitteeTagRow';
 import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
@@ -53,6 +53,8 @@ export function CommitteeMeetingCard({
         p: 0.25,
         flexShrink: 0,
         ml: 'auto',
+        minWidth: { xs: 44, sm: 32 },
+        minHeight: { xs: 44, sm: 32 },
       }}
     >
       {following ? (
@@ -96,7 +98,7 @@ export function CommitteeMeetingCard({
           </Box>
           {meeting.time_and_location && (
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75 }}>
-              <LocationOn sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.15 }} aria-hidden />
+              <Schedule sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.15 }} aria-hidden />
               <Typography
                 variant="body2"
                 color="text.secondary"
