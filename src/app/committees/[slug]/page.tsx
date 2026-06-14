@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { CommitteeDetailView } from '@/components/committees/CommitteeDetailView';
 import {
   fetchKyCommitteeAgendaForMeetings,
@@ -7,6 +7,7 @@ import {
   fetchKyCommitteeMeetingsForCommittee,
   fetchKyLegislatorRoster,
   getKyCommitteeBySlug,
+  getKyCommitteeSlugByAlias,
 } from '@/lib/ky-committee-data';
 import { fetchKyCommitteesBrowseList } from '@/lib/ky-ga-browse-server';
 import { buildCommitteeMemberDisplay } from '@/lib/ky-committee-members';
@@ -32,7 +33,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function CommitteeDetailPage({ params }: PageProps) {
   const { slug } = await params;
   const committee = await getKyCommitteeBySlug(slug);
-  if (!committee) notFound();
+  if (!committee) {
+    // Merged-away duplicate slugs (see scripts/merge-duplicate-committees.ts)
+    // resolve via aliases so bookmarked URLs keep working.
+    const canonicalSlug = await getKyCommitteeSlugByAlias(slug);
+    if (canonicalSlug) permanentRedirect(`/committees/${encodeURIComponent(canonicalSlug)}`);
+    notFound();
+  }
 
   const [meetings, legislatorRoster, committeeRoster, materials] = await Promise.all([
     fetchKyCommitteeMeetingsForCommittee(committee.id),
