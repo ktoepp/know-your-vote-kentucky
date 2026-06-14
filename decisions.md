@@ -778,3 +778,39 @@ Enrollment actions fill a **LegiScan gap** (date-stamped executive actions, line
 - **Not tested (carry-forward):** real screen reader (VoiceOver/NVDA), 200% zoom reflow, signed-in surfaces, real-device 390px (viewport floor was ~500px).
 
 **Revisit if:** committee dedupe surfaces more pairs than the Budget Review cluster (then the seed itself needs renaming to LRC-canonical names); drawer link list drifts from header again (consider deriving both from one nav-config array).
+
+---
+
+## 2026-06-10 — Sine-die display override for pending bills (PR #85)
+
+Bills still `In Committee` / `Introduced` / otherwise pending when a session adjourned sine die kept their pre-adjournment status on display, implying they were still live (accuracy finding: HB563 2026 RS reading "In Committee" as of 2026-06-10).
+
+- **Pure display-layer fix — no DB sync.** `sessionHasEnded(sessionName, asOf?)` in `ky-sessions.ts` reads the existing `sineDie`/end milestone data and returns **false for unknown sessions** so nothing is ever silently mislabeled. `isActivePendingBillStatus(status)` in `bill-display.ts` identifies the non-terminal statuses that become misleading post-adjournment (In Committee, Introduced, Referred, Reported, Draft, Prefiled).
+- **Override point: `BillStatusMetaChip`.** When both conditions hold, the chip shows **"Adjourned Sine Die"** routed to the existing `adjourned_sine_die` tooltip ("Any bills not yet passed are dead until the next session").
+- **Untouched:** terminal statuses (Signed, Vetoed, Failed, Chaptered, Passed Chamber) and any bill from a session still active/future in `KY_SESSIONS`. **Depends on** the 2026 RS `sineDie` milestone populated 2026-06-09 (§ 2026-06-09).
+
+---
+
+## 2026-06-11 — District-map hover UX (PRs #86/#87)
+
+Replaced the non-interactive full-card popup on `/members/map` with a lighter-weight hover model. (#86 shipped the change; #87 refined it — same title.)
+
+- **Chromeless hover chip + sidebar preview.** Hovering a district shows a lightweight chip tooltip and previews that district's member(s) in the sidebar, rather than overlaying a full member card on the map that the pointer couldn't interact with.
+- **Selected-fill tint + smoother transitions** for clearer "which district am I on" feedback. Continues the 2026-06-01 map-affordance line (real `<label>` on the address input, empty vs no-district states).
+
+---
+
+## 2026-06-12 — Committee record merge (seed-code vs LRC full-label duplicates) (PR #89)
+
+> **✅ Re-landed on `main` 2026-06-13.** PR #89 was originally merged into the **`fix/design-a11y-pass-2026-06-12` branch (PR #88), not `main`** — and #88 had already squash-merged to main by then, so #89's code never reached `main`. Re-landed by lifting the seven code files (migration **030** `ky_committees.aliases`, `scripts/merge-duplicate-committees.ts`, `scripts/diagnose-committee-duplicates.ts`, the `audit:accuracy` checkCommittees near-dupe guard, `src/lib/ky-committee-data.ts` alias lookup + `/committees/[slug]` 308-redirect, `package.json` scripts) onto `main`; typecheck + eslint clean. The **data** change was already applied to primary 2026-06-12 (below) and migration 030 is idempotent (`ADD COLUMN/CREATE INDEX IF NOT EXISTS`), so the re-land needs no DB action.
+
+**Fixes the top finding from the same-day design+a11y audit (§ 2026-06-12 above).** `ky_committees` upserts on `(lrc_rsn, committee_type)`, and the LRC changed the `CommitteeType` URL param on the legislative calendar from short codes (`IJ`, `S` — the values migration 027's seed also used) to full labels (`Interim Joint Committee`, `Statutory Committee`). Every interim/statutory committee then got a second row on the next sync: **14 confirmed pairs** (not the 2 suspected during the audit), each sharing an `lrc_rsn` with data split across the rows — old row held the PDF-backfilled future meetings and any follows; new row received current calendar scrapes and materials copies.
+
+- **Survivor rule: the row current LRC syncs target** (full-label row) — merging the other direction would let the next sync recreate the duplicate.
+- **Meeting collision matching is date-only, deliberately** — loser PDF-backfill time strings ("11:00 ET") vs survivor calendar form ("11:00 am ET / 10:00 am CT, Annex Room 154") are the same meeting; `(date, time_and_location)` equality would double-list and later fire false `meeting_cancelled` digests (one had already fired for the loser's 2026-06-02 education meeting).
+- **Aliases over hard 404s (migration 030).** `ky_committees.aliases TEXT[]` + GIN; merge appends the loser slug; `/committees/[slug]` falls back to alias lookup + `permanentRedirect` (308) so old bookmarks keep working.
+- **Idempotent + auditable.** `merge:duplicate-committees` is dry-run by default (`--live` to write, `--pair=loser:survivor` overrides; auto mode only merges clean same-rsn short/full splits); live runs write a JSON change report under `reports/`. Re-run: "No mergeable pairs found."
+- **Applied to primary 2026-06-12:** 14 pairs, 244 actions; `ky_committees` **69 → 55 rows**; the one real follower's 3 follows moved with per-user dedupe; no loser-slug refs in `committee_memberships`. Verified: canonical admin-regs page shows members *and* the Jul 8 meeting; alias slug 308s to it.
+- **Regression guard:** `audit:accuracy` checkCommittees warns when two rows share an `lrc_rsn` or normalized (depluralized) name, **before** the calendar fetch (fires even when LRC is down). *(Also stranded off main — re-lands with the PR.)*
+
+**Revisit if:** LRC changes the `CommitteeType` param again (the weekly warn catches it); a committee genuinely meets twice on one date during a merge window (date-only matching would fold them — recheck before merging session-period standing committees); fresh-DB installs re-seed 027's short codes and immediately duplicate (consider updating the 027 seed to full labels for new environments).

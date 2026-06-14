@@ -36,6 +36,61 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
   const started = Date.now();
   const findings: Finding[] = [];
 
+  // Near-duplicate committee records: ky_committees upserts on (lrc_rsn,
+  // committee_type), so an LRC change to the CommitteeType URL param (e.g. the
+  // 2026-06 'IJ' → 'Interim Joint Committee' switch) silently mints a second row
+  // for the same committee with data split across the two. Warn whenever two rows
+  // share an lrc_rsn or a normalized name. Merge with
+  // `npm run merge:duplicate-committees` (see decisions.md § 2026-06-12).
+  {
+    const { data: allCommittees } = await db
+      .from('ky_committees')
+      .select('lrc_rsn, committee_type, name, slug');
+    const rows = allCommittees ?? [];
+    const normalizeName = (name: string) =>
+      name
+        .toLowerCase()
+        .replace(/&/g, ' and ')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((tok) => (tok.length > 3 && tok.endsWith('s') ? tok.slice(0, -1) : tok))
+        .join(' ');
+    const byRsn = new Map<number, typeof rows>();
+    const byName = new Map<string, typeof rows>();
+    for (const c of rows) {
+      if (c.lrc_rsn != null) {
+        byRsn.set(c.lrc_rsn, [...(byRsn.get(c.lrc_rsn) ?? []), c]);
+      }
+      const n = normalizeName(c.name as string);
+      byName.set(n, [...(byName.get(n) ?? []), c]);
+    }
+    const flagged = new Set<string>();
+    for (const [rsn, group] of byRsn) {
+      if (group.length < 2) continue;
+      const slugs = group.map((c) => `${c.slug} (type=${c.committee_type})`).sort();
+      flagged.add(group.map((c) => c.slug).sort().join('|'));
+      findings.push({
+        severity: 'warn',
+        domain: 'committees',
+        entity: `lrc_rsn=${rsn}`,
+        message: `near-duplicate committee rows share lrc_rsn: ${slugs.join(' vs ')} — run merge:duplicate-committees`,
+      });
+    }
+    for (const [, group] of byName) {
+      if (group.length < 2) continue;
+      const key = group.map((c) => c.slug).sort().join('|');
+      if (flagged.has(key)) continue;
+      findings.push({
+        severity: 'warn',
+        domain: 'committees',
+        entity: group[0].name as string,
+        message: `near-duplicate committee rows share a normalized name: ${group.map((c) => `${c.slug} (rsn=${c.lrc_rsn})`).sort().join(' vs ')} — run merge:duplicate-committees`,
+      });
+    }
+  }
+
+
   let html: string;
   try {
     const res = await axios.get<string>(LRC_LEGISLATIVE_CALENDAR_URL, {
