@@ -38,6 +38,8 @@
     "diagnose:committee-duplicates": "tsx scripts/diagnose-committee-duplicates.ts",
     "merge:duplicate-committees": "tsx scripts/merge-duplicate-committees.ts",
     "merge:duplicate-committees:live": "tsx scripts/merge-duplicate-committees.ts --live",
+    "probe:committee-links": "tsx scripts/probe-committee-material-links.ts",
+    "probe:committee-links:dry": "tsx scripts/probe-committee-material-links.ts --dry",
     "reconcile:committee-memberships": "tsx scripts/reconcile-committee-memberships.ts",
     "remap:recommittal-statuses": "tsx scripts/remap-recommittal-statuses.ts",
     "refresh:bill-status": "tsx scripts/refresh-bill-status-from-legiscan.ts",
