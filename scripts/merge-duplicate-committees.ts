@@ -156,15 +156,33 @@ async function main() {
           db.from('ky_committee_meetings').update({ committee_id: survivor.id }).eq('id', lm.id));
         continue;
       }
-      // Collision: survivor already has this meeting. Merge children, then drop the loser meeting.
-      const { count: sItemCount } = await db
-        .from('ky_committee_agenda_items').select('id', { count: 'exact', head: true }).eq('meeting_id', matchId);
-      if ((sItemCount ?? 0) > 0) {
-        await act('drop-duplicate-agenda', `loser meeting ${lm.meeting_date} — survivor meeting already has ${sItemCount} agenda items`, () =>
-          db.from('ky_committee_agenda_items').delete().eq('meeting_id', lm.id));
-      } else {
-        await act('move-agenda-items', `loser meeting ${lm.meeting_date} → survivor meeting ${matchId}`, () =>
-          db.from('ky_committee_agenda_items').update({ meeting_id: matchId }).eq('meeting_id', lm.id));
+      // Collision: survivor already has this meeting. Merge agenda items by
+      // content — drop loser items the survivor already has, move the rest.
+      // A wholesale delete would lose loser-only items (e.g. a fuller PDF-backfill
+      // agenda vs a sparse calendar one). ky_committee_agenda_items is UNIQUE on
+      // (meeting_id, sort_order), so moved rows are re-sequenced after the
+      // survivor's highest sort_order to avoid colliding with its existing items.
+      const itemKey = (it: { ky_bill_id: string | null; raw_text: string }) =>
+        it.ky_bill_id ?? `t:${it.raw_text.trim().toLowerCase()}`;
+      const [{ data: sItems }, { data: lItems }] = await Promise.all([
+        db.from('ky_committee_agenda_items').select('id, sort_order, raw_text, ky_bill_id').eq('meeting_id', matchId),
+        db.from('ky_committee_agenda_items').select('id, sort_order, raw_text, ky_bill_id').eq('meeting_id', lm.id),
+      ]);
+      const sKeys = new Set((sItems ?? []).map(itemKey));
+      const maxSort = (sItems ?? []).reduce((mx, it) => Math.max(mx, (it.sort_order as number) ?? 0), 0);
+      const dupItems = (lItems ?? []).filter((it) => sKeys.has(itemKey(it)));
+      const moveItems = (lItems ?? [])
+        .filter((it) => !sKeys.has(itemKey(it)))
+        .sort((a, b) => ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0));
+      if (dupItems.length > 0) {
+        await act('drop-duplicate-agenda', `${dupItems.length} loser items already on survivor meeting ${lm.meeting_date}`, () =>
+          db.from('ky_committee_agenda_items').delete().in('id', dupItems.map((it) => it.id)));
+      }
+      for (let i = 0; i < moveItems.length; i++) {
+        const it = moveItems[i];
+        const newSort = maxSort + 1 + i;
+        await act('move-agenda-item', `loser item ${it.id} → survivor meeting ${matchId} (sort_order ${newSort})`, () =>
+          db.from('ky_committee_agenda_items').update({ meeting_id: matchId, sort_order: newSort }).eq('id', it.id));
       }
       await act('repoint-materials-meeting', `materials on loser meeting ${lm.meeting_date} → survivor meeting`, () =>
         db.from('ky_committee_materials').update({ meeting_id: matchId }).eq('meeting_id', lm.id));
