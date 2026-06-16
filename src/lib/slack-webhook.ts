@@ -1,8 +1,30 @@
+import { writeFileSync } from 'node:fs';
 import type { SyncResult } from './ky-sync-pipeline';
 import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 import { fetchLegiscanQuotaSummary } from './legiscan-quota';
 
 const SLACK_POST_TIMEOUT_MS = 8_000;
+
+/**
+ * Sentinel file a workflow's generic "notify on workflow failure" step checks
+ * before posting. Lets that step act as a pure last-resort net (setup failures,
+ * OOM, pre-flight exits) without double-posting when a script has already sent
+ * a rich message to #errors. See {@link markSlackErrorNotified}.
+ */
+export const SLACK_NOTIFIED_MARKER = '.slack-notified';
+
+/**
+ * Drop the {@link SLACK_NOTIFIED_MARKER} file so the workflow failure step skips.
+ * No-op outside GitHub Actions, so it never writes during Vercel runtime or local dev.
+ */
+export function markSlackErrorNotified(): void {
+  if (process.env.GITHUB_ACTIONS !== 'true') return;
+  try {
+    writeFileSync(SLACK_NOTIFIED_MARKER, new Date().toISOString());
+  } catch {
+    /* ignore — marker is best-effort */
+  }
+}
 
 export function isVercelCronRequest(req: Request): boolean {
   return req.headers.get('x-vercel-cron') === '1';
@@ -390,6 +412,33 @@ export async function notifySyncExceptionSlack(params: {
 export async function notifyHealthCheckFailureSlack(details: string): Promise<void> {
   const clipped = details.length > 2000 ? `${details.slice(0, 2000)}…` : details;
   await postToAlertsAndSupport(`*KY Vote health check failed*\n${clipped}`);
+}
+
+/** Mask an email for an ops channel: keep first 2 chars of the local part + domain. */
+function maskEmail(email: string): string {
+  const at = email.indexOf('@');
+  if (at < 1) return '***';
+  const local = email.slice(0, at);
+  const domain = email.slice(at);
+  const head = local.slice(0, 2);
+  return `${head}${local.length > 2 ? '***' : '*'}${domain}`;
+}
+
+/**
+ * Posts a new-signup notice to the status-reports digest channel. Server-side and
+ * fires exactly once per user (called after the idempotent welcome-email send), so
+ * unlike the client `user_registered` PostHog event it can't be dropped by ad-blockers.
+ * No-op when no digest webhook is configured.
+ */
+export async function notifyNewUserSlack(params: {
+  email: string;
+  displayName?: string | null;
+}): Promise<void> {
+  const url = webhookUrlForSyncDigest();
+  if (!url) return;
+  const name = params.displayName?.trim();
+  const who = name ? `${name} · \`${maskEmail(params.email)}\`` : `\`${maskEmail(params.email)}\``;
+  await postSlackIncomingWebhook(url, `*KY Vote — new verified user* :tada:\n${who}`);
 }
 
 /**

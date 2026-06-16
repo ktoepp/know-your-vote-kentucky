@@ -71,3 +71,6 @@ diagnose-after.txt
 
 # Script audit output (npm run audit:lrc:bill-refs, weekly workflow artifacts)
 /reports/
+
+# CI-only sentinel written by sync/audit scripts to dedupe Slack failure posts
+.slack-notified

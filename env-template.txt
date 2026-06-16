@@ -159,6 +159,12 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 #
 # Local dev does not send events to PostHog unless you opt in (keeps real dashboards clean):
 # NEXT_PUBLIC_POSTHOG_REPORT_DEV=true
+#
+# Vercel PREVIEW/branch deploys are also excluded (next.config.ts bakes NEXT_PUBLIC_VERCEL_ENV
+# from Vercel's VERCEL_ENV; instrumentation-client.ts skips init when it is "preview").
+# Do NOT set NEXT_PUBLIC_VERCEL_ENV manually — it is derived at build time.
+# Internal-user / bot / IP filtering is configured in the PostHog UI, not here:
+# see docs/analytics-internal-traffic.md.
 
 # =============================================================================
 # OPTIONAL — Slack notifications

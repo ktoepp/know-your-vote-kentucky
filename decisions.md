@@ -817,6 +817,24 @@ Replaced the non-interactive full-card popup on `/members/map` with a lighter-we
 
 ---
 
+## 2026-06-16
+
+**Notification + analytics hygiene pass.**
+
+- **Dead Slack lib removed.** Deleted `src/lib/slack.ts` (Block-Kit `sendErrorAlert`/`sendSyncNotification`/`sendDeploymentNotification`/`sendAlert`/`sendSlackMessage`) — zero importers; superseded by `src/lib/slack-webhook.ts`. It used a divergent env-var convention (`SLACK_WEBHOOK_ALERTS/SYNC`) that muddied the channel model. Active Slack plumbing is `slack-webhook.ts` only (channels: `SLACK_WEBHOOK_STATUS_REPORTS` / `ERRORS` / `SUPPORT`, legacy aliases `SYNC`/`ALERTS`/`URL` still honored as fallbacks — **kept** for now). **Legacy aliases not dropped this pass** (would require migrating Vercel + GitHub secrets to canonical names first).
+- **CI failure double-post fixed.** GitHub Actions sync/verify/audit scripts post a rich `#errors` message and then `exit 1`, which tripped each workflow's generic "notify on workflow failure" step → a second `#errors` post. New shared helper `markSlackErrorNotified()` (`slack-webhook.ts`) drops a `.slack-notified` sentinel (only when `GITHUB_ACTIONS=true`); each workflow's failure step now `[ -f .slack-notified ]` → skip. The generic step is now a true last-resort net for failures *outside* the script's notify path (setup/`npm ci`/OOM/pre-flight `exit 1`). Wired in `manual-sync.ts` (errors + crash), `verify-legislator-external-links.ts` (failed>0), `accuracy-audit.ts` (operational error only — content findings exit 0). `.slack-notified` gitignored.
+- **PostHog preview-deploy exclusion.** `vercel.json` forces `NODE_ENV=production` for *all* deploys, so preview/branch builds were sending events into the production PostHog project. `next.config.ts` now exposes `NEXT_PUBLIC_VERCEL_ENV` (from Vercel's build-time `VERCEL_ENV`); `instrumentation-client.ts` skips PostHog init when it's `"preview"`. No dashboard change needed. **Internal-user / bot / IP filtering is PostHog-UI-only** — documented in [docs/analytics-internal-traffic.md](./docs/analytics-internal-traffic.md) (relies on `identifyUser` passing `email`; signed-out internal browsing needs host/IP filters). PostHog→Slack Action subscriptions live in the PostHog UI, not the repo.
+
+**Revisit if:** migrating Slack secrets to canonical names (then strip `SLACK_WEBHOOK_SYNC/ALERTS/URL` fallbacks from `slack-webhook.ts`, the 4 workflows, and `env-template.txt`); a script that posts its own `#errors` message is added without calling `markSlackErrorNotified()` (it will double-post in CI).
+
+### 2026-06-16 (cont.) — new-user alert + PostHog Slack consolidation
+
+- **New-user Slack alert moved server-side.** Added `notifyNewUserSlack()` (`src/lib/slack-webhook.ts`, masks email) called from `src/app/api/me/welcome-email/route.tsx` on the committed-stamp success path → fires exactly once per *verified* user to `#status-reports`. Reliable vs the client-side `user_registered` PostHog event (ad-blockable).
+- **PostHog Slack wiring consolidated (done in PostHog UI, project #450281, channel #subscriptions / C094NBMCU3U).** Signups were pinging `#subscriptions` twice (two destinations both matched `user_registered`). Resolution: removed the `user_registered` matcher from destination "Slack #subscriptions — user actions" (kept `preferences_saved` + `account_deleted`), and disabled the generic "Slack" destination (its sole matcher was `user_registered`; removing it would have made it fire on all events, so the whole destination was paused). Net: PostHog no longer pages Slack on signup; the server-side alert is the single source.
+- **Bill follow/unfollow notification disabled.** It was a *scheduled daily Slack digest* — subscription "Bill Follows/Unfollows Daily Slack Report" on insight `Tcdx6K8J` (09:00 ET → #subscriptions), NOT a per-event ping. Disabled (not deleted); `bill_followed`/`bill_unfollowed` events still collected for analytics.
+- **Internal/test filter left OFF** on the Slack destinations per owner. Stale name on the "user actions" destination still reads "(registered/preferences/deleted)" — cosmetic.
+
+**Revisit if:** wanting signup alerts on *registration* (not just verification) — the server-side alert fires post-verification; re-enabling a PostHog `user_registered` destination would cover unverified signups too (accept the duplicate or move both to one channel). PostHog event→Slack topology is documented in memory `project_posthog_notifications`.
 ## 2026-06-13 — Committee material link-status (404 detection persisted)
 
 Open follow-up from § 2026-06-09 / § 2026-06-11 (committee materials notes). LRC document URLs go dead after a session ends; we link out (no file hosting), so a stored link that now 404s shows the user a broken link. The accuracy audit *already* probed a rotating sample and flagged 404s — but the result was ephemeral (a weekly finding), never surfaced to users. This persists it.
