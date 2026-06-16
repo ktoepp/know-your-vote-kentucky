@@ -761,7 +761,7 @@ Enrollment actions fill a **LegiScan gap** (date-stamped executive actions, line
 ### Open follow-ups
 
 - **`delivered_to_sos` event slug** — deferred; payload-only under `signed_or_vetoed` or future slug when bill-detail countdown ships.
-- **Committee materials link 404 detection** — `link_status` column + accuracy-audit HEAD probe (see § 2026-06-09 committee materials notes).
+- **Committee materials link 404 detection** — ✅ DONE 2026-06-13 (migration 031 `link_status`/`link_checked_at` + audit-probe writeback + `probe:committee-links` backfill + UI "Link unavailable" flag). See § 2026-06-13 — Committee material link-status.
 - **Historical enrollment sessions** — extend `KY_SESSIONS` + one-time sync when older record slugs are needed beyond 2025/2026 RS.
 
 ---
@@ -811,7 +811,7 @@ Replaced the non-interactive full-card popup on `/members/map` with a lighter-we
 - **Aliases over hard 404s (migration 030).** `ky_committees.aliases TEXT[]` + GIN; merge appends the loser slug; `/committees/[slug]` falls back to alias lookup + `permanentRedirect` (308) so old bookmarks keep working.
 - **Idempotent + auditable.** `merge:duplicate-committees` is dry-run by default (`--live` to write, `--pair=loser:survivor` overrides; auto mode only merges clean same-rsn short/full splits); live runs write a JSON change report under `reports/`. Re-run: "No mergeable pairs found."
 - **Applied to primary 2026-06-12:** 14 pairs, 244 actions; `ky_committees` **69 → 55 rows**; the one real follower's 3 follows moved with per-user dedupe; no loser-slug refs in `committee_memberships`. Verified: canonical admin-regs page shows members *and* the Jul 8 meeting; alias slug 308s to it.
-- **Regression guard:** `audit:accuracy` checkCommittees warns when two rows share an `lrc_rsn` or normalized (depluralized) name, **before** the calendar fetch (fires even when LRC is down). *(Also stranded off main — re-lands with the PR.)*
+- **Regression guard:** `audit:accuracy` checkCommittees warns when two rows share an `lrc_rsn` or normalized (depluralized) name, **before** the calendar fetch (fires even when LRC is down). *(Re-landed on main with PR #90.)*
 
 **Revisit if:** LRC changes the `CommitteeType` param again (the weekly warn catches it); a committee genuinely meets twice on one date during a merge window (date-only matching would fold them — recheck before merging session-period standing committees); fresh-DB installs re-seed 027's short codes and immediately duplicate (consider updating the 027 seed to full labels for new environments).
 
@@ -835,3 +835,15 @@ Replaced the non-interactive full-card popup on `/members/map` with a lighter-we
 - **Internal/test filter left OFF** on the Slack destinations per owner. Stale name on the "user actions" destination still reads "(registered/preferences/deleted)" — cosmetic.
 
 **Revisit if:** wanting signup alerts on *registration* (not just verification) — the server-side alert fires post-verification; re-enabling a PostHog `user_registered` destination would cover unverified signups too (accept the duplicate or move both to one channel). PostHog event→Slack topology is documented in memory `project_posthog_notifications`.
+## 2026-06-13 — Committee material link-status (404 detection persisted)
+
+Open follow-up from § 2026-06-09 / § 2026-06-11 (committee materials notes). LRC document URLs go dead after a session ends; we link out (no file hosting), so a stored link that now 404s shows the user a broken link. The accuracy audit *already* probed a rotating sample and flagged 404s — but the result was ephemeral (a weekly finding), never surfaced to users. This persists it.
+
+- **Schema (migration 031, idempotent).** `ky_committee_materials.link_status TEXT CHECK (link_status IN ('ok','dead'))` + `link_checked_at TIMESTAMPTZ`. NULL = never probed.
+- **Only definitive outcomes are recorded.** `classifyLinkStatus`: 404 → `dead`, 2xx/3xx → `ok`, everything else (timeout, 403/5xx, status 0) → `null` = leave the stored value untouched. A transient blip or a bot-block never flips a good link to dead. The probe persists; the audit *findings* still warn on any non-2xx (unchanged).
+- **Shared probe lib.** `src/lib/ky-committee-material-link-probe.ts` extracts `probeUrl` (HEAD→Range-GET fallback, one retry) + `mapWithConcurrency` from the audit checker so both the audit and the backfill script use one implementation.
+- **Two writers.** (1) The accuracy-audit materials checker persists `link_status` for the ~`ACCURACY_LINK_SAMPLE/2` material rows it probes when `ACCURACY_PROBE_LINKS=true` — keeps it fresh weekly. (2) `npm run probe:committee-links` (`:dry` to probe-without-writing) is the full-coverage / backfill tool and a cron candidate — `--only-unchecked`, `--limit=N`, `--committee=<slug>`, `--concurrency=N`; orders by `link_checked_at` nulls-first so capped runs rotate coverage.
+- **UI.** Committee detail flags a `dead` material as line-through title + a non-interactive "Link unavailable" chip (pointing at the LRC profile via the existing section caveat) instead of rendering a link to a 404. `ok`/unchecked links render normally.
+- **⚠️ Deploy ordering.** The materials read query now selects `link_status`, so **migration 031 must be applied to primary before this code deploys** — otherwise the select errors and the materials section renders empty. After applying, run `npm run probe:committee-links` once to backfill `link_status`.
+
+**Revisit if:** LRC starts returning 403/anti-bot on document HEADs at scale (then `dead` coverage stalls — consider treating a stable 403 streak as dead); or if we want a Vercel cron for `probe:committee-links` rather than relying on audit-sample rotation + manual backfill.
