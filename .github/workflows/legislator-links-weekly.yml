@@ -88,6 +88,10 @@ jobs:
             echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
             exit 0
           fi
+          if [ -f .slack-notified ]; then
+            echo "Skip Slack: verify script already posted the failure to #errors."
+            exit 0
+          fi
           curl -sS -X POST -H 'Content-Type: application/json' \
             -d "{\"text\":\"*KY Vote — legislator links weekly workflow failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
             "$WEBHOOK"

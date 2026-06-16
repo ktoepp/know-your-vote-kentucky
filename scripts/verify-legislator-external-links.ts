@@ -29,7 +29,10 @@ import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { legiscanPersonUrl, normalizeBallotpediaHref } from '../src/lib/external-legislative-links';
 import { normalizeHttpsUrl, type LegislatorExternalLink } from '../src/lib/legislator-link-normalize';
 import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
-import { notifyLegislatorLinksVerifySlack } from '../src/lib/slack-webhook';
+import {
+  markSlackErrorNotified,
+  notifyLegislatorLinksVerifySlack,
+} from '../src/lib/slack-webhook';
 
 const TIMEOUT_MS = 18_000;
 const CONCURRENCY = 6;
@@ -434,6 +437,9 @@ async function main() {
     fromCli: true,
   }).catch((e) => console.error('[Slack] verify notify failed:', e));
 
+  // Failures were already posted to #errors above; suppress the workflow's
+  // generic failure-notify step to avoid a duplicate message.
+  if (failed > 0) markSlackErrorNotified();
   process.exit(failed > 0 ? 1 : 0);
 }
 

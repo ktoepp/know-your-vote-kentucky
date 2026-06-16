@@ -30,7 +30,11 @@
  */
 
 import './load-env';
-import { notifySyncExceptionSlack, notifySyncSlack } from '../src/lib/slack-webhook';
+import {
+  markSlackErrorNotified,
+  notifySyncExceptionSlack,
+  notifySyncSlack,
+} from '../src/lib/slack-webhook';
 import {
   syncAll,
   SYNC_SOURCES,
@@ -156,6 +160,9 @@ async function main() {
       fromCli: true,
     }).catch((e) => console.error('[Slack] sync notify failed:', e));
     const failed = results.filter(r => r.status === 'error');
+    // notifySyncSlack already posted these failures to #errors; tell the
+    // workflow's failure step to stand down so it doesn't double-post.
+    if (failed.length > 0) markSlackErrorNotified();
     process.exit(failed.length > 0 ? 1 : 0);
   } catch (err: any) {
     console.error(`\n❌ Fatal error: ${err.message}`);
@@ -166,6 +173,7 @@ async function main() {
       isVercelCron: false,
       fromCli: true,
     }).catch((e) => console.error('[Slack] sync exception notify failed:', e));
+    markSlackErrorNotified();
     process.exit(1);
   }
 }
