@@ -137,6 +137,8 @@ export interface KYCommitteeMaterial {
   url: string;
   file_type: string | null;
   sort_order: number;
+  /** Last probed reachability (migration 031); 'dead' = known 404, null = unchecked. */
+  link_status: 'ok' | 'dead' | null;
 }
 
 async function fetchKyCommitteeMaterialsUncached(
@@ -147,7 +149,7 @@ async function fetchKyCommitteeMaterialsUncached(
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('ky_committee_materials')
-    .select('id, committee_id, meeting_id, meeting_date, date_label, title, url, file_type, sort_order')
+    .select('id, committee_id, meeting_id, meeting_date, date_label, title, url, file_type, sort_order, link_status')
     .eq('committee_id', committeeId)
     .order('meeting_date', { ascending: false, nullsFirst: false })
     .order('sort_order', { ascending: true })

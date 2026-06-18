@@ -42,7 +42,7 @@ import {
   formatSlackReport,
   summarizeAudit,
 } from '../src/lib/accuracy-audit/report';
-import { notifyAccuracyAuditSlack } from '../src/lib/slack-webhook';
+import { markSlackErrorNotified, notifyAccuracyAuditSlack } from '../src/lib/slack-webhook';
 
 function parseArgs(argv: string[]): {
   json: boolean;
@@ -191,6 +191,9 @@ async function main() {
     } catch (e) {
       console.error('[accuracy-audit] Slack notify failed:', e instanceof Error ? e.message : e);
     }
+    // Operational errors were escalated to #errors above; let the workflow's
+    // failure step stand down. (Content findings exit 0 and never reach here.)
+    if (hasOperationalError) markSlackErrorNotified();
   }
 
   process.exit(hasOperationalError ? 1 : 0);

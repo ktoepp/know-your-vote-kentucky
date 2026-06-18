@@ -115,22 +115,48 @@ export function CommitteeMaterialsSection({
                         sx={{ flexShrink: 0 }}
                       />
                     )}
-                    <MuiLink
-                      href={m.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      underline="hover"
-                      sx={{
-                        fontWeight: 500,
-                        wordBreak: 'break-word',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                      }}
-                    >
-                      {m.title}
-                      <OpenInNew sx={{ fontSize: '0.85rem', color: 'text.secondary' }} aria-hidden />
-                    </MuiLink>
+                    {m.link_status === 'dead' ? (
+                      <Typography
+                        component="span"
+                        sx={{
+                          fontWeight: 500,
+                          wordBreak: 'break-word',
+                          color: 'text.disabled',
+                          display: 'inline-flex',
+                          alignItems: 'baseline',
+                          gap: 0.75,
+                        }}
+                      >
+                        <Box component="span" sx={{ textDecoration: 'line-through' }}>
+                          {m.title}
+                        </Box>
+                        <Chip
+                          size="small"
+                          label="Link unavailable"
+                          variant="outlined"
+                          color="default"
+                          title="This document is no longer hosted on LRC — try the committee's LRC profile."
+                          sx={{ flexShrink: 0, height: 'auto', '& .MuiChip-label': { py: 0.25 } }}
+                        />
+                      </Typography>
+                    ) : (
+                      <MuiLink
+                        href={m.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        underline="hover"
+                        sx={{
+                          fontWeight: 500,
+                          wordBreak: 'break-word',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                        }}
+                      >
+                        {m.title}
+                        <OpenInNew sx={{ fontSize: '0.85rem', color: 'text.secondary' }} aria-hidden />
+                      </MuiLink>
+                    )}
                   </Box>
                 ))}
               </Box>

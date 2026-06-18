@@ -20,12 +20,17 @@ import {
   type CheckerResult,
   type Finding,
 } from '../types';
+import {
+  classifyLinkStatus,
+  mapWithConcurrency,
+  persistMaterialLinkStatus,
+  probeUrl,
+} from '../../ky-committee-material-link-probe';
 
 const FETCH_HEADERS = {
   'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; accuracy-audit)',
   Accept: 'text/html',
 };
-const PROBE_TIMEOUT_MS = 15_000;
 
 interface CommitteeRow {
   id: string;
@@ -47,6 +52,8 @@ interface LinkTarget {
   kind: LinkKind;
   label: string;
   url: string;
+  /** Present for `material` targets so a probe result can persist to its row. */
+  materialId?: string;
 }
 
 /** Known Kentucky legislature web hosts (current + legacy LRC domain). */
@@ -116,55 +123,6 @@ function validateLinkShape(target: LinkTarget): Finding | null {
   }
 
   return null;
-}
-
-async function probeUrl(url: string): Promise<{ ok: boolean; status: number }> {
-  const attempt = async (method: 'head' | 'get') => {
-    const res = await axios.request({
-      url,
-      method,
-      timeout: PROBE_TIMEOUT_MS,
-      maxRedirects: 5,
-      validateStatus: () => true,
-      headers: method === 'get' ? { ...FETCH_HEADERS, Range: 'bytes=0-0' } : FETCH_HEADERS,
-    });
-    return res.status;
-  };
-  const once = async () => {
-    let status = await attempt('head');
-    if (status === 405 || status === 501 || status === 403) {
-      status = await attempt('get');
-    }
-    return status;
-  };
-  try {
-    let status = await once();
-    // One retry for transient timeouts/connection resets (status 0).
-    if (status === 0) {
-      await new Promise((r) => setTimeout(r, 500 + Math.random() * 500));
-      status = await once();
-    }
-    return { ok: status >= 200 && status < 400, status };
-  } catch {
-    return { ok: false, status: 0 };
-  }
-}
-
-/** Run async tasks with a small concurrency cap + jitter to avoid burst timeouts. */
-async function mapWithConcurrency<T>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<void>,
-): Promise<void> {
-  let cursor = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (cursor < items.length) {
-      const item = items[cursor++]!;
-      await new Promise((r) => setTimeout(r, Math.random() * 250));
-      await fn(item);
-    }
-  });
-  await Promise.all(workers);
 }
 
 async function checkMaterialsDiff(
@@ -255,9 +213,9 @@ async function checkMaterialsDiff(
 async function checkLinks(db: SupabaseClient, cfg: AuditConfig, findings: Finding[]): Promise<number> {
   const half = Math.max(1, Math.floor(cfg.linkSampleLimit / 2));
 
-  const materials = await sampleTable<{ title: string | null; url: string }>(db, {
+  const materials = await sampleTable<{ id: string; title: string | null; url: string }>(db, {
     table: 'ky_committee_materials',
-    select: 'title, url',
+    select: 'id, title, url',
     seed: cfg.seed,
     limit: half,
   });
@@ -272,7 +230,9 @@ async function checkLinks(db: SupabaseClient, cfg: AuditConfig, findings: Findin
 
   const targets: LinkTarget[] = [];
   for (const m of materials) {
-    if (m.url) targets.push({ kind: 'material', label: `material: ${m.title ?? m.url}`, url: m.url });
+    if (m.url) {
+      targets.push({ kind: 'material', label: `material: ${m.title ?? m.url}`, url: m.url, materialId: m.id });
+    }
   }
   for (const b of bills) {
     if (b.bill_text_url) {
@@ -292,6 +252,11 @@ async function checkLinks(db: SupabaseClient, cfg: AuditConfig, findings: Findin
   // Opt-in (ACCURACY_PROBE_LINKS=true): live HTTP reachability, concurrency-limited.
   await mapWithConcurrency(targets, 4, async (t) => {
     const { ok, status } = await probeUrl(t.url);
+    // Persist the definitive outcome on material rows so the UI can flag dead
+    // links (bill text URLs live in ky_bills and are out of scope here).
+    if (t.materialId) {
+      await persistMaterialLinkStatus(db, t.materialId, classifyLinkStatus(status));
+    }
     if (ok) return;
     findings.push({
       severity: status === 404 ? 'fail' : 'warn',

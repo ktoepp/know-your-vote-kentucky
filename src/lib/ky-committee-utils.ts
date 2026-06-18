@@ -9,6 +9,23 @@ export function committeeSlugFromName(name: string | null | undefined): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * Normalize a committee name for near-duplicate comparison: lowercase, expand
+ * `&`, strip punctuation, and depluralize each token (so regulation/regulations
+ * collapse). Shared by the duplicate diagnostic (`diagnose-committee-duplicates`)
+ * and the committees accuracy checker so both flag the same pairs.
+ */
+export function normalizeCommitteeNameForDupes(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((tok) => (tok.length > 3 && tok.endsWith('s') ? tok.slice(0, -1) : tok))
+    .join(' ');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Static KY General Assembly standing committees
 // Names follow LegiScan conventions where known; phrase matching handles variants.

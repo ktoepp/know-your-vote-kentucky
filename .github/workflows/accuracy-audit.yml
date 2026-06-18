@@ -67,6 +67,10 @@ jobs:
             echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
             exit 0
           fi
+          if [ -f .slack-notified ]; then
+            echo "Skip Slack: audit script already posted the operational error to #errors."
+            exit 0
+          fi
           curl -sS -X POST -H 'Content-Type: application/json' \
             -d "{\"text\":\"*KY Vote - content accuracy audit failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
             "$WEBHOOK"

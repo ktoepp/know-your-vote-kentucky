@@ -14,6 +14,7 @@ import { getAuthedUser } from '@/lib/supabase/route-auth';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { WelcomeEmail } from '@/lib/email/welcome-email';
 import { publicSiteOrigin } from '@/lib/site-canonical';
+import { notifyNewUserSlack } from '@/lib/slack-webhook';
 
 export const runtime = 'nodejs';
 
@@ -116,6 +117,13 @@ export async function POST(request: NextRequest) {
         .eq('welcome_email_sent_at', stampedAt);
       return NextResponse.json({ sent: false, error: error.message }, { status: 502 });
     }
+    // Fire-and-forget ops notice. Runs only on the committed-stamp success path,
+    // so it's exactly-once per user; a Slack failure must not break the response.
+    void notifyNewUserSlack({
+      email: profile.email as string,
+      displayName: profile.display_name as string | null,
+    }).catch((e) => console.error('[Slack] new-user notify failed:', e));
+
     return NextResponse.json({ sent: true, id: data?.id ?? null }, { status: 200 });
   } catch (e) {
     await supabaseAdmin
