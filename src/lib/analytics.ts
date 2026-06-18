@@ -122,9 +122,15 @@ export const trackMobileInteraction = (
 // (e.g. Slack notifications) keep working across UI refactors.
 
 export const trackUserRegistered = (
-  props?: { method?: "email"; needs_verification?: boolean },
+  props?: { method?: "email"; needs_verification?: boolean; email_verified?: boolean },
 ): void => {
   capture("user_registered", { method: "email", ...props });
+};
+
+export const trackUserLoggedIn = (
+  props?: { method?: "email"; email_verified?: boolean },
+): void => {
+  capture("user_logged_in", { method: "email", ...props });
 };
 
 export const trackBillFollowed = (billId: string): void => {
@@ -158,8 +164,52 @@ export const identifyUser = (
   posthog.identify(distinctId, traits);
 };
 
+type PostHogUserLike = {
+  id: string;
+  email?: string | null;
+  email_confirmed_at?: string | null;
+  user_metadata?: Record<string, unknown>;
+};
+
+function postHogPersonTraits(user: PostHogUserLike): Record<string, unknown> {
+  const traits: Record<string, unknown> = {
+    account_type: "registered",
+    email_verified: Boolean(user.email_confirmed_at),
+  };
+  if (user.email) traits.email = user.email;
+  const name = user.user_metadata?.full_name;
+  if (typeof name === "string" && name) traits.name = name;
+  return traits;
+}
+
+/** Tag the current anonymous visitor so People can be filtered from registered users. */
+export const markAnonymousPerson = (): void => {
+  if (typeof window === "undefined" || !posthog.__loaded) return;
+  posthog.setPersonProperties({ account_type: "anonymous", email_verified: false });
+};
+
+/**
+ * Keep PostHog person profiles in sync with the Supabase session.
+ * Pass signedOut: true only on SIGNED_OUT so we rotate to a fresh anonymous profile.
+ */
+export const syncPostHogUser = (
+  user: PostHogUserLike | null | undefined,
+  options?: { signedOut?: boolean },
+): void => {
+  if (!user?.id) {
+    if (options?.signedOut) {
+      resetIdentity();
+    } else {
+      markAnonymousPerson();
+    }
+    return;
+  }
+  identifyUser(user.id, postHogPersonTraits(user));
+};
+
 /** Clear identity on sign-out so subsequent events go to an anonymous profile. */
 export const resetIdentity = (): void => {
   if (typeof window === "undefined" || !posthog.__loaded) return;
   posthog.reset();
+  markAnonymousPerson();
 };

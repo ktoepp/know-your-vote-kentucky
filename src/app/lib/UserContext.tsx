@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { syncPostHogUser, trackUserLoggedIn } from "@/lib/analytics";
 import { supabase } from "./supabaseClient";
 
 interface UserContextType {
@@ -28,8 +29,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const getSession = async () => {
       try {
         const { data, error } = await supabase!.auth.getSession();
+        const sessionUser = data.session?.user ?? null;
         setSession(data.session);
-        setUser(data.session?.user ?? null);
+        setUser(sessionUser);
+        syncPostHogUser(sessionUser);
       } catch (error) {
         console.error('Error getting session:', error);
       } finally {
@@ -40,9 +43,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
     getSession();
     
     if (supabase) {
-      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+        const sessionUser = session?.user ?? null;
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(sessionUser);
+        if (sessionUser) {
+          syncPostHogUser(sessionUser);
+          if (event === "SIGNED_IN") {
+            trackUserLoggedIn({ email_verified: Boolean(sessionUser.email_confirmed_at) });
+          }
+        } else {
+          syncPostHogUser(null, { signedOut: event === "SIGNED_OUT" });
+        }
       });
       
       return () => {

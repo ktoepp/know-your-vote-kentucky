@@ -26,7 +26,8 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
     capture_pageview: false,
     capture_pageleave: true,
     autocapture: true,
-    person_profiles: "identified_only",
+    // Create profiles for anonymous visitors too; identify() upgrades them when users sign in.
+    person_profiles: "always",
   });
 }
 
