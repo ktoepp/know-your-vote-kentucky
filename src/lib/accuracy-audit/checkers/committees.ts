@@ -20,6 +20,7 @@ import {
   type LrcCalendarMeeting,
 } from '../../lrc-legislative-calendar-parser';
 import { summarizeResult, type AuditConfig, type CheckerResult, type Finding } from '../types';
+import { normalizeCommitteeNameForDupes } from '../../ky-committee-utils';
 
 const FETCH_HEADERS = {
   'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; accuracy-audit)',
@@ -47,22 +48,13 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
       .from('ky_committees')
       .select('lrc_rsn, committee_type, name, slug');
     const rows = allCommittees ?? [];
-    const normalizeName = (name: string) =>
-      name
-        .toLowerCase()
-        .replace(/&/g, ' and ')
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((tok) => (tok.length > 3 && tok.endsWith('s') ? tok.slice(0, -1) : tok))
-        .join(' ');
     const byRsn = new Map<number, typeof rows>();
     const byName = new Map<string, typeof rows>();
     for (const c of rows) {
       if (c.lrc_rsn != null) {
         byRsn.set(c.lrc_rsn, [...(byRsn.get(c.lrc_rsn) ?? []), c]);
       }
-      const n = normalizeName(c.name as string);
+      const n = normalizeCommitteeNameForDupes(c.name as string);
       byName.set(n, [...(byName.get(n) ?? []), c]);
     }
     const flagged = new Set<string>();

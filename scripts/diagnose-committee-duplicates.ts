@@ -20,6 +20,7 @@ import './load-env';
 import { writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { createClient } from '@supabase/supabase-js';
+import { normalizeCommitteeNameForDupes } from '../src/lib/ky-committee-utils';
 
 const args = process.argv.slice(2);
 const jsonOut = args.find((a) => a.startsWith('--json='))?.split('=')[1];
@@ -44,19 +45,6 @@ interface RecordStats {
   events: number;
   follows: number;
   membershipRefs: number;
-}
-
-/** Normalize a committee name for duplicate comparison: lowercase, strip
- * punctuation, depluralize each token (regulation/regulations collapse). */
-export function normalizeCommitteeNameForDupes(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((tok) => (tok.length > 3 && tok.endsWith('s') ? tok.slice(0, -1) : tok))
-    .join(' ');
 }
 
 function tokenSet(normalized: string): Set<string> {
@@ -153,9 +141,13 @@ async function main() {
     const [sa, sb] = await Promise.all([statsFor(pair.a), statsFor(pair.b)]);
     // Survivor heuristic: the record still receiving calendar data — most recent
     // meeting scrape wins, then upcoming meetings, then latest meeting date.
-    const score = (s: RecordStats) =>
-      `${s.latestMeetingScrapedAt ?? ''}|${s.upcomingMeetings}|${s.latestMeetingDate ?? ''}`;
-    const survivorIsA = score(sa) >= score(sb);
+    // Compared field-by-field (upcomingMeetings is numeric — a single composite
+    // string would sort it lexically, ranking 10 below 2).
+    const cmp = (a: RecordStats, b: RecordStats): number =>
+      (a.latestMeetingScrapedAt ?? '').localeCompare(b.latestMeetingScrapedAt ?? '') ||
+      a.upcomingMeetings - b.upcomingMeetings ||
+      (a.latestMeetingDate ?? '').localeCompare(b.latestMeetingDate ?? '');
+    const survivorIsA = cmp(sa, sb) >= 0;
     const fmt = (c: CommitteeRow, s: RecordStats, role: string) =>
       `  [${role}] ${c.slug}\n` +
       `        name="${c.name}" rsn=${c.lrc_rsn} type=${c.committee_type} chamber=${c.chamber}\n` +

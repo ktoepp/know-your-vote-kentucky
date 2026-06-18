@@ -12,7 +12,13 @@ const posthogInDev =
   process.env.NEXT_PUBLIC_POSTHOG_REPORT_DEV === "1" ||
   process.env.NEXT_PUBLIC_POSTHOG_REPORT_DEV === "true";
 
-if (posthogKey && (process.env.NODE_ENV === "production" || posthogInDev)) {
+// Exclude Vercel preview/branch deploys from analytics. vercel.json forces
+// NODE_ENV=production for ALL deployments (incl. previews), so the NODE_ENV
+// gate alone would send preview/test traffic into the production PostHog
+// project. NEXT_PUBLIC_VERCEL_ENV is baked in via next.config.ts.
+const isPreviewDeploy = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview";
+
+if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || posthogInDev)) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
     // App Router pageviews are tracked manually via PostHogPageviewTracker;

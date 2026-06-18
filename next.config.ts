@@ -11,6 +11,16 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   /** Native WebSocket impl used by Supabase Realtime when Node is below 22 (see supabaseAdminCore.ts). */
   serverExternalPackages: ["ws"],
+  /**
+   * Expose Vercel's deployment environment to the browser bundle. `VERCEL_ENV`
+   * ("production" | "preview" | "development") is a build-time system var on
+   * Vercel; baking it in as `NEXT_PUBLIC_VERCEL_ENV` lets client code (PostHog
+   * init in instrumentation-client.ts) exclude preview deploys from analytics
+   * without a dashboard change. Empty string off-Vercel (local dev).
+   */
+  env: {
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "",
+  },
   async redirects() {
     const apex = 'https://kyvky.com';
     const hostsToApex = [
