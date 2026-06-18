@@ -100,8 +100,6 @@ export default function ProfilePage() {
 
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
-  const [welcomeBusy, setWelcomeBusy] = useState(false);
-  const [welcomeMsg, setWelcomeMsg] = useState<string | null>(null);
 
   const emailVerified = Boolean(profile?.email_verified_at);
 
@@ -482,47 +480,6 @@ export default function ProfilePage() {
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
             {exportMsg}
           </Typography>
-        )}
-
-        {emailVerified && (
-          <>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
-              Welcome email
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Resend the one-time setup email if you lost the original.
-            </Typography>
-            <Button
-              variant="outlined"
-              size="small"
-              disabled={welcomeBusy}
-              onClick={async () => {
-                if (!session?.access_token) return;
-                setWelcomeBusy(true);
-                setWelcomeMsg(null);
-                try {
-                  const res = await fetch('/api/me/welcome-email?force=1', {
-                    method: 'POST',
-                    headers: { Authorization: `Bearer ${session.access_token}` },
-                  });
-                  const body = (await res.json().catch(() => ({}))) as { sent?: boolean; error?: string };
-                  if (!res.ok) throw new Error(body.error || 'Send failed');
-                  setWelcomeMsg(body.sent ? 'Welcome email sent.' : 'Could not send — check Resend configuration.');
-                } catch (e) {
-                  setWelcomeMsg(e instanceof Error ? e.message : 'Send failed');
-                } finally {
-                  setWelcomeBusy(false);
-                }
-              }}
-            >
-              {welcomeBusy ? 'Sending…' : 'Send welcome email again'}
-            </Button>
-            {welcomeMsg && (
-              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, mb: 2 }}>
-                {welcomeMsg}
-              </Typography>
-            )}
-          </>
         )}
 
         <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>

@@ -44,6 +44,7 @@ async function unsubscribe(token: string): Promise<{ ok: boolean; status: number
     .update({
       digest_frequency: 'off',
       unsubscribed_all_at: new Date().toISOString(),
+      digest_user_disabled: true,
     })
     .eq('unsubscribe_token', token);
 

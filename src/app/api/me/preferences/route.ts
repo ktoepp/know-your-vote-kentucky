@@ -142,9 +142,13 @@ export async function PATCH(request: NextRequest) {
     event_types?: string[];
     topic_filters?: string[];
     unsubscribed_all_at?: null;
+    digest_user_disabled?: boolean;
   } = { ...patch };
   if (rowPatch.digest_frequency === 'daily' || rowPatch.digest_frequency === 'weekly') {
     rowPatch.unsubscribed_all_at = null;
+    rowPatch.digest_user_disabled = false;
+  } else if (rowPatch.digest_frequency === 'off') {
+    rowPatch.digest_user_disabled = true;
   }
 
   const { data, error } = await auth.supabase

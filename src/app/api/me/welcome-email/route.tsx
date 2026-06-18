@@ -1,11 +1,8 @@
 /**
- * POST /api/me/welcome-email — one-time welcome email after first email verification.
+ * POST /api/me/welcome-email — one-time welcome email (paused; route kept for manual/preview use).
  *
  * Idempotent: checks ky_user_profiles.welcome_email_sent_at and returns 200 with
- * { sent: false } if already sent. Verified-only: skips users whose
- * email_confirmed_at is null (deliverability hygiene). The verify page calls this
- * fire-and-forget after a successful session exchange; the API still works for
- * any signed-in verified user that didn't get one yet (manual recovery / testing).
+ * { sent: false } if already sent. Not called from /auth/verify while welcome is paused.
  */
 import { NextResponse, type NextRequest } from 'next/server';
 import { render } from '@react-email/render';
@@ -14,7 +11,6 @@ import { getAuthedUser } from '@/lib/supabase/route-auth';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { WelcomeEmail } from '@/lib/email/welcome-email';
 import { publicSiteOrigin } from '@/lib/site-canonical';
-import { notifyNewUserSlack } from '@/lib/slack-webhook';
 
 export const runtime = 'nodejs';
 
@@ -117,12 +113,6 @@ export async function POST(request: NextRequest) {
         .eq('welcome_email_sent_at', stampedAt);
       return NextResponse.json({ sent: false, error: error.message }, { status: 502 });
     }
-    // Fire-and-forget ops notice. Runs only on the committed-stamp success path,
-    // so it's exactly-once per user; a Slack failure must not break the response.
-    void notifyNewUserSlack({
-      email: profile.email as string,
-      displayName: profile.display_name as string | null,
-    }).catch((e) => console.error('[Slack] new-user notify failed:', e));
 
     return NextResponse.json({ sent: true, id: data?.id ?? null }, { status: 200 });
   } catch (e) {

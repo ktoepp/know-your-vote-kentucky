@@ -5,6 +5,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
+import { notifyNewUserSlack } from '@/lib/slack-webhook';
 
 export async function POST(request: NextRequest) {
   const auth = await getAuthedUser(request);
@@ -43,6 +44,19 @@ export async function POST(request: NextRequest) {
       verified: Boolean(existing?.email_verified_at),
       email_verified_at: existing?.email_verified_at ?? null,
     });
+  }
+
+  const { data: profile } = await supabaseAdmin
+    .from('ky_user_profiles')
+    .select('email, display_name')
+    .eq('user_id', auth.userId)
+    .maybeSingle();
+
+  if (profile?.email) {
+    void notifyNewUserSlack({
+      email: profile.email as string,
+      displayName: profile.display_name as string | null,
+    }).catch((e) => console.error('[Slack] new-user notify failed:', e));
   }
 
   return NextResponse.json({ verified: true, email_verified_at: data.email_verified_at });
