@@ -438,7 +438,7 @@ Closure pass on Slack-canvas review-queue rows #12, #13, #18, #21 (see prior ses
 
 | Workflow | Schedule (UTC) | Command |
 |---|---|---|
-| `sync-ky-bills-status.yml` | `0 */6 * * *` | `npm run sync:ky:bills:status` (hash-gated, no `getBill`) |
+| `sync-ky-bills-status.yml` | `0 */6 * * *` | `npm run sync:ky:bills:status` (hash-gated; `getBill` only for changed/new bills) |
 | `sync-lrc-calendar.yml` (live) | `0 12 * * *` + `0 18 * * *` | `npm run sync:ky:lrc-calendar` |
 | `sync-lrc-calendar.yml` (backfill) | `0 6 * * 0` | `npm run backfill:lrc:calendar` + refresh |
 | `legislator-links-weekly.yml` | `0 12 * * 1` | `sync:ky:legislators` → `verify:legislator-links` → `audit:legiscan-subjects` |
@@ -451,7 +451,7 @@ Closure pass on Slack-canvas review-queue rows #12, #13, #18, #21 (see prior ses
 ### Intentionally distinct (not duplicates)
 
 - **Vercel `/api/sync?source=lrc-committee-materials` (13:30 daily) vs. GH Actions `sync-lrc-calendar.yml` (12:00 + 18:00 daily).** Different LRC surfaces — `lrc-committee-materials` scrapes per-committee document pages into `ky_committee_materials`; `lrc-calendar` parses the LRC weekly-calendar HTML into `ky_committee_meetings` + agenda. Same data source (`apps.legislature.ky.gov`), different endpoints, different tables.
-- **Vercel bills sync (05:00 daily, full bills with `--skip-bill-sponsor-details`) vs. GH Actions `sync-ky-bills-status.yml` (every 6h, `sync:ky:bills:status`).** Different command shapes: Vercel run skips sponsor *fetch* but still calls `getBill`; GH Actions run is hash-gated and never calls `getBill`. The every-6h cadence is conservative intra-day refresh; Vercel's 05:00 run is the guaranteed daily baseline.
+- **Vercel bills sync (05:00 daily, hash-gated with `--skip-bill-sponsor-details`) vs. GH Actions `sync-ky-bills-status.yml` (every 6h, same flags).** Both use `syncKyBillsByHash`: idle runs cost ~2 LegiScan calls; `getBill` runs only for changed/new bills (sponsor JSON omitted when `skipBillSponsorDetails`). The every-6h cadence is conservative intra-day refresh; Vercel's 05:00 run is the guaranteed daily baseline.
 - **Vercel does NOT run `lrc-calendar`** (retired in Wave 4a; GH Actions is sole scheduler). Stale comment in `sync-lrc-calendar.yml` header reflecting the old setup was corrected in this pass.
 
 ### Heartbeat mode retired — `SLACK_SYNC_CLI_DIGEST_ALWAYS`
@@ -816,6 +816,25 @@ Replaced the non-interactive full-card popup on `/members/map` with a lighter-we
 **Revisit if:** LRC changes the `CommitteeType` param again (the weekly warn catches it); a committee genuinely meets twice on one date during a merge window (date-only matching would fold them — recheck before merging session-period standing committees); fresh-DB installs re-seed 027's short codes and immediately duplicate (consider updating the 027 seed to full labels for new environments).
 
 ---
+
+## 2026-06-18 — LegiScan bill sync timeout resilience + quota hold
+
+**Problem:** `sync-ky-bills-status.yml` failed ~17% of runs over the prior week — all on the first LegiScan call (`getSessionList`), with `timeout of 25000ms exceeded` across three retries. No bill data was fetched; the job exited 1 and posted to `#errors`.
+
+**Root cause:** transient LegiScan API latency, not quota exhaustion or a logic bug. Each GH Actions run starts with a cold client (no in-process cache), so a slow `getSessionList` had no fallback.
+
+### Fixes (`src/lib/ky-legiscan-client.ts`, `src/lib/legiscan-quota.ts`, `src/lib/ky-sync-pipeline.ts`, `.github/workflows/sync-ky-bills-status.yml`)
+
+- **Longer timeout + more retries:** axios timeout **25s → 60s**; retries **3 → 5** with exponential backoff on timeouts (2s, 4s, 8s, 16s).
+- **Session list cache:** successful `getSessionList` responses persist to `ky_sync_state` key `legiscan_ky_sessions` (7-day TTL). On API failure, `fetchSessions()` falls back to the cached list and logs a warning; hard-fails only when the API fails and no cache exists (fresh DB).
+- **Sync quota hold:** `checkLegiscanQuotaForSync()` skips LegiScan calls when monthly usage ≥ `LEGISCAN_SYNC_QUOTA_STOP_PCT` (default **95**, falls back to `ACCURACY_LEGISCAN_QUOTA_STOP_PCT`). Returns `status: 'skipped'` (exit 0) — same threshold policy as the weekly accuracy audit.
+- **Workflow retry:** one automatic retry after **120s** when the first sync step fails (operational failure only; successful no-op and quota-skip runs do not retry).
+
+### Documentation corrections
+
+- Hash-gated cron paths **do** call `getBill` for changed/new bills; `skipBillSponsorDetails` only omits sponsor JSON on upsert. Updated workflow header, `/api/sync` route comment, and § 2026-06-07 cron landscape above.
+
+**Trade-off:** retry on timeout adds up to 5 extra `getSessionList` attempts per failed run before cache fallback; the session cache and quota hold prevent runaway usage. Monthly quota visibility remains via existing Slack digest lines (`LegiScan quota` in sync notifications).
 
 ## 2026-06-16
 

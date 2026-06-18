@@ -34,3 +34,40 @@ export async function fetchLegiscanQuotaSummary(): Promise<LegiscanQuotaSummary 
   const pct = limit > 0 ? Math.round((used / limit) * 1000) / 10 : 0;
   return { month, used, limit, pct };
 }
+
+function envQuotaStopPct(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n >= 1 && n <= 100 ? n : fallback;
+}
+
+/** Monthly usage % at which scheduled sync skips LegiScan calls (default 95, same as accuracy audit). */
+export function legiscanSyncQuotaStopPct(): number {
+  if (process.env.LEGISCAN_SYNC_QUOTA_STOP_PCT?.trim()) {
+    return envQuotaStopPct('LEGISCAN_SYNC_QUOTA_STOP_PCT', 95);
+  }
+  return envQuotaStopPct('ACCURACY_LEGISCAN_QUOTA_STOP_PCT', 95);
+}
+
+export type LegiscanQuotaGuardResult = {
+  blocked: boolean;
+  reason?: string;
+  summary: LegiscanQuotaSummary | null;
+};
+
+/** Returns `blocked: true` when monthly LegiScan usage is at/above the sync hold threshold. */
+export async function checkLegiscanQuotaForSync(): Promise<LegiscanQuotaGuardResult> {
+  const summary = await fetchLegiscanQuotaSummary();
+  if (!summary || summary.limit <= 0) {
+    return { blocked: false, summary };
+  }
+  const stopPct = legiscanSyncQuotaStopPct();
+  if (summary.pct >= stopPct) {
+    return {
+      blocked: true,
+      reason: `LegiScan quota ${summary.pct}% (>= ${stopPct}% sync hold)`,
+      summary,
+    };
+  }
+  return { blocked: false, summary };
+}

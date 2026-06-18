@@ -29,6 +29,7 @@ import {
   fetchBillHistorySnapshots,
   recordBillStatusHistoryForBuiltBatch,
 } from './ky-bill-status-history';
+import { checkLegiscanQuotaForSync } from './legiscan-quota';
 import {
   buildOrdinanceSponsorsJson,
   isLegistarMatterLikelyTestNoise,
@@ -187,8 +188,9 @@ export interface SyncOptions {
   source?: string;
   limit?: number;
   /**
-   * Skip per-bill LegiScan `getBill` calls (faster sync; `sponsors` on ky_bills will not be updated).
-   * Use for cron jobs if API time or quota is a concern; run a full sync periodically for sponsor JSON.
+   * With hash-gated sync: skip writing sponsor JSON from `getBill`, but detail is still fetched
+   * for changed/new bills (title, status, last_action are required). Use for cron when sponsor
+   * refresh can wait; run a full sponsor sync manually when needed.
    */
   skipBillSponsorDetails?: boolean;
   /**
@@ -753,6 +755,16 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
   const source = 'bills';
   log(source, 'Starting bills sync from LegiScan');
   try {
+    const quotaCheck = await checkLegiscanQuotaForSync();
+    if (quotaCheck.blocked) {
+      const msg = quotaCheck.reason!;
+      log(source, `Skipped — ${msg}`);
+      if (!options.dryRun) {
+        await updateSourceStatus(source, 'success', 0, msg);
+      }
+      return { source, status: 'skipped', itemsSynced: 0, error: msg, duration: Date.now() - start };
+    }
+
     const client = getKyLegiScanClient();
     const sessions = await client.fetchSessions();
     if (!sessions.length) {

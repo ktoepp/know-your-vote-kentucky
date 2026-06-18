@@ -2,8 +2,12 @@
 #
 # Strategy (see src/lib/ky-sync-pipeline.ts — syncKyBillsByHash):
 #   --use-change-hash     Master list raw + DB change_hash; unchanged bills skip writes and skip getBill.
-#   --skip-bill-sponsor-details   Never calls getBill — lowest API usage; status/last_action from raw list.
+#   --skip-bill-sponsor-details   Omits sponsor JSON on upsert; getBill still runs for changed/new bills.
 # Topic tags use keyword classifyTopics only during sync (no Anthropic calls on this path).
+#
+# Quota: hash-gated idle runs cost ~2 LegiScan calls (session list + masterlistraw). Sync holds at
+# LEGISCAN_SYNC_QUOTA_STOP_PCT / ACCURACY_LEGISCAN_QUOTA_STOP_PCT (default 95%). Session list is
+# cached in ky_sync_state for 7d when getSessionList is slow.
 #
 # Does NOT replace occasional full sponsor enrichment — run a bills sync without skip locally when needed.
 #
@@ -54,7 +58,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Bills sync (hash-gated, no getBill)
+      - name: Bills sync (hash-gated)
+        id: bills_sync
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -67,6 +72,28 @@ jobs:
           SLACK_SYNC_NOTIFY_CLI: 'true'
         run: |
           set -euo pipefail
+          EXTRA=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            EXTRA="--historic-sessions=${{ inputs.historic_sessions }}"
+          fi
+          npm run sync:ky:bills:status -- ${EXTRA}
+
+      - name: Retry bills sync after transient failure
+        if: failure() && steps.bills_sync.outcome == 'failure'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+          SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+          SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+          SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_SYNC_NOTIFY_CLI: 'true'
+        run: |
+          set -euo pipefail
+          echo "First bills sync attempt failed; waiting 120s before one retry…"
+          sleep 120
           EXTRA=""
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EXTRA="--historic-sessions=${{ inputs.historic_sessions }}"
