@@ -12,8 +12,8 @@
  *
  * Bills sync tuning:
  *   `limit` — max bills per LegiScan session (master list is chamber-balanced before limiting).
- *   `skipBillSponsorDetails=true` — omit per-bill LegiScan getBill calls (required for serverless
- *   time limits on cron; run a manual sync without this periodically for sponsor JSON).
+ *   `skipBillSponsorDetails=true` — omit sponsor JSON from upserts (hash-gated path still calls
+ *   `getBill` for changed/new bills to populate title/status/last_action).
  *   `historicSessions=N` — sync N most recent KY sessions that have bills (default 1). Backfills prior GAs.
  *   `legiscanSessionId=N` — sync only that session (from `npm run sync:ky:sessions`); overrides historicSessions.
  *   `quotaBackfill=true` — full master list per session + sponsor cap + `ky_sync_state` cursor (migration 005).

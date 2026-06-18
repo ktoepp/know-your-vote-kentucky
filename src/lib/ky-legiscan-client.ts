@@ -73,10 +73,19 @@ export interface LegiScanSessionPerson {
 }
 
 const LEGISCAN_QUERY_COUNTER_KEY = 'legiscan_query_counter';
+/** Persisted in `ky_sync_state` so cron/CLI runs can fall back when `getSessionList` is slow. */
+const LEGISCAN_KY_SESSIONS_KEY = 'legiscan_ky_sessions';
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
+const SESSIONS_PERSIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RATE_DELAY = 500;
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 5;
+const REQUEST_TIMEOUT_MS = 60_000;
+
+type PersistedKySessionsPayload = {
+  sessions: LegiScanSession[];
+  fetched_at: string;
+};
 
 export class KyLegiScanClient {
   private client: AxiosInstance;
@@ -89,7 +98,7 @@ export class KyLegiScanClient {
     if (!this.apiKey) console.warn('[KyLegiScan] LEGISCAN_API_KEY not set');
     this.client = axios.create({
       baseURL: 'https://api.legiscan.com/',
-      timeout: 25_000,
+      timeout: REQUEST_TIMEOUT_MS,
     });
   }
 
@@ -121,7 +130,10 @@ export class KyLegiScanClient {
       } catch (err: any) {
         console.error(`[KyLegiScan] Attempt ${i}/${MAX_RETRIES} failed: ${err.message}`);
         if (i === MAX_RETRIES) throw err;
-        await new Promise(r => setTimeout(r, 1000 * i));
+        const isTimeout =
+          err.code === 'ECONNABORTED' || /timeout/i.test(String(err.message ?? ''));
+        const delayMs = isTimeout ? 2000 * 2 ** (i - 1) : 1000 * i;
+        await new Promise((r) => setTimeout(r, delayMs));
       }
     }
     throw new Error('Unreachable');
@@ -161,10 +173,81 @@ export class KyLegiScanClient {
     return payload[m] || 0;
   }
 
+  private async readPersistedKySessions(): Promise<LegiScanSession[] | null> {
+    if (!supabaseAdmin) return null;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('ky_sync_state')
+        .select('payload, updated_at')
+        .eq('key', LEGISCAN_KY_SESSIONS_KEY)
+        .maybeSingle();
+      if (error) {
+        console.warn(`[KyLegiScan] Failed to read cached KY sessions: ${error.message}`);
+        return null;
+      }
+      const payload = data?.payload as PersistedKySessionsPayload | null;
+      const sessions = Array.isArray(payload?.sessions) ? payload.sessions : null;
+      if (!sessions?.length) return null;
+      const fetchedAt = payload?.fetched_at || data?.updated_at;
+      if (fetchedAt) {
+        const ageMs = Date.now() - new Date(fetchedAt).getTime();
+        if (ageMs > SESSIONS_PERSIST_TTL_MS) {
+          console.warn(
+            `[KyLegiScan] Cached KY sessions are stale (${Math.round(ageMs / 86_400_000)}d old); ignoring`,
+          );
+          return null;
+        }
+      }
+      return sessions;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[KyLegiScan] Failed to read cached KY sessions: ${msg}`);
+      return null;
+    }
+  }
+
+  private async persistKySessions(sessions: LegiScanSession[]): Promise<void> {
+    if (!supabaseAdmin || !sessions.length) return;
+    try {
+      const payload: PersistedKySessionsPayload = {
+        sessions,
+        fetched_at: new Date().toISOString(),
+      };
+      const { error } = await supabaseAdmin.from('ky_sync_state').upsert(
+        {
+          key: LEGISCAN_KY_SESSIONS_KEY,
+          payload,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' },
+      );
+      if (error) throw error;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[KyLegiScan] Failed to persist KY sessions cache: ${msg}`);
+    }
+  }
+
   async fetchSessions(): Promise<LegiScanSession[]> {
     console.log('[KyLegiScan] Fetching KY sessions');
-    const d = await this.request<any>({ op: 'getSessionList', state: 'KY' });
-    return d?.sessions || [];
+    try {
+      const d = await this.request<any>({ op: 'getSessionList', state: 'KY' });
+      const sessions: LegiScanSession[] = d?.sessions || [];
+      if (sessions.length > 0) {
+        await this.persistKySessions(sessions);
+      }
+      return sessions;
+    } catch (err: unknown) {
+      const cached = await this.readPersistedKySessions();
+      if (cached?.length) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[KyLegiScan] getSessionList failed (${msg}); using ${cached.length} cached KY session(s)`,
+        );
+        return cached;
+      }
+      throw err;
+    }
   }
 
   async fetchBills(sessionId: number): Promise<LegiScanBillSummary[]> {
