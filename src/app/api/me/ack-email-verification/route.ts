@@ -10,7 +10,8 @@ export async function POST(request: NextRequest) {
   const auth = await getAuthedUser(request);
   if ('error' in auth) return auth.error;
 
-  if (!auth.user.email_confirmed_at) {
+  const { data: userData, error: userErr } = await auth.supabase.auth.getUser();
+  if (userErr || !userData.user?.email_confirmed_at) {
     return NextResponse.json({ verified: false, reason: 'unconfirmed' }, { status: 400 });
   }
 
