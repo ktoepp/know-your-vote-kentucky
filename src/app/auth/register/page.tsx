@@ -15,7 +15,7 @@ import {
 import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
-import { trackUserRegistered } from '@/lib/analytics';
+import { syncPostHogUser, trackUserRegistered } from '@/lib/analytics';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -59,13 +59,22 @@ export default function RegisterPage() {
       return;
     }
     // No session until the user confirms — hosted/local with email confirmations on.
+    const emailVerified = Boolean(data.user?.email_confirmed_at);
+    // Identify before capture so user_registered attaches to the registered person profile.
+    syncPostHogUser(data.user);
     if (data.session) {
-      trackUserRegistered({ needs_verification: false });
+      trackUserRegistered({
+        needs_verification: !emailVerified,
+        email_verified: emailVerified,
+      });
       router.refresh();
       router.push('/profile');
       return;
     }
-    trackUserRegistered({ needs_verification: true });
+    trackUserRegistered({
+      needs_verification: !emailVerified,
+      email_verified: emailVerified,
+    });
     setSuccess(true);
   };
 
