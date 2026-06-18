@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
 import {
   ensureKyNotificationPreferencesRow,
@@ -32,7 +33,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  let emailVerifiedAt: string | null = null;
+  if (supabaseAdmin) {
+    const { data: profile } = await supabaseAdmin
+      .from('ky_user_profiles')
+      .select('email_verified_at')
+      .eq('user_id', auth.userId)
+      .maybeSingle();
+    emailVerifiedAt = profile?.email_verified_at ?? null;
+  }
+
+  return NextResponse.json({ ...data, email_verified_at: emailVerifiedAt });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -102,6 +113,22 @@ export async function PATCH(request: NextRequest) {
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: 'No updatable fields provided.' }, { status: 400 });
+  }
+
+  const enablingDigest =
+    patch.digest_frequency === 'daily' || patch.digest_frequency === 'weekly';
+  if (enablingDigest && supabaseAdmin) {
+    const { data: profile } = await supabaseAdmin
+      .from('ky_user_profiles')
+      .select('email_verified_at')
+      .eq('user_id', auth.userId)
+      .maybeSingle();
+    if (!profile?.email_verified_at) {
+      return NextResponse.json(
+        { error: 'Verify your email before turning on email notifications.' },
+        { status: 403 },
+      );
+    }
   }
 
   const ensured = await ensureKyNotificationPreferencesRow(auth.supabase, auth.userId);

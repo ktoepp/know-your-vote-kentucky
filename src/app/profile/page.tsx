@@ -103,7 +103,7 @@ export default function ProfilePage() {
   const [welcomeBusy, setWelcomeBusy] = useState(false);
   const [welcomeMsg, setWelcomeMsg] = useState<string | null>(null);
 
-  const emailVerified = Boolean(user?.email_confirmed_at);
+  const emailVerified = Boolean(profile?.email_verified_at);
 
   const loadProfile = useCallback(async () => {
     if (!supabase || !user?.id) {
@@ -357,7 +357,7 @@ export default function ProfilePage() {
             </Button>
           }
         >
-          Your email is not verified yet. Some features stay limited until you confirm your address.
+          Your email is not verified yet. Email digests and other notifications stay off until you confirm your address.
           {resendMsg && (
             <Typography variant="caption" display="block" sx={{ mt: 1 }}>
               {resendMsg}

@@ -27,6 +27,20 @@ async function exchangeSessionTokens(
  * welcome_email_sent_at first and only sends when that update affects a row),
  * so multiple calls or retries can't double-send.
  */
+async function ackEmailVerification(token: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/me/ack-email-verification', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return false;
+    const body = (await res.json().catch(() => ({}))) as { verified?: boolean };
+    return Boolean(body.verified);
+  } catch {
+    return false;
+  }
+}
+
 async function requestWelcomeEmail(token: string): Promise<void> {
   try {
     await fetch('/api/me/welcome-email', {
@@ -70,7 +84,10 @@ export default function VerifyEmailPage() {
           await exchangeSessionTokens(client, access_token, refresh_token);
           const isRecovery = type === 'recovery';
           if (!isRecovery) {
-            void requestWelcomeEmail(access_token);
+            const verified = await ackEmailVerification(access_token);
+            if (verified) {
+              void requestWelcomeEmail(access_token);
+            }
           }
           if (!cancelled) {
             setStatus('ok');

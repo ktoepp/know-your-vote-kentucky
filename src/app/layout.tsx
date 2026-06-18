@@ -35,6 +35,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
   metadataBase: new URL(siteOrigin),
+  manifest: '/manifest.json',
   openGraph: {
     title: "Know Your Vote Kentucky - Track Kentucky Legislation",
     description: "Track Kentucky legislation, representatives, and civic engagement. Making government accessible through AI.",
