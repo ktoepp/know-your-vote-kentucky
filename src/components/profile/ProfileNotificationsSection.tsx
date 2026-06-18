@@ -43,6 +43,7 @@ type PrefsResponse = {
   topic_filters: string[];
   unsubscribed_all_at: string | null;
   updated_at: string;
+  email_verified_at?: string | null;
 };
 
 const KY_TOPIC_ORDER = new Map<string, number>(KY_TOPICS.map((t, i) => [t, i]));
@@ -69,6 +70,7 @@ export function ProfileNotificationsSection() {
   const token = session?.access_token ?? null;
 
   const [loading, setLoading] = useState(true);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [digestFrequency, setDigestFrequency] = useState<DigestFrequency>('daily');
   const [eventTypes, setEventTypes] = useState<KyDigestEventType[]>([]);
@@ -95,6 +97,7 @@ export function ProfileNotificationsSection() {
       setTopicFilters(sortSelectedTopics(body.topic_filters ?? []));
       setUnsubscribedAt(body.unsubscribed_all_at ?? null);
       setPrevOff(body.digest_frequency === 'off');
+      setEmailVerified(Boolean(body.email_verified_at));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load preferences');
     } finally {
@@ -210,6 +213,13 @@ export function ProfileNotificationsSection() {
         </Alert>
       )}
 
+      {!emailVerified && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Email notifications stay off until you verify your address. Use the banner at the top of this page to resend
+          the confirmation link.
+        </Alert>
+      )}
+
       {unsubscribedAt && (
         <Alert severity="info" sx={{ mb: 2 }}>
           You unsubscribed from digest emails using a link in a message. Choose <strong>Daily</strong> or{' '}
@@ -217,7 +227,7 @@ export function ProfileNotificationsSection() {
         </Alert>
       )}
 
-      <FormControl component="fieldset" variant="standard" sx={{ mb: 2, width: '100%' }}>
+      <FormControl component="fieldset" variant="standard" sx={{ mb: 2, width: '100%' }} disabled={!emailVerified}>
         <FormLabel component="legend">Digest frequency</FormLabel>
         <RadioGroup
           value={digestFrequency}
@@ -242,10 +252,10 @@ export function ProfileNotificationsSection() {
         <strong>Agenda / hearing scheduled</strong> to include those lines.
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-        <Button size="small" variant="outlined" onClick={applyPresetMilestones}>
+        <Button size="small" variant="outlined" onClick={applyPresetMilestones} disabled={!emailVerified}>
           Major milestones only
         </Button>
-        <Button size="small" variant="outlined" onClick={applyPresetEverything}>
+        <Button size="small" variant="outlined" onClick={applyPresetEverything} disabled={!emailVerified}>
           Everything
         </Button>
       </Box>
@@ -272,6 +282,7 @@ export function ProfileNotificationsSection() {
                       checked={checked}
                       onChange={(e) => toggleEvent(slug, e.target.checked)}
                       size="small"
+                      disabled={!emailVerified}
                     />
                   }
                   label={
@@ -306,8 +317,8 @@ export function ProfileNotificationsSection() {
           gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
           gap: 0,
           mb: 2,
-          opacity: topicBusy ? 0.7 : 1,
-          pointerEvents: topicBusy ? 'none' : 'auto',
+          opacity: topicBusy || !emailVerified ? 0.7 : 1,
+          pointerEvents: topicBusy || !emailVerified ? 'none' : 'auto',
         }}
       >
         {KY_TOPICS.map((label) => (
@@ -351,7 +362,11 @@ export function ProfileNotificationsSection() {
         </>
       )}
 
-      <Button variant="contained" disabled={saveBusy} onClick={() => void handleSaveDigestAndEvents()}>
+      <Button
+        variant="contained"
+        disabled={saveBusy || !emailVerified}
+        onClick={() => void handleSaveDigestAndEvents()}
+      >
         {saveBusy ? 'Saving…' : 'Save digest frequency and event types'}
       </Button>
 
