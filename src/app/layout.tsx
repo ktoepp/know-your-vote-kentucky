@@ -18,9 +18,10 @@ import SiteFooter from "./components/SiteFooter";
 import { TooltipProvider } from '@/lib/TooltipContext';
 import { UserProvider } from "./lib/UserContext";
 import { publicSiteOrigin } from '@/lib/site-canonical';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { buildSiteJsonLd } from '@/lib/structured-data';
 
 const siteOrigin = publicSiteOrigin();
-const ogImageUrl = `${siteOrigin}/og-image.jpg`;
 
 export const metadata: Metadata = {
   title: 'Know Your Vote Kentucky',
@@ -41,14 +42,6 @@ export const metadata: Metadata = {
     description: "Track Kentucky legislation, representatives, and civic engagement. Making government accessible through AI.",
     url: siteOrigin,
     siteName: "Know Your Vote Kentucky",
-    images: [
-      {
-        url: ogImageUrl,
-        width: 1200,
-        height: 630,
-        alt: "Know Your Vote Kentucky",
-      },
-    ],
     locale: "en_US",
     type: "website",
   },
@@ -56,7 +49,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Know Your Vote Kentucky - Track Kentucky Legislation",
     description: "Track Kentucky legislation, representatives, and civic engagement. Making government accessible through AI.",
-    images: [ogImageUrl],
+  },
+  alternates: {
+    canonical: siteOrigin,
+  },
+  verification: {
+    google: "fQMQMUDeDWtfRZTik5SInNXWP6a9OWx99aRPY_V6iCM",
   },
   robots: {
     index: true,
@@ -68,9 +66,6 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
-  },
-  verification: {
-    google: "your-google-verification-code",
   },
 };
 
@@ -96,6 +91,7 @@ export default function RootLayout({
             `,
           }}
         />
+        <JsonLd data={buildSiteJsonLd()} />
       </head>
       <body className="flex min-h-screen flex-col" suppressHydrationWarning>
         <a href="#main-content" className="skip-link">Skip to main content</a>

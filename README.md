@@ -31,6 +31,7 @@ Read first if you're picking up this project:
 | Sync pipeline | `src/lib/ky-sync-pipeline.ts` |
 | Bill Watch UX reference | `docs/reference/bill-watch/` |
 | App shell / providers | `src/app/layout.tsx` |
+| SEO / GEO (sitemap, JSON-LD, OG, llms.txt) | `src/app/sitemap.ts`, `src/lib/sitemap-data.ts`, `src/lib/structured-data.ts`, `src/components/seo/JsonLd.tsx`, `src/app/opengraph-image.tsx`, `src/app/llms.txt/route.ts`, `src/app/robots.ts` |
 
 ### Hidden routes (no nav, `noindex`)
 
