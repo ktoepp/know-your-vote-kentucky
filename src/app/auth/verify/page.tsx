@@ -23,18 +23,19 @@ async function exchangeSessionTokens(
 }
 
 /**
- * Fire-and-forget welcome email request. The API is idempotent (it stamps
- * welcome_email_sent_at first and only sends when that update affects a row),
- * so multiple calls or retries can't double-send.
+ * Fire-and-forget app-side verification stamp after the user opens the signup link.
  */
-async function requestWelcomeEmail(token: string): Promise<void> {
+async function ackEmailVerification(token: string): Promise<boolean> {
   try {
-    await fetch('/api/me/welcome-email', {
+    const res = await fetch('/api/me/ack-email-verification', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (!res.ok) return false;
+    const body = (await res.json().catch(() => ({}))) as { verified?: boolean };
+    return Boolean(body.verified);
   } catch {
-    // best-effort; user-visible verification status is unaffected
+    return false;
   }
 }
 
@@ -70,7 +71,7 @@ export default function VerifyEmailPage() {
           await exchangeSessionTokens(client, access_token, refresh_token);
           const isRecovery = type === 'recovery';
           if (!isRecovery) {
-            void requestWelcomeEmail(access_token);
+            void ackEmailVerification(access_token);
           }
           if (!cancelled) {
             setStatus('ok');

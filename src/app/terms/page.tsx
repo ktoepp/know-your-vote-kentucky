@@ -73,9 +73,10 @@ export default function TermsPage() {
             Email
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            We send a one-time welcome email after you verify, and digest emails when bills you
-            follow change status. We do not send marketing or promotional mail. You can unsubscribe
-            from digests anytime via the link in any email or from{' '}
+            We send digest emails when bills you follow change status. Digests turn on automatically
+            when you follow your first bill (weekly by default). We do not send marketing or
+            promotional mail. You can unsubscribe from digests anytime via the link in any email or
+            from{' '}
             <MuiLink component={Link} href="/profile">your profile</MuiLink>.
           </Typography>
         </section>

@@ -155,7 +155,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
   const userIds = prefs.map((p) => p.user_id as string);
   const { data: profiles, error: profErr } = await supabaseAdmin
     .from('ky_user_profiles')
-    .select('user_id, email')
+    .select('user_id, email, email_verified_at')
     .in('user_id', userIds);
 
   if (profErr) {
@@ -164,7 +164,9 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
 
   const emailByUser = new Map<string, string>();
   for (const r of profiles ?? []) {
-    if (r.user_id && r.email) emailByUser.set(String(r.user_id), String(r.email));
+    if (r.user_id && r.email && r.email_verified_at) {
+      emailByUser.set(String(r.user_id), String(r.email));
+    }
   }
 
   const globalWindowStart = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString();

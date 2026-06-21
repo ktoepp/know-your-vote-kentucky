@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
 import { resolveBillUuid } from '@/lib/bill-id-resolver';
-import { ensureKyNotificationPreferencesRow } from '@/lib/ky-notification-preferences';
+import { ensureKyNotificationPreferencesRow, maybeEnableDigestOnFirstBillFollow } from '@/lib/ky-notification-preferences';
 import { rateLimit } from '@/lib/rate-limit';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -60,8 +60,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     .from('ky_bill_follows')
     .insert({ user_id: auth.userId, bill_id: billId });
 
+  const alreadyFollowing = error?.code === '23505';
   // 23505 = unique_violation — already following is success.
-  if (error && error.code !== '23505') {
+  if (error && !alreadyFollowing) {
     console.error('ky_bill_follows insert:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -69,6 +70,10 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   const prefs = await ensureKyNotificationPreferencesRow(auth.supabase, auth.userId);
   if (prefs.error) {
     console.error('ensureKyNotificationPreferencesRow (follow):', prefs.error);
+  }
+
+  if (!alreadyFollowing) {
+    await maybeEnableDigestOnFirstBillFollow(auth.supabase, auth.userId);
   }
 
   return NextResponse.json({ ok: true, bill_id: billId, following: true });

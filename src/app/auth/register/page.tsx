@@ -17,6 +17,36 @@ import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
 import { syncPostHogUser, trackUserRegistered } from '@/lib/analytics';
 
+async function establishSessionAfterSignup(
+  email: string,
+  password: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await fetch('/api/auth/establish-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const body = (await res.json().catch(() => ({}))) as {
+    access_token?: string;
+    refresh_token?: string;
+    error?: string;
+  };
+  if (!res.ok || !body.access_token || !body.refresh_token) {
+    return { ok: false, error: body.error ?? 'Could not sign you in after signup.' };
+  }
+  if (!supabase) {
+    return { ok: false, error: 'Authentication service is not configured.' };
+  }
+  const { error: sessionErr } = await supabase.auth.setSession({
+    access_token: body.access_token,
+    refresh_token: body.refresh_token,
+  });
+  if (sessionErr) {
+    return { ok: false, error: sessionErr.message };
+  }
+  return { ok: true };
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -24,13 +54,11 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccess(false);
     if (!supabase) {
       setError('Authentication service is not configured.');
       setLoading(false);
@@ -45,43 +73,52 @@ export default function RegisterPage() {
         emailRedirectTo: `${origin}/auth/verify`,
       },
     });
-    setLoading(false);
     if (signErr) {
+      setLoading(false);
       setError(signErr.message);
       return;
     }
-    // Duplicate or reused email: Supabase may return a user row with no identities (no email sent again).
     const identities = data.user?.identities;
     if (identities && identities.length === 0) {
+      setLoading(false);
       setError(
         'This email is already registered or could not be confirmed. Try logging in, or use “Forgot password” on the login page.',
       );
       return;
     }
-    // No session until the user confirms — hosted/local with email confirmations on.
+
     const emailVerified = Boolean(data.user?.email_confirmed_at);
-    // Identify before capture so user_registered attaches to the registered person profile.
     syncPostHogUser(data.user);
-    if (data.session) {
-      trackUserRegistered({
-        needs_verification: !emailVerified,
-        email_verified: emailVerified,
-      });
-      router.refresh();
-      router.push('/profile');
+
+    let signedIn = Boolean(data.session);
+    if (!signedIn) {
+      const sessionResult = await establishSessionAfterSignup(email, password);
+      if (!sessionResult.ok) {
+        setLoading(false);
+        setError(sessionResult.error);
+        return;
+      }
+      signedIn = true;
+    }
+
+    setLoading(false);
+    if (!signedIn) {
+      setError('Account created, but we could not start your session. Try logging in.');
       return;
     }
+
     trackUserRegistered({
       needs_verification: !emailVerified,
       email_verified: emailVerified,
     });
-    setSuccess(true);
+    router.refresh();
+    router.push('/bills');
   };
 
   return (
     <AuthPaperLayout
       title="Create account"
-      subtitle="Use your email to register. We will send a link to verify your address."
+      subtitle="Use your email to register. You can browse right away; we will send a link to verify your address."
     >
       <Box component="form" onSubmit={handleRegister}>
         <Stack spacing={2}>
@@ -118,21 +155,7 @@ export default function RegisterPage() {
             {error}
           </Alert>
         )}
-        {success && (
-          <Alert severity="success" sx={{ mt: 2 }}>
-            <Typography variant="body2" component="div" sx={{ fontWeight: 600, mb: 0.5 }}>
-              Check your email for a confirmation link. After verifying, you can sign in.
-            </Typography>
-            <Typography variant="body2" color="text.secondary" component="div">
-              If nothing arrives in a few minutes: check spam, try again, and confirm your Supabase project has
-              <strong> Authentication → Providers → Email → Confirm email</strong> enabled, custom{' '}
-              <strong>SMTP</strong> saved correctly (if you use it), and{' '}
-              <strong>URL Configuration → Redirect URLs</strong> includes this site&apos;s{' '}
-              <code style={{ fontSize: '0.85em' }}>/auth/verify</code> URL.
-            </Typography>
-          </Alert>
-        )}
-        <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 3 }} disabled={loading || success}>
+        <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 3 }} disabled={loading}>
           {loading ? 'Creating…' : 'Create account'}
         </Button>
         <Typography variant="caption" color="text.secondary" align="center" display="block" sx={{ mt: 1.5, lineHeight: 1.5 }}>

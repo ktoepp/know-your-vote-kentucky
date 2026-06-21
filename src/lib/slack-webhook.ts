@@ -426,7 +426,7 @@ function maskEmail(email: string): string {
 
 /**
  * Posts a new-signup notice to the status-reports digest channel. Server-side and
- * fires exactly once per user (called after the idempotent welcome-email send), so
+ * fires exactly once per user (called from ack-email-verification on first verify),
  * unlike the client `user_registered` PostHog event it can't be dropped by ad-blockers.
  * No-op when no digest webhook is configured.
  */

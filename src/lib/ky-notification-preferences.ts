@@ -160,6 +160,20 @@ const EVENT_SET = new Set<string>(KY_DIGEST_EVENT_TYPES);
 
 export type DigestFrequency = 'daily' | 'weekly' | 'off';
 
+/** Event types shown only in advanced notification settings (committee + detail). */
+export const KY_DIGEST_ADVANCED_EVENT_TYPES: KyDigestEventType[] = KY_DIGEST_EVENT_TYPES.filter(
+  (t) => !KY_DIGEST_MAJOR_MILESTONE_SET.has(t),
+);
+
+/** Weekly digest enabled automatically on a user's first bill follow when still at default-off. */
+export const KY_DIGEST_AUTO_ENABLE_FREQUENCY: DigestFrequency = 'weekly';
+
+export function isMajorMilestonesOnly(types: readonly string[]): boolean {
+  if (types.length !== KY_DIGEST_MAJOR_MILESTONES.length) return false;
+  const set = new Set(types);
+  return KY_DIGEST_MAJOR_MILESTONES.every((t) => set.has(t));
+}
+
 export function isDigestFrequency(v: string): v is DigestFrequency {
   return v === 'daily' || v === 'weekly' || v === 'off';
 }
@@ -190,6 +204,41 @@ export function normalizeTopicFilters(input: string[]): string[] {
 /**
  * Ensure a preferences row exists (RLS INSERT policy on 020+). Idempotent.
  */
+/**
+ * When a user follows their first bill, turn on weekly digests unless they
+ * previously opted out or unsubscribed.
+ */
+export async function maybeEnableDigestOnFirstBillFollow(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  const { count, error: countErr } = await supabase
+    .from('ky_bill_follows')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  if (countErr || count !== 1) return;
+
+  const { data: prefs, error: prefsErr } = await supabase
+    .from('ky_notification_preferences')
+    .select('digest_frequency, digest_user_disabled, unsubscribed_all_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (prefsErr || !prefs) return;
+  if (prefs.digest_frequency !== 'off') return;
+  if (prefs.digest_user_disabled || prefs.unsubscribed_all_at) return;
+
+  const { error: upErr } = await supabase
+    .from('ky_notification_preferences')
+    .update({ digest_frequency: KY_DIGEST_AUTO_ENABLE_FREQUENCY })
+    .eq('user_id', userId);
+
+  if (upErr) {
+    console.error('maybeEnableDigestOnFirstBillFollow:', upErr);
+  }
+}
+
 export async function ensureKyNotificationPreferencesRow(
   supabase: SupabaseClient,
   userId: string,
