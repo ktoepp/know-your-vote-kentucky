@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { BillDetailView } from '@/components/bills/BillDetailView';
 import { getKyBillDetailPageData } from '@/lib/ky-bill-detail-server';
 import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-server';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { buildBillJsonLd, buildBreadcrumbJsonLd } from '@/lib/structured-data';
 
 export const revalidate = 300;
 
@@ -22,9 +24,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${bill.bill_number} | Know Your Vote Kentucky`,
     description: description.slice(0, 160),
+    alternates: { canonical: `/bills/${id}` },
     openGraph: {
       title: bill.bill_number,
       description: bill.title,
+      url: `/bills/${id}`,
+      type: 'article',
     },
   };
 }
@@ -37,12 +42,25 @@ export default async function BillDetailPage({ params }: PageProps) {
   ]);
   if (!data) notFound();
 
+  const path = `/bills/${id}`;
   return (
-    <BillDetailView
-      bill={data.bill}
-      detail={data.detail}
-      routeId={id}
-      legislatorRoster={legislatorRoster}
-    />
+    <>
+      <JsonLd
+        data={[
+          buildBillJsonLd(data.bill, path),
+          buildBreadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Bills', path: '/bills' },
+            { name: data.bill.bill_number, path },
+          ]),
+        ]}
+      />
+      <BillDetailView
+        bill={data.bill}
+        detail={data.detail}
+        routeId={id}
+        legislatorRoster={legislatorRoster}
+      />
+    </>
   );
 }

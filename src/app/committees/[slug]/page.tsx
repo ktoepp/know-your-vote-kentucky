@@ -12,6 +12,8 @@ import {
 import { fetchKyCommitteesBrowseList } from '@/lib/ky-ga-browse-server';
 import { buildCommitteeMemberDisplay } from '@/lib/ky-committee-members';
 import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { buildCommitteeJsonLd, buildBreadcrumbJsonLd } from '@/lib/structured-data';
 
 export const revalidate = 300;
 
@@ -27,6 +29,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${name} | Know Your Vote Kentucky`,
     description: `Scheduled meetings and agendas for ${name} from the Kentucky LRC legislative calendar.`,
+    alternates: { canonical: `/committees/${slug}` },
+    openGraph: {
+      title: name,
+      description: `Scheduled meetings and agendas for ${name} from the Kentucky LRC legislative calendar.`,
+      url: `/committees/${slug}`,
+      type: 'article',
+    },
   };
 }
 
@@ -50,14 +59,27 @@ export default async function CommitteeDetailPage({ params }: PageProps) {
   const members = buildCommitteeMemberDisplay(committee, meetings, legislatorRoster);
   const agendaByMeetingId = await fetchKyCommitteeAgendaForMeetings(meetings.map((m) => m.id));
 
+  const path = `/committees/${slug}`;
   return (
-    <CommitteeDetailView
-      committee={committee}
-      meetings={meetings}
-      agendaByMeetingId={agendaByMeetingId}
-      members={members}
-      materials={materials}
-      committeeRoster={committeeRoster.map((c) => ({ slug: c.slug, name: c.name }))}
-    />
+    <>
+      <JsonLd
+        data={[
+          buildCommitteeJsonLd(committee, path),
+          buildBreadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Committees', path: '/committees' },
+            { name: normalizeKyGaDisplayName(committee.name), path },
+          ]),
+        ]}
+      />
+      <CommitteeDetailView
+        committee={committee}
+        meetings={meetings}
+        agendaByMeetingId={agendaByMeetingId}
+        members={members}
+        materials={materials}
+        committeeRoster={committeeRoster.map((c) => ({ slug: c.slug, name: c.name }))}
+      />
+    </>
   );
 }

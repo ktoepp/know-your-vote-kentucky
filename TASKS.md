@@ -8,6 +8,23 @@
 
 ## In Progress
 
+### SEO + GEO discoverability (branch `seo-geo-optimization`, 2026-06-21)
+
+First indexability + generative-engine pass — not yet merged. Full rationale in [decisions.md § 2026-06-21](./decisions.md#2026-06-21--seo--geo-discoverability-pass-branch-seo-geo-optimization).
+
+- [x] Dynamic sitemap (bills/members/committees) — `src/lib/sitemap-data.ts` + `src/app/sitemap.ts`; 9 → 1,218 URLs verified against primary.
+- [x] Schema.org JSON-LD — site-wide `Organization` + `WebSite` (`SearchAction`), per-page `Legislation` / `Person` / `GovernmentOrganization` + `BreadcrumbList`. `src/lib/structured-data.ts`, `src/components/seo/JsonLd.tsx`.
+- [x] `llms.txt` route handler at `src/app/llms.txt/route.ts`.
+- [x] OG image — dynamic 1200×630 via Next file-based `src/app/opengraph-image.tsx` (`runtime = 'edge'`). Replaces broken `og-image.jpg` reference.
+- [x] Per-page `alternates.canonical` on `/bills/[id]`, `/members/[slug]`, `/committees/[slug]`. `openGraph.type` set per page.
+- [x] Removed `verification.google` placeholder (`"your-google-verification-code"` was shipping).
+- [ ] **Google Search Console** — Add property for `https://kyvky.com`, obtain verification code, drop into `verification.google` in `src/app/layout.tsx`. Submit `/sitemap.xml`. Manual / operator step.
+- [ ] **Bing Webmaster Tools** — same flow as GSC (use the "Import from GSC" option once GSC is set up).
+- [ ] Deferred follow-ups (not blocking PR):
+  - `Event` JSON-LD on `/meetings` (blocked on parsing free-form `time_and_location` into ISO timestamps).
+  - `FAQPage` JSON-LD on `/glossary` (low rich-result yield since Google narrowed FAQ surface area in 2023; revisit if reopened).
+  - `next/image` adoption sweep (only 4 alt-text sites today — LCP, not indexability).
+
 ### Open follow-ups from the 2026-06-12 design + a11y pass
 
 The pass itself **shipped as PR #88** (full record in Recently completed). Still open:

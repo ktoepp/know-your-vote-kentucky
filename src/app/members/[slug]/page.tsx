@@ -8,6 +8,8 @@ import { fetchKyCommittees } from '@/lib/ky-committee-data';
 import { MemberProfileView } from '@/components/members/MemberProfileView';
 import { kyMemberTitleShort } from '@/lib/ky-member-utils';
 import { formatKyLegislatorDistrict } from '@/lib/bill-display';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { buildLegislatorJsonLd, buildBreadcrumbJsonLd } from '@/lib/structured-data';
 
 export const revalidate = 300;
 
@@ -26,9 +28,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${leg.name} | Know Your Vote Kentucky`,
     description: desc,
+    alternates: { canonical: `/members/${slug}` },
     openGraph: {
       title: `${leg.name}`,
       description: desc,
+      url: `/members/${slug}`,
+      type: 'profile',
     },
   };
 }
@@ -45,14 +50,27 @@ export default async function MemberProfilePage({ params }: PageProps) {
     fetchMemberVoteRecord(leg, { sessionName, maxRows: 200, recentLimit: 8 }),
     fetchCommitteeAssignmentsForLegislator(leg, committees),
   ]);
+  const path = `/members/${slug}`;
   return (
-    <MemberProfileView
-      leg={leg}
-      legislatorRoster={roster}
-      sessionName={sessionName}
-      sponsoredBills={sponsoredBills}
-      voteRecord={voteRecord}
-      committeeAssignments={committeeAssignments}
-    />
+    <>
+      <JsonLd
+        data={[
+          buildLegislatorJsonLd(leg, path),
+          buildBreadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Members', path: '/members' },
+            { name: leg.name, path },
+          ]),
+        ]}
+      />
+      <MemberProfileView
+        leg={leg}
+        legislatorRoster={roster}
+        sessionName={sessionName}
+        sponsoredBills={sponsoredBills}
+        voteRecord={voteRecord}
+        committeeAssignments={committeeAssignments}
+      />
+    </>
   );
 }
