@@ -59,7 +59,7 @@ jobs:
         run: npm run audit:accuracy
 
       - name: Slack notify on workflow failure
-        if: failure()
+        if: cancelled() || failure()
         env:
           WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
         run: |
