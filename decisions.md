@@ -924,3 +924,9 @@ The Sunday audit (`accuracy-audit.yml`) has `timeout-minutes: 30`. The job start
 
 **Revisit if:** the accuracy audit times out again next Sunday — that would suggest a structural slowness (e.g. LegiScan rate-limit backoff loop, LLM pass consuming most of the budget) and should be diagnosed via `--no-llm` dry run locally. Vercel MCP access should be confirmed before the next health check.
 
+---
+
+## 2026-06-25 — Spot-check conventions: member display-name truncation
+
+**Known and accepted:** kyvky.com omits middle names from legislator display names (e.g. "Julie Adams" for the official "Julie Raque Adams", "Cassie Armstrong" for "Cassie Chambers Armstrong"). This is intentional display simplification, not a data error. District numbers, chamber assignments, and party affiliations are the authoritative identity fields. **Do not flag middle-name omissions as discrepancies in future spot-checks or accuracy audits.**
+
