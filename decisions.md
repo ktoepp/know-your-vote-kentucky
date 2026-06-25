@@ -930,3 +930,5 @@ The Sunday audit (`accuracy-audit.yml`) has `timeout-minutes: 30`. The job start
 
 **Known and accepted:** kyvky.com omits middle names from legislator display names (e.g. "Julie Adams" for the official "Julie Raque Adams", "Cassie Armstrong" for "Cassie Chambers Armstrong"). This is intentional display simplification, not a data error. District numbers, chamber assignments, and party affiliations are the authoritative identity fields. **Do not flag middle-name omissions as discrepancies in future spot-checks or accuracy audits.**
 
+**Spot-check output format:** Report results as a single concise table — one row per check, columns: Check | Result | Notes/Action. Result is PASS / FAIL / UNABLE TO VERIFY. Notes should be one line; flag any required action inline. No prose sections unless a finding is complex enough to warrant it.
+
