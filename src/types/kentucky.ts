@@ -83,6 +83,10 @@ export interface KYBill {
   legiscan_subjects?: LegiscanBillSubject[] | null;
   /** Sync-only search helper (newline-separated lowercase subject names). */
   legiscan_subjects_search?: string | null;
+  /** LegiScan getBill history[] (date/action/chamber/importance), persisted for DB-only bill detail. */
+  legiscan_history?: unknown[] | null;
+  /** LegiScan getBill texts[] (doc_id/type/mime/date/url/state_link), persisted for DB-only bill detail. */
+  legiscan_texts?: unknown[] | null;
   /** Detail page view count; absent in older API responses until column exists. */
   view_count?: number | null;
   created_at: string;
