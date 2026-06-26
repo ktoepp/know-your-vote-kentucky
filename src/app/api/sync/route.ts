@@ -71,6 +71,7 @@ function syncParamsFromUrl(req: NextRequest) {
   const sponsorDetailBudgetPerSession = sdb ? parseInt(sdb, 10) : undefined;
   const quotaBackfillAdvanceCursor = searchParams.get('quotaBackfillAdvanceCursor') !== 'false';
   const useChangeHash = searchParams.get('useChangeHash') === 'true' || process.env.KY_SYNC_USE_CHANGE_HASH === 'true';
+  const force = searchParams.get('force') === 'true';
   return {
     source,
     dryRun,
@@ -87,6 +88,7 @@ function syncParamsFromUrl(req: NextRequest) {
       : sponsorDetailBudgetPerSession,
     quotaBackfillAdvanceCursor,
     useChangeHash: useChangeHash || undefined,
+    force: force || undefined,
   };
 }
 
@@ -124,6 +126,7 @@ export async function GET(req: NextRequest) {
     sponsorDetailBudgetPerSession,
     quotaBackfillAdvanceCursor,
     useChangeHash,
+    force,
   } = syncParamsFromUrl(req);
   try {
     const results = await withVercelSyncCronMonitor(source, () =>
@@ -139,6 +142,7 @@ export async function GET(req: NextRequest) {
         sponsorDetailBudgetPerSession,
         quotaBackfillAdvanceCursor,
         useChangeHash,
+        force,
       }),
     );
     const hasErrors = results.some((r) => r.status === 'error');
@@ -182,6 +186,7 @@ export async function POST(req: NextRequest) {
     sponsorDetailBudgetPerSession,
     quotaBackfillAdvanceCursor,
     useChangeHash,
+    force,
   } = syncParamsFromUrl(req);
 
   try {
@@ -198,6 +203,7 @@ export async function POST(req: NextRequest) {
         sponsorDetailBudgetPerSession,
         quotaBackfillAdvanceCursor,
         useChangeHash,
+        force,
       }),
     );
     const hasErrors = results.some((r) => r.status === 'error');

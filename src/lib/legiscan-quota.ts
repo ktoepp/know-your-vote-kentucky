@@ -55,6 +55,23 @@ export type LegiscanQuotaGuardResult = {
   summary: LegiscanQuotaSummary | null;
 };
 
+/**
+ * Thrown by `KyLegiScanClient.request()` when monthly quota is at/above the sync hold threshold.
+ * Caught upstream by sync callers (mark the run skipped) and by bill-detail render (fall back to DB).
+ */
+export class LegiscanQuotaHoldError extends Error {
+  readonly summary: LegiscanQuotaSummary | null;
+  constructor(message: string, summary: LegiscanQuotaSummary | null) {
+    super(message);
+    this.name = 'LegiscanQuotaHoldError';
+    this.summary = summary;
+  }
+}
+
+export function isLegiscanQuotaHoldError(err: unknown): err is LegiscanQuotaHoldError {
+  return err instanceof Error && err.name === 'LegiscanQuotaHoldError';
+}
+
 /** Returns `blocked: true` when monthly LegiScan usage is at/above the sync hold threshold. */
 export async function checkLegiscanQuotaForSync(): Promise<LegiscanQuotaGuardResult> {
   const summary = await fetchLegiscanQuotaSummary();

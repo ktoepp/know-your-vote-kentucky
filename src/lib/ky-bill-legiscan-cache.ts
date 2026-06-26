@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { getKyLegiScanClient } from '@/lib/ky-legiscan-client';
+import { isLegiscanQuotaHoldError } from '@/lib/legiscan-quota';
 
 const LEGISCAN_DETAIL_REVALIDATE_SECONDS = 300;
 
@@ -42,17 +43,26 @@ async function enrichVotes(
 
 async function fetchLegiscanBillDetailUncached(legiscanId: number): Promise<LegiscanBillDetailPayload | null> {
   const client = getKyLegiScanClient();
-  const raw = await client.fetchBillDetail(legiscanId);
-  if (!raw) return null;
-  const votes = await enrichVotes((raw.votes ?? []) as unknown as LegiscanBillDetailPayload['votes']);
-  return {
-    subjects: raw.subjects ?? [],
-    history: raw.history ?? [],
-    texts: raw.texts ?? [],
-    sponsors: raw.sponsors ?? [],
-    votes,
-    committee: raw.committee ?? null,
-  };
+  try {
+    const raw = await client.fetchBillDetail(legiscanId);
+    if (!raw) return null;
+    const votes = await enrichVotes((raw.votes ?? []) as unknown as LegiscanBillDetailPayload['votes']);
+    return {
+      subjects: raw.subjects ?? [],
+      history: raw.history ?? [],
+      texts: raw.texts ?? [],
+      sponsors: raw.sponsors ?? [],
+      votes,
+      committee: raw.committee ?? null,
+    };
+  } catch (err) {
+    if (isLegiscanQuotaHoldError(err)) {
+      // Public traffic must not bleed quota past the sync hold — page falls back to
+      // DB-only data (titles, sponsors, vote summaries already in ky_bills/ky_bill_votes).
+      return null;
+    }
+    throw err;
+  }
 }
 
 /** Server cache for LegiScan bill detail + roll-call enrichment (per `legiscan_id`). */

@@ -219,18 +219,63 @@ async function buildDigestExtras(results: SyncResult[]): Promise<{ quota?: strin
   return out;
 }
 
+const QUOTA_ALERT_BANDS = [90, 95, 98, 100] as const;
+type QuotaAlertBand = (typeof QUOTA_ALERT_BANDS)[number];
+const QUOTA_ALERT_STATE_KEY = 'slack_legiscan_quota_alert_state';
+
+function bandFor(pct: number): QuotaAlertBand | 0 {
+  let band: QuotaAlertBand | 0 = 0;
+  for (const b of QUOTA_ALERT_BANDS) {
+    if (pct >= b) band = b;
+  }
+  return band;
+}
+
+type QuotaAlertState = { month: string; band: QuotaAlertBand | 0 };
+
+async function readQuotaAlertState(): Promise<QuotaAlertState | null> {
+  if (!supabaseAdmin) return null;
+  const { data } = await supabaseAdmin
+    .from('ky_sync_state')
+    .select('payload')
+    .eq('key', QUOTA_ALERT_STATE_KEY)
+    .maybeSingle();
+  const payload = data?.payload as Partial<QuotaAlertState> | null;
+  if (!payload?.month || typeof payload.band !== 'number') return null;
+  return { month: payload.month, band: payload.band as QuotaAlertBand | 0 };
+}
+
+async function writeQuotaAlertState(state: QuotaAlertState): Promise<void> {
+  if (!supabaseAdmin) return;
+  await supabaseAdmin.from('ky_sync_state').upsert(
+    { key: QUOTA_ALERT_STATE_KEY, payload: state, updated_at: new Date().toISOString() },
+    { onConflict: 'key' },
+  );
+}
+
+/**
+ * Edge-triggered: only posts when the quota band increases (90 → 95 → 98 → 100) within a month,
+ * or when the month rolls over. Sustained usage at the same band stays silent.
+ */
 async function maybeAlertLegiscanQuotaHigh(): Promise<void> {
   try {
     const quota = await fetchLegiscanQuotaSummary();
     if (!quota || quota.limit <= 0) return;
-    const pctThreshold = slackQuotaAlertThresholdPct();
-    const fracThreshold = pctThreshold / 100;
-    if (quota.used < quota.limit * fracThreshold) return;
+    const minBand = slackQuotaAlertThresholdPct();
+    const currentBand = bandFor(quota.pct);
+    if (currentBand === 0 || currentBand < minBand) return;
+
+    const last = await readQuotaAlertState();
+    const monthChanged = !last || last.month !== quota.month;
+    const bandRose = !last || currentBand > last.band;
+    if (!monthChanged && !bandRose) return;
+
     await postToAlertsAndSupport(
-      `*LegiScan quota threshold (${pctThreshold}%+)*\nMonth \`${quota.month}\`: ${quota.used.toLocaleString()} / ${quota.limit.toLocaleString()} (${quota.pct}% used)`,
+      `*LegiScan quota threshold (${currentBand}%+)*\nMonth \`${quota.month}\`: ${quota.used.toLocaleString()} / ${quota.limit.toLocaleString()} (${quota.pct}% used)`,
     );
+    await writeQuotaAlertState({ month: quota.month, band: currentBand });
   } catch {
-    /* ignore */
+    /* ignore — alert hygiene is best-effort */
   }
 }
 
@@ -350,15 +395,25 @@ export async function notifySyncSlack(params: {
   const body = formatSyncLines(results);
 
   const digestHeartbeat = process.env.SLACK_SYNC_DIGEST_ALWAYS === 'true';
-  /** Hourly Vercel `source=bills` cron: post digest + quota unless opted out with SLACK_SYNC_BILLS_DIGEST_ALWAYS=false */
+  /**
+   * Default (false): only post the bills digest on change/error/new-skip-reason.
+   * Set SLACK_SYNC_BILLS_DIGEST_ALWAYS=true to restore the previous always-on heartbeat.
+   */
   const vercelBillsHeartbeat =
     isVercelCron &&
     source === 'bills' &&
-    process.env.SLACK_SYNC_BILLS_DIGEST_ALWAYS !== 'false';
+    process.env.SLACK_SYNC_BILLS_DIGEST_ALWAYS === 'true';
+  /**
+   * Quota-hold skips re-fire every cron tick with the same reason; treat them as quiet so we
+   * don't repost "bills skipped — LegiScan quota 96%" hourly. The banded #errors alert covers
+   * the band transitions; mid-band sustained holds don't need a #status-reports tick.
+   */
+  const isQuotaHoldSkip = (r: SyncResult) =>
+    r.status === 'skipped' && typeof r.error === 'string' && /LegiScan quota/i.test(r.error);
   const hasNewOrInteresting =
     hasErrors ||
     results.some((r) => r.status === 'success' && r.itemsSynced > 0) ||
-    results.some((r) => r.status === 'skipped' && Boolean(r.error));
+    results.some((r) => r.status === 'skipped' && Boolean(r.error) && !isQuotaHoldSkip(r));
 
   // CLI / GitHub Actions runs may post when SLACK_SYNC_NOTIFY_CLI=true.
   const cliEnabled = fromCli && cliNotify;

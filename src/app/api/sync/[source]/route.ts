@@ -73,6 +73,7 @@ export async function POST(
   const sponsorDetailBudgetPerSession = sdb ? parseInt(sdb, 10) : undefined;
   const quotaBackfillAdvanceCursor = searchParams.get('quotaBackfillAdvanceCursor') !== 'false';
   const useChangeHash = searchParams.get('useChangeHash') === 'true';
+  const force = searchParams.get('force') === 'true';
 
   try {
     const results = await syncAll({
@@ -91,6 +92,7 @@ export async function POST(
         : sponsorDetailBudgetPerSession,
       quotaBackfillAdvanceCursor,
       useChangeHash: useChangeHash || undefined,
+      force: force || undefined,
     });
     const result = results[0];
     const cron = isVercelCronRequest(req);
