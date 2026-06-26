@@ -81,9 +81,10 @@ async function reviewSummaries(
     title: string;
     description: string | null;
     ai_summary: string | null;
+    legiscan_subjects: { subject_name?: string }[] | null;
   }>(db, {
     table: 'ky_bills',
-    select: 'bill_number, title, description, ai_summary',
+    select: 'bill_number, title, description, ai_summary, legiscan_subjects',
     seed: cfg.seed,
     limit: cfg.llmSample,
     filter: (q) => q.not('ai_summary', 'is', null).neq('ai_summary', ''),
@@ -93,16 +94,23 @@ async function reviewSummaries(
     key: b.bill_number as string,
     title: clip(b.title as string, 300),
     description: clip(b.description as string),
+    subjects: ((b.legiscan_subjects ?? []) as { subject_name?: string }[])
+      .map((s) => s?.subject_name?.trim())
+      .filter((s): s is string => !!s),
     summary: clip(b.ai_summary as string),
   }));
   if (items.length === 0) return 0;
 
-  const prompt = `You are auditing AI-generated plain-language summaries on a Kentucky General Assembly transparency website. For each bill, judge whether the "summary" is faithful to the bill's "title" and "description" and contains no fabricated or contradicting claims.
+  const prompt = `You are auditing AI-generated plain-language summaries on a Kentucky General Assembly transparency website. Each "summary" is 2-3 sentences and MAY end with a "Who it may affect:" clause naming impacted Kentuckians. For each bill, judge it against the bill's "title", "description", and official "subjects".
+
+Flag a summary when:
+- it states a fabricated fact or a claim that contradicts the title/description; OR
+- its "Who it may affect:" clause names audiences that are NOT supported by the title/description/subjects, or are overbroad/overclaimed (impact is inferential, so this is the highest-risk part).
 
 Return ONLY a JSON array, one object per bill:
 { "key": "<bill_number>", "ok": true|false, "severity": "fail"|"warn"|"info", "issue": "<short reason, empty if ok>" }
 
-Use severity "fail" for hallucinated facts or claims that contradict the bill; "warn" for misleading emphasis or notable omissions; "info"/ok=true when faithful.
+Use severity "fail" for hallucinated facts, contradictions, or fabricated audiences; "warn" for misleading emphasis, notable omissions, or overbroad audience claims; "info"/ok=true when faithful and grounded. An omitted "Who it may affect:" clause is fine — do NOT penalize a missing clause.
 
 Bills:
 ${JSON.stringify(items, null, 2)}`;

@@ -72,5 +72,9 @@ diagnose-after.txt
 # Script audit output (npm run audit:lrc:bill-refs, weekly workflow artifacts)
 /reports/
 
+# Raw user-feedback artifacts (email screenshots, conversation notes, survey exports).
+# May contain PII — keep local. FEEDBACK.md holds the curated, anonymized record.
+/docs/feedback/
+
 # CI-only sentinel written by sync/audit scripts to dedupe Slack failure posts
 .slack-notified

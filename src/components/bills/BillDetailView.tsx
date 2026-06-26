@@ -655,7 +655,12 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
             {bill.ai_summary && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
-                  <AiGeneratedBlock officialHref={officialTextForAi} officialLabel="Open official bill text (PDF)">
+                  <AiGeneratedBlock
+                    officialHref={officialTextForAi}
+                    officialLabel="Open official bill text (PDF)"
+                    billNumber={bill.bill_number}
+                    beta
+                  >
                     {bill.ai_summary}
                   </AiGeneratedBlock>
                 </MuiCardContent>

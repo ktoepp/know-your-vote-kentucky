@@ -11,6 +11,9 @@ import type {
   KYSchoolBoardItem,
 } from '@/types/kentucky';
 
+/** Model used for all KY plain-language content generation. Exported so backfills can record provenance. */
+export const KY_CONTENT_MODEL = 'claude-sonnet-4-6';
+
 let client: Anthropic | null = null;
 
 function getClient(): Anthropic | null {
@@ -23,49 +26,76 @@ function getClient(): Anthropic | null {
   return client;
 }
 
-const SYSTEM_PROMPT = `You are a non-partisan civic education assistant for Know Your Vote Kentucky. 
-Generate plain-language summaries that are:
-- 2-3 sentences maximum
-- Non-partisan and factual
-- Written for a general audience (no jargon)
-- Include why this matters to Kentuckians
-Do NOT include opinions or political bias. Focus on practical impact.`;
+const SYSTEM_PROMPT = `You are a non-partisan civic education assistant for Know Your Vote Kentucky.
+Generate plain-language summaries with this shape:
+- First, 2-3 sentences maximum: what the bill does, in plain language, why it matters to Kentuckians.
+- Then, on a new line, a short "Who it may affect:" clause naming the Kentuckians most directly impacted (e.g. parents and students, renters, small employers, veterans).
+
+Hard rules:
+- Use ONLY the bill fields provided (number, title, description, topics, subjects). Do not use outside knowledge or assume provisions that are not stated.
+- Name affected groups ONLY when clearly inferable from those fields. Hedge with "may affect." If the impact is unclear or the description is too thin to tell, OMIT the "Who it may affect:" clause entirely rather than guessing.
+- Non-partisan and factual. No opinions, no political framing, no predictions about passage.
+- Written for a general audience, no jargon.
+- Plain text only — NO markdown, asterisks, bold, or headers. Do not restate the bill number; the page already shows it. Separate the summary and the "Who it may affect:" clause with a single blank line.`;
+
+/**
+ * Sentinel strings returned by generateSummary when no genuine summary was produced
+ * (missing key, empty/blocked response, rate limit, API error). Callers that PERSIST
+ * summaries (the backfill) must treat these as "skip", never write them as real content.
+ */
+export const SUMMARY_UNAVAILABLE_SENTINELS = [
+  'AI summary not available — API key not configured.',
+  'Summary unavailable.',
+  'Summary temporarily unavailable due to high demand. Please try again shortly.',
+  'Summary could not be generated at this time.',
+] as const;
+
+/** True when `text` is a genuine generated summary (non-empty and not a failure sentinel). */
+export function isUsableSummary(text: string | null | undefined): boolean {
+  const t = (text ?? '').trim();
+  if (!t) return false;
+  return !(SUMMARY_UNAVAILABLE_SENTINELS as readonly string[]).includes(t);
+}
 
 async function generateSummary(prompt: string): Promise<string> {
   const anthropic = getClient();
   if (!anthropic) {
-    return 'AI summary not available — API key not configured.';
+    return SUMMARY_UNAVAILABLE_SENTINELS[0];
   }
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: KY_CONTENT_MODEL,
       max_tokens: 256,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: prompt }],
     });
     const block = message.content[0];
-    return block.type === 'text' ? block.text.trim() : 'Summary unavailable.';
+    return block.type === 'text' ? block.text.trim() : SUMMARY_UNAVAILABLE_SENTINELS[1];
   } catch (err: any) {
     if (err?.status === 429) {
       console.warn('[KY-Content] Rate limited — returning placeholder');
-      return 'Summary temporarily unavailable due to high demand. Please try again shortly.';
+      return SUMMARY_UNAVAILABLE_SENTINELS[2];
     }
     console.error('[KY-Content] Error generating summary:', err?.message ?? err);
-    return 'Summary could not be generated at this time.';
+    return SUMMARY_UNAVAILABLE_SENTINELS[3];
   }
 }
 
 /** AI-generated plain-language summary of a KY state bill */
 export async function generateBillSummary(bill: KYBill): Promise<string> {
-  const prompt = `Summarize this Kentucky state bill in 2-3 plain-language sentences for voters.
-Include why it matters to Kentuckians.
+  const subjectNames = (bill.legiscan_subjects ?? [])
+    .map((s) => s?.subject_name?.trim())
+    .filter((s): s is string => !!s);
+  const prompt = `Summarize this Kentucky state bill for voters, following the system rules
+(2-3 plain-language sentences, then an optional "Who it may affect:" clause grounded only in the fields below).
 
 Bill Number: ${bill.bill_number}
 Title: ${bill.title}
 ${bill.description ? `Description: ${bill.description}` : ''}
 ${bill.status ? `Status: ${bill.status}` : ''}
 ${bill.chamber ? `Chamber: Kentucky ${bill.chamber === 'house' ? 'House' : 'Senate'}` : ''}
-${bill.topics?.length ? `Topics: ${bill.topics.join(', ')}` : ''}`;
+${bill.topics?.length ? `Topics: ${bill.topics.join(', ')}` : ''}
+${subjectNames.length ? `Official LegiScan subjects: ${subjectNames.join(', ')}` : ''}`;
   return generateSummary(prompt);
 }
 

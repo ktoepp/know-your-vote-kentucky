@@ -12,6 +12,7 @@ Read first if you're picking up this project:
 
 - **[TASKS.md](./TASKS.md)** — current roadmap, what's shipped, what's next.
 - **[decisions.md](./decisions.md)** — append-only rationale log; check before changing established patterns.
+- **[FEEDBACK.md](./FEEDBACK.md)** — incoming user feedback (email / in-person / PostHog) and how it's triaged into work. Raw artifacts live in gitignored `docs/feedback/`.
 - **[docs/specs/](./docs/specs/)** — feature specs (follow-bills, committee-calendar).
 - **This is the Kentucky General Assembly**, not the US Congress. Use KY terminology: 100 House / 38 Senate, Governor (not President), 3/5 veto override.
 - **Stack:** TypeScript, Next.js 15 (App Router only), React 18, MUI (primary), Tailwind (minimal — tooltip layer), Supabase / Postgres.
@@ -23,6 +24,7 @@ Read first if you're picking up this project:
 | --- | --- |
 | Bill card / detail | `src/components/bills/KYBillCard.tsx`, `src/app/bills/[id]/page.tsx` |
 | Bill status → tooltip mapping | `src/lib/bill-display.ts` (`billStatusToTooltipKey`, `billPrefixToTooltipKey`) |
+| AI bill summary (plain-language, incl. impact audiences) | generator `src/lib/ky-content-generation.ts`; render `src/components/civic/AiAttribution.tsx` (`AiGeneratedBlock`); backfill `scripts/backfill-bill-summaries.ts`; faithfulness audit `src/lib/accuracy-audit/checkers/llm-review.ts` |
 | Member roster / profile / map | `src/components/members/MemberCard.tsx`, `src/app/members/[slug]/page.tsx`, `src/components/members/DistrictMapExplorer.tsx` |
 | Committees / meetings | `src/app/committees/`, `src/components/committees/MeetingsBrowse.tsx`, `src/components/bills/BillHearingsSection.tsx` |
 | Profile activity feed | `src/components/profile/ProfileActivitySection.tsx`, `GET /api/me/activity` |
@@ -35,7 +37,7 @@ Read first if you're picking up this project:
 
 ### Hidden routes (no nav, `noindex`)
 
-`/dashboard` (legacy redirect target — superseded by `/profile`), `/browse`, `/find-content`, `/design-system`, `/dev/digest-history`. Reachable by URL for development. `/admin/sync-status` requires the `ADMIN_TOKEN` header.
+`/dashboard` (legacy redirect target — superseded by `/profile`), `/browse`, `/find-content`, `/design-system`, `/dev/digest-history`, `/dev/bill-summary-preview` (dev-only, gated on `NODE_ENV`). Reachable by URL for development. `/admin/sync-status` requires the `ADMIN_TOKEN` header.
 
 ### Tooltip taxonomy
 
@@ -74,6 +76,7 @@ All tooling lives in `scripts/` and is exposed via `package.json`. There is no J
 | `npm run geo:ky-districts` / `geo:ky-mask` | Rebuild district GeoJSON / outside-mask assets. |
 | `npm run verify:votes` / `verify:legislator-links` / `spot-check:bill-links` | Data integrity checks. |
 | `npm run preview:digest` / `preview:welcome` | Render digest / welcome email locally. |
+| `npm run backfill:bill-summaries` (`:dry`) | Generate AI plain-language `ai_summary` for bills (active session by default; `--limit`, `--only-missing`, `--session`, `--all-sessions`). Anthropic tokens, zero LegiScan quota. |
 | `npm run diagnose:legislators` | Report active rows missing `legiscan_id`. |
 | `npm run generate:district-thumbnails` | Static district minimap PNGs. |
 | `npm run slack:smoke-test` | Post a test message to configured Slack webhooks. |
