@@ -10,14 +10,14 @@
 
 ### AI plain-language bill summaries (beta) — PR #103, 2026-06-26
 
-Revives the dormant `ky_bills.ai_summary` so each bill gets a 2–3 sentence plain-language summary that also names likely impacted Kentuckians (a "Who it may affect:" clause). Code is merge-ready; **no summary content is written yet** — generation is an operator step. Implements [FEEDBACK.md #1](./FEEDBACK.md); partially serves #3. Full rationale: [decisions.md § 2026-06-26](./decisions.md#2026-06-26--ai-plain-language-bill-descriptions-with-embedded-impact-audiences).
+Revives the dormant `ky_bills.ai_summary` so each bill gets a 2–3 sentence plain-language summary that also names likely impacted Kentuckians (a "Who it may affect:" clause). Code is merge-ready and the **initial backfill has run against primary** (1,398 active-session bills summarized, 2026-06-26). Implements [FEEDBACK.md #1](./FEEDBACK.md); partially serves #3. Full rationale: [decisions.md § 2026-06-26](./decisions.md#2026-06-26--ai-plain-language-bill-descriptions-with-embedded-impact-audiences).
 
 - [x] Generator grounds on title + description + topics + LegiScan subjects (no full-text fetch → zero LegiScan quota); plain text, hedged audience clause, omitted when unclear. `src/lib/ky-content-generation.ts`.
 - [x] Migration **034** — `ai_summary_generated_at` / `_model` / `_input_hash` for provenance + staleness-aware regen. **Applied to primary 2026-06-26.**
 - [x] Backfill `scripts/backfill-bill-summaries.ts` (`npm run backfill:bill-summaries[:dry]`) — active session by default, change-detect via input hash, idempotent, decoupled from LegiScan sync.
 - [x] Frontend: Beta tag, bold "Who it may affect:" label, "See a problem? Tell us" CTA → `katie@kyvky.com` (routes into FEEDBACK.md). On-site only; **never in digest emails** (preserves § 2026-05-10).
 - [x] Accuracy: prompt guardrails + the weekly LLM faithfulness audit extended to flag fabricated/overbroad audience claims (advisory, capped to warn). `src/lib/accuracy-audit/checkers/llm-review.ts`.
-- [ ] **Operator: run the backfill.** `npm run backfill:bill-summaries -- --limit=15` (spot-check on real pages) → then unlimited for the active session. The weekly accuracy audit then exercises real summaries automatically.
+- [x] **Operator backfill ran 2026-06-26** — 1,398 / 1,737 active-session bills summarized (`claude-sonnet-4-6`). ~339 thin-description bills still uncovered; top up with `npm run backfill:bill-summaries -- --only-missing`. The weekly accuracy audit now exercises the live summaries automatically.
 - [ ] Deferred follow-ups: cross-bill audience **lens pages** (FEEDBACK #3 proper); a **cron** to auto-summarize new/changed bills; AI-model-id cleanup across modules.
 
 **Open engineering follow-ups (from PR #102 — LegiScan quota guard, merged 2026-06-26):**
