@@ -927,6 +927,39 @@ Framing decision, no code changes yet. Driven by two adjacent pieces of user fee
 
 ---
 
+## 2026-06-23 — Health check findings
+
+Routine automated health check against GitHub Actions and Vercel.
+
+**GitHub Actions status (all workflows, trailing 7 days):**
+- Sync KY bill statuses: ✅ 14/14 runs success — last run 2026-06-23 09:49 UTC
+- Sync LRC committee calendar: ✅ All recent runs success — last run 2026-06-22 20:48 UTC
+- Legislator links weekly: ✅ Success — 2026-06-22 16:50 UTC (correct Monday cadence)
+- Slack repo events: ✅ Success — 2026-06-22 01:17 UTC
+- Content accuracy audit: ⚠️ **Cancelled** — 2026-06-21 10:23 UTC (run #27901338397)
+
+**Accuracy audit timeout — root cause and fix:**
+The Sunday audit (`accuracy-audit.yml`) has `timeout-minutes: 30`. The job started at 10:23:48 UTC and was killed at 10:53:26 UTC — exactly 30 minutes. Step 5 "Run content accuracy audit" was the step that timed out; steps 1–4 (checkout, setup-node, npm ci) all succeeded. The Slack notify step uses `if: failure()`, which evaluates to `false` when a job is cancelled (timeout kills produce conclusion=`cancelled`, not `failure`) — so **no Slack alert fired**. The audit ran 3 hours after the scheduled 07:00 UTC cron time, which is consistent with GitHub Actions queuing delay on a busy Sunday morning; the delay itself is not the issue.
+
+**Decision: fix the Slack notify condition.** Change `if: failure()` → `if: cancelled() || failure()` in `.github/workflows/accuracy-audit.yml` so both hard failures and timeout-cancellations post to `#errors`. This is a one-line change, low risk.
+
+**Decision: audit timeout budget.** The 30-minute cap was originally conservative. If the audit regularly takes >25 minutes (LegiScan + OpenStates API calls + LLM pass are the slowest steps), consider bumping to `timeout-minutes: 45`. Do not raise blindly — check the next two successful runs' actual durations first. If the audit consistently finishes in <20 min the timeout is fine and the 2026-06-21 run was an outlier (slow external API day).
+
+**Vercel observability gap:**
+`mcp__Vercel__list_projects` returned an empty array for team `katies-projects-4f5ab601`. Direct project-slug lookups (`know-your-vote-kentucky`, `kyvky`) returned 404. This means Vercel runtime logs and cron invocation records for the four daily Vercel crons (digest 11:00, committee materials 13:30, enrollment actions 14:45, health-check 14:00 UTC) could not be pulled programmatically this session. **Not a production issue** — a monitoring access issue. Check the Vercel dashboard at vercel.com/katies-projects-4f5ab601 directly; verify the MCP token scope if automated Vercel observability is needed in future health checks.
+
+**Revisit if:** the accuracy audit times out again next Sunday — that would suggest a structural slowness (e.g. LegiScan rate-limit backoff loop, LLM pass consuming most of the budget) and should be diagnosed via `--no-llm` dry run locally. Vercel MCP access should be confirmed before the next health check.
+
+---
+
+## 2026-06-25 — Spot-check conventions: member display-name truncation
+
+**Known and accepted:** kyvky.com omits middle names from legislator display names (e.g. "Julie Adams" for the official "Julie Raque Adams", "Cassie Armstrong" for "Cassie Chambers Armstrong"). This is intentional display simplification, not a data error. District numbers, chamber assignments, and party affiliations are the authoritative identity fields. **Do not flag middle-name omissions as discrepancies in future spot-checks or accuracy audits.**
+
+**Spot-check output format:** Report results as a single concise table — one row per check, columns: Check | Result | Notes/Action. Result is PASS / FAIL / UNABLE TO VERIFY. Notes should be one line; flag any required action inline. No prose sections unless a finding is complex enough to warrant it.
+
+---
+
 ## 2026-06-26 — LegiScan quota guard moved into the client + edge-triggered Slack alerts
 
 Branch `feat/legiscan-quota-guard-and-slack-dedupe` (commit `e32133c`, not merged). Triggered by Slack flag triage: `#errors` was getting `*LegiScan quota threshold (90%+)*` every sync tick (19 posts in 48h drifting 94.3% → 97.1%) and `#status-reports` was re-posting `bills: skipped — LegiScan quota XX% (>= 95% sync hold)` every hourly bills cron — both level-triggered alerts with no edge dedupe. Underneath the noise, monthly quota was still climbing ~840 calls in 48h *while bills sync was on hold the entire window*, so something else was leaking.
