@@ -21,7 +21,7 @@ Triage of redundant Slack flags (`#errors` 19× quota threshold posts / 48h; `#s
 - [x] Typecheck + lint clean.
 - [x] **Operator: set Vercel env** — none required, but optional tuning knobs documented in [decisions.md § 2026-06-26 env vars](./decisions.md#2026-06-26--legiscan-quota-guard-moved-into-the-client--edge-triggered-slack-alerts).
 - [x] **Operator: one-time SQL reset** — `delete from ky_sync_state where key = 'slack_legiscan_quota_alert_state';` — confirmed no-op against primary 2026-06-26 (the new edge-triggered code hasn't deployed yet, so the row doesn't exist; first post-deploy sync creates it fresh).
-- [ ] **Operator: invite Slack app to `#subscriptions`** — Slack MCP returned `channel_not_found` (C094NBMCU3U) during triage. Unrelated to this PR but blocks reading that channel from automation. Manual: type `/invite @<bot-name>` in `#subscriptions` (substitute the bot's display name from the Slack app settings).
+- [x] **Operator: Slack MCP visibility into `#subscriptions`** — **Won't fix.** Workspace blocks adding the Claude app to channels, and the MCP can't see it either way (search returns no match for "subscriptions"). Route around: read the channel manually in Slack when needed; for source-of-truth on subscription events, drive the PostHog UI via `javascript_tool` (per [[project_posthog_notifications]] — project #450281). Never blocked PR #102 — was a triage convenience only.
 - [x] **Push branch + open PR.** Pushed; [PR #102](https://github.com/ktoepp/know-your-vote-kentucky/pull/102) open and out of draft (2026-06-26).
 
 **Deferred follow-ups (handoff to next agent — engineering work, not blocking the PR above):**
