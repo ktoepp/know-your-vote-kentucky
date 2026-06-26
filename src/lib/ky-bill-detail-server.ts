@@ -24,7 +24,28 @@ function createServerClient() {
   return createClient(url, key);
 }
 
+/**
+ * Minimal step timeline synthesized from columns already on ky_bills, used when the
+ * live LegiScan call is unavailable. The full action history is not persisted (only
+ * fetched live), so this surfaces the two anchors we do store — Introduced and the
+ * latest action — so the page shows real steps instead of a blank timeline.
+ */
+function buildFallbackHistory(bill: KYBill): KyBillDetailEnrichment['history'] {
+  const entries: { date: string; action: string; chamber: string; importance: number }[] = [];
+  if (bill.introduced_date) {
+    entries.push({ date: bill.introduced_date, action: 'Introduced', chamber: '', importance: 1 });
+  }
+  if (bill.last_action && bill.last_action_date) {
+    const dup = entries.some((e) => e.date === bill.last_action_date && e.action === bill.last_action);
+    if (!dup) {
+      entries.push({ date: bill.last_action_date, action: bill.last_action, chamber: '', importance: 1 });
+    }
+  }
+  return entries as KyBillDetailEnrichment['history'];
+}
+
 function buildDetailPayload(
+  billData: KYBill,
   legiscanDetail: LegiscanBillDetailPayload | null,
   fallbackSubjects: KyBillDetailEnrichment['subjects'],
 ): KyBillDetailEnrichment | null {
@@ -41,17 +62,25 @@ function buildDetailPayload(
       committee: legiscanDetail.committee ?? null,
     };
   }
-  if (fallbackSubjects.length > 0) {
-    return {
-      subjects: fallbackSubjects,
-      history: [],
-      texts: [],
-      sponsors: [],
-      votes: [],
-      committee: null,
-    };
+  // DB-only fallback (LegiScan unavailable — quota hold per the #102 guard, or a fetch
+  // error). Sponsors are persisted on ky_bills.sponsors and a minimal step timeline can
+  // be rebuilt from stored fields, so the page degrades gracefully instead of dropping
+  // sponsors + steps entirely. Votes/texts/full history remain LegiScan-only for now.
+  const dbSponsors = Array.isArray(billData.sponsors)
+    ? (billData.sponsors as unknown as KyBillDetailEnrichment['sponsors'])
+    : [];
+  const fallbackHistory = buildFallbackHistory(billData);
+  if (fallbackSubjects.length === 0 && dbSponsors.length === 0 && fallbackHistory.length === 0) {
+    return null;
   }
-  return null;
+  return {
+    subjects: fallbackSubjects,
+    history: fallbackHistory,
+    texts: [],
+    sponsors: dbSponsors,
+    votes: [],
+    committee: null,
+  };
 }
 
 /** Resolve bill row + LegiScan enrichment for detail page and API (server-only). */
@@ -100,7 +129,7 @@ export async function fetchKyBillDetailPageData(routeId: string): Promise<KyBill
 
   return {
     bill: billData,
-    detail: buildDetailPayload(legiscanDetail, fallbackSubjects),
+    detail: buildDetailPayload(billData, legiscanDetail, fallbackSubjects),
   };
 }
 
