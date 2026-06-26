@@ -17,7 +17,8 @@ Revives the dormant `ky_bills.ai_summary` so each bill gets a 2–3 sentence pla
 - [x] Backfill `scripts/backfill-bill-summaries.ts` (`npm run backfill:bill-summaries[:dry]`) — active session by default, change-detect via input hash, idempotent, decoupled from LegiScan sync.
 - [x] Frontend: Beta tag, bold "Who it may affect:" label, "See a problem? Tell us" CTA → `katie@kyvky.com` (routes into FEEDBACK.md). On-site only; **never in digest emails** (preserves § 2026-05-10).
 - [x] Accuracy: prompt guardrails + the weekly LLM faithfulness audit extended to flag fabricated/overbroad audience claims (advisory, capped to warn). `src/lib/accuracy-audit/checkers/llm-review.ts`.
-- [x] **Operator backfill ran 2026-06-26** — 1,398 / 1,737 active-session bills summarized (`claude-sonnet-4-6`). ~339 thin-description bills still uncovered; top up with `npm run backfill:bill-summaries -- --only-missing`. The weekly accuracy audit now exercises the live summaries automatically.
+- [x] **Initial backfill ran 2026-06-26** — 1,398 / 1,737 active-session bills summarized (`claude-sonnet-4-6`); now live on production. The weekly accuracy audit exercises the live summaries automatically.
+- [ ] **In progress — top up the remaining ~339 active-session bills.** `npm run backfill:bill-summaries -- --only-missing`. Likely rate-limit skips from the first run (the generator summarizes from a bill's title alone, so thin descriptions still produce output), not genuine no-content bills.
 - [ ] Deferred follow-ups: cross-bill audience **lens pages** (FEEDBACK #3 proper); a **cron** to auto-summarize new/changed bills; AI-model-id cleanup across modules.
 
 **Open engineering follow-ups (from PR #102 — LegiScan quota guard, merged 2026-06-26):**
