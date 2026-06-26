@@ -71,6 +71,22 @@ import {
 import { mapLegiScanBillStatus } from './map-legiscan-bill-status';
 
 /** LegiScan getBill `committee` (object or occasional array) → `ky_bills` committee columns. */
+/**
+ * Persist the LegiScan action history + bill-text versions as JSONB on ky_bills
+ * (mirrors how `sponsors` is stored), so the bill-detail page can render the full
+ * timeline + text links from the DB instead of a live getBill call on every view.
+ * Only set when present so a detail-less sync never clobbers stored values.
+ */
+function legiscanHistoryTextColumnsFromDetail(detail: LegiScanBillDetail | null): {
+  legiscan_history?: unknown[];
+  legiscan_texts?: unknown[];
+} {
+  const out: { legiscan_history?: unknown[]; legiscan_texts?: unknown[] } = {};
+  if (detail?.history?.length) out.legiscan_history = detail.history;
+  if (detail?.texts?.length) out.legiscan_texts = detail.texts;
+  return out;
+}
+
 function committeeFieldsFromLegiScanDetail(detail: LegiScanBillDetail | null): {
   committee_legiscan_id: number | null;
   committee_name: string | null;
@@ -451,6 +467,7 @@ async function buildBillRowsForSession(
       row.introduced_date = introducedDate;
       Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
       Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
+      Object.assign(row, legiscanHistoryTextColumnsFromDetail(detail));
     }
     rows.push(row);
     if (!skipSponsors && (i + 1) % 25 === 0) {
@@ -546,6 +563,7 @@ async function buildBillRowsQuotaSession(
       row.introduced_date = introducedDate;
       Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
       Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
+      Object.assign(row, legiscanHistoryTextColumnsFromDetail(detail));
     } else {
       const prev = opts.existingLegiscanSubjects.get(bill.bill_id);
       if (prev !== undefined) {
@@ -732,6 +750,7 @@ async function syncKyBillsByHash(
       row.introduced_date = introducedDate;
       Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
       Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
+      Object.assign(row, legiscanHistoryTextColumnsFromDetail(detail));
       rows.push(row);
       if ((i + 1) % 25 === 0) {
         log(source, `Hash-gated enrich ${i + 1}/${changedOrNew.length}`);
@@ -1536,6 +1555,7 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
             description: vote.desc || null,
             yea_count: vote.yea || 0,
             nay_count: vote.nay || 0,
+            nv_count: vote.nv || 0,
             absent_count: vote.absent || 0,
             passed: vote.passed === 1,
             roll_call: vote.votes?.map((v: any) => ({ legislator_id: String(v.people_id), vote: v.vote_text })) || null,

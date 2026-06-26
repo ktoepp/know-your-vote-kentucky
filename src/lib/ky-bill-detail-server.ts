@@ -1,15 +1,15 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import type { KYBill } from '@/types/kentucky';
-import { getCachedLegiscanBillDetail, type LegiscanBillDetailPayload } from '@/lib/ky-bill-legiscan-cache';
 
+/** Bill-detail enrichment shape consumed by BillDetailView. Now sourced entirely from the DB. */
 export type KyBillDetailEnrichment = {
-  subjects: LegiscanBillDetailPayload['subjects'];
-  history: LegiscanBillDetailPayload['history'];
-  texts: LegiscanBillDetailPayload['texts'];
-  sponsors: LegiscanBillDetailPayload['sponsors'];
-  votes: LegiscanBillDetailPayload['votes'];
-  committee: LegiscanBillDetailPayload['committee'];
+  subjects: unknown[];
+  history: unknown[];
+  texts: unknown[];
+  sponsors: unknown[];
+  votes: Array<{ roll_call_id?: number; [key: string]: unknown }>;
+  committee: unknown | null;
 };
 
 export type KyBillDetailPageData = {
@@ -25,10 +25,10 @@ function createServerClient() {
 }
 
 /**
- * Minimal step timeline synthesized from columns already on ky_bills, used when the
- * live LegiScan call is unavailable. The full action history is not persisted (only
- * fetched live), so this surfaces the two anchors we do store — Introduced and the
- * latest action — so the page shows real steps instead of a blank timeline.
+ * Minimal step timeline synthesized from columns on ky_bills, used for bills whose
+ * full `legiscan_history` hasn't been persisted yet (rows synced before migration 036,
+ * until their next detail sync). Surfaces the two anchors we always store — Introduced
+ * and the latest action — so the page shows real steps instead of a blank timeline.
  */
 function buildFallbackHistory(bill: KYBill): KyBillDetailEnrichment['history'] {
   const entries: { date: string; action: string; chamber: string; importance: number }[] = [];
@@ -44,41 +44,72 @@ function buildFallbackHistory(bill: KYBill): KyBillDetailEnrichment['history'] {
   return entries as KyBillDetailEnrichment['history'];
 }
 
-function buildDetailPayload(
+/**
+ * Roll calls rendered on the bill page come from ky_votes (populated by syncKyVotes),
+ * not a live getRollCall enrichment — so page traffic no longer scales LegiScan quota.
+ * Mapped to the shape BillDetailView consumes (yea/nay/nv/date/desc/roll_call_id).
+ * nv_count is NULL on rows synced before migration 035; the UI hides the NV chip until
+ * a re-sync fills it, so Yea/Nay stay accurate meanwhile.
+ */
+async function fetchDbVotes(
+  supabase: NonNullable<ReturnType<typeof createServerClient>>,
+  billId: string,
+): Promise<KyBillDetailEnrichment['votes']> {
+  const { data, error } = await supabase
+    .from('ky_votes')
+    .select('roll_call_id, date, description, yea_count, nay_count, nv_count, passed')
+    .eq('bill_id', billId)
+    .order('date', { ascending: true, nullsFirst: true })
+    .order('roll_call_id', { ascending: true });
+  if (error || !data) return [];
+  return data.map((v) => ({
+    roll_call_id: v.roll_call_id ?? undefined,
+    date: v.date ?? null,
+    desc: v.description ?? null,
+    yea: v.yea_count ?? 0,
+    nay: v.nay_count ?? 0,
+    nv: v.nv_count ?? 0,
+    passed: v.passed ?? null,
+  })) as KyBillDetailEnrichment['votes'];
+}
+
+/**
+ * Build the bill-detail enrichment entirely from DB-resident data — no live LegiScan
+ * call on the read path. Everything the page renders is persisted during sync:
+ * subjects (ky_bills.legiscan_subjects), sponsors (ky_bills.sponsors), votes (ky_votes),
+ * history + text versions (ky_bills.legiscan_history / legiscan_texts). Committee is not
+ * rendered. History falls back to a synthesized timeline for rows not yet detail-synced.
+ */
+function buildDetailFromDb(
   billData: KYBill,
-  legiscanDetail: LegiscanBillDetailPayload | null,
   fallbackSubjects: KyBillDetailEnrichment['subjects'],
+  dbVotes: KyBillDetailEnrichment['votes'],
 ): KyBillDetailEnrichment | null {
-  if (legiscanDetail) {
-    return {
-      subjects:
-        Array.isArray(legiscanDetail.subjects) && legiscanDetail.subjects.length > 0
-          ? legiscanDetail.subjects
-          : fallbackSubjects,
-      history: legiscanDetail.history ?? [],
-      texts: legiscanDetail.texts ?? [],
-      sponsors: legiscanDetail.sponsors ?? [],
-      votes: legiscanDetail.votes ?? [],
-      committee: legiscanDetail.committee ?? null,
-    };
-  }
-  // DB-only fallback (LegiScan unavailable — quota hold per the #102 guard, or a fetch
-  // error). Sponsors are persisted on ky_bills.sponsors and a minimal step timeline can
-  // be rebuilt from stored fields, so the page degrades gracefully instead of dropping
-  // sponsors + steps entirely. Votes/texts/full history remain LegiScan-only for now.
   const dbSponsors = Array.isArray(billData.sponsors)
     ? (billData.sponsors as unknown as KyBillDetailEnrichment['sponsors'])
     : [];
-  const fallbackHistory = buildFallbackHistory(billData);
-  if (fallbackSubjects.length === 0 && dbSponsors.length === 0 && fallbackHistory.length === 0) {
+  const history =
+    Array.isArray(billData.legiscan_history) && billData.legiscan_history.length > 0
+      ? (billData.legiscan_history as KyBillDetailEnrichment['history'])
+      : buildFallbackHistory(billData);
+  const texts = Array.isArray(billData.legiscan_texts)
+    ? (billData.legiscan_texts as KyBillDetailEnrichment['texts'])
+    : [];
+  if (
+    fallbackSubjects.length === 0 &&
+    dbSponsors.length === 0 &&
+    history.length === 0 &&
+    dbVotes.length === 0 &&
+    texts.length === 0
+  ) {
     return null;
   }
   return {
     subjects: fallbackSubjects,
-    history: fallbackHistory,
-    texts: [],
+    history,
+    texts,
     sponsors: dbSponsors,
-    votes: [],
+    votes: dbVotes,
     committee: null,
   };
 }
@@ -118,18 +149,11 @@ export async function fetchKyBillDetailPageData(routeId: string): Promise<KyBill
     ? (billData.legiscan_subjects as KyBillDetailEnrichment['subjects'])
     : [];
 
-  let legiscanDetail: LegiscanBillDetailPayload | null = null;
-  if (billData.legiscan_id) {
-    try {
-      legiscanDetail = await getCachedLegiscanBillDetail(Number(billData.legiscan_id));
-    } catch (err: unknown) {
-      console.error('[BillDetail] LegiScan fetch failed:', err instanceof Error ? err.message : err);
-    }
-  }
+  const dbVotes = await fetchDbVotes(supabase, billData.id);
 
   return {
     bill: billData,
-    detail: buildDetailPayload(billData, legiscanDetail, fallbackSubjects),
+    detail: buildDetailFromDb(billData, fallbackSubjects, dbVotes),
   };
 }
 
