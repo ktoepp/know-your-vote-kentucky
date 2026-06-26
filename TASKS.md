@@ -19,10 +19,10 @@ Triage of redundant Slack flags (`#errors` 19× quota threshold posts / 48h; `#s
 - [x] Edge-triggered `maybeAlertLegiscanQuotaHigh` — banded state `{month, band}` persisted under `slack_legiscan_quota_alert_state` in `ky_sync_state`. Bands `90/95/98/100`. Posts only on band rise or month rollover.
 - [x] `SLACK_SYNC_BILLS_DIGEST_ALWAYS` default flipped to `false`. Quota-hold skips (`/LegiScan quota/i`) no longer count as `hasNewOrInteresting` in `notifySyncSlack`.
 - [x] Typecheck + lint clean.
-- [ ] **Operator: set Vercel env** — none required, but optional tuning knobs documented in [decisions.md § 2026-06-26 env vars](./decisions.md#2026-06-26--legiscan-quota-guard-moved-into-the-client--edge-triggered-slack-alerts).
-- [ ] **Operator: one-time SQL reset** — `delete from ky_sync_state where key = 'slack_legiscan_quota_alert_state';` so the next sync posts a fresh banded alert from the current band rather than staying silent because the threshold was already "passed."
-- [ ] **Operator: invite Slack app to `#subscriptions`** — Slack MCP returned `channel_not_found` (C094NBMCU3U) during triage. Unrelated to this PR but blocks reading that channel from automation. `/invite @<app-name>` in `#subscriptions`.
-- [ ] **Push branch + open PR.** Branch not yet pushed; review the commit before push.
+- [x] **Operator: set Vercel env** — none required, but optional tuning knobs documented in [decisions.md § 2026-06-26 env vars](./decisions.md#2026-06-26--legiscan-quota-guard-moved-into-the-client--edge-triggered-slack-alerts).
+- [x] **Operator: one-time SQL reset** — `delete from ky_sync_state where key = 'slack_legiscan_quota_alert_state';` — confirmed no-op against primary 2026-06-26 (the new edge-triggered code hasn't deployed yet, so the row doesn't exist; first post-deploy sync creates it fresh).
+- [ ] **Operator: invite Slack app to `#subscriptions`** — Slack MCP returned `channel_not_found` (C094NBMCU3U) during triage. Unrelated to this PR but blocks reading that channel from automation. Manual: type `/invite @<bot-name>` in `#subscriptions` (substitute the bot's display name from the Slack app settings).
+- [x] **Push branch + open PR.** Pushed; [PR #102](https://github.com/ktoepp/know-your-vote-kentucky/pull/102) open and out of draft (2026-06-26).
 
 **Deferred follow-ups (handoff to next agent — engineering work, not blocking the PR above):**
 
