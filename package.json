@@ -33,6 +33,8 @@
     "audit:accuracy:dry": "tsx scripts/accuracy-audit.ts --dry-run",
     "topics:reclassify": "tsx scripts/reclassify-bill-topics.ts",
     "topics:reclassify:dry": "tsx scripts/reclassify-bill-topics.ts --dry-run",
+    "backfill:bill-summaries": "tsx scripts/backfill-bill-summaries.ts",
+    "backfill:bill-summaries:dry": "tsx scripts/backfill-bill-summaries.ts --dry-run",
     "audit:legiscan-subjects": "tsx scripts/audit-legiscan-subjects.ts",
     "diagnose:legislators": "tsx scripts/diagnose-legislators.ts",
     "diagnose:committee-duplicates": "tsx scripts/diagnose-committee-duplicates.ts",
