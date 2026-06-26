@@ -29,7 +29,8 @@ import {
   fetchBillHistorySnapshots,
   recordBillStatusHistoryForBuiltBatch,
 } from './ky-bill-status-history';
-import { checkLegiscanQuotaForSync } from './legiscan-quota';
+import { checkLegiscanQuotaForSync, isLegiscanQuotaHoldError } from './legiscan-quota';
+import { getSessionPhase } from './ky-sessions';
 import {
   buildOrdinanceSponsorsJson,
   isLegistarMatterLikelyTestNoise,
@@ -224,6 +225,12 @@ export interface SyncOptions {
    * Default off — standard path unchanged. Requires migration 007 columns on `ky_bills`.
    */
   useChangeHash?: boolean;
+  /**
+   * Run the source even when its default interim guard would skip it (votes / legislator-bios).
+   * Pass `force=true` as a query param on `/api/sync` or `--force` on `manual-sync` to override.
+   * Defaults false so cron stays quiet outside session.
+   */
+  force?: boolean;
 }
 
 export interface SyncResult {
@@ -236,6 +243,19 @@ export interface SyncResult {
 
 const log = (source: string, msg: string) => console.log(`[Sync:${source}] ${msg}`);
 const logError = (source: string, msg: string) => console.error(`[Sync:${source}] ERROR: ${msg}`);
+
+/**
+ * LegiScan-touching syncs (`votes`, `legislator-bios`) skip themselves outside session unless
+ * forced. Set `KY_SYNC_FORCE_INTERIM=true` to bypass for an entire process (one-off backfills),
+ * or pass `force=true` on the sync request. Skip reason is recorded on `ky_sources` so the admin
+ * dashboard explains the silence.
+ */
+function interimSkipReason(options: SyncOptions): string | null {
+  if (options.force === true) return null;
+  if (process.env.KY_SYNC_FORCE_INTERIM === 'true') return null;
+  if (getSessionPhase() !== 'interim') return null;
+  return 'KY General Assembly is in interim — no new roll calls expected; pass force=true to override';
+}
 
 /** PostgREST when `lrc_profile_url` column exists in repo migrations but remote DB was not migrated. */
 function isMissingLrcProfileUrlColumn(err: { message?: string } | null): boolean {
@@ -1392,6 +1412,12 @@ export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<S
   const start = Date.now();
   const source = 'legislator-bios';
   log(source, 'Starting legislator bio enrichment from LegiScan');
+  const interimReason = interimSkipReason(options);
+  if (interimReason) {
+    log(source, `Skipped — ${interimReason}`);
+    if (!options.dryRun) await updateSourceStatus(source, 'success', 0, interimReason);
+    return { source, status: 'skipped', itemsSynced: 0, error: interimReason, duration: Date.now() - start };
+  }
   try {
     const db = getSupabase();
     const { data: legislators, error: fetchErr } = await db
@@ -1472,6 +1498,12 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
   const source = 'votes';
   const billLimit = options.limit ?? 5;
   log(source, 'Starting votes sync from LegiScan');
+  const interimReason = interimSkipReason(options);
+  if (interimReason) {
+    log(source, `Skipped — ${interimReason}`);
+    if (!options.dryRun) await updateSourceStatus(source, 'success', 0, interimReason);
+    return { source, status: 'skipped', itemsSynced: 0, error: interimReason, duration: Date.now() - start };
+  }
   try {
     const legiscanClient = getKyLegiScanClient();
     const db = getSupabase();

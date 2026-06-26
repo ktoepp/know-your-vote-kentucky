@@ -6,6 +6,7 @@
  */
 import axios, { AxiosInstance } from 'axios';
 import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
+import { LegiscanQuotaHoldError, checkLegiscanQuotaForSync } from './legiscan-quota';
 
 export interface LegiScanSession { session_id: number; state_id: number; year_start: number; year_end: number; session_name: string; special: number; }
 export interface LegiScanBillSummary { bill_id: number; number: string; title: string; description: string; state: string; session_id: number; status: number; status_desc: string; last_action: string; last_action_date: string; url: string; }
@@ -81,6 +82,8 @@ const SESSIONS_PERSIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RATE_DELAY = 500;
 const MAX_RETRIES = 5;
 const REQUEST_TIMEOUT_MS = 60_000;
+/** How long the client trusts its last quota-guard result before re-checking. */
+const QUOTA_GUARD_TTL_MS = 60_000;
 
 type PersistedKySessionsPayload = {
   sessions: LegiScanSession[];
@@ -92,6 +95,9 @@ export class KyLegiScanClient {
   private apiKey: string;
   private cache = new Map<string, { data: unknown; ts: number }>();
   private lastReq = 0;
+  private quotaCheckedAt = 0;
+  private quotaHoldReason: string | null = null;
+  private quotaHoldSummary: Awaited<ReturnType<typeof checkLegiscanQuotaForSync>>['summary'] = null;
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || process.env.LEGISCAN_API_KEY || '';
@@ -115,10 +121,24 @@ export class KyLegiScanClient {
     return null;
   }
 
+  private async ensureQuotaAllows(): Promise<void> {
+    const now = Date.now();
+    if (now - this.quotaCheckedAt > QUOTA_GUARD_TTL_MS) {
+      this.quotaCheckedAt = now;
+      const result = await checkLegiscanQuotaForSync();
+      this.quotaHoldReason = result.blocked ? result.reason ?? 'LegiScan quota hold' : null;
+      this.quotaHoldSummary = result.summary;
+    }
+    if (this.quotaHoldReason) {
+      throw new LegiscanQuotaHoldError(this.quotaHoldReason, this.quotaHoldSummary);
+    }
+  }
+
   private async request<T>(params: Record<string, string>): Promise<T> {
     const ck = JSON.stringify(params);
     const cached = this.getCached<T>(ck);
     if (cached) return cached;
+    await this.ensureQuotaAllows();
     await this.throttle();
     for (let i = 1; i <= MAX_RETRIES; i++) {
       try {
