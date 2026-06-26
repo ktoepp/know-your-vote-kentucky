@@ -8,6 +8,30 @@
 
 ## In Progress
 
+### LegiScan quota guard + Slack alert dedupe (branch `feat/legiscan-quota-guard-and-slack-dedupe`, 2026-06-26)
+
+Triage of redundant Slack flags (`#errors` 19× quota threshold posts / 48h; `#status-reports` re-posting the same "bills skipped — LegiScan quota 96%" line every hourly tick) surfaced a deeper leak: monthly quota was climbing while `bills` sync was on hold the entire window. Full rationale in [decisions.md § 2026-06-26](./decisions.md#2026-06-26--legiscan-quota-guard-moved-into-the-client--edge-triggered-slack-alerts).
+
+- [x] `LegiscanQuotaHoldError` + `isLegiscanQuotaHoldError` in `src/lib/legiscan-quota.ts`.
+- [x] Guard inside `KyLegiScanClient.request()` — every method on the client respects the hold; 60s in-process TTL on the check.
+- [x] Soft fallback in `getCachedLegiscanBillDetail` — page renders DB-only payload when hold fires; `unstable_cache` stores the null.
+- [x] Interim gate on `syncKyVotes` + `syncKyLegislatorBios` via `getSessionPhase() === 'interim'`. `force?: boolean` on `SyncOptions` + `?force=true` query param on both sync API routes + `KY_SYNC_FORCE_INTERIM=true` process-wide override.
+- [x] Edge-triggered `maybeAlertLegiscanQuotaHigh` — banded state `{month, band}` persisted under `slack_legiscan_quota_alert_state` in `ky_sync_state`. Bands `90/95/98/100`. Posts only on band rise or month rollover.
+- [x] `SLACK_SYNC_BILLS_DIGEST_ALWAYS` default flipped to `false`. Quota-hold skips (`/LegiScan quota/i`) no longer count as `hasNewOrInteresting` in `notifySyncSlack`.
+- [x] Typecheck + lint clean.
+- [ ] **Operator: set Vercel env** — none required, but optional tuning knobs documented in [decisions.md § 2026-06-26 env vars](./decisions.md#2026-06-26--legiscan-quota-guard-moved-into-the-client--edge-triggered-slack-alerts).
+- [ ] **Operator: one-time SQL reset** — `delete from ky_sync_state where key = 'slack_legiscan_quota_alert_state';` so the next sync posts a fresh banded alert from the current band rather than staying silent because the threshold was already "passed."
+- [ ] **Operator: invite Slack app to `#subscriptions`** — Slack MCP returned `channel_not_found` (C094NBMCU3U) during triage. Unrelated to this PR but blocks reading that channel from automation. `/invite @<app-name>` in `#subscriptions`.
+- [ ] **Push branch + open PR.** Branch not yet pushed; review the commit before push.
+
+**Deferred follow-ups (handoff to next agent — engineering work, not blocking the PR above):**
+
+- [ ] **Persist roll-call data to DB during sync; strip LegiScan from bill-detail render path entirely.** Today `getCachedLegiscanBillDetail` fires 1 `getBill` + up to 12 `getRollCall` on each public bill-detail cache miss (`MAX_BILL_ROLL_CALL_ENRICH = 12`, 300s `unstable_cache`). With the new client-level guard this falls back gracefully when quota is held, but the nominal path still spends quota on visitor traffic. **What to do:** persist roll-call totals (yea/nay/nv/absent/passed) into `ky_bill_votes` (or a new column on the existing row) during `syncKyVotes` / hash-gated bills sync; have the bill detail page render entirely from DB; delete `enrichVotes` from `ky-bill-legiscan-cache.ts`. **Why this matters:** removes the only remaining LegiScan call path that scales with traffic instead of with data change; bill detail becomes free for any traffic level. **Watch out for:** `ky_bill_votes` already exists (`syncKyVotes` writes to it) — verify the schema covers all five tallies before adding columns. Bill detail render is in `src/lib/ky-bill-detail-server.ts`; the page renders `KyBillDetailPayload` from `buildDetailPayload(legiscanDetail, fallbackSubjects)`.
+- [ ] **Classify mid-run `QuotaHoldError` as `skipped` instead of `error`.** The start-of-run `checkLegiscanQuotaForSync` in `syncKyBills` already returns `'skipped'`, but if quota crosses the threshold mid-sync (e.g. during a long hash-gated run), the `LegiscanQuotaHoldError` propagates to the top-level catch and gets recorded as `status: 'error'` on `ky_sources`. **What to do:** add a typed catch in each `syncKy*` top-level try block: `if (isLegiscanQuotaHoldError(err)) return { source, status: 'skipped', ... }`. Update `ky_sources` row with the hold reason, not an error message. **Why:** prevents a misleading red status on `/admin/sync-status` and avoids tripping the (separate) `hasErrors` Slack path. Low priority — only matters during catch-up syncs that span the threshold.
+- [ ] **Use LegiScan Dataset Pull API for a weekly full-reconcile.** `getDatasetList` + `getDataset` ships an entire session as a ZIP for ~2 quota points. **What to do:** add a `npm run sync:ky:dataset` script + weekly GH Action (Sundays, paired with `accuracy-audit.yml`) that pulls the latest dataset, diffs against `ky_bills`, and upserts anything the hash-diff missed. Replaces the per-bill `getBill` calls the accuracy-audit currently issues. **Why:** belt-and-suspenders against a missed `change_hash` update; trivially cheap; gives a clean reconciliation point. **Not urgent** during interim (no new bills) — schedule landing this before 2027 RS convenes.
+
+The decision context for all three lives in [decisions.md § 2026-06-26](./decisions.md#2026-06-26--legiscan-quota-guard-moved-into-the-client--edge-triggered-slack-alerts) under "Deliberate non-goals."
+
 ### SEO + GEO discoverability (branch `seo-geo-optimization`, 2026-06-21)
 
 First indexability + generative-engine pass — not yet merged. Full rationale in [decisions.md § 2026-06-21](./decisions.md#2026-06-21--seo--geo-discoverability-pass-branch-seo-geo-optimization).

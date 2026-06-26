@@ -899,3 +899,84 @@ First pass at making `kyvky.com` indexable by search engines and citable by gene
 
 **Revisit if:** GSC arrives (re-add `verification.google` in `layout.tsx`); bill cardinality ever forces a sitemap-index file (split per session); we want meeting `Event` schema (requires ISO time parsing for `time_and_location`); LLM citation traffic shows up in PostHog (signal that `llms.txt` is working and worth expanding).
 
+---
+
+## 2026-06-23 — Audience lens as a distinct axis from subject-area topics
+
+Framing decision, no code changes yet. Driven by two adjacent pieces of user feedback ([FEEDBACK.md #1](./FEEDBACK.md), [#3](./FEEDBACK.md)): Iva Markicevic asked for plain-language per-bill summaries ("what the bill means for Kentuckians"); Katie Greene asked for a "Women & Families" entry point on `/bills` to drive her group to relevant legislation. Both are the same question — *"what does this bill mean for me / the people I care about?"* — from opposite ends (per-bill prose vs cross-bill aggregation).
+
+- **Audience lens is a separate facet from subject area, not a new entry in the existing taxonomy.** The current `KY_TOPICS` (Education, Healthcare, Labor, Transportation, …) are subject areas — what the bill is *about*. An audience lens (Women & Families, Workers, Seniors, Parents, Veterans, Renters, Rural, Disabled, LGBTQ+, Immigrants, Students, Small Business) is *who is affected*. They're orthogonal: a paid-family-leave bill is Labor *and* affects Women & Families *and* affects Workers. Cramming both into the single `ky_bills.topics TEXT[]` would work mechanically (it's just an array) but conflates two ideas and erodes the meaning of "topic." **Trade-off:** the current taxonomy already has audience lenses smuggled in inconsistently (Veterans Affairs is an audience; Higher Education straddles); this decision means accepting that inconsistency for now rather than reclassifying. **Revisit if:** we ever do a taxonomy cleanup pass — Veterans Affairs / Higher Education should probably move to the audience axis at that point.
+
+- **This reverses the "defer topic expansion" stance from [§ 2026-05-10](#2026-05-10).** That call was about adding more *subject areas*; the audience axis didn't exist as a concept yet. Adding "Women & Families" as a topic was the obvious move when Katie Greene asked, but it would have baked the conflation in. Better to recognize the axis now.
+
+- **Three candidate architectures considered:**
+  - **(A) Two-axis taxonomy** — add an `audiences TEXT[]` column on `ky_bills`, mirror the classifier (keyword + LegiScan-subject + AI fallback), add a second facet to `/bills`, extend the follow/digest plumbing. Clean and consistent but a real lift (schema + classifier + UI + follow plumbing), and we'd be building it on a hunch.
+  - **(B) Curated landing pages** — `/lenses/women-and-families` is hand-built: saved query over existing topics + manually-pinned bills + editorial copy. Zero schema change. Doesn't scale beyond a handful of lenses; no follow/digest integration; quality is editorial, not algorithmic.
+  - **(C) Structured "impact" field per bill** — each bill gets a plain-English summary plus structured fields (`affects: []`, `key_change`, `cost_to_kentuckians`). Audience lenses become automatic queries over `affects`. Same investment unlocks Iva's per-bill summaries, lens pages, better digest copy, social-share cards, and search. Large build — LLM generation + editorial review pipeline + UI surfaces.
+
+- **Sequencing: B → C, with A deferred indefinitely.** Ship one curated lens (Women & Families) first to validate that audience entry points actually drive traffic and sharing; this is the cheapest way to answer "do users want this?" If it sticks, expand to 2–3 more curated lenses, then invest in C (structured impact field) as the durable architecture. C subsumes A — once `affects` is a structured field, audience lenses are queries, no separate column needed. **Why not jump straight to A:** we don't yet know that audience lenses are a sustained user need vs. a one-time ask from one group chat; B costs ~1 day of editorial work per lens and is reversible; A costs weeks and is forward-only. **Why not jump straight to C:** scope and risk — LLM-generated civic content needs an editorial review loop we haven't designed (mis-summaries in a legislative context erode the trust the digest decisions in [§ 2026-05-10](#2026-05-10) were built to protect).
+
+- **Interaction with [§ 2026-05-10](#2026-05-10) "no AI summaries in v1":** that decision was scoped to *email digests* — the trust argument doesn't automatically transfer to on-site bill view, where users can read the source bill alongside the summary and corrections are easy. C will need its own decision entry on AI vs. human authorship, review cadence, and how to surface uncertainty (e.g. "auto-generated, verify against bill text" label). Not deciding that today.
+
+- **What this means for the open feedback items:**
+  - [#3] (Women & Families) is now a curated-lens build, not a taxonomy edit. Smaller and faster than the original plan.
+  - [#1] (plain-English summaries) stays open as the destination; pre-work is the lens-page experiment.
+  - The `KY_TOPICS` constant is **not** edited as a result of #3 — that was the immediate-but-wrong move.
+
+**Revisit if:** the first curated lens fails to drive traffic / sharing (pull back from the audience-lens direction entirely); we get audience-lens asks from 3+ unrelated user groups (accelerate to C); or we decide to do a taxonomy cleanup that moves Veterans Affairs / Higher Education out of `KY_TOPICS` (then re-evaluate whether A becomes worth it as a forcing function).
+
+---
+
+## 2026-06-26 — LegiScan quota guard moved into the client + edge-triggered Slack alerts
+
+Branch `feat/legiscan-quota-guard-and-slack-dedupe` (commit `e32133c`, not merged). Triggered by Slack flag triage: `#errors` was getting `*LegiScan quota threshold (90%+)*` every sync tick (19 posts in 48h drifting 94.3% → 97.1%) and `#status-reports` was re-posting `bills: skipped — LegiScan quota XX% (>= 95% sync hold)` every hourly bills cron — both level-triggered alerts with no edge dedupe. Underneath the noise, monthly quota was still climbing ~840 calls in 48h *while bills sync was on hold the entire window*, so something else was leaking.
+
+### Why the level-triggered alerts existed
+
+`maybeAlertLegiscanQuotaHigh()` in [slack-webhook.ts](src/lib/slack-webhook.ts) was called from `notifySyncSlack` with no state tracking — any tick where `quota.pct >= SLACK_LEGISCAN_QUOTA_ALERT_PCT` re-posted the same message. The `#status-reports` bills heartbeat had the same shape: `vercelBillsHeartbeat = true` for `source=bills` cron unless `SLACK_SYNC_BILLS_DIGEST_ALWAYS=false`, and the `worthDigest` clause counted *any* `r.status === 'skipped' && Boolean(r.error)` as interesting — but the "error" string was the unchanged hold reason, so it tripped on every tick.
+
+### Where the quota leak came from
+
+`checkLegiscanQuotaForSync` was wired *only* into [`syncKyBills`](src/lib/ky-sync-pipeline.ts:758). Every other LegiScan caller bypassed the hold: `syncKyVotes`, `syncKyLegislatorBios`, the accuracy audit, and — biggest in volume — [`getCachedLegiscanBillDetail`](src/lib/ky-bill-legiscan-cache.ts) which fires 1 `getBill` + up to 12 `getRollCall` on every bill-detail cache miss (300s TTL), driven by public traffic. Per-caller wiring is the wrong shape — there's no way to extend it to "all upstream API calls" without missing one. The right shape is a single chokepoint inside the API client.
+
+### Architecture choice — guard at the client, soft-fail upstream
+
+- **Quota check is now inside [`KyLegiScanClient.request()`](src/lib/ky-legiscan-client.ts).** Every method on the client — `fetchBillDetail`, `fetchRollCall`, `fetchVotes`, `fetchPerson`, `fetchSessions`, etc. — automatically respects the hold. Result is cached in-process for 60s (`QUOTA_GUARD_TTL_MS`) so the Supabase read doesn't double request volume.
+- **`LegiscanQuotaHoldError` is the signaling channel** ([legiscan-quota.ts](src/lib/legiscan-quota.ts)). `isLegiscanQuotaHoldError(err)` is the public predicate so callers can distinguish quota-hold from real network failures.
+- **Public traffic falls back, doesn't crash.** [`getCachedLegiscanBillDetail`](src/lib/ky-bill-legiscan-cache.ts) catches `QuotaHoldError` and returns `null`; bill detail page renders the DB-only payload (`fallbackSubjects` already in place at [ky-bill-detail-server.ts:88](src/lib/ky-bill-detail-server.ts:88)). `unstable_cache` stores the null for the TTL window, so the next ~5 minutes of cache misses don't re-trigger the check.
+- **Mid-run quota crossings still record as `status: 'error'`** on `ky_sources`. Acceptable for now; the cleaner shape would be per-sync top-level catches that classify QuotaHoldError as `skipped`. Tagged as a follow-up rather than blocking this PR — the more common case (start-of-run check) already returns `skipped`.
+
+### Why not split the budget (e.g. routine 85% / hard stop 98%)
+
+Originally proposed two thresholds. Single threshold turned out to be enough: every caller now respects the same `LEGISCAN_SYNC_QUOTA_STOP_PCT`, and operators can raise it temporarily via env for one-off runs. Adding a second threshold would mean a second env var and second alert band with no incremental safety. **Revisit if:** we hit a scenario where the accuracy audit needs its own budget independent of routine syncs (today they intentionally share via the `ACCURACY_LEGISCAN_QUOTA_STOP_PCT` fallback in [legiscan-quota.ts:46](src/lib/legiscan-quota.ts:46)).
+
+### Interim gate — `syncKyVotes` + `syncKyLegislatorBios`
+
+Both LegiScan-touching daily crons now short-circuit when `getSessionPhase() === 'interim'` ([ky-sessions.ts:129](src/lib/ky-sessions.ts:129)). KY 2026 RS adjourned sine die 2026-04-15; there are no new roll calls until 2027 RS convenes, and legislator bio fields (Ballotpedia, headshot) don't change session-to-session. **Why a phase check instead of a date range:** the phase API already exists and handles the special cases (veto recess, final days). **Override paths:** per-request `?force=true` on `/api/sync`, or process-wide `KY_SYNC_FORCE_INTERIM=true`. **Note:** `syncKyLegislators` is **not** gated — it uses Open States, not LegiScan, and OS data (committee assignments, contact info) does drift during interim.
+
+### Edge-triggered Slack — band state in `ky_sync_state`
+
+`maybeAlertLegiscanQuotaHigh()` now persists `{ month, band }` under `slack_legiscan_quota_alert_state` and only posts when the band crosses up (90 → 95 → 98 → 100) within a month, or when the month rolls over. Worst case: 4 posts/month. The minimum-band gate (`SLACK_LEGISCAN_QUOTA_ALERT_PCT`, default 90) determines which crossings count as alert-worthy; below that band is always silent. The `#status-reports` bills digest got the same treatment from the opposite direction: `SLACK_SYNC_BILLS_DIGEST_ALWAYS` default flipped to `false`, and skip rows whose error matches `/LegiScan quota/i` no longer count toward `hasNewOrInteresting`.
+
+### Env vars
+
+- `SLACK_LEGISCAN_QUOTA_ALERT_PCT` (default `90`) — minimum band before `#errors` will fire. Existing var; semantics changed from "fire every tick above this" to "fire when crossing into this band or higher."
+- `LEGISCAN_SYNC_QUOTA_STOP_PCT` (default `95`) — existing var, now applies to every LegiScan caller via the client.
+- `SLACK_SYNC_BILLS_DIGEST_ALWAYS` — **default flipped from `true` to `false`**. Set to `true` on Vercel to restore the previous hourly heartbeat.
+- `KY_SYNC_FORCE_INTERIM` (new, optional) — set to `true` to bypass the interim gate process-wide. Leave unset on Vercel.
+
+### Reset step (one-time)
+
+To unstick the band state from the pre-PR firing pattern:
+```sql
+delete from ky_sync_state where key = 'slack_legiscan_quota_alert_state';
+```
+Next sync will post one fresh banded alert at the current band, then go quiet until the band increases.
+
+### Deliberate non-goals (deferred follow-ups — handed off via TASKS.md)
+
+- **Persist roll-call data to DB during sync; strip LegiScan from bill-detail render path entirely.** Once shipped, public traffic stops touching LegiScan at all (the guard becomes belt-and-suspenders).
+- **Classify mid-run `QuotaHoldError` as `skipped` not `error`** on `ky_sources`. Cosmetic until it actually causes a misleading alert.
+- **Dataset Pull API (`getDatasetList` + `getDataset`) as the weekly full-reconcile.** ~2 quota points for the whole session; would replace selective `getBill` calls in the weekly accuracy audit. Worth doing when interim ends and we want a belt-and-suspenders catch-up.
+
+**Revisit if:** we see another quota-leak window where the hold is engaged but quota keeps climbing — the most likely cause is a new code path that imports `getKyLegiScanClient` directly and circumvents the per-method API (unlikely, the client is the chokepoint), or a Vercel cron added after this PR that doesn't pass through the sync API route.
