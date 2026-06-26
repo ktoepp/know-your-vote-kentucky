@@ -1536,6 +1536,7 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
             description: vote.desc || null,
             yea_count: vote.yea || 0,
             nay_count: vote.nay || 0,
+            nv_count: vote.nv || 0,
             absent_count: vote.absent || 0,
             passed: vote.passed === 1,
             roll_call: vote.votes?.map((v: any) => ({ legislator_id: String(v.people_id), vote: v.vote_text })) || null,

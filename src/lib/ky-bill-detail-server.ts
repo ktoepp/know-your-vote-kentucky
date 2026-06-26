@@ -44,10 +44,40 @@ function buildFallbackHistory(bill: KYBill): KyBillDetailEnrichment['history'] {
   return entries as KyBillDetailEnrichment['history'];
 }
 
+/**
+ * Roll calls rendered on the bill page come from ky_votes (populated by syncKyVotes),
+ * not a live getRollCall enrichment — so page traffic no longer scales LegiScan quota.
+ * Mapped to the shape BillDetailView consumes (yea/nay/nv/date/desc/roll_call_id).
+ * nv_count is NULL on rows synced before migration 035; the UI hides the NV chip until
+ * a re-sync fills it, so Yea/Nay stay accurate meanwhile.
+ */
+async function fetchDbVotes(
+  supabase: NonNullable<ReturnType<typeof createServerClient>>,
+  billId: string,
+): Promise<KyBillDetailEnrichment['votes']> {
+  const { data, error } = await supabase
+    .from('ky_votes')
+    .select('roll_call_id, date, description, yea_count, nay_count, nv_count, passed')
+    .eq('bill_id', billId)
+    .order('date', { ascending: true, nullsFirst: true })
+    .order('roll_call_id', { ascending: true });
+  if (error || !data) return [];
+  return data.map((v) => ({
+    roll_call_id: v.roll_call_id ?? undefined,
+    date: v.date ?? null,
+    desc: v.description ?? null,
+    yea: v.yea_count ?? 0,
+    nay: v.nay_count ?? 0,
+    nv: v.nv_count ?? 0,
+    passed: v.passed ?? null,
+  })) as KyBillDetailEnrichment['votes'];
+}
+
 function buildDetailPayload(
   billData: KYBill,
   legiscanDetail: LegiscanBillDetailPayload | null,
   fallbackSubjects: KyBillDetailEnrichment['subjects'],
+  dbVotes: KyBillDetailEnrichment['votes'],
 ): KyBillDetailEnrichment | null {
   if (legiscanDetail) {
     return {
@@ -58,19 +88,25 @@ function buildDetailPayload(
       history: legiscanDetail.history ?? [],
       texts: legiscanDetail.texts ?? [],
       sponsors: legiscanDetail.sponsors ?? [],
-      votes: legiscanDetail.votes ?? [],
+      votes: dbVotes,
       committee: legiscanDetail.committee ?? null,
     };
   }
   // DB-only fallback (LegiScan unavailable — quota hold per the #102 guard, or a fetch
-  // error). Sponsors are persisted on ky_bills.sponsors and a minimal step timeline can
-  // be rebuilt from stored fields, so the page degrades gracefully instead of dropping
-  // sponsors + steps entirely. Votes/texts/full history remain LegiScan-only for now.
+  // error). Sponsors are on ky_bills.sponsors, votes come from ky_votes, and a minimal
+  // step timeline is rebuilt from stored fields, so the page degrades gracefully instead
+  // of dropping sponsors/votes/steps. Texts + full action history remain LegiScan-only
+  // until they are persisted (next phase).
   const dbSponsors = Array.isArray(billData.sponsors)
     ? (billData.sponsors as unknown as KyBillDetailEnrichment['sponsors'])
     : [];
   const fallbackHistory = buildFallbackHistory(billData);
-  if (fallbackSubjects.length === 0 && dbSponsors.length === 0 && fallbackHistory.length === 0) {
+  if (
+    fallbackSubjects.length === 0 &&
+    dbSponsors.length === 0 &&
+    fallbackHistory.length === 0 &&
+    dbVotes.length === 0
+  ) {
     return null;
   }
   return {
@@ -78,7 +114,7 @@ function buildDetailPayload(
     history: fallbackHistory,
     texts: [],
     sponsors: dbSponsors,
-    votes: [],
+    votes: dbVotes,
     committee: null,
   };
 }
@@ -118,6 +154,8 @@ export async function fetchKyBillDetailPageData(routeId: string): Promise<KyBill
     ? (billData.legiscan_subjects as KyBillDetailEnrichment['subjects'])
     : [];
 
+  const dbVotes = await fetchDbVotes(supabase, billData.id);
+
   let legiscanDetail: LegiscanBillDetailPayload | null = null;
   if (billData.legiscan_id) {
     try {
@@ -129,7 +167,7 @@ export async function fetchKyBillDetailPageData(routeId: string): Promise<KyBill
 
   return {
     bill: billData,
-    detail: buildDetailPayload(billData, legiscanDetail, fallbackSubjects),
+    detail: buildDetailPayload(billData, legiscanDetail, fallbackSubjects, dbVotes),
   };
 }
 
