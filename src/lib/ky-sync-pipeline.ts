@@ -317,6 +317,32 @@ async function updateSourceStatus(
   }
 }
 
+/**
+ * Mid-run quota-hold handler for LegiScan-touching syncs. If `err` is a
+ * `LegiscanQuotaHoldError` thrown after the run started (monthly quota crossed
+ * the hold threshold mid-sync), treat it as a benign skip rather than a failure:
+ * record `success` on `ky_sources` with the hold reason — mirroring the
+ * start-of-run guard in `syncKyBills` — so it doesn't show a red status on
+ * `/admin/sync-status` or trip the `hasErrors` Slack path, and return `skipped`.
+ * Returns `null` for any other error so the caller falls through to its normal
+ * error handling. Inner per-item catches re-throw `LegiscanQuotaHoldError` so it
+ * reaches the top-level catch instead of being swallowed per item.
+ */
+async function quotaHoldSkipResult(
+  source: string,
+  err: unknown,
+  start: number,
+  options: SyncOptions,
+): Promise<SyncResult | null> {
+  if (!isLegiscanQuotaHoldError(err)) return null;
+  const msg = err.message;
+  log(source, `Skipped mid-run — ${msg}`);
+  if (!options.dryRun) {
+    await updateSourceStatus(source, 'success', 0, msg);
+  }
+  return { source, status: 'skipped', itemsSynced: 0, error: msg, duration: Date.now() - start };
+}
+
 const LEGISCAN_BILL_BACKFILL_CURSOR_KEY = 'legiscan_bill_backfill';
 
 async function readLegiscanBackfillCursor(db: ReturnType<typeof getSupabase>): Promise<number> {
@@ -438,6 +464,7 @@ async function buildBillRowsForSession(
           introducedDate = deriveIntroducedDate(detail);
         }
       } catch (err: any) {
+        if (isLegiscanQuotaHoldError(err)) throw err;
         log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
       }
     }
@@ -526,6 +553,7 @@ async function buildBillRowsQuotaSession(
           introducedDate = deriveIntroducedDate(detail);
         }
       } catch (err: any) {
+        if (isLegiscanQuotaHoldError(err)) throw err;
         log(source, `Sponsor fetch failed for ${bill.number}: ${err?.message || err}`);
       }
       enrichDone++;
@@ -711,6 +739,7 @@ async function syncKyBillsByHash(
           introducedDate = deriveIntroducedDate(detail);
         }
       } catch (err: any) {
+        if (isLegiscanQuotaHoldError(err)) throw err;
         log(source, `Detail fetch failed for ${raw.number}: ${err?.message || err}`);
       }
       if (!detail) continue; // skip if detail fetch failed entirely
@@ -1030,6 +1059,8 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
     await updateSourceStatus(source, 'success', totalSynced);
     return { source, status: 'success', itemsSynced: totalSynced, duration: Date.now() - start };
   } catch (err: any) {
+    const held = await quotaHoldSkipResult(source, err, start, options);
+    if (held) return held;
     logError(source, err.message);
     await updateSourceStatus(source, 'error', 0, err.message);
     return { source, status: 'error', itemsSynced: 0, error: err.message, duration: Date.now() - start };
@@ -1496,6 +1527,7 @@ export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<S
           logError(source, `Failed updating ${leg.id}: ${error.message}`);
         } else synced++;
       } catch (err: any) {
+        if (isLegiscanQuotaHoldError(err)) throw err;
         failed++;
         logError(source, `getPerson failed for legiscan_id=${leg.legiscan_id}: ${err.message}`);
       }
@@ -1505,6 +1537,8 @@ export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<S
     await updateSourceStatus(source, failed > 0 && synced === 0 ? 'error' : 'success', synced);
     return { source, status: failed > 0 && synced === 0 ? 'error' : 'success', itemsSynced: synced, duration: Date.now() - start };
   } catch (err: any) {
+    const held = await quotaHoldSkipResult(source, err, start, options);
+    if (held) return held;
     logError(source, err.message);
     await updateSourceStatus(source, 'error', 0, err.message);
     return { source, status: 'error', itemsSynced: 0, error: err.message, duration: Date.now() - start };
@@ -1562,6 +1596,7 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
           });
         }
       } catch (err: any) {
+        if (isLegiscanQuotaHoldError(err)) throw err;
         logError(source, `Failed to fetch votes for bill ${bill.legiscan_id}: ${err.message}`);
       }
     }
@@ -1585,6 +1620,8 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
     else { log(source, `Synced ${synced} votes`); await updateSourceStatus(source, 'success', synced); }
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
   } catch (err: any) {
+    const held = await quotaHoldSkipResult(source, err, start, options);
+    if (held) return held;
     logError(source, err.message);
     await updateSourceStatus(source, 'error', 0, err.message);
     return { source, status: 'error', itemsSynced: 0, error: err.message, duration: Date.now() - start };
