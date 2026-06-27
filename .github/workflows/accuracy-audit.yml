@@ -32,7 +32,10 @@ jobs:
   accuracy-audit:
     name: Content accuracy audit
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Raised from 30 after the 2026-06-21 run was cancelled at the ceiling (API
+    # latency / LLM pass overrun). The audit is weekly, so the extra headroom is
+    # cheap; a genuine hang still surfaces via the cancelled() Slack notify below.
+    timeout-minutes: 45
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -58,10 +61,11 @@ jobs:
       - name: Run content accuracy audit
         run: npm run audit:accuracy
 
-      - name: Slack notify on workflow failure
+      - name: Slack notify on workflow failure or timeout
         if: cancelled() || failure()
         env:
           WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+          JOB_STATUS: ${{ job.status }}
         run: |
           if [ -z "${WEBHOOK:-}" ]; then
             echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
@@ -71,6 +75,13 @@ jobs:
             echo "Skip Slack: audit script already posted the operational error to #errors."
             exit 0
           fi
+          # A timeout-minutes overrun cancels the job (job.status == cancelled);
+          # distinguish it from a hard failure so the alert points at the right cause.
+          if [ "${JOB_STATUS:-}" = "cancelled" ]; then
+            HEADLINE="*KY Vote - content accuracy audit timed out or was cancelled*\\nLikely the timeout-minutes ceiling - check the run for where it stalled."
+          else
+            HEADLINE="*KY Vote - content accuracy audit failed*"
+          fi
           curl -sS -X POST -H 'Content-Type: application/json' \
-            -d "{\"text\":\"*KY Vote - content accuracy audit failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            -d "{\"text\":\"${HEADLINE}\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
             "$WEBHOOK"
