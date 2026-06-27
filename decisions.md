@@ -1055,3 +1055,17 @@ Production incident + durable fix. The LegiScan quota guard ([§ 2026-06-26 — 
 **Deploy ordering:** migrations **035** + **036** are applied to primary (2026-06-26) and are additive/idempotent, so they can land before or after the code. The code is safe against NULL columns (fallbacks), so there is no strict ordering requirement.
 
 **Revisit if:** post-reset syncs don't populate `legiscan_history` for a meaningful share of bills (then a one-time, quota-budgeted `getBill` backfill is warranted once headroom exists); or we want richer roll-call detail (per-member breakdown is already stored in `ky_votes.roll_call` JSONB but not yet rendered).
+
+---
+
+## 2026-06-27 — Auth-page a11y: titles, password rules, reveal toggle
+
+First slice of the open "Minor a11y polish" item from the [§ 2026-06-12 design + a11y pass](#2026-06-12--design--a11y-pass-never-reviewed-surfaces). Auth surfaces (signed-out) were never given a dedicated a11y pass; three WCAG gaps closed.
+
+- **Distinct document `<title>` per auth route (2.4.2 Page Titled).** Every auth page inherited the root `'Know Your Vote Kentucky'` title because the forms are `'use client'` components, which cannot export `metadata`. Rather than refactor each form into a server wrapper (moving live session logic), each route gets a tiny **server `layout.tsx` that exports only `metadata.title`** and renders `{children}` — Log in / Create account / Forgot password / Reset password / Email verification / Log out. **Why a layout, not a server page wrapper:** zero churn to the working client forms, uniform across all six routes, and metadata from a nested layout merges/overrides the parent title cleanly.
+- **Password rules stated up front (3.3.2 Labels or Instructions).** Reset already enforced an 8-char minimum on submit but never told the user; register relied entirely on a post-submit Supabase error with vague helper copy. Both now show "At least 8 characters. Use one you do not reuse elsewhere." before submit, and register gained a matching **client-side length check** so the rule is enforced consistently with reset (8 is the canonical minimum already used by reset).
+- **Show/hide reveal toggle via a shared `PasswordField` (2.5.5 + 4.1.2).** New `src/components/auth/PasswordField.tsx` wraps MUI `TextField`, manages `type` internally, and renders a reveal `IconButton` in the end adornment — a real focusable button with a state-describing `aria-label` (Show/Hide password) + `aria-pressed`, sized 44×44 by the theme's existing `MuiIconButton` floor (from the 2026-06-01 pass). Wired into login, register, and both reset fields. **Why a component, not per-call-site markup:** the [§ 2026-06-12 systemic lesson](#2026-06-12--design--a11y-pass-never-reviewed-surfaces) — per-call-site a11y fixes don't stick; a shared component is the enforcement point.
+
+**Verified in-browser** on the dev server: titles render per route, the up-front helper copy shows, and the toggle flips the input `type` + swaps its label/`aria-pressed`. tsc + eslint clean.
+
+**Deliberately out of scope (still open under "Minor a11y polish"):** `/search` fallback-chip/jargon/loading copy, committee-detail new-tab announcements, glossary in-page filter + back-to-top, and search relevance — different surfaces, separate PR.

@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
+import { PasswordField } from '@/components/auth/PasswordField';
 import { safeAuthRedirectPath } from '@/lib/auth-redirect';
 
 function LoginForm() {
@@ -61,9 +62,8 @@ function LoginForm() {
           autoComplete="email"
           margin="normal"
         />
-        <TextField
+        <PasswordField
           label="Password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required

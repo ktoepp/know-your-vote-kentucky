@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, CircularProgress, Link as MuiLink, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Link as MuiLink, Typography } from '@mui/material';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
+import { PasswordField } from '@/components/auth/PasswordField';
 
 async function establishRecoverySession(client: SupabaseClient, cancelledRef: { current: boolean }) {
   const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
@@ -112,19 +113,18 @@ export default function ResetPasswordPage() {
   return (
     <AuthPaperLayout title="Choose a new password" subtitle="Your recovery session is active.">
       <Box component="form" onSubmit={handleSubmit}>
-        <TextField
+        <PasswordField
           label="New password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           fullWidth
           autoComplete="new-password"
           margin="normal"
+          helperText="At least 8 characters. Use one you do not reuse elsewhere."
         />
-        <TextField
+        <PasswordField
           label="Confirm password"
-          type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           required
