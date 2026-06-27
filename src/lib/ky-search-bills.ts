@@ -233,6 +233,51 @@ function scoreTopicTokensPartial(bill: KYBill, tokens: string[]): number {
   return add;
 }
 
+/**
+ * Low-substance instruments to demote in topical search: confirmation/appointment
+ * resolutions and ceremonial (honoring/recognizing/…) resolutions. These match a
+ * topical keyword (e.g. "education") as strongly as a substantive bill via title /
+ * LegiScan subject, so without a prior they crowd out real legislation in the top
+ * results. Demotion (not exclusion) keeps them discoverable — see the intent guard
+ * in {@link shouldPenalizeLowSubstanceResolutions}. Detection rides on LRC's regular
+ * title drafting; validated against a full session's resolutions (substantive task
+ * forces / policy resolutions are intentionally left untouched).
+ */
+const SEARCH_RESOLUTION_DESIGNATION_RE = /^(?:HR|SR|HJR|SJR|HCR|SCR)\d/;
+const SEARCH_APPOINTMENT_RESOLUTION_RE = /\bconfirming the (?:re)?appointment\b/i;
+const SEARCH_CEREMONIAL_RESOLUTION_RE =
+  /^a\s+(?:joint\s+|concurrent\s+)?resolution\s+(?:honoring|recognizing|congratulating|commemorating|celebrating|mourning|designating|adjourning|in memory of)\b/i;
+
+/** Score subtracted from a low-substance resolution so substantive matches outrank it (topical queries only). */
+const LOW_SUBSTANCE_RESOLUTION_PENALTY = 5000;
+
+/** Query text that signals the user actually wants appointments / honors / resolutions — suppresses the demotion. */
+const LOW_SUBSTANCE_INTENT_RE =
+  /\b(appoint|reappoint|confirm|nominat|honou?r|recogniz|commemorat|memorial|in memory|resolution)\b/i;
+
+function isLowSubstanceResolutionForSearch(bill: KYBill): boolean {
+  const bn = normalizeKyBillDesignation(bill.bill_number);
+  if (!SEARCH_RESOLUTION_DESIGNATION_RE.test(bn)) return false;
+  const title = (bill.title || '').trim();
+  return SEARCH_APPOINTMENT_RESOLUTION_RE.test(title) || SEARCH_CEREMONIAL_RESOLUTION_RE.test(title);
+}
+
+/**
+ * True for topical/keyword queries where appointment + ceremonial resolutions should be
+ * demoted. Suppressed for bill-number / designation queries (`23`, `HB23`) and for queries
+ * whose own words ask for those instruments — so explicit intent still surfaces them.
+ */
+function shouldPenalizeLowSubstanceResolutions(
+  safe: string,
+  compactDesignation: string,
+  numericOnlyQuery: boolean,
+): boolean {
+  if (numericOnlyQuery) return false;
+  if (/^[A-Z]+\d+$/.test(compactDesignation)) return false;
+  if (LOW_SUBSTANCE_INTENT_RE.test(safe)) return false;
+  return true;
+}
+
 function relevanceScoreForKyBillSearch(
   bill: KYBill,
   safe: string,
@@ -464,10 +509,21 @@ export async function fetchKyBillsMatchingSearch(
   }
 
   const rankingTokens = relevanceTokensFromQuery(safe);
+  const penalizeLowSubstance = shouldPenalizeLowSubstanceResolutions(safe, compactDesignation, numericOnlyQuery);
+  // Score each row once (the comparator runs O(n log n) times — don't re-score there),
+  // then apply the low-substance demotion as a ranking-policy step on top of the pure score.
+  const scoreById = new Map<string, number>();
+  for (const bill of merged) {
+    let s = relevanceScoreForKyBillSearch(bill, safe, compactDesignation, numericOnlyQuery, rankingTokens);
+    if (penalizeLowSubstance && isLowSubstanceResolutionForSearch(bill)) {
+      s -= LOW_SUBSTANCE_RESOLUTION_PENALTY;
+    }
+    scoreById.set(bill.id, s);
+  }
   const stable = [...merged];
   stable.sort((a, b) => {
-    const ra = relevanceScoreForKyBillSearch(a, safe, compactDesignation, numericOnlyQuery, rankingTokens);
-    const rb = relevanceScoreForKyBillSearch(b, safe, compactDesignation, numericOnlyQuery, rankingTokens);
+    const ra = scoreById.get(a.id) ?? 0;
+    const rb = scoreById.get(b.id) ?? 0;
     if (rb !== ra) return rb - ra;
     return compareSessionsDescKy(a, b);
   });
