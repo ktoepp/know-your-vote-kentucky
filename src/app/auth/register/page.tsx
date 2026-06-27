@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
+import { PasswordField } from '@/components/auth/PasswordField';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
 import { syncPostHogUser, trackUserRegistered } from '@/lib/analytics';
 
@@ -61,6 +62,11 @@ export default function RegisterPage() {
     setError(null);
     if (!supabase) {
       setError('Authentication service is not configured.');
+      setLoading(false);
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
       setLoading(false);
       return;
     }
@@ -139,15 +145,14 @@ export default function RegisterPage() {
             fullWidth
             autoComplete="email"
           />
-          <TextField
+          <PasswordField
             label="Password"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             fullWidth
             autoComplete="new-password"
-            helperText="Choose a strong password you do not reuse elsewhere."
+            helperText="At least 8 characters. Use one you do not reuse elsewhere."
           />
         </Stack>
         {error && (
