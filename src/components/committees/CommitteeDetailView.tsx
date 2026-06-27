@@ -208,7 +208,12 @@ export function CommitteeDetailView({
               <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6, mt: 1 }}>
                 Jurisdiction and staff rosters are maintained on the{' '}
                 {committee.profile_url ? (
-                  <MuiLink href={committee.profile_url} target="_blank" rel="noopener noreferrer">
+                  <MuiLink
+                    href={committee.profile_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="official LRC committee profile (opens in a new tab)"
+                  >
                     official LRC committee profile
                   </MuiLink>
                 ) : (
