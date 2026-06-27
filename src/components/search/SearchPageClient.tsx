@@ -360,7 +360,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 variant="caption"
                 sx={{ display: 'block', mb: 1, fontWeight: 700, color: 'text.primary' }}
               >
-                Popular LegiScan subjects this session
+                Suggested searches
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                 {suggestionsLoading &&
@@ -462,7 +462,8 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
         {searched && !loading && bills && (
           <>
             <Typography variant="body2" color="text.secondary" role="status" sx={{ mb: 1 }}>
-              {totalResults} result{totalResults !== 1 ? 's' : ''} for &quot;{query}&quot;
+              {totalResults >= SEARCH_FETCH_LIMIT ? `${SEARCH_FETCH_LIMIT}+` : totalResults} result
+              {totalResults !== 1 ? 's' : ''} for &quot;{query}&quot;
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Also search{' '}

@@ -1055,3 +1055,16 @@ Production incident + durable fix. The LegiScan quota guard ([§ 2026-06-26 — 
 **Deploy ordering:** migrations **035** + **036** are applied to primary (2026-06-26) and are additive/idempotent, so they can land before or after the code. The code is safe against NULL columns (fallbacks), so there is no strict ordering requirement.
 
 **Revisit if:** post-reset syncs don't populate `legiscan_history` for a meaningful share of bills (then a one-time, quota-budgeted `getBill` backfill is warranted once headroom exists); or we want richer roll-call detail (per-member breakdown is already stored in `ky_votes.roll_call` JSONB but not yet rendered).
+
+---
+
+## 2026-06-27 — Search/glossary/committee a11y polish
+
+Continuation of the "Minor a11y polish" item ([§ 2026-06-12 design + a11y pass](#2026-06-12--design--a11y-pass-never-reviewed-surfaces)); copy kept deliberately minimal to avoid adding UI noise.
+
+- **`/search` suggestion heading: drop jargon, fix the contradiction.** "Popular LegiScan subjects this session" exposed the internal data-source name (LegiScan) and was inaccurate — the chip row always also includes bill-number examples ("Bill number: 23", "HB 1"), and falls back to generic "Try: …" chips when no subjects load, none of which are "popular subjects." Renamed to **"Suggested searches"** — honest for the full mixed set, no jargon. One-word-level change, no new prose.
+- **`/search` result count no longer reads as a hard cap.** The client fetches up to `SEARCH_FETCH_LIMIT = 500` merged hits then slices to it, so a broad query (e.g. "education") rendered a flat "500 results" that looked like a ceiling. Now shows **"500+"** when `totalResults >= SEARCH_FETCH_LIMIT`. Display-only; the fetch cap is unchanged.
+- **Committee detail external link announces the new tab.** The inline "official LRC committee profile" link opens with `target="_blank"` but lacked the new-tab announcement that `OfficialSourceLinks` already gives every other outbound link. Added `aria-label="… (opens in a new tab)"` to match (WCAG G201). Icon intentionally omitted — an `OpenInNew` glyph mid-sentence reads as noise; the aria-label is the actual a11y fix.
+- **Glossary in-page filter + back-to-top via a new `GlossaryBrowser` client component.** The page stays a server component (keeps its `metadata`); the list moved into `src/components/glossary/GlossaryBrowser.tsx`, which adds a labeled "Filter terms" search over title + definition (live `role="status"` "N of 76 terms" count + a no-match line), hides the section jump-nav while a filter is active (anchors are meaningless mid-filter), and renders a "Back to top" link per section (the page `<h1>` gained `id="glossary-top"`). Verified in-browser: filter narrows correctly, jump-nav toggles, counts update.
+
+**Deliberately deferred:** the `/search` **relevance reorder** (appointment/confirmation resolutions outranking substantive bills) — a behavior-changing ranking tweak to `relevanceScoreForKyBillSearch` that needs real query-data validation, so it's not a low-risk polish item. The loading skeleton's literal "…" chip is left as-is — it's `aria-hidden` and decorative, so not an a11y defect.
