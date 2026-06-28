@@ -1115,3 +1115,17 @@ Closes the deferred `/search` relevance reorder. **Decision framework set by the
 **Verified against live data:** "education"/"agriculture" now lead with substantive bills; the intent guard ("education appointment") still shows confirmations; the designation guard ("SR213") still returns the resolution; "health" keeps its substantive task-force resolutions (`SJR116`, `HCR113/103`) — i.e. not over-demoted. tsc + eslint clean.
 
 **Revisit if:** browse / digest / member-profile surfaces want the same substance prior (then promote the heuristic to a persisted `bill_class` per option D); or the penalty magnitude needs tuning once we have query analytics. **Adjacent, out of scope:** the `ky_bills_plain_search` FTS RPC hit a statement timeout in repro and fell back to `ilike` legs — a separate search-performance item.
+
+---
+
+## 2026-06-28 — Accuracy audit: a LegiScan quota stop is a skip, not an operational error
+
+**Trigger.** The first scheduled accuracy audit after the § 2026-06-27 timeout fix (run [#28318388587](https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/28318388587)) confirmed the timeout is gone — it finished in **2m**, not 30m+ — but it still failed CI (exit 1) and paged `#errors`. The content was clean: `checked=208 ok=188 fail=0 warn=20`. The only "problem" was a start-of-run **LegiScan quota stop** (`bills` / `votes` skipped at 97.2% ≥ the 95% stop), which `scripts/accuracy-audit.ts` folded into `hasOperationalError`.
+
+**Decision.** A quota stop is **not** an operational error. It's the same expected, self-protective skip that § 2026-06-27 reclassified for the sync pipeline (`syncKyBills` / `syncKyVotes` / `syncKyLegislatorBios`) — the audit just hadn't been brought in line. `hasOperationalError` is now `summary.hasOperationalError` alone (a checker actually **crashing** — `result.error` set). The `|| legiscanBlockedReason != null` clause was removed. A quota stop already surfaces in the status digest as a `skipped` domain line ("• bills: skipped — LegiScan quota 97.2% …"), so it loses no visibility; it simply no longer escalates to `#errors` (`escalateToAlerts: false`) and the script exits 0.
+
+- **Why this matters now.** During interim there are no new bills, so the monthly LegiScan quota sits high all month — meaning the audit's start-of-run guard trips **every Sunday**. Under the old logic that was a guaranteed weekly false-red on `#errors` for a non-event. The whole thrust of § 2026-06-26 / § 2026-06-27 was that quota holds are expected and should be quiet, not alarming.
+- **What still pages.** A genuine operational error — a checker throwing (network, schema drift, an unhandled bug) — still sets `summary.hasOperationalError`, still escalates to `#errors`, and still exits 1. Content `fail` findings continue to report to the status digest without failing CI (unchanged).
+- **Scope.** One file (`scripts/accuracy-audit.ts`): the `hasOperationalError` expression, plus the explanatory comment and the header `Exit:` line. No change to the checkers, the report formatter, the Slack helper, or the workflow YAML. tsc + eslint clean.
+
+**Revisit if:** we want a *distinct* low-severity signal for "audit couldn't fully run this week" (e.g. a one-line note to the status digest when LegiScan-backed domains were all skipped) — currently that's inferable from the `skipped` lines. The cleaner long-term fix is task #28 (LegiScan Dataset Pull weekly reconcile), which removes the audit's per-bill `getBill` quota pressure entirely.
