@@ -25,6 +25,8 @@ import {
   Cancel,
   Clear,
   Search,
+  ViewModule,
+  ViewList,
 } from '@mui/icons-material';
 import { useFollowedCommittees } from '@/lib/use-followed-committees';
 import { supabase } from '@/app/lib/supabaseClient';
@@ -33,6 +35,7 @@ import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import { EmptyState } from '@/components/civic/EmptyState';
 import { AgendaSearchResults } from '@/components/committees/AgendaSearchResults';
 import { CommitteeMeetingCard } from '@/components/committees/CommitteeMeetingCard';
+import { MeetingsCalendar } from '@/components/committees/MeetingsCalendar';
 import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { withTimeout } from '@/lib/async-utils';
@@ -68,7 +71,12 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
     setAgendaQuery,
     followsMe,
     setFollowsMe,
+    view,
+    setView,
+    month,
+    setMonth,
   } = useGaMeetingsBrowseUrlState();
+  const isCalendar = view === 'calendar';
   const [agendaInput, setAgendaInput] = useState(agendaQuery);
   const {
     followedCommitteeIds,
@@ -165,6 +173,20 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
     });
   }, [meetings, chamber, range, effectiveFollowsMe, followedCommitteeIds]);
 
+  // Calendar view: apply chamber + follows but NOT the upcoming/recent cutoff,
+  // so navigating to past or future months both populate.
+  const calendarMeetings = useMemo(() => {
+    return meetings.filter((m) => {
+      if (chamber && m.ky_committees?.chamber !== chamber) return false;
+      if (
+        effectiveFollowsMe &&
+        !followedCommitteeIds.has(String(m.ky_committees?.id ?? ''))
+      )
+        return false;
+      return true;
+    });
+  }, [meetings, chamber, effectiveFollowsMe, followedCommitteeIds]);
+
   const filteredAgenda = useMemo(() => {
     const today = kyTodayIso();
     return agendaHits.filter((item) => {
@@ -181,8 +203,9 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
     });
   }, [agendaHits, chamber, range, effectiveFollowsMe, followedCommitteeIds]);
 
-  const hasActiveFilters =
-    Boolean(chamber) || range !== 'upcoming' || Boolean(agendaQuery) || followsMe;
+  const hasActiveFilters = isCalendar
+    ? Boolean(chamber) || followsMe
+    : Boolean(chamber) || range !== 'upcoming' || Boolean(agendaQuery) || followsMe;
   const isAgendaMode = Boolean(agendaQuery.trim());
   const resultCount = isAgendaMode ? filteredAgenda.length : filteredMeetings.length;
   const summary =
@@ -222,6 +245,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
           </Alert>
         )}
 
+        {!isCalendar && (
         <Box
           component="form"
           onSubmit={submitAgendaSearch}
@@ -258,6 +282,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
             }}
           />
         </Box>
+        )}
 
         <Box
           sx={{
@@ -272,6 +297,27 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <ToggleButtonGroup
+              value={view}
+              exclusive
+              size="small"
+              onChange={(_, v) => {
+                if (v !== null) setView(v);
+              }}
+              aria-label="Switch between list and calendar view"
+              sx={{ '& .MuiToggleButtonGroup-grouped': { minHeight: { xs: 44, sm: 'auto' } } }}
+            >
+              <ToggleButton value="list" aria-label="List view">
+                <ViewList fontSize="small" aria-hidden sx={{ mr: 0.5 }} />
+                List
+              </ToggleButton>
+              <ToggleButton value="calendar" aria-label="Calendar view">
+                <ViewModule fontSize="small" aria-hidden sx={{ mr: 0.5 }} />
+                Calendar
+              </ToggleButton>
+            </ToggleButtonGroup>
+
+            {!isCalendar && (
+            <ToggleButtonGroup
               value={range}
               exclusive
               size="small"
@@ -284,6 +330,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
               <ToggleButton value="upcoming">Upcoming</ToggleButton>
               <ToggleButton value="recent">Recent</ToggleButton>
             </ToggleButtonGroup>
+            )}
 
             {authed && (
               <Button
@@ -323,7 +370,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
                 variant="outlined"
               />
             )}
-            {agendaQuery && (
+            {!isCalendar && agendaQuery && (
               <Chip
                 label={`Agenda: "${agendaQuery}"`}
                 size="small"
@@ -336,7 +383,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
                 variant="outlined"
               />
             )}
-            {range !== 'upcoming' && (
+            {!isCalendar && range !== 'upcoming' && (
               <Chip
                 label="Recent"
                 size="small"
@@ -375,7 +422,11 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <CalendarMonth sx={{ fontSize: '1.2rem', color: 'primary.main' }} aria-hidden />
           <Typography variant="body2" fontWeight={600}>
-            {loading ? 'Loading…' : summary}
+            {loading
+              ? 'Loading…'
+              : isCalendar
+                ? 'Select a day to see meetings, bills, and votes'
+                : summary}
           </Typography>
         </Box>
 
@@ -414,6 +465,14 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />
           </Box>
+        ) : isCalendar ? (
+          <MeetingsCalendar
+            meetings={calendarMeetings}
+            month={month}
+            onMonthChange={setMonth}
+            followedCommitteeIds={authed ? followedCommitteeIds : new Set<string>()}
+            onToggleFollow={authed ? toggleFollow : undefined}
+          />
         ) : isAgendaMode ? (
           filteredAgenda.length === 0 ? (
             <EmptyState message="No agenda lines match your search. Try a bill number or keyword from the LRC calendar." />
