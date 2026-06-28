@@ -1,5 +1,6 @@
 import { Box, Container, Typography } from '@mui/material';
 import { getSessionBannerModel } from '@/lib/ky-session-banner';
+import { LRC_LEGISLATIVE_CALENDAR_URL } from '@/lib/ky-committee-display';
 
 export function SessionBannerServer() {
   const { sessionName, dateRange, contextLine, showLrcLink } = getSessionBannerModel();
@@ -24,7 +25,7 @@ export function SessionBannerServer() {
             {showLrcLink && (
               <Box
                 component="a"
-                href="https://legislature.ky.gov/Committee/Schedule"
+                href={LRC_LEGISLATIVE_CALENDAR_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 sx={{ color: 'primary.main', textDecoration: 'underline' }}
