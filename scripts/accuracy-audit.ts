@@ -18,7 +18,8 @@
  *           ACCURACY_LLM_SAMPLE, ACCURACY_SKIP_LLM, ACCURACY_LLM_MODEL,
  *           ACCURACY_LEGISCAN_QUOTA_STOP_PCT.
  *
- * Exit: 0 when no hard failures; 1 when any failure or checker crash occurs.
+ * Exit: 0 for clean runs, content findings, AND expected skips (e.g. a LegiScan
+ *       quota stop); 1 only when a checker crashes (an operational error).
  */
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
@@ -167,10 +168,15 @@ async function main() {
 
   const summary = summarizeAudit(results, startedAtMs, cfg.seed);
 
-  // Operational problems (a checker crashed, or LegiScan quota blocked the run)
-  // fail the job and page #errors. Content findings — even deterministic `fail`s
-  // — are reported to the status digest but do NOT fail CI (see decisions.md).
-  const hasOperationalError = summary.hasOperationalError || legiscanBlockedReason != null;
+  // Operational problems — a checker actually *crashed* — fail the job and page
+  // #errors. A LegiScan quota stop is NOT an operational error: it is an expected,
+  // self-protective skip (the same reclassification applied to the sync pipeline,
+  // see decisions.md § 2026-06-27). It already surfaces as a `skipped` domain line
+  // in the status digest, so it needs no escalation — during interim, quota sits
+  // high every week and this otherwise red-paged #errors every Sunday for nothing.
+  // Content findings — even deterministic `fail`s — are reported to the status
+  // digest but do NOT fail CI either (see decisions.md).
+  const hasOperationalError = summary.hasOperationalError;
 
   if (args.json) {
     console.log(JSON.stringify(summary, null, 2));
