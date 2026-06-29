@@ -1151,3 +1151,18 @@ All four live call sites now import it: `ky-content-generation` (`KY_CONTENT_MOD
 **Decision — delete two dead modules.** `src/lib/summarize.ts` and `src/app/lib/summarize.ts` were confirmed **fully unused** (no imports of either module; no references to any of their exported functions — `analyzeCongressionalContent`, `summarizeForYoungVoters`, `summarizeDecisions`, etc.). They're leftovers from the retired generic event-summarizer product (congressional / "young voters" framing, not the KY civic tool) and were the only remaining holders of the stale `claude-3-5-sonnet-20241022` id. Removed both. tsc + eslint clean.
 
 **Revisit if:** a future surface needs a genuinely different model (e.g. a cheaper Haiku tier for high-volume classification) — at that point add a second named constant rather than re-scattering literals.
+
+---
+
+## 2026-06-28 — Auto-summarize new/changed bills, paired with the 6h bills sync
+
+**Trigger.** With active-session summary coverage verified at 100% (1,737/1,737), the remaining gap was *keeping* it at 100% as bills move during session — the deferred "cron to auto-summarize new/changed bills" follow-up. Without it, a new or amended bill would sit with a stale/missing `ai_summary` until the next manual backfill.
+
+**Decision — a step on the existing bills-sync workflow, not a new cron.** Added a `Summarize new/changed bills` step to `.github/workflows/sync-ky-bills-status.yml` (the every-6h hash-gated sync), running `npm run backfill:bill-summaries -- --limit=300` after a clean primary sync.
+
+- **Why pair it with the sync instead of a standalone schedule.** The summary input hash is over title / description / topics / `legiscan_subjects` — exactly the fields the bills sync updates. Running the backfill immediately after the sync means summaries refresh in the same window a bill changes, with no separate schedule to reason about and a shared checkout / `npm ci`. The backfill is hash-gated and idempotent, so when nothing changed it just scans and generates zero (the steady state during interim).
+- **Gated on `steps.bills_sync.outcome == 'success'`.** If the primary sync failed (even if the retry step later rescued the job), summaries are skipped this round and picked up on the next 6h run. Keeps the dependency explicit and avoids summarizing against a half-synced state.
+- **Advisory, never reds the sync.** `continue-on-error: true` — bill summaries are beta and their faithfulness is already monitored by the weekly accuracy audit's LLM pass; a transient Anthropic hiccup must not fail the bill-status sync or page `#errors`. A missing `ANTHROPIC_API_KEY` cleanly skips the step (the secret is optional on this workflow, unlike the audit).
+- **`--limit=300` as the per-run cost cap.** Bounds generations per run so a burst of changes (e.g. a busy session day, or a sitewide `topics:reclassify`) can't fire an unbounded Anthropic batch; overflow is absorbed by the next 6h run. Zero LegiScan quota either way — this path is Anthropic-only, decoupled from the quota-sensitive sync (see § 2026-06-26). New-DB bootstrap or a large catch-up is still an operator's manual `npm run backfill:bill-summaries` (no limit).
+
+**Revisit if:** during a heavy session the 6h cadence lags bill changes noticeably (raise the limit or cadence), or if Anthropic spend needs a hard ceiling (wire the backfill through the existing `anthropic:llm:daily` token bucket the way `/api/intelligence` does — currently the `--limit` cap is the only guard).

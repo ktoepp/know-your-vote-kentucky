@@ -11,10 +11,15 @@
 #
 # Does NOT replace occasional full sponsor enrichment — run a bills sync without skip locally when needed.
 #
+# After a successful sync, an advisory step regenerates ai_summary for bills whose inputs changed
+# (title/description/topics/subjects hash mismatch) or are missing one — keeping the beta AI summaries
+# fresh as bills move. Zero LegiScan quota (Anthropic only); a near-no-op when nothing changed.
+#
 # Secrets (Settings → Secrets and variables → Actions):
 #   LEGISCAN_API_KEY
 #   NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL
 #   SUPABASE_SERVICE_ROLE_KEY
+#   ANTHROPIC_API_KEY   (optional — bill-summary step is skipped if unset)
 #
 # Optional Slack (same Incoming Webhooks as Vercel — see env-template.txt):
 #   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL, SLACK_SYNC_NOTIFY_CLI=true
@@ -99,6 +104,27 @@ jobs:
             EXTRA="--historic-sessions=${{ inputs.historic_sessions }}"
           fi
           npm run sync:ky:bills:status -- ${EXTRA}
+
+      - name: Summarize new/changed bills (beta AI summaries)
+        # Runs only after a clean primary sync. backfill:bill-summaries regenerates ai_summary for
+        # bills whose input hash changed (new/changed) or that lack a usable summary — a near-no-op
+        # when nothing changed. --limit caps generations (cost) per run; overflow is picked up by the
+        # next 6h run. Advisory: a summary hiccup must never red the bill-status sync (continue-on-error),
+        # and a missing ANTHROPIC_API_KEY simply skips the step. Zero LegiScan quota (Anthropic only).
+        if: steps.bills_sync.outcome == 'success'
+        continue-on-error: true
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "Skip bill summaries: ANTHROPIC_API_KEY not set."
+            exit 0
+          fi
+          npm run backfill:bill-summaries -- --limit=300
 
       - name: Slack notify on workflow failure
         if: failure()
