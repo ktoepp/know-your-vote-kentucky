@@ -10,9 +10,10 @@ import type {
   KYExecutiveOrder,
   KYSchoolBoardItem,
 } from '@/types/kentucky';
+import { KY_DEFAULT_ANTHROPIC_MODEL } from './anthropic-model';
 
 /** Model used for all KY plain-language content generation. Exported so backfills can record provenance. */
-export const KY_CONTENT_MODEL = 'claude-sonnet-4-6';
+export const KY_CONTENT_MODEL = KY_DEFAULT_ANTHROPIC_MODEL;
 
 let client: Anthropic | null = null;
 
