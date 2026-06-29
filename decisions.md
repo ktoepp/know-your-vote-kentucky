@@ -1129,3 +1129,25 @@ Closes the deferred `/search` relevance reorder. **Decision framework set by the
 - **Scope.** One file (`scripts/accuracy-audit.ts`): the `hasOperationalError` expression, plus the explanatory comment and the header `Exit:` line. No change to the checkers, the report formatter, the Slack helper, or the workflow YAML. tsc + eslint clean.
 
 **Revisit if:** we want a *distinct* low-severity signal for "audit couldn't fully run this week" (e.g. a one-line note to the status digest when LegiScan-backed domains were all skipped) — currently that's inferable from the `skipped` lines. The cleaner long-term fix is task #28 (LegiScan Dataset Pull weekly reconcile), which removes the audit's per-bill `getBill` quota pressure entirely.
+
+---
+
+## 2026-06-28 — AI model-id consolidation + dead `summarize` module removal
+
+**Trigger.** While scoping the deferred "AI-model-id cleanup" follow-up, a grep showed the Anthropic model id hardcoded in six places with **three different values**: `claude-sonnet-4-6` (content-gen, intelligence, accuracy-audit), `claude-sonnet-4-20250514` (topic classifier — an older Sonnet 4 snapshot), and `claude-3-5-sonnet-20241022` (two `summarize.ts` files). The drift meant the topic classifier was silently running a different, older model than every other LLM surface.
+
+**Decision — one canonical constant.** Added `src/lib/anthropic-model.ts`:
+
+```ts
+export const KY_DEFAULT_ANTHROPIC_MODEL =
+  process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-6';
+```
+
+All four live call sites now import it: `ky-content-generation` (`KY_CONTENT_MODEL` re-exports it, preserving the value persisted to `ky_bills.ai_summary_model` for provenance), `ky-intelligence`, `ky-topic-classifier`, and the accuracy audit's `buildAuditConfig` (`ACCURACY_LLM_MODEL` still overrides per-run; it now falls back to the shared default instead of its own literal). A model migration is now a one-line edit, or a no-deploy `ANTHROPIC_MODEL` env flip.
+
+- **Topic classifier aligned to 4.6 — a deliberate behavior change.** It was the lone holdout on `claude-sonnet-4-20250514`. Bringing it onto `claude-sonnet-4-6` matches every other surface and is a newer model; topic classification has a keyword fast-path with the LLM only as an ambiguous-item fallback, and outputs are constrained to the fixed `KY_TOPICS` set, so the blast radius is small. Re-running `npm run topics:reclassify` would pick up any shifts, but isn't required — existing tags stand until the next classify pass.
+- **Why env-overridable.** The repo has flagged model migration as a recurring concern; a single `ANTHROPIC_MODEL` knob lets an operator test a new model in one environment without a code change. Per-surface knobs (`ACCURACY_LLM_MODEL`) still layer on top for targeted experiments.
+
+**Decision — delete two dead modules.** `src/lib/summarize.ts` and `src/app/lib/summarize.ts` were confirmed **fully unused** (no imports of either module; no references to any of their exported functions — `analyzeCongressionalContent`, `summarizeForYoungVoters`, `summarizeDecisions`, etc.). They're leftovers from the retired generic event-summarizer product (congressional / "young voters" framing, not the KY civic tool) and were the only remaining holders of the stale `claude-3-5-sonnet-20241022` id. Removed both. tsc + eslint clean.
+
+**Revisit if:** a future surface needs a genuinely different model (e.g. a cheaper Haiku tier for high-volume classification) — at that point add a second named constant rather than re-scattering literals.

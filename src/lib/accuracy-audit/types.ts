@@ -5,6 +5,7 @@
  * and diffs it against what is stored in Supabase, returning a {@link CheckerResult}.
  * The orchestrator (`scripts/accuracy-audit.ts`) aggregates results and posts to Slack.
  */
+import { KY_DEFAULT_ANTHROPIC_MODEL } from '../anthropic-model';
 
 export type Severity = 'fail' | 'warn' | 'info';
 
@@ -124,7 +125,7 @@ export function buildAuditConfig(overrides: AuditConfigOverrides = {}): AuditCon
     probeLinks: envBool('ACCURACY_PROBE_LINKS'),
     llmSample: envInt('ACCURACY_LLM_SAMPLE', 8),
     skipLlm: overrides.skipLlm ?? envBool('ACCURACY_SKIP_LLM'),
-    llmModel: process.env.ACCURACY_LLM_MODEL?.trim() || 'claude-sonnet-4-6',
+    llmModel: process.env.ACCURACY_LLM_MODEL?.trim() || KY_DEFAULT_ANTHROPIC_MODEL,
     legiscanQuotaStopPct: envInt('ACCURACY_LEGISCAN_QUOTA_STOP_PCT', 95),
     dryRun: overrides.dryRun ?? false,
     domains: overrides.domains ?? null,

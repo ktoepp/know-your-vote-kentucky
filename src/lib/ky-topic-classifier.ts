@@ -4,6 +4,7 @@
  * Uses keyword matching for speed with AI fallback for ambiguous items.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { KY_DEFAULT_ANTHROPIC_MODEL } from './anthropic-model';
 
 /** Kentucky-specific topic taxonomy */
 export const KY_TOPICS = [
@@ -150,7 +151,7 @@ export async function classifyTopicsAI(title: string, description: string): Prom
     const anthropic = new Anthropic();
     const validTopics = KY_TOPICS.join(', ');
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: KY_DEFAULT_ANTHROPIC_MODEL,
       max_tokens: 100,
       system: `You classify Kentucky civic content into topics. Return ONLY a comma-separated list of 1-4 topics from this list: ${validTopics}. No other text.`,
       messages: [{
