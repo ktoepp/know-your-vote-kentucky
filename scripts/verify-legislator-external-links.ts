@@ -29,6 +29,7 @@ import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { legiscanPersonUrl, normalizeBallotpediaHref } from '../src/lib/external-legislative-links';
 import { normalizeHttpsUrl, type LegislatorExternalLink } from '../src/lib/legislator-link-normalize';
 import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
+import { isLegiscanQuotaHoldError } from '../src/lib/legiscan-quota';
 import {
   markSlackErrorNotified,
   notifyLegislatorLinksVerifySlack,
@@ -68,6 +69,8 @@ interface ProbeResult {
   status: number;
   finalUrl: string;
   error?: string;
+  /** LegiScan API refused the call because monthly quota is on sync hold — link is un-verifiable, not broken. */
+  quotaHold?: boolean;
 }
 
 function parseArgs(): {
@@ -161,6 +164,7 @@ async function verifyLegiscanPersonViaApi(peopleId: number): Promise<ProbeResult
       status: 0,
       finalUrl: legiscanPersonUrl(peopleId),
       error: e instanceof Error ? e.message : String(e),
+      quotaHold: isLegiscanQuotaHoldError(e),
     };
   }
 }
@@ -311,6 +315,7 @@ async function main() {
     ProbeResult & {
       exemptLegiscan403: boolean;
       exemptSocialBlock: boolean;
+      exemptLegiscanQuota: boolean;
       legiscanVia?: 'api' | 'http';
     };
   const table: RowOut[] = [];
@@ -321,7 +326,14 @@ async function main() {
         pid != null
           ? await verifyLegiscanPersonViaApi(pid)
           : ({ ok: false, status: 0, finalUrl: p.url, error: 'Could not parse people id from URL' } satisfies ProbeResult);
-      table.push({ ...p, ...r, exemptLegiscan403: false, exemptSocialBlock: false, legiscanVia: 'api' });
+      table.push({
+        ...p,
+        ...r,
+        exemptLegiscan403: false,
+        exemptSocialBlock: false,
+        exemptLegiscanQuota: r.quotaHold === true,
+        legiscanVia: 'api',
+      });
       continue;
     }
     const r = urlCache.get(p.url)!;
@@ -338,6 +350,7 @@ async function main() {
       ...r,
       exemptLegiscan403,
       exemptSocialBlock,
+      exemptLegiscanQuota: false,
       legiscanVia: p.field === 'legiscan' ? 'http' : undefined,
     });
   }
@@ -345,8 +358,10 @@ async function main() {
   let failed = 0;
   let skippedLegiscan403 = 0;
   let skippedSocialBlock = 0;
+  let skippedLegiscanQuota = 0;
   for (const row of table) {
     if (row.exemptLegiscan403) skippedLegiscan403++;
+    else if (row.exemptLegiscanQuota) skippedLegiscanQuota++;
     else if (row.exemptSocialBlock) skippedSocialBlock++;
     else if (!row.ok) failed++;
   }
@@ -357,13 +372,15 @@ async function main() {
       probes: table.length,
       failed,
       skippedLegiscan403,
+      skippedLegiscanQuota,
       skippedSocialBlock,
       strictLegiscan,
       probeSocial,
       legiscanVerification: useLegiscanApi ? 'legiscan_api_getperson' : 'public_http',
-      rows: table.map(({ exemptLegiscan403, exemptSocialBlock, ...rest }) => ({
+      rows: table.map(({ exemptLegiscan403, exemptSocialBlock, exemptLegiscanQuota, ...rest }) => ({
         ...rest,
         ...(exemptLegiscan403 ? { verifierNote: 'legiscan_html_403_exempt' } : {}),
+        ...(exemptLegiscanQuota ? { verifierNote: 'legiscan_quota_hold_exempt' } : {}),
         ...(exemptSocialBlock ? { verifierNote: 'social_host_bot_block_exempt' } : {}),
       })),
     };
@@ -380,6 +397,10 @@ async function main() {
       skippedLegiscan403 > 0 && !strictLegiscan
         ? ` | LegiScan HTTP skipped (403 bot block): ${skippedLegiscan403}`
         : '';
+    const quotaNote =
+      skippedLegiscanQuota > 0
+        ? ` | LegiScan API skipped (monthly quota on sync hold): ${skippedLegiscanQuota}`
+        : '';
     const socialNote = skippedSocialBlock > 0 ? ` | Social hosts skipped (401/403/429 bot block): ${skippedSocialBlock}` : '';
     const apiNote =
       useLegiscanApi && legApiN > 0
@@ -388,7 +409,7 @@ async function main() {
           ? ' | LegiScan: set LEGISCAN_API_KEY to validate people_id via API (public HTML often 403).'
           : '';
     console.log(
-      `Legislators: ${rows.length} | Link checks: ${table.length} (${uniqueUrls.length} unique HTTP URLs) | Failed: ${failed}${skipNote}${socialNote}${apiNote}\n`,
+      `Legislators: ${rows.length} | Link checks: ${table.length} (${uniqueUrls.length} unique HTTP URLs) | Failed: ${failed}${skipNote}${quotaNote}${socialNote}${apiNote}\n`,
     );
     if (strictLegiscan && !useLegiscanApi) {
       console.log(
@@ -409,17 +430,17 @@ async function main() {
     for (const t of table) {
       let okStr = 'yes';
       if (!t.ok) {
-        okStr = t.exemptLegiscan403 || t.exemptSocialBlock ? 'skip' : 'no ';
+        okStr = t.exemptLegiscan403 || t.exemptSocialBlock || t.exemptLegiscanQuota ? 'skip' : 'no ';
       }
       const line = `${t.name.slice(0, wName).padEnd(wName)} ${t.field.padEnd(18)} ${String(t.status).padEnd(4)} ${okStr}   ${t.finalUrl}`;
       console.log(line);
-      if (!t.ok && !t.exemptLegiscan403 && !t.exemptSocialBlock && t.error)
+      if (!t.ok && !t.exemptLegiscan403 && !t.exemptSocialBlock && !t.exemptLegiscanQuota && t.error)
         console.log(`${''.padEnd(wName)} ${''.padEnd(18)}      note: ${t.error}`);
     }
   }
 
   const failures = table
-    .filter((row) => !row.ok && !row.exemptLegiscan403 && !row.exemptSocialBlock)
+    .filter((row) => !row.ok && !row.exemptLegiscan403 && !row.exemptSocialBlock && !row.exemptLegiscanQuota)
     .map((row) => ({
       name: row.name,
       field: row.field,
@@ -432,6 +453,7 @@ async function main() {
     probes: table.length,
     failed,
     skippedLegiscan403,
+    skippedLegiscanQuota,
     skippedSocialBlock,
     failures,
     fromCli: true,

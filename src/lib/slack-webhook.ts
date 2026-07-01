@@ -312,6 +312,7 @@ export async function notifyLegislatorLinksVerifySlack(params: {
   probes: number;
   failed: number;
   skippedLegiscan403: number;
+  skippedLegiscanQuota?: number;
   skippedSocialBlock: number;
   failures?: LegislatorLinkVerifyFailure[];
   fromCli?: boolean;
@@ -330,6 +331,7 @@ export async function notifyLegislatorLinksVerifySlack(params: {
   const stats =
     `Legislators \`${params.legislators}\` · Probes \`${params.probes}\` · Failed \`${params.failed}\`` +
     (params.skippedLegiscan403 > 0 ? ` · LegiScan HTTP skipped \`${params.skippedLegiscan403}\`` : '') +
+    ((params.skippedLegiscanQuota ?? 0) > 0 ? ` · LegiScan quota-hold skipped \`${params.skippedLegiscanQuota}\`` : '') +
     (params.skippedSocialBlock > 0 ? ` · Social skipped \`${params.skippedSocialBlock}\`` : '');
   const runUrl = params.runUrl ?? githubActionsRunUrl();
   const runLine = runUrl ? `\n<${runUrl}|GitHub run>` : '';
