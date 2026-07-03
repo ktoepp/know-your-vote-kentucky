@@ -343,6 +343,55 @@ async function quotaHoldSkipResult(
   return { source, status: 'skipped', itemsSynced: 0, error: msg, duration: Date.now() - start };
 }
 
+/**
+ * True when `err` means "couldn't reach LegiScan" (transport-level timeout or
+ * network failure, or a 502/503/504 gateway), as opposed to LegiScan rejecting
+ * us (a `status: 'ERROR'` payload — bad key, quota, etc. — arrives as HTTP 200
+ * and must NOT be treated as transient). LegiScan's public API is intermittently
+ * slow: roughly one in three of the every-6h scheduled syncs sees every request
+ * hit the client's 60s timeout across all retries.
+ */
+function isTransientLegiscanNetworkError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as { code?: string }).code ?? '';
+  if (
+    ['ECONNABORTED', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT'].includes(
+      code,
+    )
+  ) {
+    return true;
+  }
+  const status = (err as { response?: { status?: number } }).response?.status;
+  if (typeof status === 'number' && status >= 502 && status <= 504) return true;
+  return /timeout/i.test(err.message);
+}
+
+/**
+ * Mid-run handler for a transient LegiScan outage (timeout / network / gateway).
+ * Mirrors {@link quotaHoldSkipResult}: an idle every-6h hash-gated sync shouldn't
+ * red the workflow and page #errors when LegiScan is briefly unreachable — the
+ * next run picks it up, and Vercel Cron owns the guaranteed daily sync. Record
+ * `success` on `ky_sources` (keeps `/admin/sync-status` green) and return
+ * `skipped`. Returns `null` for any other error so callers fall through to
+ * normal error handling. Quota-hold is handled by `quotaHoldSkipResult` first.
+ */
+async function legiscanUnreachableSkipResult(
+  source: string,
+  err: unknown,
+  start: number,
+  options: SyncOptions,
+): Promise<SyncResult | null> {
+  if (isLegiscanQuotaHoldError(err)) return null;
+  if (!isTransientLegiscanNetworkError(err)) return null;
+  const msg = err instanceof Error ? err.message : String(err);
+  const reason = `LegiScan unreachable (transient): ${msg}`;
+  log(source, `Skipped — ${reason}`);
+  if (!options.dryRun) {
+    await updateSourceStatus(source, 'success', 0, reason);
+  }
+  return { source, status: 'skipped', itemsSynced: 0, error: reason, duration: Date.now() - start };
+}
+
 const LEGISCAN_BILL_BACKFILL_CURSOR_KEY = 'legiscan_bill_backfill';
 
 async function readLegiscanBackfillCursor(db: ReturnType<typeof getSupabase>): Promise<number> {
@@ -1061,6 +1110,8 @@ export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult
   } catch (err: any) {
     const held = await quotaHoldSkipResult(source, err, start, options);
     if (held) return held;
+    const unreachable = await legiscanUnreachableSkipResult(source, err, start, options);
+    if (unreachable) return unreachable;
     logError(source, err.message);
     await updateSourceStatus(source, 'error', 0, err.message);
     return { source, status: 'error', itemsSynced: 0, error: err.message, duration: Date.now() - start };
@@ -1539,6 +1590,8 @@ export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<S
   } catch (err: any) {
     const held = await quotaHoldSkipResult(source, err, start, options);
     if (held) return held;
+    const unreachable = await legiscanUnreachableSkipResult(source, err, start, options);
+    if (unreachable) return unreachable;
     logError(source, err.message);
     await updateSourceStatus(source, 'error', 0, err.message);
     return { source, status: 'error', itemsSynced: 0, error: err.message, duration: Date.now() - start };
@@ -1622,6 +1675,8 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
   } catch (err: any) {
     const held = await quotaHoldSkipResult(source, err, start, options);
     if (held) return held;
+    const unreachable = await legiscanUnreachableSkipResult(source, err, start, options);
+    if (unreachable) return unreachable;
     logError(source, err.message);
     await updateSourceStatus(source, 'error', 0, err.message);
     return { source, status: 'error', itemsSynced: 0, error: err.message, duration: Date.now() - start };
