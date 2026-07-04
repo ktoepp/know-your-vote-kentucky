@@ -39,6 +39,7 @@ import { MeetingsCalendar } from '@/components/committees/MeetingsCalendar';
 import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { withTimeout } from '@/lib/async-utils';
+import { formatCivicDate } from '@/lib/civic-date';
 import { searchKyCommitteeAgendaItems } from '@/lib/ky-committee-search';
 import { KY_MEETING_BROWSE_SELECT } from '@/lib/ky-ga-browse-select';
 import { KY_SESSIONS } from '@/lib/ky-sessions';
@@ -55,6 +56,30 @@ import type {
 } from '@/types/kentucky';
 
 const MEETINGS_PAGE_SIZE = 24;
+
+/** Consecutive meetings sharing a date, for day-grouped list rendering. */
+function groupMeetingsByDay(
+  meetings: KYCommitteeMeetingBrowse[],
+): { iso: string; meetings: KYCommitteeMeetingBrowse[] }[] {
+  const groups: { iso: string; meetings: KYCommitteeMeetingBrowse[] }[] = [];
+  for (const meeting of meetings) {
+    const last = groups[groups.length - 1];
+    if (last && last.iso === meeting.meeting_date) last.meetings.push(meeting);
+    else groups.push({ iso: meeting.meeting_date, meetings: [meeting] });
+  }
+  return groups;
+}
+
+/** "Today · Monday, July 6, 2026" style heading for a day group. */
+function dayGroupLabel(iso: string, todayIso: string): string {
+  const formatted = formatCivicDate(iso, { weekday: 'long' }) ?? iso;
+  const tomorrow = new Date(`${todayIso}T12:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const tomorrowIso = tomorrow.toISOString().slice(0, 10);
+  if (iso === todayIso) return `Today · ${formatted}`;
+  if (iso === tomorrowIso) return `Tomorrow · ${formatted}`;
+  return formatted;
+}
 
 export interface MeetingsBrowseProps {
   /** Preloaded meeting window (server); omitted when URL has agenda search `q`. */
@@ -177,6 +202,14 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
       return true;
     });
   }, [meetings, chamber, effectiveListRange, effectiveFollowsMe, followedCommitteeIds]);
+
+  // Meetings load in ascending date order — right for Upcoming (soonest first),
+  // backwards for Recent (most recent past meeting should lead).
+  const orderedMeetings = useMemo(
+    () =>
+      effectiveListRange === 'recent' ? [...filteredMeetings].reverse() : filteredMeetings,
+    [filteredMeetings, effectiveListRange],
+  );
 
   // Calendar view: apply chamber + follows but NOT the upcoming/recent cutoff,
   // so navigating to past or future months both populate.
@@ -509,19 +542,39 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
         ) : filteredMeetings.length === 0 ? (
           <EmptyState message="No committee meetings match your filters." />
         ) : (
-          <PaginatedSection items={filteredMeetings} pageSize={MEETINGS_PAGE_SIZE} variant="loadmore">
+          <PaginatedSection items={orderedMeetings} pageSize={MEETINGS_PAGE_SIZE} variant="loadmore">
             {(visible) => (
-              <CardGrid>
-                {visible.map((meeting) => (
-                  <CardGridItem key={meeting.id}>
-                    <CommitteeMeetingCard
-                      meeting={meeting}
-                      following={followedCommitteeIds.has(String(meeting.ky_committees?.id ?? ''))}
-                      onToggleFollow={authed ? toggleFollow : undefined}
-                    />
-                  </CardGridItem>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5 }}>
+                {groupMeetingsByDay(visible).map((group) => (
+                  <Box key={group.iso} component="section" aria-label={dayGroupLabel(group.iso, kyTodayIso())}>
+                    <Typography
+                      component="h2"
+                      variant="subtitle1"
+                      fontWeight={700}
+                      sx={{
+                        pb: 0.75,
+                        mb: 1.5,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    >
+                      {dayGroupLabel(group.iso, kyTodayIso())}
+                    </Typography>
+                    <CardGrid>
+                      {group.meetings.map((meeting) => (
+                        <CardGridItem key={meeting.id}>
+                          <CommitteeMeetingCard
+                            meeting={meeting}
+                            hideDate
+                            following={followedCommitteeIds.has(String(meeting.ky_committees?.id ?? ''))}
+                            onToggleFollow={authed ? toggleFollow : undefined}
+                          />
+                        </CardGridItem>
+                      ))}
+                    </CardGrid>
+                  </Box>
                 ))}
-              </CardGrid>
+              </Box>
             )}
           </PaginatedSection>
         )}

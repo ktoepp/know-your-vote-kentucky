@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { Avatar, Box, IconButton, Typography } from '@mui/material';
-import { Bookmark as BookmarkFilled } from '@mui/icons-material';
+import { Bookmark as BookmarkFilled, CalendarMonth } from '@mui/icons-material';
 import { Bookmark } from 'lucide-react';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { MetaChip } from '@/components/ui/Chip';
 import { CommitteeTagRow } from '@/components/committees/CommitteeTagRow';
 import type { KYCommitteeBrowseCard } from '@/lib/ky-committees-browse-enriched';
-import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
+import { iconRemSx } from '@/lib/ui-tokens';
+import { formatKyMeetingDate, normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
 
 export interface KYCommitteeCardProps {
   committee: KYCommitteeBrowseCard;
@@ -124,6 +125,20 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
             </Box>
           ) : null}
         </>
+      }
+      footer={
+        committee.nextMeetingDate ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <CalendarMonth sx={{ ...iconRemSx('inline'), color: 'primary.main' }} aria-hidden />
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Next meeting · {formatKyMeetingDate(committee.nextMeetingDate)}
+            </Typography>
+          </Box>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            No upcoming meetings scheduled.
+          </Typography>
+        )
       }
     />
   );

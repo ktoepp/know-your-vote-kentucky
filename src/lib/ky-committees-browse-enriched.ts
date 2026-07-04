@@ -24,6 +24,8 @@ function isLeadershipRole(roleLabel: string | null): boolean {
 export type KYCommitteeBrowseCard = KYCommittee & {
   leadershipNames: string[];
   topicTags: string[];
+  /** Soonest non-cancelled meeting on/after today, ISO date; null when none scheduled. */
+  nextMeetingDate: string | null;
 };
 
 function leadershipFromMembers(members: CommitteeMemberDisplay[]): string[] {
@@ -74,16 +76,21 @@ export async function fetchKyCommitteesBrowseEnriched(): Promise<KYCommitteeBrow
     meetingsByCommittee.set(m.committee_id, list);
   }
 
+  const today = kyTodayIso();
   const cards = committees.map((committee) => {
     const committeeMeetings = meetingsByCommittee.get(committee.id) ?? [];
     const members = buildCommitteeMemberDisplay(committee, committeeMeetings, roster);
     const leadershipNames = leadershipFromMembers(members);
     const topicTags = classifyTopics(committee.name, '').slice(0, 3);
+    const nextMeetingDate = committeeMeetings
+      .filter((m) => m.status !== 'cancelled' && m.meeting_date >= today)
+      .reduce<string | null>((min, m) => (min === null || m.meeting_date < min ? m.meeting_date : min), null);
 
     return {
       ...committee,
       leadershipNames,
       topicTags,
+      nextMeetingDate,
       _memberCount: members.length,
     };
   });
@@ -103,5 +110,13 @@ export async function fetchKyCommitteesBrowseEnriched(): Promise<KYCommitteeBrow
       const max = nameToMaxMembers.get(key) ?? 0;
       return max === 0 || c._memberCount > 0;
     })
-    .map(({ _memberCount: _mc, ...c }) => c);
+    .map(({ _memberCount: _mc, ...c }) => c)
+    .sort((a, b) => {
+      // Full committees before subcommittees, so the alphabetical wall of
+      // Budget Review subcommittees stops burying the major committees.
+      const aSub = a.name.toLowerCase().includes('subcommittee') ? 1 : 0;
+      const bSub = b.name.toLowerCase().includes('subcommittee') ? 1 : 0;
+      if (aSub !== bSub) return aSub - bSub;
+      return a.name.localeCompare(b.name);
+    });
 }

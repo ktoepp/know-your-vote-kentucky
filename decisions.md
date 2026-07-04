@@ -1205,3 +1205,25 @@ All four live call sites now import it: `ky-content-generation` (`KY_CONTENT_MOD
 **Measured (local prod build, Lighthouse 12.8.2, vs pre-pass-1 baseline → after pass 2):** home 68→98 desktop / 30→74 mobile; bills 89→95 / 60→76; members 97→98 / 59→74; bill detail 98→99 / 73→81; member profile 93→97 / 73→76. FCP ~250–300ms desktop and ~0.9–1.2s mobile sitewide (baseline: ~800ms / 2.6–6.4s). CLS ≤0.031 everywhere.
 
 **Revisit if:** the Typekit kit's font files change (re-measure the size-adjust ratios), district GeoJSON is regenerated (re-run the PIP parity check), or a future pass targets shared-bundle size (the remaining mobile LCP lever).
+
+---
+
+## 2026-07-04 — Meetings + committees UX pass (browse scannability, next-meeting orientation)
+
+**Trigger.** First dedicated UX pass on `/meetings` and `/committees` since the 2026-06-12 a11y-focused audit. In-browser review (desktop + 375px) found the surfaces structurally sound but weak at the two questions civic users actually bring: *"what's happening, and when?"* (meetings) and *"is this committee active?"* (committees). Branch `feat/meetings-committees-uiux`.
+
+**Findings → decisions.**
+
+- **/meetings list gets day-group headers; cards drop their date row there.** The grid repeated "Mon, Jul 6, 2026" on every card with no visual chronology. Meetings now group under `Today · Monday, July 6, 2026`-style `h2` headers (weekday + Today/Tomorrow prefixes); `CommitteeMeetingCard` gains `hideDate` so the heading carries the date (also applied in the calendar's selected-day panel, which had the same redundancy). Cards' aria-labels keep the full date for screen readers.
+- **Cancelled meetings de-emphasized, not hidden.** 5 of the first 8 "Upcoming" cards were full-weight red-chip Cancelled cards — cancellations visually outranked meetings actually happening. Cancelled cards render at `opacity 0.68` (full opacity on hover) with "(cancelled)" appended to the aria-label. Kept in the list: a cancellation is real information during interim.
+- **"Recent" now sorts newest-first.** The list fetch is date-ascending (right for Upcoming); Recent was showing the oldest past meeting first. Reversed for the recent range only.
+- **Committee detail: meetings split Upcoming (soonest first) / Past (newest first); the next meeting leads, chipped, agenda pre-expanded.** The server hands meetings newest-first, which buried the *next* meeting (2 days out, 13 agenda items) at position 5 under Nov/Oct/Sep interim dates. The next non-cancelled upcoming meeting also gets a "Next meeting" `info` chip and its agenda opens expanded — it's the page's headline question.
+- **Meeting deep links.** Every meeting card on the detail page gets `id="meeting-<id>"` + scroll margin; `CommitteeMeetingCard` (meetings browse + calendar) now links to `/committees/<slug>#meeting-<id>` (footer copy "View committee" → "View meeting details"), and quick-facts "View agenda →" targets the specific next meeting. A mount-time hash effect expands the linked meeting's agenda. Previously, a meeting card dropped users at the top of the committee page to hunt for the meeting themselves.
+- **/committees cards get a next-meeting signal; subcommittees sort after full committees.** Cards showed only kind tags + leadership — no way to tell an active committee from a dormant one. Card footers now show `Next meeting · <date>` (from data the enriched browse fetch already loaded — zero new queries) or "No upcoming meetings scheduled." Default sort demotes names containing "subcommittee" below full committees (alpha within each group) — the alphabetical wall of Budget Review subcommittees was burying every major committee below the fold.
+- **Committee detail header decluttered.** Removed: the "← All committees" button (breadcrumbs already provide the path), the duplicate "Meeting materials" official link (same URL as the LRC profile link two lines up), and the `height: '100%'` stretch on the overview card (two lines of text stretched to match the quick-facts column — pure dead space).
+
+**Data finding (not in this PR):** `/committees` shows near-duplicate rows "Commission on Race **&** Access to Opportunity" / "Commission on Race **and** Access to Opportunity" with meeting data split across them — the § 2026-06-12 merge failure class, but the &/and variant evades the audit's depluralized-name near-dupe guard. Spawned as a dedicated data-reconciliation task (merge via existing tooling + teach the guard `&`≡`and`), per the § 2026-06-12 rule that follow-bearing record merges don't ride UI PRs.
+
+**Deferred:** agenda previews on browse meeting cards (needs an agenda fetch the browse path doesn't do; calendar day-panel + detail deep links cover the need for now); real portraits on committee-card leadership avatars (initials-only today, and two "SR" co-chairs on one card demonstrate the ambiguity).
+
+**Revisit if:** LRC posts intra-day meeting times in a parseable form (day groups could then order by time); the subcommittee-last sort confuses anyone looking for Budget Review subs specifically (a name-filter input would be the fix, not a sort revert).
