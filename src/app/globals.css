@@ -3,6 +3,27 @@
 @tailwind utilities;
 
 /* ===================================================================
+   Metric-adjusted local fallback for the Typekit heading font.
+   The Typekit stylesheet loads non-blocking (layout.tsx), so headings
+   first paint in this Georgia-based face. size-adjust matches Georgia's
+   advance width to aesthet-nova's (canvas-measured: bold 84.2%, regular
+   92.8%) so the swap doesn't re-wrap long headings (footer CLS 0.65 on
+   bill detail before this). Re-measure if the kit's font changes.
+   =================================================================== */
+@font-face {
+  font-family: "aesthet-nova-fallback";
+  src: local("Georgia Bold"), local("Georgia");
+  font-weight: 700 900;
+  size-adjust: 83.1%;
+}
+@font-face {
+  font-family: "aesthet-nova-fallback";
+  src: local("Georgia");
+  font-weight: 100 699;
+  size-adjust: 92.8%;
+}
+
+/* ===================================================================
    KYvKY design tokens — canonical names mirror the Framer design.
    Source of truth: kyvky/project/guidelines.md
    =================================================================== */
@@ -45,7 +66,7 @@
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
 
   /* Type */
-  --font-display: "aesthet-nova", Georgia, "Times New Roman", serif;
+  --font-display: "aesthet-nova", "aesthet-nova-fallback", Georgia, "Times New Roman", serif;
   --font-sans:    var(--font-instrument-sans, "Instrument Sans"),
                   -apple-system, BlinkMacSystemFont, "Segoe UI",
                   "Helvetica Neue", Arial, sans-serif;
