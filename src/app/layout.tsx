@@ -79,7 +79,20 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://use.typekit.net" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://p.typekit.net" crossOrigin="anonymous" />
-        <link rel="stylesheet" href="https://use.typekit.net/yru3sto.css" />
+        {/* Typekit (aesthet-nova headings) loaded non-blocking: it cost ~870ms
+            of render-block on throttled mobile. The preload starts the fetch at
+            head-parse; the inline script attaches the stylesheet without
+            blocking first paint. Headings fall back Georgia -> aesthet-nova
+            for the brief load window (see theme.ts font stack). */}
+        <link rel="preload" href="https://use.typekit.net/yru3sto.css" as="style" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var l=document.createElement('link');l.rel='stylesheet';l.href='https://use.typekit.net/yru3sto.css';document.head.appendChild(l);})();`,
+          }}
+        />
+        <noscript>
+          <link rel="stylesheet" href="https://use.typekit.net/yru3sto.css" />
+        </noscript>
         <script
           dangerouslySetInnerHTML={{
             __html: `
