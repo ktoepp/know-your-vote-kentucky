@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -24,6 +24,28 @@ const LandingDistrictMapPreview = dynamic(
 export function LandingMapSection() {
   const router = useRouter();
   const [address, setAddress] = useState('');
+  // Mount the Mapbox preview only when the section nears the viewport — the
+  // chunk + district GeoJSON + tiles total >1MB, too heavy to load eagerly on
+  // every home visit.
+  const mapSlotRef = useRef<HTMLDivElement | null>(null);
+  const [mapInView, setMapInView] = useState(false);
+
+  useEffect(() => {
+    if (mapInView) return;
+    const el = mapSlotRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setMapInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setMapInView(true);
+      },
+      { rootMargin: '400px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [mapInView]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,8 +67,12 @@ export function LandingMapSection() {
         mb: { xs: 6, md: 8 },
       }}
     >
-      <Box sx={{ flex: '0 0 55%', height: { xs: 260, md: 380 }, position: 'relative' }}>
-        <LandingDistrictMapPreview />
+      <Box ref={mapSlotRef} sx={{ flex: '0 0 55%', height: { xs: 260, md: 380 }, position: 'relative' }}>
+        {mapInView ? (
+          <LandingDistrictMapPreview />
+        ) : (
+          <Box sx={{ width: '100%', height: '100%', bgcolor: 'action.hover' }} aria-hidden />
+        )}
       </Box>
       <Box sx={{ flex: 1, p: { xs: 3, md: 5 }, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <Typography variant="h4" component="h2" fontWeight={700} gutterBottom sx={{ lineHeight: 1.2 }}>
