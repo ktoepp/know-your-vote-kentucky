@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Avatar, Box, type AvatarProps } from '@mui/material';
 import { formatPartyLetterAbbrev, partyBadgeBackgroundColor } from '@/lib/bill-display';
+import { isOptimizedPortraitUrl } from '@/lib/ky-member-utils';
 
 export interface LegislatorAvatarProps extends Omit<AvatarProps, 'children'> {
   /** Display initials when no image */
@@ -20,8 +22,17 @@ export function LegislatorAvatar({
   initials,
   showPartyBadge = true,
   sx,
+  src,
+  alt,
+  imgProps,
   ...avatarProps
 }: LegislatorAvatarProps) {
+  // State portrait hosts serve original-resolution photos (multi-MB); route
+  // them through next/image for an edge-resized version. On optimizer failure
+  // fall back to the plain <img> path (which itself falls back to initials).
+  const [optimizerFailed, setOptimizerFailed] = React.useState(false);
+  const optimized = Boolean(src) && !optimizerFailed && isOptimizedPortraitUrl(src);
+
   const abbrev = formatPartyLetterAbbrev(party);
   const badgeVisible = showPartyBadge && Boolean(abbrev);
   const size = typeof sx === 'object' && sx && 'width' in sx ? Number(sx.width) : 40;
@@ -37,8 +48,20 @@ export function LegislatorAvatar({
         lineHeight: 0,
       }}
     >
-      <Avatar sx={sx} {...avatarProps}>
-        {initials}
+      <Avatar sx={sx} {...(optimized ? {} : { src, alt, imgProps })} {...avatarProps}>
+        {optimized && src ? (
+          <Image
+            src={src}
+            alt={alt ?? ''}
+            fill
+            sizes="88px"
+            referrerPolicy={imgProps?.referrerPolicy}
+            onError={() => setOptimizerFailed(true)}
+            style={{ objectFit: 'cover' }}
+          />
+        ) : (
+          initials
+        )}
       </Avatar>
       {badgeVisible ? (
         <Box
