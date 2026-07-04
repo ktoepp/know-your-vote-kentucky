@@ -18,12 +18,14 @@ export function parseGaChamberParam(value: string | null): GaChamberFilter {
   return '';
 }
 
-export type GaMeetingsRangeParam = 'upcoming' | 'recent';
+/** `''` = no explicit choice: the meeting list defaults to upcoming, agenda search spans all dates. */
+export type GaMeetingsRangeParam = 'upcoming' | 'recent' | '';
 
 export function parseGaMeetingsRangeParam(value: string | null): GaMeetingsRangeParam {
   // `all` was the legacy URL value for the combined recent+upcoming view.
   if (value === 'recent' || value === 'all') return 'recent';
-  return 'upcoming';
+  if (value === 'upcoming') return 'upcoming';
+  return '';
 }
 
 export type GaMeetingsViewParam = 'list' | 'calendar';
@@ -101,8 +103,10 @@ export function useGaMeetingsBrowseUrlState(): {
   const setRange = useCallback(
     (next: GaMeetingsRangeParam) => {
       patchParams((p) => {
-        if (next === 'upcoming') p.delete('when');
-        else p.set('when', next);
+        // `upcoming` is set explicitly: an absent `when` is not "upcoming" in
+        // agenda-search mode (it means all dates there).
+        if (next) p.set('when', next);
+        else p.delete('when');
       });
     },
     [patchParams],

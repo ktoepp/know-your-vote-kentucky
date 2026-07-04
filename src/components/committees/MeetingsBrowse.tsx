@@ -77,6 +77,11 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
     setMonth,
   } = useGaMeetingsBrowseUrlState();
   const isCalendar = view === 'calendar';
+  const isAgendaMode = Boolean(agendaQuery.trim());
+  // The meeting list defaults to upcoming when `when` is absent; agenda search
+  // leaves `range` empty there and spans all dates (empty = no date filter,
+  // matching the chamber filter's "no selection shows everything").
+  const effectiveListRange = range || 'upcoming';
   const [agendaInput, setAgendaInput] = useState(agendaQuery);
   const {
     followedCommitteeIds,
@@ -161,8 +166,8 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
   const filteredMeetings = useMemo(() => {
     const today = kyTodayIso();
     return meetings.filter((m) => {
-      if (range === 'upcoming' && m.meeting_date < today) return false;
-      if (range === 'recent' && m.meeting_date >= today) return false;
+      if (effectiveListRange === 'upcoming' && m.meeting_date < today) return false;
+      if (effectiveListRange === 'recent' && m.meeting_date >= today) return false;
       if (chamber && m.ky_committees?.chamber !== chamber) return false;
       if (
         effectiveFollowsMe &&
@@ -171,7 +176,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
         return false;
       return true;
     });
-  }, [meetings, chamber, range, effectiveFollowsMe, followedCommitteeIds]);
+  }, [meetings, chamber, effectiveListRange, effectiveFollowsMe, followedCommitteeIds]);
 
   // Calendar view: apply chamber + follows but NOT the upcoming/recent cutoff,
   // so navigating to past or future months both populate.
@@ -203,10 +208,20 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
     });
   }, [agendaHits, chamber, range, effectiveFollowsMe, followedCommitteeIds]);
 
+  // Agenda mode: any explicit range choice is a filter chip. List mode: only
+  // Recent (Upcoming is the default view, chip-less as before).
+  const rangeChipLabel = isAgendaMode
+    ? range === 'upcoming'
+      ? 'Upcoming'
+      : range === 'recent'
+        ? 'Recent'
+        : ''
+    : effectiveListRange === 'recent'
+      ? 'Recent'
+      : '';
   const hasActiveFilters = isCalendar
     ? Boolean(chamber) || followsMe
-    : Boolean(chamber) || range !== 'upcoming' || Boolean(agendaQuery) || followsMe;
-  const isAgendaMode = Boolean(agendaQuery.trim());
+    : Boolean(chamber) || Boolean(rangeChipLabel) || Boolean(agendaQuery) || followsMe;
   const resultCount = isAgendaMode ? filteredAgenda.length : filteredMeetings.length;
   const summary =
     resultCount === 1
@@ -318,11 +333,13 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
 
             {!isCalendar && (
             <ToggleButtonGroup
-              value={range}
+              value={isAgendaMode ? range : effectiveListRange}
               exclusive
               size="small"
               onChange={(_, v) => {
-                if (v !== null) setRange(v);
+                // Agenda mode allows deselecting back to all dates; the list
+                // always keeps a selection (deselect falls back to Upcoming).
+                if (v !== null || isAgendaMode) setRange(v ?? '');
               }}
               aria-label="Filter by date range"
               sx={{ '& .MuiToggleButtonGroup-grouped': { minHeight: { xs: 44, sm: 'auto' } } }}
@@ -383,11 +400,11 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
                 variant="outlined"
               />
             )}
-            {!isCalendar && range !== 'upcoming' && (
+            {!isCalendar && rangeChipLabel && (
               <Chip
-                label="Recent"
+                label={rangeChipLabel}
                 size="small"
-                onDelete={() => setRange('upcoming')}
+                onDelete={() => setRange('')}
                 deleteIcon={<Cancel />}
                 color="primary"
                 variant="outlined"
@@ -407,7 +424,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
               label="Clear all"
               size="small"
               onClick={() => {
-                setRange('upcoming');
+                setRange('');
                 setChamber('');
                 setAgendaInput('');
                 setAgendaQuery('');
@@ -475,7 +492,13 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
           />
         ) : isAgendaMode ? (
           filteredAgenda.length === 0 ? (
-            <EmptyState message="No agenda lines match your search. Try a bill number or keyword from the LRC calendar." />
+            <EmptyState
+              message={
+                chamber || range || effectiveFollowsMe
+                  ? 'No agenda lines match your search with the current filters. Clear the chamber, date, or following filters above to widen results.'
+                  : 'No agenda lines match your search. Try a bill number or keyword from the LRC calendar.'
+              }
+            />
           ) : (
             <AgendaSearchResults
               items={filteredAgenda}
