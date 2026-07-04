@@ -500,6 +500,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                         params.delete('status');
                         params.delete('dateRange');
                         params.delete('committee');
+                        params.delete('session');
                         const qc = canonicalUrlQ.trim();
                         if (!qc) {
                           router.replace(`${pathname}?${params.toString()}`);
