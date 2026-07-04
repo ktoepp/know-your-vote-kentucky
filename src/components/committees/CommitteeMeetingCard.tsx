@@ -21,6 +21,8 @@ export interface CommitteeMeetingCardProps {
   meeting: KYCommitteeMeetingWithCommittee | KYCommitteeMeetingBrowse;
   /** When set, committee name is omitted (committee detail page). */
   hideCommitteeName?: boolean;
+  /** When set, the date row is omitted (day-grouped lists where a heading carries the date). */
+  hideDate?: boolean;
   agendaPreview?: string[];
   /** Follow state for the parent committee (drives bookmark icon). */
   following?: boolean;
@@ -31,13 +33,18 @@ export interface CommitteeMeetingCardProps {
 export function CommitteeMeetingCard({
   meeting,
   hideCommitteeName = false,
+  hideDate = false,
   agendaPreview,
   following = false,
   onToggleFollow,
 }: CommitteeMeetingCardProps) {
   const committee = meeting.ky_committees;
+  const cancelled = meeting.status === 'cancelled';
   const committeeName = committee ? normalizeKyGaDisplayName(committee.name) : '';
-  const committeeHref = committee?.slug ? `/committees/${encodeURIComponent(committee.slug)}` : undefined;
+  // Deep-link to this meeting on the committee page (anchor auto-expands its agenda).
+  const committeeHref = committee?.slug
+    ? `/committees/${encodeURIComponent(committee.slug)}#meeting-${encodeURIComponent(meeting.id)}`
+    : undefined;
   const followControl = onToggleFollow && committee?.id ? (
     <IconButton
       size="small"
@@ -69,15 +76,16 @@ export function CommitteeMeetingCard({
     <CivicCard
       variant="meeting"
       href={committeeHref}
-      ariaLabel={
+      ariaLabel={`${
         committee
           ? `${committeeName} meeting on ${formatKyMeetingDate(meeting.meeting_date)}`
           : `Committee meeting on ${formatKyMeetingDate(meeting.meeting_date)}`
-      }
+      }${cancelled ? ' (cancelled)' : ''}`}
+      sx={cancelled ? { opacity: 0.68, '&:hover': { opacity: 1 } } : undefined}
       header={
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
           {committee ? <CommitteeTagRow committee={committee} /> : null}
-          {meeting.status === 'cancelled' && (
+          {cancelled && (
             <MetaChip label="Cancelled" tone="error" size="small" variant="filled" />
           )}
           {followControl}
@@ -90,12 +98,14 @@ export function CommitteeMeetingCard({
               {committeeName}
             </Typography>
           )}
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, mb: 0.75 }}>
-            <CalendarToday sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.15 }} aria-hidden />
-            <Typography variant="body2" color="text.secondary">
-              {formatKyMeetingDate(meeting.meeting_date)}
-            </Typography>
-          </Box>
+          {!hideDate && (
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, mb: 0.75 }}>
+              <CalendarToday sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.15 }} aria-hidden />
+              <Typography variant="body2" color="text.secondary">
+                {formatKyMeetingDate(meeting.meeting_date)}
+              </Typography>
+            </Box>
+          )}
           {meeting.time_and_location && (
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75 }}>
               <Schedule sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.15 }} aria-hidden />
@@ -149,7 +159,7 @@ export function CommitteeMeetingCard({
       footer={
         committeeHref ? (
           <Typography variant="body2" color="primary.main" fontWeight={600} sx={{ fontSize: '0.95rem' }}>
-            View committee
+            View meeting details
           </Typography>
         ) : (
           <OfficialSourceLinks

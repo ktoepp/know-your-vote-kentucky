@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   Box,
   Breadcrumbs,
-  Button,
   Card,
   CardContent,
   Chip,
@@ -21,7 +20,6 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
-  ArrowBack,
   CalendarMonth,
   ExpandLess,
   ExpandMore,
@@ -38,6 +36,7 @@ import { FOCUS_RING, ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE, iconRemSx } from 
 import {
   formatAgendaItemKind,
   formatKyMeetingDate,
+  kyTodayIso,
   LRC_LEGISLATIVE_CALENDAR_URL,
   normalizeKyGaAgendaLine,
   normalizeKyGaDisplayName,
@@ -112,8 +111,45 @@ export function CommitteeDetailView({
   const theme = useTheme();
   const displayName = normalizeKyGaDisplayName(committee.name);
   const kindInfo = useCommitteeKindInfo(committee);
-  const [expandedAgenda, setExpandedAgenda] = React.useState<Record<string, boolean>>({});
   const topicTags = useMemo(() => classifyTopics(committee.name, '').slice(0, 4), [committee.name]);
+
+  // Upcoming soonest-first (the next meeting leads), past newest-first. The
+  // server hands meetings newest-first, which buried the next meeting under
+  // far-future interim dates.
+  const todayIso = kyTodayIso();
+  const upcomingMeetings = useMemo(
+    () =>
+      meetings
+        .filter((m) => m.meeting_date >= todayIso)
+        .sort((a, b) => a.meeting_date.localeCompare(b.meeting_date)),
+    [meetings, todayIso],
+  );
+  const pastMeetings = useMemo(
+    () =>
+      meetings
+        .filter((m) => m.meeting_date < todayIso)
+        .sort((a, b) => b.meeting_date.localeCompare(a.meeting_date)),
+    [meetings, todayIso],
+  );
+
+  const upcoming = useMemo(
+    () => upcomingMeetings.find((m) => m.status !== 'cancelled'),
+    [upcomingMeetings],
+  );
+
+  // The next meeting's agenda opens expanded — it's the page's headline question.
+  const [expandedAgenda, setExpandedAgenda] = React.useState<Record<string, boolean>>(() =>
+    upcoming ? { [upcoming.id]: true } : {},
+  );
+
+  // Deep links (#meeting-<id>) from meeting cards elsewhere expand their target.
+  React.useEffect(() => {
+    const match = window.location.hash.match(/^#meeting-(.+)$/);
+    if (match) {
+      const id = decodeURIComponent(match[1]!);
+      setExpandedAgenda((prev) => (prev[id] ? prev : { ...prev, [id]: true }));
+    }
+  }, []);
 
   const parentRef = useMemo(
     () =>
@@ -126,13 +162,6 @@ export function CommitteeDetailView({
     [committee.name, committeeRoster, kindInfo.kind, kindInfo.shortLabel],
   );
 
-  const upcoming = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return meetings
-      .filter((m) => m.status !== 'cancelled' && m.meeting_date >= today)
-      .sort((a, b) => a.meeting_date.localeCompare(b.meeting_date))[0];
-  }, [meetings]);
-
   const toggleAgenda = (meetingId: string) => {
     setExpandedAgenda((prev) => ({ ...prev, [meetingId]: !prev[meetingId] }));
   };
@@ -142,23 +171,11 @@ export function CommitteeDetailView({
       ? [{ href: committee.profile_url, label: 'Legislative Research Commission (LRC) committee profile' }]
       : []),
     { href: LRC_LEGISLATIVE_CALENDAR_URL, label: 'Legislative calendar' },
-    ...(committee.profile_url
-      ? [{ href: committee.profile_url, label: 'Meeting materials' }]
-      : []),
   ];
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Button
-          component={Link}
-          href="/committees"
-          startIcon={<ArrowBack sx={{ fontSize: ICON_REM.nav }} aria-hidden />}
-          sx={{ mb: 2, textTransform: 'none', fontWeight: 600 }}
-        >
-          All committees
-        </Button>
-
         <Breadcrumbs aria-label="Breadcrumb" sx={{ mb: 2 }}>
           <Link href="/committees" style={{ textDecoration: 'none', color: 'inherit' }}>
             Committees
@@ -178,7 +195,7 @@ export function CommitteeDetailView({
             mb: 4,
           }}
         >
-          <Card sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, height: '100%' }}>
+          <Card sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
             <CardContent sx={{ p: { xs: 2, md: 3 } }}>
               <CommitteeTagRow committee={committee}>
                 {topicTags.map((tag) => (
@@ -247,7 +264,11 @@ export function CommitteeDetailView({
                       {upcoming.time_and_location}
                     </Typography>
                   )}
-                  <MuiLink href="#committee-meetings" underline="hover" sx={{ display: 'inline-block', mt: 0.75, fontWeight: 600 }}>
+                  <MuiLink
+                    href={`#meeting-${upcoming.id}`}
+                    underline="hover"
+                    sx={{ display: 'inline-block', mt: 0.75, fontWeight: 600 }}
+                  >
                     View agenda →
                   </MuiLink>
                 </Box>
@@ -332,74 +353,108 @@ export function CommitteeDetailView({
         {meetings.length === 0 ? (
           <EmptyState message="No meetings synced for this committee yet." />
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}>
-            {meetings.map((meeting) => {
-              const items = agendaByMeetingId[meeting.id] ?? [];
-              const agendaExpanded = Boolean(expandedAgenda[meeting.id]);
-              const hasAgenda = items.length > 0;
-              return (
-                <Card key={meeting.id} variant="outlined" sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-                  <Box sx={{ p: 2.5 }}>
-                    <Box
-                      component={hasAgenda ? 'button' : 'div'}
-                      type={hasAgenda ? 'button' : undefined}
-                      onClick={hasAgenda ? () => toggleAgenda(meeting.id) : undefined}
-                      aria-expanded={hasAgenda ? agendaExpanded : undefined}
-                      sx={{
-                        display: 'block',
-                        width: '100%',
-                        p: 0,
-                        m: 0,
-                        border: 0,
-                        bgcolor: 'transparent',
-                        textAlign: 'left',
-                        cursor: hasAgenda ? 'pointer' : 'default',
-                        color: 'inherit',
-                        font: 'inherit',
-                        borderRadius: 1,
-                        '&:hover': hasAgenda ? { opacity: 0.92 } : undefined,
-                        '&:focus-visible': hasAgenda ? FOCUS_RING : undefined,
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
-                        {meeting.status === 'cancelled' && (
-                          <MetaChip label="Cancelled" tone="error" size="small" variant="filled" />
-                        )}
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, mb: 0.75 }}>
-                        <CalendarToday sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.2 }} aria-hidden />
-                        <Typography variant="body1" fontWeight={600} component="span">
-                          {formatKyMeetingDate(meeting.meeting_date)}
-                        </Typography>
-                      </Box>
-                      {meeting.time_and_location && (
-                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, mb: 0.5 }}>
-                          <LocationOn sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.2 }} aria-hidden />
-                          <Typography variant="body2" color="text.secondary" component="span">
-                            {meeting.time_and_location}
-                          </Typography>
-                        </Box>
-                      )}
-                      {hasAgenda && (
-                        <Typography
-                          variant="body2"
-                          color="primary.main"
-                          fontWeight={600}
-                          sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}
-                        >
-                          {agendaExpanded ? 'Hide agenda' : 'Show agenda'}
-                          {agendaExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                          <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-                            ({items.length} item{items.length === 1 ? '' : 's'})
-                          </Box>
-                        </Typography>
-                      )}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 4 }}>
+            {(
+              [
+                { key: 'upcoming', label: 'Upcoming', list: upcomingMeetings },
+                { key: 'past', label: 'Past meetings', list: pastMeetings },
+              ] as const
+            )
+              .filter((group) => group.list.length > 0)
+              .map((group) => (
+                <Box key={group.key}>
+                  <Typography component="h3" variant="subtitle1" fontWeight={700} sx={{ mb: 1.25 }}>
+                    {group.label}
+                    <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500, ml: 0.75 }}>
+                      ({group.list.length})
                     </Box>
-                    <MeetingAgendaBlock items={items} expanded={agendaExpanded} />
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {group.list.map((meeting) => {
+                      const items = agendaByMeetingId[meeting.id] ?? [];
+                      const agendaExpanded = Boolean(expandedAgenda[meeting.id]);
+                      const hasAgenda = items.length > 0;
+                      const cancelled = meeting.status === 'cancelled';
+                      return (
+                        <Card
+                          key={meeting.id}
+                          id={`meeting-${meeting.id}`}
+                          variant="outlined"
+                          sx={{
+                            borderRadius: 3,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            scrollMarginTop: '80px',
+                            ...(cancelled ? { opacity: 0.68 } : null),
+                          }}
+                        >
+                          <Box sx={{ p: 2.5 }}>
+                            <Box
+                              component={hasAgenda ? 'button' : 'div'}
+                              type={hasAgenda ? 'button' : undefined}
+                              onClick={hasAgenda ? () => toggleAgenda(meeting.id) : undefined}
+                              aria-expanded={hasAgenda ? agendaExpanded : undefined}
+                              sx={{
+                                display: 'block',
+                                width: '100%',
+                                p: 0,
+                                m: 0,
+                                border: 0,
+                                bgcolor: 'transparent',
+                                textAlign: 'left',
+                                cursor: hasAgenda ? 'pointer' : 'default',
+                                color: 'inherit',
+                                font: 'inherit',
+                                borderRadius: 1,
+                                '&:hover': hasAgenda ? { opacity: 0.92 } : undefined,
+                                '&:focus-visible': hasAgenda ? FOCUS_RING : undefined,
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                                {meeting.id === upcoming?.id && (
+                                  <MetaChip label="Next meeting" tone="info" size="small" variant="filled" />
+                                )}
+                                {cancelled && (
+                                  <MetaChip label="Cancelled" tone="error" size="small" variant="filled" />
+                                )}
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, mb: 0.75 }}>
+                                <CalendarToday sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.2 }} aria-hidden />
+                                <Typography variant="body1" fontWeight={600} component="span">
+                                  {formatKyMeetingDate(meeting.meeting_date)}
+                                </Typography>
+                              </Box>
+                              {meeting.time_and_location && (
+                                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, mb: 0.5 }}>
+                                  <LocationOn sx={{ ...iconRemSx('inline'), color: 'text.secondary', mt: 0.2 }} aria-hidden />
+                                  <Typography variant="body2" color="text.secondary" component="span">
+                                    {meeting.time_and_location}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {hasAgenda && (
+                                <Typography
+                                  variant="body2"
+                                  color="primary.main"
+                                  fontWeight={600}
+                                  sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}
+                                >
+                                  {agendaExpanded ? 'Hide agenda' : 'Show agenda'}
+                                  {agendaExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                                  <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                                    ({items.length} item{items.length === 1 ? '' : 's'})
+                                  </Box>
+                                </Typography>
+                              )}
+                            </Box>
+                            <MeetingAgendaBlock items={items} expanded={agendaExpanded} />
+                          </Box>
+                        </Card>
+                      );
+                    })}
                   </Box>
-                </Card>
-              );
-            })}
+                </Box>
+              ))}
           </Box>
         )}
 

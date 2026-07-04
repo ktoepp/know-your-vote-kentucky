@@ -380,6 +380,7 @@ export function MeetingsCalendar({
                 <Box key={meeting.id}>
                   <CommitteeMeetingCard
                     meeting={meeting}
+                    hideDate
                     following={followedCommitteeIds.has(String(meeting.ky_committees?.id ?? ''))}
                     onToggleFollow={onToggleFollow}
                   />
