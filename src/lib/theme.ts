@@ -1,7 +1,11 @@
 import { createTheme, ThemeOptions } from '@mui/material/styles';
 
-/** Heading / display type (Adobe Typekit kit — `<link>` in root layout). */
-export const FONT_HEADING = '"aesthet-nova", Georgia, "Times New Roman", serif';
+/**
+ * Heading / display type (Adobe Typekit kit — loaded non-blocking in root
+ * layout; `aesthet-nova-fallback` is the size-adjusted Georgia face in
+ * globals.css that prevents layout shift during the font swap).
+ */
+export const FONT_HEADING = '"aesthet-nova", "aesthet-nova-fallback", Georgia, "Times New Roman", serif';
 
 /** UI / body type (loaded via `next/font/google` in `app/layout.tsx`). */
 export const FONT_SANS =
