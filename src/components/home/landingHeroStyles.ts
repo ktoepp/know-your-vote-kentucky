@@ -1,7 +1,10 @@
+/** Single source of truth for the hero asset URL — also preloaded from src/app/page.tsx. */
+export const LANDING_HERO_IMAGE_URL = '/images/ky-capitol-hero.webp';
+
 /** Shared capitol hero background for marketing + returning home heroes. */
 export const LANDING_HERO_BACKGROUND = {
   position: 'relative' as const,
-  backgroundImage: 'url(/images/ky-capitol-hero.jpg)',
+  backgroundImage: `url(${LANDING_HERO_IMAGE_URL})`,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   color: 'common.white',
