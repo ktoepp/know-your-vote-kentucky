@@ -8,6 +8,17 @@
 
 ## In Progress
 
+### Performance pass (2026-07-03) — PR 1 on `perf/speed-optimization`
+
+First dedicated speed pass. Baseline (local prod build + Lighthouse): home SSR HTML was a spinner (auth-gated hero → mobile perf 30, LCP 11.4s); `/members` shipped ~31MB of original-resolution images (an 18.3MB governor portrait among them). Full rationale: [decisions.md § 2026-07-03](./decisions.md#2026-07-03--performance-pass-1-image-pipeline--home-hero-ssr-pr-pending).
+
+- [x] Quick wins: explicit `revalidate=60` on `/`; `s-maxage=60` + SWR on `/api/search`; hero 91KB jpg → 28KB webp + head preload (`fetchPriority=high`); `dayjs` removed (unused).
+- [x] District thumbnails via `next/image` (`LegislatorDistrictThumbnail` — ~9KB served vs ~78–190KB; API-fallback branch stays raw `<img>`).
+- [x] Legislator portraits via `next/image` (`LegislatorAvatar` + `images.remotePatterns` allowlist; tail hosts keep plain `<img>`; optimizer→img→initials fallback chain).
+- [x] Marketing hero server-rendered (passed as prop through the client boundary; brief hero swap for signed-in visitors — approved trade).
+- [x] Measured: home desktop 68→97; members transfer 31.2MB→1.2MB; members mobile LCP 122s→8.1s. Before/after JSON in session scratchpad.
+- [ ] **Perf pass 2** (branch `perf/speed-optimization-2`): defer landing map preview until in-viewport (mapbox chunk + ~590KB GeoJSON load eagerly on `/`); GeoJSON `mapshaper` simplify; `loading.tsx` skeletons for browse routes; async Typekit (~870ms mobile render-block; drop if FOUT unacceptable); roster `select('*')` narrowing + `IN_MEMORY_FILTER_CAP` review; fuller home server-split only if warranted post-measurement.
+
 ### AI plain-language bill summaries (beta) — PR #103, 2026-06-26
 
 Revives the dormant `ky_bills.ai_summary` so each bill gets a 2–3 sentence plain-language summary that also names likely impacted Kentuckians (a "Who it may affect:" clause). Code is merge-ready and the **initial backfill has run against primary** (1,398 active-session bills summarized, 2026-06-26). Implements [FEEDBACK.md #1](./FEEDBACK.md); partially serves #3. Full rationale: [decisions.md § 2026-06-26](./decisions.md#2026-06-26--ai-plain-language-bill-descriptions-with-embedded-impact-audiences).
