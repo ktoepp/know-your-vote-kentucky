@@ -20,7 +20,7 @@ import {
   MenuItem,
 } from '@mui/material';
 import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
-import { gaChamberFilterLabel, type GaChamberFilter } from '@/lib/ky-committee-display';
+import { gaChamberFilterLabel } from '@/lib/ky-committee-display';
 import { Cancel, Search, Gavel, ArrowForward } from '@mui/icons-material';
 import ListSubheader from '@mui/material/ListSubheader';
 import { supabase } from '@/app/lib/supabaseClient';
@@ -35,9 +35,11 @@ import {
   canonicalizeKyBillSearchInput,
   fetchKyBillsMatchingSearch,
   isDigitsOnlyBillSearchQuery,
+  parseKyBillSearchDateRangeParam,
   type KyBillSearchFilters,
 } from '@/lib/ky-search-bills';
 import { parseKyBillSessionParam } from '@/lib/ky-bills-browse-url';
+import { parseGaChamberParam } from '@/lib/ky-ga-browse-url';
 import { KY_BILL_SESSION_OPTIONS } from '@/lib/ky-sessions';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
@@ -161,8 +163,10 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
     pushSearchUrl(query);
   };
 
-  const chamberSelect = searchParams.get('chamber') || '';
-  const dateRangeSelect = searchParams.get('dateRange') || '';
+  // Validate URL values here so hand-edited params (chamber=banana, dateRange=weird) don't
+  // render phantom filter chips for filters that aren't actually applied.
+  const chamberSelect = parseGaChamberParam(searchParams.get('chamber'));
+  const dateRangeSelect = parseKyBillSearchDateRangeParam(searchParams.get('dateRange'));
   const statusSelect = searchParams.get('status') || 'all';
   const committeeSelect = searchParams.get('committee') || '';
   const sessionSelect = parseKyBillSessionParam(searchParams.get('session'));
@@ -233,12 +237,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               >
                 Chamber
               </Typography>
-              <GaChamberFilterBar
-                value={(chamberSelect === 'house' || chamberSelect === 'senate' || chamberSelect === 'joint'
-                  ? chamberSelect
-                  : '') as GaChamberFilter}
-                onChange={(v) => setFilterParam('chamber', v)}
-              />
+              <GaChamberFilterBar value={chamberSelect} onChange={(v) => setFilterParam('chamber', v)} />
             </Box>
             <FormControl size="small" sx={{ minWidth: 160 }}>
               <InputLabel id="search-filter-status-label">Status</InputLabel>
@@ -323,7 +322,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               </Typography>
               {chamberSelect && (
                 <Chip
-                  label={gaChamberFilterLabel(chamberSelect as GaChamberFilter)}
+                  label={gaChamberFilterLabel(chamberSelect)}
                   size="small"
                   onDelete={() => setFilterParam('chamber', '')}
                   deleteIcon={<Cancel />}

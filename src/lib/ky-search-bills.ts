@@ -50,6 +50,17 @@ export type KyBillSearchFilters = {
   session?: string;
 };
 
+/** Date-range keys the search UI offers; anything else is treated as unset (see {@link minDateForRange}). */
+export const KY_BILL_SEARCH_DATE_RANGE_KEYS = ['today', 'week', 'month', 'quarter', 'year'] as const;
+
+export type KyBillSearchDateRangeKey = (typeof KY_BILL_SEARCH_DATE_RANGE_KEYS)[number];
+
+export function parseKyBillSearchDateRangeParam(value: string | null): KyBillSearchDateRangeKey | '' {
+  return (KY_BILL_SEARCH_DATE_RANGE_KEYS as readonly string[]).includes(value ?? '')
+    ? (value as KyBillSearchDateRangeKey)
+    : '';
+}
+
 /**
  * Query params (same as `/search` URL): `chamber`, `dateRange`, `status`, `committee`, `session`.
  * `status` values are UI buckets, resolved by {@link billMatchesBrowseStatusFilter}.
@@ -62,7 +73,7 @@ export function buildKyBillSearchFiltersFromUrlSearch(
   const session = parseKyBillSessionParam(sp.get('session'));
   return {
     chamber: ch === 'house' || ch === 'senate' || ch === 'joint' ? ch : undefined,
-    dateRange: sp.get('dateRange') || undefined,
+    dateRange: parseKyBillSearchDateRangeParam(sp.get('dateRange')) || undefined,
     status: st && st !== 'all' ? st : undefined,
     committee: sp.get('committee') || undefined,
     session: session || undefined,
