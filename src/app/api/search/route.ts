@@ -3,6 +3,11 @@ import { supabase } from '../../lib/supabaseClient';
 import { buildKyBillSearchFiltersFromUrlSearch, canonicalizeKyBillSearchInput, fetchKyBillsMatchingSearch } from '@/lib/ky-search-bills';
 import { parseLimit, ValidationError } from '@/lib/api-validation';
 
+/** Public bill data only — safe for CDN caching (matches /api/bills/browse). */
+const SEARCH_CACHE_HEADERS = {
+  'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,7 +15,7 @@ export async function GET(request: NextRequest) {
     const limit = parseLimit(searchParams.get('limit'), { default: 20, max: 100 });
 
     if (!query.trim()) {
-      return NextResponse.json({ results: [], query: '', count: 0 });
+      return NextResponse.json({ results: [], query: '', count: 0 }, { headers: SEARCH_CACHE_HEADERS });
     }
 
     const qRaw = query.trim();
@@ -38,11 +43,14 @@ export async function GET(request: NextRequest) {
       type: 'bill' as const,
     }));
 
-    return NextResponse.json({
-      results,
-      query: q,
-      count: results.length,
-    });
+    return NextResponse.json(
+      {
+        results,
+        query: q,
+        count: results.length,
+      },
+      { headers: SEARCH_CACHE_HEADERS },
+    );
   } catch (error) {
     if (error instanceof ValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

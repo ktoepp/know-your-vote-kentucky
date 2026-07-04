@@ -145,6 +145,33 @@ export function normalizeLegislatorPhotoUrl(url: string | null | undefined): str
 }
 
 /**
+ * Portrait hosts allowed through the next/image optimizer. Must stay in sync
+ * with `images.remotePatterns` in next.config.ts. State sites serve
+ * original-resolution photos (multi-MB); the long tail of one-off
+ * campaign/news hosts stays on the plain <img> path instead of erroring the
+ * optimizer.
+ */
+const OPTIMIZED_PORTRAIT_HOSTS = new Set([
+  'legislature.ky.gov',
+  'governor.ky.gov',
+  'www.ag.ky.gov',
+]);
+
+export function isOptimizedPortraitUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:') return false;
+    const host = u.hostname.toLowerCase();
+    if (OPTIMIZED_PORTRAIT_HOSTS.has(host)) return true;
+    // Ballotpedia thumbnails (scoped by bucket path in next.config.ts).
+    return host === 's3.amazonaws.com' && u.pathname.startsWith('/ballotpedia-api4/');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Kentucky LRC headshot URL pattern when LegiScan omits `bio.social.image` (often `bio: []`).
  * Senate filenames use 100 + district number (e.g. SD-009 → senate109.jpg).
  */

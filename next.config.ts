@@ -21,6 +21,21 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "",
   },
+  /**
+   * Hosts whose legislator portraits may be resized through next/image. State
+   * sites serve original-resolution photos (the governor's official portrait
+   * is 18MB); the optimizer serves them right-sized instead. Must stay in sync
+   * with OPTIMIZED_PORTRAIT_HOSTS in src/lib/ky-member-utils.ts — unlisted
+   * hosts (one-off campaign/news sites) keep the plain <img> path.
+   */
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "legislature.ky.gov" },
+      { protocol: "https", hostname: "governor.ky.gov" },
+      { protocol: "https", hostname: "www.ag.ky.gov" },
+      { protocol: "https", hostname: "s3.amazonaws.com", pathname: "/ballotpedia-api4/**" },
+    ],
+  },
   async redirects() {
     const apex = 'https://kyvky.com';
     const hostsToApex = [

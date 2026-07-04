@@ -1,12 +1,23 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Box, Typography } from '@mui/material';
 import type { KYLegislator } from '@/types/kentucky';
 import { parseKyDistrictNumber } from '@/lib/ky-district-geo';
 import { formatKyLegislatorDistrict } from '@/lib/bill-display';
 
 const HEIGHT: Record<'card' | 'profile', number> = { card: 120, profile: 200 };
+
+/**
+ * Rendered widths for next/image srcset selection. Committed assets are 2x
+ * Mapbox renders (card 1200×560, profile 1440×840) — far larger than the
+ * ~200px card slot / ~480px profile column they display in.
+ */
+const SIZES: Record<'card' | 'profile', string> = {
+  card: '200px',
+  profile: '(max-width: 899px) 100vw, 480px',
+};
 
 export interface LegislatorDistrictThumbnailProps {
   leg: Pick<KYLegislator, 'chamber' | 'district' | 'name'>;
@@ -60,13 +71,10 @@ export function LegislatorDistrictThumbnail({ leg, size = 'card' }: LegislatorDi
     );
   }
 
-  const src = useApiFallback
-    ? `/api/geo/district-thumbnail?chamber=${chamber}&district=${encodeURIComponent(leg.district ?? '')}&size=${size}`
-    : localDistrictThumbSrc(chamber, districtName, size);
-
   return (
     <Box
       sx={{
+        position: 'relative',
         height,
         borderRadius: 2,
         overflow: 'hidden',
@@ -76,18 +84,29 @@ export function LegislatorDistrictThumbnail({ leg, size = 'card' }: LegislatorDi
         pointerEvents: 'none',
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- static map asset; local or API redirect */}
-      <img
-        src={src}
-        alt={ariaLabel}
-        loading="lazy"
-        decoding="async"
-        onError={() => {
-          if (!useApiFallback) setUseApiFallback(true);
-          else setError(true);
-        }}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-      />
+      {useApiFallback ? (
+        // Raw <img>: this route redirects to Mapbox Static Images, which the
+        // next/image optimizer must not proxy.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`/api/geo/district-thumbnail?chamber=${chamber}&district=${encodeURIComponent(leg.district ?? '')}&size=${size}`}
+          alt={ariaLabel}
+          loading="lazy"
+          decoding="async"
+          onError={() => setError(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        <Image
+          src={localDistrictThumbSrc(chamber, districtName, size)}
+          alt={ariaLabel}
+          fill
+          sizes={SIZES[size]}
+          loading="lazy"
+          onError={() => setUseApiFallback(true)}
+          style={{ objectFit: 'cover' }}
+        />
+      )}
     </Box>
   );
 }

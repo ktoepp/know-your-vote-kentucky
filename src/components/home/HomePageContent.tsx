@@ -1,30 +1,36 @@
 'use client';
 
-import { Box, CircularProgress, Container } from '@mui/material';
+import { Container } from '@mui/material';
 import { useUser } from '@/app/lib/UserContext';
-import { LandingHero } from '@/components/home/LandingHero';
 import { LandingHeroReturning } from '@/components/home/LandingHeroReturning';
 import { LandingPersonalStrip } from '@/components/home/LandingPersonalStrip';
 import { LandingFeatures } from '@/components/home/LandingFeatures';
 import { LandingMapSection } from '@/components/home/LandingMapSection';
 import { LandingTopics } from '@/components/home/LandingTopics';
 
-/** Picks marketing vs returning hero; no forced redirect off `/`. */
-export function HomePageContent({ currentSessionBillCount }: { currentSessionBillCount?: number }) {
+/**
+ * Picks marketing vs returning hero; no forced redirect off `/`.
+ *
+ * The marketing hero arrives as a server-rendered prop so it is present in the
+ * SSR HTML (it is the LCP element) instead of waiting on client auth
+ * resolution. While auth is loading we show it rather than a spinner; a
+ * signed-in visitor sees a brief marketing→returning hero swap (~100–300ms,
+ * same background photo), a deliberate trade for fast first paint.
+ */
+export function HomePageContent({
+  currentSessionBillCount,
+  marketingHero,
+}: {
+  currentSessionBillCount?: number;
+  marketingHero: React.ReactNode;
+}) {
   const { user, loading } = useUser();
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-        <CircularProgress aria-label="Loading" />
-      </Box>
-    );
-  }
+  const showReturning = !loading && Boolean(user);
 
   return (
     <>
-      {user ? <LandingHeroReturning /> : <LandingHero />}
-      {user ? <LandingPersonalStrip /> : null}
+      {showReturning ? <LandingHeroReturning /> : marketingHero}
+      {showReturning ? <LandingPersonalStrip /> : null}
       <Container maxWidth="lg">
         <LandingFeatures currentSessionBillCount={currentSessionBillCount} />
         <LandingMapSection />
