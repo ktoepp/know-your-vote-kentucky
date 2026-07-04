@@ -350,16 +350,21 @@ export async function fetchKyBillsMatchingSearch(
   const safe = q.trim();
   if (!safe) return [];
 
-  /** Was 120 and capped merge results too low; KY session-scale search needs room for 25/50/100 per page. */
-  const mergeCap = Math.min(
-    1000,
-    Math.max(
-      limit,
-      filters.committee || filters.dateRange ? limit * 4 : limit,
-      filters.chamber ? limit * 3 : limit,
-      filters.committee || (filters.status && filters.status !== 'all') ? limit * 6 : limit,
-    ),
+  const hasPostFilters = Boolean(
+    filters.chamber ||
+      filters.dateRange ||
+      filters.committee ||
+      filters.session ||
+      (filters.status && filters.status !== 'all'),
   );
+
+  /**
+   * Was 120 and capped merge results too low; KY session-scale search needs room for 25/50/100 per page.
+   * The cap must be the same for every filter combination — per-filter multipliers made the fetched pool
+   * (and therefore the post-filter count) grow when a user ADDED a narrowing filter, e.g.
+   * `session=2025` → 149 results but `session=2025&committee=…` → 156.
+   */
+  const mergeCap = Math.min(1000, hasPostFilters ? limit * 6 : limit);
 
   const likePattern = `%${safe}%`;
   const compactDesignation = sanitizeIlikeFragment(normalizeKyBillDesignation(safe));
@@ -432,7 +437,11 @@ export async function fetchKyBillsMatchingSearch(
     );
 
     const ftsCount = ftsRows?.length ?? 0;
-    const useIlikeFallback = omitKyBillsPlainSearchRpc || ftsCount < Math.min(limit, 15);
+    // FTS rows are not session/chamber-filtered at the DB, so when client-side filters will
+    // prune them, always run the ilike legs too — those go through `base()` and are
+    // session/chamber-filtered server-side, backfilling matches FTS truncation loses.
+    const useIlikeFallback =
+      omitKyBillsPlainSearchRpc || hasPostFilters || ftsCount < Math.min(limit, 15);
     if (useIlikeFallback) {
       supplemental.push(
         base().ilike('title', likePattern).order('session', { ascending: false }).limit(mergeCap),
