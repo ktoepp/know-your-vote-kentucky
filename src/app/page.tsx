@@ -4,6 +4,8 @@ import { HomePageContent } from '@/components/home/HomePageContent';
 import { SessionBannerServer } from '@/components/home/SessionBannerServer';
 import { fetchKyCurrentSessionBillCount } from '@/lib/ky-bills-browse-server';
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: 'Know Your Vote Kentucky — Track Kentucky legislation',
   description:
