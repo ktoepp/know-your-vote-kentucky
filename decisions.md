@@ -1248,3 +1248,21 @@ All four live call sites now import it: `ky-content-generation` (`KY_CONTENT_MOD
 - Script quirk noted, not fixed: dry-run "plans" over-count vs live (188 vs 166) because dry-run's collided-meeting event repoints don't persist, so step 3 re-lists the same events. Cosmetic; live counts are correct.
 
 **Revisit if:** a short-type row reappears (only two sources: a fresh-DB 027 re-seed — the § 2026-06-12 suggestion to re-cut the seed with full-label types is now the *known* fix for the last latent instance of this class — or LRC flipping the `CommitteeType` param back; the weekly same-rsn warn catches both); audit `warn` findings again age for weeks unactioned (the digest carries them, but nothing escalates a warning that repeats N weeks running).
+
+---
+
+## 2026-07-04 — Supabase security advisor: search_path pinning + definer RPC revokes (migration 037)
+
+**Trigger:** the Supabase security advisor showed 12 warnings — 5 × `function_search_path_mutable`, 6 × anon/authenticated can execute a `SECURITY DEFINER` function, 1 × leaked-password protection disabled.
+
+**Migration `037_ky_advisor_function_hardening.sql` (applied to primary 2026-07-04):**
+
+- **Pinned `search_path = public`** (via `ALTER FUNCTION`, no body changes) on the five functions created before the pinning convention: `ky_rate_limit_consume` (008), `ky_increment_counter` (009), `ky_top_legiscan_subject_names` (017), `ky_user_profiles_touch_updated_at` (016), `ky_notification_preferences_touch_updated_at` (019). `public` rather than `''` because the bodies reference tables unqualified — matches the already-pinned `ky_increment_bill_view` / `ky_sync_profile_from_auth_user`.
+- **Revoked EXECUTE from `PUBLIC`/`anon`/`authenticated`** on two definer functions that are not public API: `ky_sync_profile_from_auth_user` (fired only by triggers on `auth.users`; Postgres checks EXECUTE at trigger *creation*, not fire time, so triggers are unaffected) and `rls_auto_enable` (**dashboard-created event-trigger function `ensure_rls`, not in the repo** — auto-enables RLS on new `public` tables; returns `event_trigger` so PostgREST couldn't genuinely run it, revoked to clear the finding. Definition recorded here since 037 only alters grants: loops `pg_event_trigger_ddl_commands()` on `CREATE TABLE` in `public` and runs `ALTER TABLE … ENABLE ROW LEVEL SECURITY`).
+- **`ky_increment_bill_view` anon EXECUTE kept by design** — the bill detail page increments `view_count` from the browser (`BillDetailView`), and the definer wrapper exists to avoid granting anon `UPDATE` on `ky_bills`. The two advisor warnings on it (0028/0029) are **accepted**, not misses.
+
+**Verified on primary:** `pg_proc.proconfig` + `has_function_privilege` confirm all eight functions pinned and the two revokes in place; anon-facing RPCs smoke-tested (`ky_top_legiscan_subject_names` returns subjects, `ky_rate_limit_consume` allows + bucket cleaned up); **signup path re-proven end-to-end** — Auth admin `createUser` → profile trigger inserted the `ky_user_profiles` row → `deleteUser` cascaded cleanup (a rolled-back `SET ROLE supabase_auth_admin` test wasn't possible; `postgres` can't assume that role on hosted).
+
+**Remaining manual step — leaked-password protection (HIBP):** an Auth config toggle, not SQL: Dashboard → Authentication → Sign In / Providers → "Prevent use of leaked passwords" (Pro-plan feature). Couldn't be flipped from this machine: the local `supabase` CLI token belongs to a different org (Newsreel), so the Management API path was unavailable.
+
+**Revisit if:** a future migration adds a function without `SET search_path` (advisor will re-warn — pin at creation instead of a follow-up 037-style pass), or Supabase's advisor starts flagging the accepted `ky_increment_bill_view` grants at a higher severity.
