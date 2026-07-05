@@ -60,13 +60,13 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   hb: {
     category: 'bill_types',
     title: "House Bill (HB)",
-    content: "A proposed law introduced in the Kentucky House of Representatives. To become law, it has to pass the House, pass the Senate, and then go to the Governor."
+    content: "A proposed law introduced in the Kentucky House of Representatives. To become law, it has to pass the House, pass the Senate, and then go to the Governor — who can sign it, veto it, or let it become law without a signature. The General Assembly can override a veto with a majority of all members in each chamber (51 in the House, 20 in the Senate)."
   },
 
   sb: {
     category: 'bill_types',
     title: "Senate Bill (SB)",
-    content: "A proposed law introduced in the Kentucky Senate. To become law, it has to pass the Senate, pass the House, and then go to the Governor."
+    content: "A proposed law introduced in the Kentucky Senate. To become law, it has to pass the Senate, pass the House, and then go to the Governor — who can sign it, veto it, or let it become law without a signature. The General Assembly can override a veto with a majority of all members in each chamber (51 in the House, 20 in the Senate)."
   },
 
   hjr: {
@@ -473,16 +473,16 @@ export const governmentTooltips: Record<string, TooltipContent> = {
     content: "The bill is being reviewed by a specialized committee. Members may hold hearings, propose changes, and vote on whether to send it to the full chamber."
   },
 
-  timeline_markup: {
+  timeline_committee_amendments: {
     category: 'bill_status_and_stages',
     title: "Committee Amendments",
-    content: "The committee is actively reviewing and changing the bill's text before deciding whether to send it to the full chamber."
+    content: "The committee is considering changes to the bill's text — in Kentucky these take the form of committee amendments or a committee substitute — before deciding whether to send it to the full chamber."
   },
 
   timeline_vote: {
     category: 'bill_status_and_stages',
     title: "Floor Vote",
-    content: "The full chamber — all 100 House members or all 38 Senators — is voting on whether to pass the bill."
+    content: "The full House or Senate — members present — is voting on whether to pass the bill, as opposed to a vote only in committee."
   },
 
   timeline_passed: {
@@ -520,7 +520,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   senate_district: {
     category: 'districts_and_geography',
     title: "Senate District",
-    content: "The geographic area a Kentucky Senator represents. Kentucky has 38 Senate districts, each covering a larger area than a House district. You have both a House rep and a Senate rep."
+    content: "The geographic area a Kentucky Senator represents. Kentucky has 38 Senate districts, each electing one Senator and covering a larger area than a House district. Every Kentuckian lives in one — you have both a House rep and a Senate rep."
   },
 
   ballotpedia: {

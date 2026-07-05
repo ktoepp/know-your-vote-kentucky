@@ -28,7 +28,7 @@ const stageIcons: Record<string, string> = {
   cloture: '⏰',
   timeline_introduced: '📄',
   timeline_committee: '📋',
-  timeline_markup: '✏️',
+  timeline_committee_amendments: '✏️',
   timeline_vote: '🗳️',
   timeline_passed: '🏛️',
   timeline_signed: '✍️'
