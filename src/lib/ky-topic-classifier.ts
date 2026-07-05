@@ -39,7 +39,9 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   // 'diabetes' added 2026-06-07: student health / chronic disease screening bills may not use the word 'health'.
   // Bare 'drug' removed (2026-06-11): matched controlled-substance language in criminal /
   // search-warrant bills. Use specific healthcare phrasing instead.
-  Healthcare: ['health', 'hospital', 'medicaid', 'medicare', 'insurance', 'mental health', 'opioid', 'prescription drug', 'pharmacy', 'nurse', 'doctor', 'clinic', 'diabetes'],
+  // 'physician'/'physicians' added 2026-07-05: preceptor/licensure bills say "physician", never
+  // "doctor"/"health". Both forms listed — the word-boundary regex does not match plurals.
+  Healthcare: ['health', 'hospital', 'medicaid', 'medicare', 'insurance', 'mental health', 'opioid', 'prescription drug', 'pharmacy', 'nurse', 'doctor', 'clinic', 'diabetes', 'physician', 'physicians'],
   // Transport keywords (road/highway/transit/transportation/motor vehicle/etc.) moved to the
   // dedicated 'Transportation' topic below. Bare 'construction' removed: it matched finance/legal
   // boilerplate ("construction loans", "construction contracts", "statutory construction") far more
@@ -58,8 +60,13 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   // in non-labor bills. Bare 'employment' removed (2026-06-07): matched "employment of pharmacists",
   // "employer-sponsored insurance", etc. Replaced with 'employer', 'labor law', 'employment law'.
   Labor: ['workers', 'wage', 'employer', 'labor law', 'employment law', 'union', 'labor', 'workforce', 'unemployment', 'minimum wage', 'workplace'],
-  Housing: ['housing', 'rent', 'affordable housing', 'zoning', 'landlord', 'tenant', 'homeless', 'eviction', 'mortgage'],
-  Agriculture: ['farm', 'agriculture', 'crop', 'livestock', 'tobacco', 'bourbon', 'hemp', 'rural', 'usda'],
+  // 'forcible entry and detainer'/'forcible detainer' added 2026-07-05: KRS 383 eviction bills use
+  // the statutory term, never 'eviction'. Full phrases only — bare 'detainer' would match criminal
+  // jail-detainer bills and bare 'forcible entry' would match burglary bills.
+  Housing: ['housing', 'rent', 'affordable housing', 'zoning', 'landlord', 'tenant', 'homeless', 'eviction', 'mortgage', 'forcible entry and detainer', 'forcible detainer'],
+  // 'agricultural'/'cattle'/'cattlemen' added 2026-07-05: word-boundary match misses the adjectival
+  // form ("agricultural program trust fund"), and cattle bills may name neither farm nor agriculture.
+  Agriculture: ['farm', 'agriculture', 'agricultural', 'crop', 'livestock', 'tobacco', 'bourbon', 'hemp', 'rural', 'usda', 'cattle', 'cattlemen'],
   Energy: ['energy', 'coal', 'natural gas', 'solar', 'wind', 'utility', 'electric', 'pipeline', 'power plant', 'renewable'],
   'Criminal Justice': ['prison', 'jail', 'sentencing', 'parole', 'probation', 'felony', 'misdemeanor', 'incarceration', 'juvenile', 'expungement', 'warrantless', 'no-knock'],
   // Bare 'registration'/'primary' removed: 'registration' matched generic vehicle/business/

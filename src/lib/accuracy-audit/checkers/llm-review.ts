@@ -93,7 +93,9 @@ async function reviewSummaries(
   const items = data.map((b) => ({
     key: b.bill_number as string,
     title: clip(b.title as string, 300),
-    description: clip(b.description as string),
+    // The summary generator sees the full description; the auditor must too, or claims grounded
+    // past the clip read as fabricated (2026-07-05: HB257 "school climate" at char ~1050 of 1275).
+    description: clip(b.description as string, 2000),
     subjects: ((b.legiscan_subjects ?? []) as { subject_name?: string }[])
       .map((s) => s?.subject_name?.trim())
       .filter((s): s is string => !!s),
@@ -163,7 +165,9 @@ async function reviewTopics(
       return {
         key: b.bill_number as string,
         title: clip(b.title as string, 300),
-        description: clip(b.description as string, 500),
+        // Keyword classifier runs on the full description — clipping shorter than the classifier's
+        // input makes keyword-matched topics look unsupported.
+        description: clip(b.description as string, 2000),
         topics: Array.isArray(b.topics) ? (b.topics as string[]) : [],
         legiscanSubjects: subjects,
       };
