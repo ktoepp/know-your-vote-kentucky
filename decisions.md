@@ -1227,3 +1227,24 @@ All four live call sites now import it: `ky-content-generation` (`KY_CONTENT_MOD
 **Deferred:** agenda previews on browse meeting cards (needs an agenda fetch the browse path doesn't do; calendar day-panel + detail deep links cover the need for now); real portraits on committee-card leadership avatars (initials-only today, and two "SR" co-chairs on one card demonstrate the ambiguity).
 
 **Revisit if:** LRC posts intra-day meeting times in a parseable form (day groups could then order by time); the subcommittee-last sort confuses anyone looking for Budget Review subs specifically (a name-filter input would be the fix, not a sort revert).
+
+---
+
+## 2026-07-04 — Committee record merge, round 2: the 10 seed rows the June merge couldn't see
+
+**Trigger:** the § 2026-07-04 UX pass data finding — `/committees` listed both "Commission on Race **&** Access to Opportunity" (calendar-synced row, no upcoming meetings shown) and "Commission on Race **and** Access to Opportunity" (seed row holding the future interim meetings).
+
+**Diagnosis — same failure class as § 2026-06-12, new instances, and *not* a guard evasion.** `diagnose:committee-duplicates` found **10 high-confidence pairs** (not 1), every one a migration-027 seed row (short type code `IJ`/`S`, seed-style slug, `created_at` 2026-05-22, future meetings from the Interim Calendar **PDF backfill**) paired with a full-label row the live calendar sync minted on 2026-06-13/20/27. These committees simply hadn't appeared on the live legislative calendar by the 2026-06-12 merge — they were single rows then, and became pairs one by one as interim season progressed. Two corrections to the finding as originally recorded:
+
+- **The &/and variant does not evade the audit guard.** `normalizeCommitteeNameForDupes` already folds `&` → "and" (both Race names normalize identically), and the same-`lrc_rsn` check flags the pair regardless of name. **No guard change needed; none made.**
+- **The weekly audit had been warning all along** — 10 `[WARN] near-duplicate committee rows share lrc_rsn …` lines in every completed run since 2026-06-14 (see run 28318388587's log). The warnings reached the status digest but weren't acted on; the two most recent runs also didn't complete cleanly (6/21 timeout-cancel → fixed § 2026-06-27; 6/28 quota-stop false-red → fixed § 2026-06-28), which muffled the signal exactly when the pair count peaked.
+
+**Merge applied to primary 2026-07-04** (`merge:duplicate-committees --live`, auto mode — all 10 pairs were clean same-rsn short/full splits, no `--pair` overrides needed): 166 actions, `ky_committees` **66 → 56 rows**, report `reports/committee-merge-2026-07-05T00-28-38-669Z.json`.
+
+- **Survivor = the full-label row**, same rule as June — verified against live behavior before merging, not assumed: current calendar syncs upsert full-label rows (`updated_at` 2026-07-04 on state/local-government survivors; survivor meetings carry `source_url=…/legislativecalendar` vs the losers' PDF-backfill URL). The Race survivor keeps the "**&**" name because that is what LRC's calendar emits.
+- Losers' PDF-backfilled future meetings moved to survivors (Race: Jul 20 → Nov 18 now on the canonical row); collided same-date meetings merged per the June date-only rule; loser slugs appended to `aliases` (alias 308-redirect verified on `/committees/commission-race-access-opportunity`).
+- The 3 diagnose **SUSPECT** pairs (House Budget Review subs vs joint Budget Review subs) are genuinely distinct committees (different `lrc_rsn` + chamber) — left alone.
+- Verified on a local dev server against primary: `/committees` renders one Race commission card with "Next meeting · Mon, Jul 20, 2026"; 56 committees total. (kyvky.com may serve the cached list briefly until revalidation.)
+- Script quirk noted, not fixed: dry-run "plans" over-count vs live (188 vs 166) because dry-run's collided-meeting event repoints don't persist, so step 3 re-lists the same events. Cosmetic; live counts are correct.
+
+**Revisit if:** a short-type row reappears (only two sources: a fresh-DB 027 re-seed — the § 2026-06-12 suggestion to re-cut the seed with full-label types is now the *known* fix for the last latent instance of this class — or LRC flipping the `CommitteeType` param back; the weekly same-rsn warn catches both); audit `warn` findings again age for weeks unactioned (the digest carries them, but nothing escalates a warning that repeats N weeks running).
