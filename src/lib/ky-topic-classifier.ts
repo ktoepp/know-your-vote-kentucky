@@ -19,6 +19,7 @@ export const KY_TOPICS = [
   'Agriculture',
   'Energy',
   'Criminal Justice',
+  'Judiciary',
   'Voting Rights',
   'Local Government',
   'Budget',
@@ -69,6 +70,12 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   Agriculture: ['farm', 'agriculture', 'agricultural', 'crop', 'livestock', 'tobacco', 'bourbon', 'hemp', 'rural', 'usda', 'cattle', 'cattlemen'],
   Energy: ['energy', 'coal', 'natural gas', 'solar', 'wind', 'utility', 'electric', 'pipeline', 'power plant', 'renewable'],
   'Criminal Justice': ['prison', 'jail', 'sentencing', 'parole', 'probation', 'felony', 'misdemeanor', 'incarceration', 'juvenile', 'expungement', 'warrantless', 'no-knock'],
+  // Added 2026-07-05 (decisions.md § 2026-07-05 round 3). Deliberately narrow — court structure,
+  // judges, and Court of Justice administration. Excluded: bare 'judge'/'judges' (\b matches inside
+  // "county judge-executive" — local gov), bare 'court'/'courts' ("fiscal court", "court costs"),
+  // and 'circuit court'/'district court' ("may appeal to the Circuit Court" is boilerplate in
+  // occupational-licensing and administrative bills).
+  Judiciary: ['judiciary', 'judicial', 'supreme court', 'court of appeals', 'court of justice', 'appellate', 'chief justice', 'family court', 'circuit judge', 'district judge', 'judgeship', 'judgeships'],
   // Bare 'registration'/'primary' removed: 'registration' matched generic vehicle/business/
   // professional/motorboat/firearm registration boilerplate (radon contractors, metal detectors,
   // pharmacy techs, optometrists), and 'primary' matched 'primary care'/'primary school'/'primary
@@ -101,6 +108,24 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Procedural boilerplate stripped before keyword matching. Each pattern was measured to
+ * misfire a topic keyword corpus-wide (2026-07-05, Judiciary rollout): committee-referral
+ * clauses in study resolutions (11/39 'judiciary' hits), interstate-compact separation-of-powers
+ * language (11/241 'judicial' hits), and federal-court contingency clauses (3/105 'supreme
+ * court' hits). Stripping the phrase keeps the keyword's genuine signal — the alternative,
+ * deleting the keyword, is only right when most hits are noise (cf. the removed bare 'emergency').
+ */
+const BOILERPLATE_PATTERNS: RegExp[] = [
+  /\b(?:interim joint )?committee on (?:the )?judiciary\b/gi,
+  /\b(?:united states|u\.s\.) supreme court\b/gi,
+  /\b(?:executive|legislative|judicial)(?:,| and)? (?:executive|legislative|judicial),? and (?:executive|legislative|judicial) branch(?:es)?\b/gi,
+];
+
+function stripBoilerplate(text: string): string {
+  return BOILERPLATE_PATTERNS.reduce((t, re) => t.replace(re, ' '), text);
+}
+
 /** Compiled word-boundary regex cache, built once at module load. */
 const TOPIC_KEYWORD_REGEXES: { topic: KYTopicTag; keyword: string; regex: RegExp }[] =
   (Object.entries(TOPIC_KEYWORDS) as [KYTopicTag, string[]][]).flatMap(([topic, keywords]) =>
@@ -116,7 +141,7 @@ const TOPIC_KEYWORD_REGEXES: { topic: KYTopicTag; keyword: string; regex: RegExp
  * Returns matched topics sorted by relevance (number of keyword hits).
  */
 export function classifyTopics(title: string, description: string): string[] {
-  const text = `${title} ${description}`;
+  const text = stripBoilerplate(`${title} ${description}`);
   const hitsByTopic = new Map<KYTopicTag, number>();
 
   for (const { topic, regex } of TOPIC_KEYWORD_REGEXES) {
@@ -141,8 +166,9 @@ export function classifyTopics(title: string, description: string): string[] {
  * Used by Wave 3 coverage checks to log exactly what matched.
  */
 export function classifyTopicsForDebug(title: string): { keyword: string; topic: KYTopicTag }[] {
+  const text = stripBoilerplate(title);
   return TOPIC_KEYWORD_REGEXES
-    .filter(({ regex }) => regex.test(title))
+    .filter(({ regex }) => regex.test(text))
     .map(({ keyword, topic }) => ({ keyword, topic }));
 }
 

@@ -668,6 +668,11 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
     title: "Criminal Justice",
     content: "Criminal laws and penalties, courts, prosecutors and defenders, sentencing, juvenile justice, and re-entry."
   },
+  topic_judiciary: {
+    category: 'subject_topics',
+    title: "Judiciary",
+    content: "Kentucky's courts — the Supreme Court, Court of Appeals, circuit and district courts — plus judges, judicial elections and appointments, and Court of Justice administration."
+  },
   topic_voting_rights: {
     category: 'subject_topics',
     title: "Voting Rights",
