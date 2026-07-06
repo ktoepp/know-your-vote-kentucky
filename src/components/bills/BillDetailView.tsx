@@ -34,6 +34,7 @@ import { MemberName } from '@/components/civic/MemberName';
 import { BillNumber } from '@/components/bills/BillNumber';
 import { BillStatusMetaChip } from '@/components/bills/BillStatusMetaChip';
 import { MetaChip } from '@/components/ui/Chip';
+import { ExpandableText } from '@/components/ui/ExpandableText';
 import { legislatorRoleDistrictLineFromSponsor } from '@/lib/legislator-display';
 import {
   formatBillLabelText,
@@ -728,9 +729,13 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
             </Typography>
 
             {bill.description && (
-              <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.75, mb: 2, fontSize: '1.05rem' }}>
-                {bill.description}
-              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <ExpandableText
+                  text={bill.description}
+                  moreLabel="Show full description"
+                  typographyProps={{ variant: 'body1', color: 'text.secondary', sx: { lineHeight: 1.75, fontSize: '1.05rem' } }}
+                />
+              </Box>
             )}
 
             {/* Subject tags */}
