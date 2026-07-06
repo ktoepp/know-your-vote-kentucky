@@ -1360,3 +1360,17 @@ Full detail and run links: [TASKS.md § Ops notes (2026-07-05 health check)](./T
 - **Verified:** authoritative `dig` on all three zones (apexes → `216.150.1.1`, no AAAA); Vercel re-validated all domains to **Valid Configuration** without a manual refresh; curl confirms `kyvky.com` → 307 and all four `knowyourvote*` hosts → 308, all landing on `https://www.kyvky.com/` (200).
 
 **Revisit if:** Vercel flags these domains again (check for re-added AAAA/ALIAS rows in the three separate Hostinger zones — each domain has its own zone editor and nameserver pair).
+
+---
+
+## 2026-07-06 — Vercel MCP connector gap: root cause found (connector lacks "The Eighth Dimension" team grant)
+
+**The 13-day observability gap (first flagged 2026-06-23, re-flagged in three sessions since) is not a token or project-scoping bug — the Claude Vercel connector was never granted the team that hosts the production project.** No repo change fixes this; the record exists so no future session re-diagnoses it from scratch.
+
+- **Evidence chain (all firsthand, 2026-07-06):** `list_teams` through the connector returns exactly one team — `Katie's projects` (Hobby, `team_gmP71OjnH1pcPVIH72YLmfMX`); `list_projects` for that team returns `[]`; Katie confirmed via the Vercel dashboard (driven through Chrome, since the connector can't see it) that the production project lives under **The Eighth Dimension** team. The connector's OAuth grant covers only the Hobby team, so the team hosting `kyvky.com` is entirely invisible — the token "works" but can never find the project.
+- **This resolves the 07-05 puzzle** ("the token/connector works, it just can't see the project — re-link the connector to the project"): re-linking within the granted team could never have worked, because the project isn't in that team at all. The project was evidently created under or transferred to The Eighth Dimension at some point, while the connector grant stayed Hobby-only.
+- **Misleading breadcrumb — stale `.vercel/project.json`:** the local (gitignored) link file still records `orgId: team_gmP71OjnH1pcPVIH72YLmfMX` with `projectId prj_lZwB7WdEGRqlK27YiVj0zQ5JkE7M`. Vercel MCP tool docs explicitly tell agents to read this file to discover the team ID, so it actively steers every session toward querying the wrong (empty) team. Re-run `vercel link` after the grant lands so the file points at The Eighth Dimension.
+- **The fix is operator-only:** claude.ai → Settings → Connectors → Vercel → re-authorize, and include The Eighth Dimension in the team grant. No session can perform this (OAuth flows can't run non-interactively), which is why the gap survived three flags — each session could only re-confirm and recommend.
+- **Post-fix verification (any session):** `list_teams` shows The Eighth Dimension → `list_projects` for its team ID surfaces the kyvky project → spot-check `get_project` / `list_deployments` → close the open TASKS.md checkbox and resume Vercel cron/deploy health in the daily checks (digest 11:00, committee materials 13:30, health-check 14:00, enrollment actions 14:45).
+
+**Revisit if:** the grant lands but `list_projects` is still empty (then it's a per-project access restriction inside the team, a different problem than this one).
