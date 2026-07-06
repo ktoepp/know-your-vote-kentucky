@@ -293,6 +293,108 @@ function SponsorCard({
   );
 }
 
+/**
+ * Compact list of official document versions from legiscan_texts. KY document dates
+ * are "0000-00-00", so chronology comes from LegiScan's array order (oldest → newest)
+ * and versions can't be interleaved into the dated HistoryTimeline. Deduped by stage
+ * (newest document per stage wins). "Most current" follows the newest document
+ * regardless of sort order; the default is newest-first because this list's job is
+ * "get me the current text" (unlike the timeline, which tells the story oldest-first).
+ */
+function BillTextVersionsList({ texts }: { texts: LegiScanText[] }) {
+  const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('newest');
+
+  const { rows, mostCurrentDocId } = useMemo(() => {
+    const newestFirst = texts
+      .map((t, i) => ({ t, i }))
+      .sort(
+        (a, b) =>
+          (textDateOrNull(b.t.date) ?? '').localeCompare(textDateOrNull(a.t.date) ?? '') ||
+          b.i - a.i,
+      )
+      .map(({ t }) => t);
+    const seen = new Set<string>();
+    const deduped = newestFirst.filter((t) => {
+      if (seen.has(t.type)) return false;
+      seen.add(t.type);
+      return true;
+    });
+    return {
+      rows: sortOrder === 'newest' ? deduped : [...deduped].reverse(),
+      mostCurrentDocId: deduped[0]?.doc_id,
+    };
+  }, [texts, sortOrder]);
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+        <ToggleButtonGroup
+          size="small"
+          value={sortOrder}
+          exclusive
+          onChange={(_, v: 'oldest' | 'newest' | null) => {
+            if (v != null) setSortOrder(v);
+          }}
+          aria-label="Sort bill text versions"
+        >
+          <ToggleButton value="oldest" sx={{ textTransform: 'none', px: 1.5 }}>
+            Oldest first
+          </ToggleButton>
+          <ToggleButton value="newest" sx={{ textTransform: 'none', px: 1.5 }}>
+            Newest first
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+      {rows.map((t, i) => {
+        const label = TEXT_TYPE_LABELS[t.type] ?? t.type;
+        const date = textDateOrNull(t.date);
+        const href = httpUrlForUiLink(t.state_link) || httpUrlForUiLink(t.url);
+        const isCurrent = t.doc_id === mostCurrentDocId;
+        return (
+          <Box
+            key={t.doc_id}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              py: 0.75,
+              borderBottom: i === rows.length - 1 ? 'none' : '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Typography variant="body2" fontWeight={isCurrent ? 600 : 400} sx={{ flex: 1, minWidth: 0 }}>
+              {label}
+              {date && (
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
+                  {' · '}
+                  {fmtDate(date, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </Box>
+              )}
+            </Typography>
+            {isCurrent && (
+              <MuiChip label="Most current" size="small" color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
+            )}
+            {href && (
+              <MuiButton
+                variant="text"
+                size="small"
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Read the ${label} version`}
+                endIcon={<OpenInNew sx={{ fontSize: '0.85rem !important' }} />}
+                sx={{ fontWeight: 600, py: 0, minWidth: 0 }}
+              >
+                Read
+              </MuiButton>
+            )}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
 function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
@@ -485,17 +587,6 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
 
   // Most recent text version first
   const latestText = texts.find(t => t.type === 'Chaptered' || t.type === 'Enrolled' || t.type === 'Engrossed') ?? texts[0];
-  // All versions newest-first for the "Bill Text Versions" section. LegiScan returns
-  // texts[] in chronological order and KY document dates are unusable ("0000-00-00"),
-  // so real dates win when present and array position (newest last) breaks ties.
-  const sortedTexts = texts
-    .map((t, i) => ({ t, i }))
-    .sort(
-      (a, b) =>
-        (textDateOrNull(b.t.date) ?? '').localeCompare(textDateOrNull(a.t.date) ?? '') ||
-        b.i - a.i,
-    )
-    .map(({ t }) => t);
   const originalText = texts.find(t => t.type === 'Introduced');
   const officialTextForAi =
     httpUrlForUiLink(latestText?.state_link) ||
@@ -746,64 +837,16 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               </MuiCard>
             )}
 
-            {/* Bill text versions — every official document, newest first */}
-            {sortedTexts.length > 0 && (
+            {/* Bill text versions — compact, deduped by stage, toggleable like the timeline */}
+            {texts.length > 0 && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
-                  <Box sx={{ mb: 0.5 }}>
+                  <Box sx={{ mb: 1 }}>
                     <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight}>
                       Bill Text Versions
                     </Typography>
                   </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    A bill&apos;s text can change at each stage. The top entry is the most current version.
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    {sortedTexts.map((t, i) => {
-                      const href = httpUrlForUiLink(t.state_link) || httpUrlForUiLink(t.url);
-                      return (
-                        <Box
-                          key={t.doc_id}
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            flexWrap: 'wrap',
-                            p: 1.25,
-                            borderRadius: 2,
-                            bgcolor: i === 0 ? alpha(theme.palette.primary.main, 0.06) : 'transparent',
-                          }}
-                        >
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" fontWeight={i === 0 ? 700 : 500}>
-                              {TEXT_TYPE_LABELS[t.type] ?? t.type}
-                            </Typography>
-                            {textDateOrNull(t.date) && (
-                              <Typography variant="caption" color="text.secondary">
-                                {fmtDate(t.date)}
-                              </Typography>
-                            )}
-                          </Box>
-                          {i === 0 && (
-                            <MuiChip label="Most current" size="small" color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
-                          )}
-                          {href && (
-                            <MuiButton
-                              variant="text"
-                              size="small"
-                              href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              endIcon={<OpenInNew sx={{ fontSize: '0.85rem !important' }} />}
-                              sx={{ fontWeight: 600 }}
-                            >
-                              Read
-                            </MuiButton>
-                          )}
-                        </Box>
-                      );
-                    })}
-                  </Box>
+                  <BillTextVersionsList texts={texts} />
                 </MuiCardContent>
               </MuiCard>
             )}
