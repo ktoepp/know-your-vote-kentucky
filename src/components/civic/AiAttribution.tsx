@@ -104,15 +104,23 @@ export function AiGeneratedBlock({
       }}
     >
       <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 0.75, letterSpacing: '0.08em' }}>
-        {editorVerified
-          ? 'AI-generated from bill data and editor-verified notes — always verify with primary sources'
-          : 'AI-generated — always verify with primary sources'}
+        AI-generated — always verify with primary sources
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
         <Typography variant="subtitle1" fontWeight={700}>
           {title}
         </Typography>
         {beta && <Chip label="Beta" size="small" color="warning" variant="outlined" sx={{ fontWeight: 600 }} />}
+        {editorVerified && (
+          <Chip
+            label="Editor-verified details"
+            size="small"
+            color="primary"
+            variant="outlined"
+            title="Includes details a human editor verified against the official bill text."
+            sx={{ fontWeight: 600 }}
+          />
+        )}
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, whiteSpace: 'pre-line' }}>
         {renderSummaryBody(children)}
