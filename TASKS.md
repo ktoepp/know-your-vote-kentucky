@@ -63,6 +63,16 @@ Four orphaned `claude/funny-brahmagupta-*` branches held daily health-check repo
 - [ ] **`@react-email/*` sub-packages deprecated (from 06-30 check).** `npm ci` logs deprecation warnings for all of them (e.g. `@react-email/components@1.0.12`) — these render the digest + welcome emails. Not broken; plan a migration to the current `@react-email` package shape before they stop receiving patches. Low urgency.
 - [ ] **npm audit: 22 vulnerabilities (3 high, 17 moderate, 2 low) as of 06-29 CI.** Not blocking CI. Run `npm audit` locally to assess and `npm audit fix` the auto-fixable ones before the next launch review (docs/launch-checklist.md).
 
+### Ops notes (2026-07-06 health check)
+
+- **No new incidents, errors, or performance anomalies since 2026-07-05.** All systems nominal on the surfaces this session can observe.
+- **`sync-ky-bills-status.yml` — fully recovered.** 11 consecutive clean runs (#182–#192, 2026-07-03 19:27 → 2026-07-06 10:43) since the last LegiScan-timeout blip (#181, 2026-07-03). No escalation in failure rate — the 4-in-3-days blip flagged 07-05 has not continued.
+- **`accuracy-audit.yml`** — no run since #9 (2026-07-05, success); next due Sunday 2026-07-12 per schedule. Nothing to action.
+- **`sync-lrc-calendar.yml`** — clean; runs #88–#99 through 2026-07-05 all succeeded.
+- [ ] **`legislator-links-weekly.yml` — today's scheduled run (Mon 2026-07-06 ~12:00 UTC) had not yet fired as of this check** (still 14 total runs, latest is #14 / 2026-06-29, **failure**). Note: this check ran unaware of the 07-05 correction above — a fix candidate DID land (**PR #118**, merged 07-01, `exemptLegiscanQuota` classification); today's run is the first to exercise it. **Action:** re-check after 12:00 UTC today; green → close this and the 07-05 line; red → pull `reports/legislator-links.json` and run `npm run verify:legislator-links` locally to identify the specific link.
+- **Vercel MCP observability gap — still unresolved, now 13 days old.** No change from 07-05; same recommendation stands (fix connector scope or check Vercel dashboard directly).
+- **No open GitHub issues** in `ktoepp/know-your-vote-kentucky`.
+
 **Roadmap priority (2026-06-11):** [operator launch checklist](./docs/launch-checklist.md) (Resend DKIM, Sentry alerts, legal review, email QA) → mobile a11y profile/feed/follow sweep (deferred from 2026-06-01 scope). Phase 5b enrollment-actions **shipped 2026-06-11** — see Recently completed.
 
 ## Maintained on autopilot
