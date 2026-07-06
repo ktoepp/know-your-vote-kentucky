@@ -1347,3 +1347,16 @@ Full detail and run links: [TASKS.md § Ops notes (2026-07-05 health check)](./T
 - **Lesson for future DNS checks:** Hostinger's zone editor does not show the records ALIAS flattening publishes; diagnose with `dig @athena.dns-parking.com <name> <type>` against the authoritative nameservers, and compare the SOA serial to confirm whether an edit has actually landed.
 
 **Revisit if:** apex TLS errors recur (check for re-added ALIAS/AAAA), or analytics setup changes to a first-party proxy.
+
+---
+
+## 2026-07-06 — Redirect-domain DNS cleanup (Vercel "Invalid Configuration" cleared)
+
+**Follow-up to the same-day apex incident:** the Vercel Domains page flagged `knowyourvoteky.com` and `knowyourvotekentucky.com` as **Invalid Configuration** and `kyvky.com` as **DNS Change Recommended**. All three fixes were DNS edits in Hostinger hPanel; nothing changed in Vercel or the repo.
+
+- **Root cause (redirect domains):** both apex zones carried a leftover Hostinger `AAAA @ 2a02:4780:84::32` alongside the correct Vercel `A @ 216.150.1.1` — the same IPv6-goes-to-Hostinger failure mode as the apex ALIAS incident, just via a plain AAAA record this time. Vercel's error panel named that exact record as the conflict. Deleted it from both zones.
+- **216.150.1.1 is Vercel, not parking.** whois: `VERCEL-09 / Vercel, Inc`. An earlier session misread these zones as "Hostinger parking/redirect service" because of this IP — they were already pointed at Vercel, with Vercel handling the 308 → `www.kyvky.com` redirect.
+- **kyvky.com recommendation:** Vercel's IP range expansion now recommends `A @ 216.150.1.1` over the older `216.198.79.1` / `76.76.21.21` (which keep working). Updated the apex A record to match; badge cleared.
+- **Verified:** authoritative `dig` on all three zones (apexes → `216.150.1.1`, no AAAA); Vercel re-validated all domains to **Valid Configuration** without a manual refresh; curl confirms `kyvky.com` → 307 and all four `knowyourvote*` hosts → 308, all landing on `https://www.kyvky.com/` (200).
+
+**Revisit if:** Vercel flags these domains again (check for re-added AAAA/ALIAS rows in the three separate Hostinger zones — each domain has its own zone editor and nameserver pair).
