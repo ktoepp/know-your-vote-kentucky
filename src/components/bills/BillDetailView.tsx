@@ -126,8 +126,10 @@ const TEXT_TYPE_LABELS: Record<string, string> = {
   Draft: 'Draft',
 };
 
-/** Later stages rank higher when dates tie or are missing. */
-const TEXT_FINALITY: Record<string, number> = { Chaptered: 3, Enrolled: 2, Engrossed: 1 };
+/** KY texts[] ship date "0000-00-00"; treat anything non-real as missing. */
+function textDateOrNull(date: string | undefined): string | null {
+  return date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !date.startsWith('0000') ? date : null;
+}
 
 interface LegiScanSubject {
   subject_id: number;
@@ -483,12 +485,17 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
 
   // Most recent text version first
   const latestText = texts.find(t => t.type === 'Chaptered' || t.type === 'Enrolled' || t.type === 'Engrossed') ?? texts[0];
-  // All versions newest-first for the "Bill Text Versions" section (date, then stage finality).
-  const sortedTexts = [...texts].sort(
-    (a, b) =>
-      (b.date ?? '').localeCompare(a.date ?? '') ||
-      (TEXT_FINALITY[b.type] ?? 0) - (TEXT_FINALITY[a.type] ?? 0),
-  );
+  // All versions newest-first for the "Bill Text Versions" section. LegiScan returns
+  // texts[] in chronological order and KY document dates are unusable ("0000-00-00"),
+  // so real dates win when present and array position (newest last) breaks ties.
+  const sortedTexts = texts
+    .map((t, i) => ({ t, i }))
+    .sort(
+      (a, b) =>
+        (textDateOrNull(b.t.date) ?? '').localeCompare(textDateOrNull(a.t.date) ?? '') ||
+        b.i - a.i,
+    )
+    .map(({ t }) => t);
   const originalText = texts.find(t => t.type === 'Introduced');
   const officialTextForAi =
     httpUrlForUiLink(latestText?.state_link) ||
@@ -771,7 +778,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                             <Typography variant="body2" fontWeight={i === 0 ? 700 : 500}>
                               {TEXT_TYPE_LABELS[t.type] ?? t.type}
                             </Typography>
-                            {t.date && (
+                            {textDateOrNull(t.date) && (
                               <Typography variant="caption" color="text.secondary">
                                 {fmtDate(t.date)}
                               </Typography>
