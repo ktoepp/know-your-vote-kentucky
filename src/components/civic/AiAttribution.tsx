@@ -74,12 +74,11 @@ interface AiGeneratedBlockProps {
   billNumber?: string;
   /** Show a "Beta" tag on the section title while the feature is still being validated. */
   beta?: boolean;
-  /** True when the summary was generated with editor-verified notes (ky_bills.editor_notes, migration 038). */
-  editorVerified?: boolean;
 }
 
 /**
- * Prominent callout for bill/ordinance detail pages: AI text is clearly labeled with a path to primary sources.
+ * Summary block for bill/ordinance detail pages: AI text is clearly labeled with a path
+ * to primary sources. Renders as plain content — the page's card provides containment.
  */
 export function AiGeneratedBlock({
   title = 'Plain-language summary',
@@ -88,21 +87,12 @@ export function AiGeneratedBlock({
   officialLabel = 'Open official bill text',
   billNumber,
   beta = false,
-  editorVerified = false,
 }: AiGeneratedBlockProps) {
   const feedbackHref = billNumber
     ? `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(`Feedback on ${billNumber} summary`)}`
     : null;
   return (
-    <Box
-      sx={{
-        p: 2,
-        borderRadius: 2,
-        bgcolor: 'action.hover',
-        border: '1px solid',
-        borderColor: 'divider',
-      }}
-    >
+    <Box>
       <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 0.75, letterSpacing: '0.08em' }}>
         AI-generated — always verify with primary sources
       </Typography>
@@ -111,16 +101,6 @@ export function AiGeneratedBlock({
           {title}
         </Typography>
         {beta && <Chip label="Beta" size="small" color="warning" variant="outlined" sx={{ fontWeight: 600 }} />}
-        {editorVerified && (
-          <Chip
-            label="Editor-verified details"
-            size="small"
-            color="primary"
-            variant="outlined"
-            title="Includes details a human editor verified against the official bill text."
-            sx={{ fontWeight: 600 }}
-          />
-        )}
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, whiteSpace: 'pre-line' }}>
         {renderSummaryBody(children)}

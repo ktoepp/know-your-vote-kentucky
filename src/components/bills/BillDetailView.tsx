@@ -829,7 +829,6 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                     officialLabel="Open official bill text (PDF)"
                     billNumber={bill.bill_number}
                     beta
-                    editorVerified={!!bill.editor_notes}
                   >
                     {bill.ai_summary}
                   </AiGeneratedBlock>

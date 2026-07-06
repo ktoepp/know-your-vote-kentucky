@@ -12,13 +12,12 @@ export const dynamic = 'force-dynamic';
  */
 
 // Verbatim samples from `npm run backfill:bill-summaries:dry` (2026-06-26).
-// HB 904 is a hand-written approximation of editor-notes-enriched output (migration 038);
-// replace with the real dry-run text once the HB904 note is set.
-const SAMPLES: { billNumber: string; title: string; summary: string; editorVerified?: boolean }[] = [
+// HB 904 approximates editor-notes-enriched output (migration 038) — notes feed the
+// prompt as grounding but carry no distinct UI treatment (removed 2026-07-06 pending SMEs).
+const SAMPLES: { billNumber: string; title: string; summary: string }[] = [
   {
     billNumber: 'HB 904',
     title: 'AN ACT relating to gaming.',
-    editorVerified: true,
     summary:
       'This law, called the Wagering Consumer Protection Act, makes major changes to how Kentucky oversees gambling-related activities, raising the participation age for sports wagering and charitable gaming from 18 to 21 and increasing licensing fees. It also requires all electronic pull-tab devices at a licensed charitable gaming site to sit in a single cordoned-off area readily visible to the gaming chairperson, with entrance monitoring and ID checks where under-21s are allowed on the premises.\n\nWho it may affect: people who participate in sports wagering or charitable gaming; veterans service organizations such as VFW, AMVETS, and American Legion posts, fraternal orders, and similar private clubs that run charitable gaming; and businesses that distribute or manufacture gaming supplies.',
   },
@@ -67,7 +66,6 @@ export default function DevBillSummaryPreview() {
                   officialLabel="Open official bill text (PDF)"
                   billNumber={s.billNumber}
                   beta
-                  editorVerified={s.editorVerified}
                 >
                   {s.summary}
                 </AiGeneratedBlock>

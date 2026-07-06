@@ -1390,3 +1390,12 @@ Full detail and run links: [TASKS.md § Ops notes (2026-07-05 health check)](./T
 - **Bill-text-versions UI (same feedback, second gap):** the placement rule entered HB904 via substitute/amendment, and the page showed no document versions. Sync + schema were already done (migration 036 `legiscan_texts`, zero extra LegiScan quota — texts[] rides the existing getBill call); added a "Bill Text Versions" card on the bill page listing every version newest-first (date, then Chaptered>Enrolled>Engrossed finality tie-break) with a "Most current" chip and official `state_link` links. Rows synced before migration 036 stay empty until their next detail sync — the card hides itself.
 
 **Revisit if:** notes accumulate to where a history/audit trail matters (then a table), or readers report confusion between "editor-verified" and "AI-generated" wording.
+
+---
+
+## 2026-07-06 — Editor-verified UI disclosure removed; summary un-nested from grey block
+
+Two same-day reversals of the § 2026-07-06 editor-notes UI (the *mechanism* is unchanged — `editor_notes` still feeds the prompt and input hash, and the accuracy audit still receives it):
+
+- **No "editor-verified" surface on the frontend** — neither the long overline (first pass) nor the chip (second pass). Katie's call: don't market verification until there are subject-matter experts behind the word. The attribution stays the plain "AI-generated — always verify with primary sources", which remains truthful (notes are inputs; the text is model-written). **Revisit when:** SMEs join and verification has a person/process worth naming.
+- **`AiGeneratedBlock` grey box removed** — it rendered a bordered/tinted box inside the page's `MuiCard`, double-containing the summary. The block is now plain content; the card provides the single container. Both call sites (bill detail, `/dev/bill-summary-preview`) wrap it in a card, so nothing loses containment.
