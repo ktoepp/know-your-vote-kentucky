@@ -574,15 +574,6 @@ export const hasTooltipContent = (key: string): boolean => {
   return key in governmentTooltips;
 };
 
-// Vote explanation tooltips - Concise and clear
-export const voteExplanations: Record<string, string> = {
-  yes: "Voted in favor of the bill or amendment",
-  no: "Voted against the bill or amendment",
-  abstain: "Chose not to vote, often due to conflict of interest",
-  not_voting: "Was absent or chose not to participate in this vote",
-  present: "Was present but chose not to vote either way"
-};
-
 /** Tooltip content for roll-call vote-count chips (Yea / Nay / NV). */
 export const voteCountTooltips: Record<string, TooltipContent> = {
   yea: {
