@@ -112,6 +112,18 @@ const TOPIC_TO_SUBJECT_PATTERNS: Record<KYTopicTag, SubjectPattern[]> = {
     /\bjuvenile justice/i,
     /expungement/i,
   ],
+  // Anchored ^courts?/^judges? so LRC subjects like "Courts, Circuit" and "Judges" map while
+  // "Fiscal Courts" and "County Judge/Executive" (local gov) do not.
+  Judiciary: [
+    /^courts?\b/i,
+    /^judges?\b/i,
+    /judicial/i,
+    /judiciary/i,
+    /supreme court/i,
+    /court of appeals/i,
+    /court of justice/i,
+    /appellate/i,
+  ],
   'Voting Rights': [
     /\bvot(ing|er|e)\b/i,
     /\belection law|election integrity/i,

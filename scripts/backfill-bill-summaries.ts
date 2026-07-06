@@ -9,6 +9,7 @@
  *   npx tsx scripts/backfill-bill-summaries.ts --only-missing        # skip bills that already have a summary
  *   npx tsx scripts/backfill-bill-summaries.ts --all-sessions        # widen beyond the active session
  *   npx tsx scripts/backfill-bill-summaries.ts --session="2025 Regular Session"
+ *   npx tsx scripts/backfill-bill-summaries.ts --bill=HB877              # regen one bill (forces regen)
  *
  * --limit caps the number of summaries GENERATED this run (the cost knob), not rows scanned.
  * Decoupled from LegiScan sync on purpose: keeps AI latency/cost out of the quota-sensitive
@@ -36,6 +37,10 @@ const limitArg = process.argv.find((a) => a.startsWith('--limit='));
 const LIMIT = limitArg ? parseInt(limitArg.split('=')[1] ?? '', 10) : Infinity;
 const sessionArg = process.argv.find((a) => a.startsWith('--session='));
 const SESSION = sessionArg ? sessionArg.split('=')[1] ?? '' : null;
+// --bill=HB877 targets one bill (within the session scope) and forces regeneration
+// even when the input hash is unchanged — for accuracy-audit triage of a flagged summary.
+const billArg = process.argv.find((a) => a.startsWith('--bill='));
+const BILL = billArg ? (billArg.split('=')[1] ?? '').toUpperCase().replace(/\s+/g, '') : null;
 const CONCURRENCY = 4;
 
 type SummaryRow = Pick<
@@ -69,6 +74,7 @@ function summaryInputHash(row: SummaryRow): string {
 }
 
 function needsRegen(row: SummaryRow, hash: string): boolean {
+  if (BILL) return true; // explicit target: always regenerate
   if (!isUsableSummary(row.ai_summary)) return true; // missing / empty / stale placeholder
   if (ONLY_MISSING) return false; // has a usable summary and we only fill gaps
   return row.ai_summary_input_hash !== hash; // inputs changed since last generation
@@ -102,6 +108,7 @@ async function main() {
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1);
     if (sessionName) q = q.eq('session', sessionName);
+    if (BILL) q = q.eq('bill_number', BILL);
 
     const { data, error } = await q;
     if (error) throw new Error(error.message);
