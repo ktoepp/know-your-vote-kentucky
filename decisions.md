@@ -1333,3 +1333,17 @@ Full detail and run links: [TASKS.md § Ops notes (2026-07-05 health check)](./T
 - **Member profile:** separate "Not voting: N" and "Absent: N" filter chips (each rendered only when its count > 0), replacing the combined toggle; `VoteFilter` is now `'all' | VoteBucket`. Per-vote chips keep the official roll-call text (e.g. "Excused") but expand the bare "NV" abbreviation to "Not voting" for readability.
 - **Bill roll calls:** added the Absent count chip (with the existing civic tooltip); NV chip label changed "NV: n" → "Not voting: n". Yea/Nay stay filled, non-vote types outlined so decisive counts read as primary. `fetchDbVotes` now selects `absent_count`. NV chip still hides on pre-migration-035 rows (`nv_count` NULL → 0) until a votes re-sync fills it — as of this change production has **no rows with `nv_count` populated**, so bill-page NV chips appear only after the next full votes sync. Per-member "NV" entries in `roll_call` JSONB are unaffected (member profiles show them today).
 - **Not done:** `src/components/ui/VotingRecord.tsx` is dead code from a pre-MUI design (federal-style positions, Tailwind classes) — flagged for separate deletion rather than updated.
+
+---
+
+## 2026-07-06 — Apex DNS/IPv6 incident (resolved same day)
+
+**Found during live verification of PR #136:** `https://kyvky.com` (apex, no www) failed with a TLS handshake error (alert 40) for all IPv6-capable clients — most mobile carriers. `www.kyvky.com` was unaffected, which is why it went unnoticed.
+
+- **Root cause:** an `ALIAS @ → 560cb0e1fc1c9ae0c4c1.cf-prod-us-proxy.proxyhog.com` record in the Hostinger DNS zone — a PostHog managed reverse proxy hostname fronted by Cloudflare, added to the **apex** (zone serial dated 2026-07-02, same edit that repointed the A record to Vercel). Hostinger flattens ALIAS records at the nameserver, so the zone editor showed **no AAAA rows** while the nameservers served Cloudflare AAAA answers for the apex. The explicit `A @ 216.198.79.1` (Vercel) shadowed the ALIAS for IPv4, so only IPv6 broke: those visitors reached Cloudflare, which has no cert for kyvky.com.
+- **Why deleting it was safe:** production sends PostHog events directly to `us.i.posthog.com` (confirmed by watching live network traffic — `NEXT_PUBLIC_POSTHOG_HOST` is unset, `instrumentation-client.ts` default applies). Nothing referenced a proxy on the domain, and an apex proxy could never coexist with the site anyway.
+- **Fix:** deleted the ALIAS row in Hostinger hPanel (Katie, 2026-07-06). AAAA answers cleared from both authoritative nameservers (~4 min, ALIAS-flattening cache TTL 300), verified `curl -6 https://kyvky.com` → 307 → `https://www.kyvky.com/` and full page load in Chrome.
+- **If a PostHog reverse proxy is ever wanted:** put it on a subdomain (e.g. `e.kyvky.com` CNAME → the proxyhog target), set `NEXT_PUBLIC_POSTHOG_HOST` in Vercel, and configure the custom domain in the PostHog UI — never on `@`.
+- **Lesson for future DNS checks:** Hostinger's zone editor does not show the records ALIAS flattening publishes; diagnose with `dig @athena.dns-parking.com <name> <type>` against the authoritative nameservers, and compare the SOA serial to confirm whether an edit has actually landed.
+
+**Revisit if:** apex TLS errors recur (check for re-added ALIAS/AAAA), or analytics setup changes to a first-party proxy.
