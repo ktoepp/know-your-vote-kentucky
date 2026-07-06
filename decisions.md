@@ -1322,3 +1322,14 @@ All four live call sites now import it: `ky-content-generation` (`KY_CONTENT_MOD
 - **Persisting gap:** the Vercel MCP connector still returns zero projects for this team/org (same as 2026-06-23), so Vercel cron health (digest, committee materials, enrollment actions, health-check) and Sentry-surfaced runtime errors remain unverifiable from a Claude session. Two health-check cycles now with no remediation — either the MCP connector needs to be pointed at the right Vercel project, or this class of check should move to a manual dashboard review cadence instead of relying on the MCP.
 
 Full detail and run links: [TASKS.md § Ops notes (2026-07-05 health check)](./TASKS.md#ops-notes-2026-07-05-health-check).
+
+---
+
+## 2026-07-06
+
+**Voting record UI — split vote types to match the official roll call.** LegiScan distinguishes four positions (Yea / Nay / Not voting / Absent) and the DB has stored them separately since migration 035, but the UI collapsed them: member profiles merged NV + Absent into one amber "Not voting / absent" chip, and bill roll calls showed only Yea/Nay (NV when > 0, Absent never).
+
+- **Shared display mapping** in `src/lib/vote-display.ts` — one label + MUI chip color per `VoteBucket`, used by both member profile and bill roll calls, so vote types can't drift between surfaces. Colors: Yea green, Nay red, **Not voting amber** (present but declined — behaviorally notable), **Absent gray** (not present — neutral). **Trade-off:** Absent shares gray with the rare "Other" bucket; labels disambiguate.
+- **Member profile:** separate "Not voting: N" and "Absent: N" filter chips (each rendered only when its count > 0), replacing the combined toggle; `VoteFilter` is now `'all' | VoteBucket`. Per-vote chips keep the official roll-call text (e.g. "Excused") but expand the bare "NV" abbreviation to "Not voting" for readability.
+- **Bill roll calls:** added the Absent count chip (with the existing civic tooltip); NV chip label changed "NV: n" → "Not voting: n". Yea/Nay stay filled, non-vote types outlined so decisive counts read as primary. `fetchDbVotes` now selects `absent_count`. NV chip still hides on pre-migration-035 rows (`nv_count` NULL → 0) until a votes re-sync fills it — as of this change production has **no rows with `nv_count` populated**, so bill-page NV chips appear only after the next full votes sync. Per-member "NV" entries in `roll_call` JSONB are unaffected (member profiles show them today).
+- **Not done:** `src/components/ui/VotingRecord.tsx` is dead code from a pre-MUI design (federal-style positions, Tailwind classes) — flagged for separate deletion rather than updated.

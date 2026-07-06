@@ -39,6 +39,7 @@ import {
   formatBillLabelText,
 } from '@/lib/bill-display';
 import { governmentTooltips, voteCountTooltips } from '@/lib/tooltipContent';
+import { voteBucketChipColor, voteBucketLabel } from '@/lib/vote-display';
 import { getSessionTooltip } from '@/lib/ky-sessions';
 import { formatCivicDate } from '@/lib/civic-date';
 import { supabase } from '@/app/lib/supabaseClient';
@@ -165,6 +166,54 @@ function deriveRollCallLabel(
 /* ------------------------------------------------------------------ */
 /* Sub-components                                                       */
 /* ------------------------------------------------------------------ */
+/**
+ * One count chip in a roll-call summary (Yea / Nay / Not voting / Absent),
+ * wrapped in the civic tooltip explaining how that vote type counts toward
+ * passage. Yea/Nay are filled; the non-vote types are outlined so the
+ * decisive counts stay visually primary.
+ */
+function VoteCountChip({ bucket, count }: { bucket: 'yea' | 'nay' | 'nv' | 'absent'; count: number }) {
+  const chip = (
+    <MuiChip
+      label={`${voteBucketLabel(bucket)}: ${count}`}
+      size="small"
+      color={voteBucketChipColor(bucket)}
+      variant={bucket === 'yea' || bucket === 'nay' ? 'filled' : 'outlined'}
+    />
+  );
+  const tip = voteCountTooltips[bucket];
+  if (!tip) return chip;
+  return (
+    <MuiTooltip
+      title={
+        <Box sx={{ p: 0.25 }}>
+          <Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>
+            {tip.title}
+          </Typography>
+          <Typography variant="body2">{tip.content}</Typography>
+        </Box>
+      }
+      arrow
+      enterDelay={300}
+      componentsProps={{
+        tooltip: {
+          sx: {
+            maxWidth: 300,
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: 4,
+            '& .MuiTooltip-arrow': { color: 'background.paper' },
+          },
+        },
+      }}
+    >
+      {chip}
+    </MuiTooltip>
+  );
+}
+
 function SponsorCard({
   sponsor,
   rosterPhoto,
@@ -764,20 +813,10 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                           {deriveRollCallLabel(v, history)}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1.25 }}>
-                          {(['yea', 'nay'] as const).map((key) => {
-                            const tip = voteCountTooltips[key];
-                            const chip = <MuiChip key={key} label={key === 'yea' ? `Yea: ${v.yea}` : `Nay: ${v.nay}`} size="small" color={key === 'yea' ? 'success' : 'error'} />;
-                            return tip ? (
-                              <MuiTooltip key={key} title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{tip.title}</Typography><Typography variant="body2">{tip.content}</Typography></Box>} arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 300, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}>{chip}</MuiTooltip>
-                            ) : chip;
-                          })}
-                          {v.nv > 0 && (() => {
-                            const tip = voteCountTooltips['nv'];
-                            const chip = <MuiChip label={`NV: ${v.nv}`} size="small" variant="outlined" />;
-                            return tip ? (
-                              <MuiTooltip title={<Box sx={{ p: 0.25 }}><Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>{tip.title}</Typography><Typography variant="body2">{tip.content}</Typography></Box>} arrow enterDelay={300} componentsProps={{ tooltip: { sx: { maxWidth: 300, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', boxShadow: 4, '& .MuiTooltip-arrow': { color: 'background.paper' } } } }}>{chip}</MuiTooltip>
-                            ) : chip;
-                          })()}
+                          <VoteCountChip bucket="yea" count={v.yea} />
+                          <VoteCountChip bucket="nay" count={v.nay} />
+                          {v.nv > 0 && <VoteCountChip bucket="nv" count={v.nv} />}
+                          {v.absent > 0 && <VoteCountChip bucket="absent" count={v.absent} />}
                         </Box>
                         {legiscanVoteUrl && (
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
