@@ -55,6 +55,16 @@ The pass itself **shipped as PR #88** (full record in Recently completed). Still
 - [ ] **Legislator-links weekly — unresolved failure (2026-06-29, run #14, #28384198927).** `sync:ky:legislators` itself succeeded (141/141; LegiScan people_id refresh non-fatally skipped on a 97.2% quota hold), but `verify:legislator-links` exited 1 after writing `reports/legislator-links.json` — i.e. it found at least one legislator outbound link (LRC/campaign website/Ballotpedia/LegiScan) returning a bad status, which is exactly what the checker is designed to catch. **No fix landed yet** — the report artifact (30-day retention) has the specific URL(s); next scheduled run is Monday 2026-07-06 ~12:00 UTC and may self-clear if the target site was only briefly down. If it fails again next week, pull the artifact and run `npm run verify:legislator-links` locally to identify the specific stale/broken link.
 - **Vercel MCP observability gap — still unresolved, now 12 days old.** Same as 2026-06-23: `list_projects` still returns `[]` for this Vercel connector/team, so Vercel cron health (digest, committee materials, enrollment actions, health-check) and Sentry-surfaced runtime errors remain unverifiable from this session. No open GitHub issues track it. Recommend either fixing the Vercel MCP connector scope (link it to the project actually hosting `kyvky.com`) or checking the Vercel dashboard directly — this has now been a known gap for two health-check cycles with no remediation.
 
+### Ops notes (2026-07-06 health check)
+
+- **No new incidents, errors, or performance anomalies since 2026-07-05.** All systems nominal on the surfaces this session can observe.
+- **`sync-ky-bills-status.yml` — fully recovered.** 11 consecutive clean runs (#182–#192, 2026-07-03 19:27 → 2026-07-06 10:43) since the last LegiScan-timeout blip (#181, 2026-07-03). No escalation in failure rate — the 4-in-3-days blip flagged 07-05 has not continued.
+- **`accuracy-audit.yml`** — no run since #9 (2026-07-05, success); next due Sunday 2026-07-12 per schedule. Nothing to action.
+- **`sync-lrc-calendar.yml`** — clean; runs #88–#99 through 2026-07-05 all succeeded.
+- [ ] **`legislator-links-weekly.yml` — today's scheduled run (Mon 2026-07-06 ~12:00 UTC) had not yet fired as of this check** (still 14 total runs, latest is #14 / 2026-06-29, **failure** — the broken-outbound-link finding noted 07-05, still unresolved, no fix landed). **Action:** re-check after 12:00 UTC today; if it fails again, pull `reports/legislator-links.json` and run `npm run verify:legislator-links` locally per the 07-05 note. If it passes, the link may have self-cleared and this line can be closed.
+- **Vercel MCP observability gap — still unresolved, now 13 days old.** No change from 07-05; same recommendation stands (fix connector scope or check Vercel dashboard directly).
+- **No open GitHub issues** in `ktoepp/know-your-vote-kentucky`.
+
 **Roadmap priority (2026-06-11):** [operator launch checklist](./docs/launch-checklist.md) (Resend DKIM, Sentry alerts, legal review, email QA) → mobile a11y profile/feed/follow sweep (deferred from 2026-06-01 scope). Phase 5b enrollment-actions **shipped 2026-06-11** — see Recently completed.
 
 ## Maintained on autopilot
