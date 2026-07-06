@@ -74,6 +74,8 @@ interface AiGeneratedBlockProps {
   billNumber?: string;
   /** Show a "Beta" tag on the section title while the feature is still being validated. */
   beta?: boolean;
+  /** True when the summary was generated with editor-verified notes (ky_bills.editor_notes, migration 038). */
+  editorVerified?: boolean;
 }
 
 /**
@@ -86,6 +88,7 @@ export function AiGeneratedBlock({
   officialLabel = 'Open official bill text',
   billNumber,
   beta = false,
+  editorVerified = false,
 }: AiGeneratedBlockProps) {
   const feedbackHref = billNumber
     ? `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(`Feedback on ${billNumber} summary`)}`
@@ -101,7 +104,9 @@ export function AiGeneratedBlock({
       }}
     >
       <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 0.75, letterSpacing: '0.08em' }}>
-        AI-generated — always verify with primary sources
+        {editorVerified
+          ? 'AI-generated from bill data and editor-verified notes — always verify with primary sources'
+          : 'AI-generated — always verify with primary sources'}
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
         <Typography variant="subtitle1" fontWeight={700}>

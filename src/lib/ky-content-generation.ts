@@ -33,7 +33,8 @@ Generate plain-language summaries with this shape:
 - Then, on a new line, a short "Who it may affect:" clause naming the Kentuckians most directly impacted (e.g. parents and students, renters, small employers, veterans).
 
 Hard rules:
-- Use ONLY the bill fields provided (number, title, description, topics, subjects). Do not use outside knowledge or assume provisions that are not stated.
+- Use ONLY the bill fields provided (number, title, description, topics, subjects) and, when present, the editor-verified notes. Do not use outside knowledge or assume provisions that are not stated.
+- Editor-verified notes, when present, are facts a human editor confirmed against the official bill text. Treat them as authoritative grounding — incorporate what they state, and you may name affected groups they support. They are NOT license to speculate beyond what the fields and notes state.
 - Name affected groups ONLY when clearly inferable from those fields. Hedge with "may affect." If the impact is unclear or the description is too thin to tell, OMIT the "Who it may affect:" clause entirely rather than guessing.
 - Non-partisan and factual. No opinions, no political framing, no predictions about passage.
 - Written for a general audience, no jargon.
@@ -66,7 +67,7 @@ async function generateSummary(prompt: string): Promise<string> {
   try {
     const message = await anthropic.messages.create({
       model: KY_CONTENT_MODEL,
-      max_tokens: 256,
+      max_tokens: 300,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -96,7 +97,8 @@ ${bill.description ? `Description: ${bill.description}` : ''}
 ${bill.status ? `Status: ${bill.status}` : ''}
 ${bill.chamber ? `Chamber: Kentucky ${bill.chamber === 'house' ? 'House' : 'Senate'}` : ''}
 ${bill.topics?.length ? `Topics: ${bill.topics.join(', ')}` : ''}
-${subjectNames.length ? `Official LegiScan subjects: ${subjectNames.join(', ')}` : ''}`;
+${subjectNames.length ? `Official LegiScan subjects: ${subjectNames.join(', ')}` : ''}
+${bill.editor_notes?.trim() ? `Editor-verified notes (confirmed against the official bill text): ${bill.editor_notes.trim()}` : ''}`;
   return generateSummary(prompt);
 }
 

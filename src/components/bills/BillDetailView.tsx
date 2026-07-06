@@ -111,7 +111,23 @@ interface LegiScanText {
   mime: string;
   url: string;
   state_link: string;
+  /** LegiScan getBill texts[] includes the document date; older synced rows may lack it. */
+  date?: string;
 }
+
+/** Friendly labels for LegiScan texts[] type values; unknown types render as-is. */
+const TEXT_TYPE_LABELS: Record<string, string> = {
+  Introduced: 'Introduced (original)',
+  'Comm Sub': 'Committee Substitute',
+  Amended: 'Amended',
+  Engrossed: 'Engrossed (passed one chamber)',
+  Enrolled: 'Enrolled (passed both chambers)',
+  Chaptered: 'Enacted — Acts chapter (final law)',
+  Draft: 'Draft',
+};
+
+/** Later stages rank higher when dates tie or are missing. */
+const TEXT_FINALITY: Record<string, number> = { Chaptered: 3, Enrolled: 2, Engrossed: 1 };
 
 interface LegiScanSubject {
   subject_id: number;
@@ -467,6 +483,12 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
 
   // Most recent text version first
   const latestText = texts.find(t => t.type === 'Chaptered' || t.type === 'Enrolled' || t.type === 'Engrossed') ?? texts[0];
+  // All versions newest-first for the "Bill Text Versions" section (date, then stage finality).
+  const sortedTexts = [...texts].sort(
+    (a, b) =>
+      (b.date ?? '').localeCompare(a.date ?? '') ||
+      (TEXT_FINALITY[b.type] ?? 0) - (TEXT_FINALITY[a.type] ?? 0),
+  );
   const originalText = texts.find(t => t.type === 'Introduced');
   const officialTextForAi =
     httpUrlForUiLink(latestText?.state_link) ||
@@ -709,9 +731,72 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                     officialLabel="Open official bill text (PDF)"
                     billNumber={bill.bill_number}
                     beta
+                    editorVerified={!!bill.editor_notes}
                   >
                     {bill.ai_summary}
                   </AiGeneratedBlock>
+                </MuiCardContent>
+              </MuiCard>
+            )}
+
+            {/* Bill text versions — every official document, newest first */}
+            {sortedTexts.length > 0 && (
+              <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+                <MuiCardContent>
+                  <Box sx={{ mb: 0.5 }}>
+                    <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight}>
+                      Bill Text Versions
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    A bill&apos;s text can change at each stage. The top entry is the most current version.
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {sortedTexts.map((t, i) => {
+                      const href = httpUrlForUiLink(t.state_link) || httpUrlForUiLink(t.url);
+                      return (
+                        <Box
+                          key={t.doc_id}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            flexWrap: 'wrap',
+                            p: 1.25,
+                            borderRadius: 2,
+                            bgcolor: i === 0 ? alpha(theme.palette.primary.main, 0.06) : 'transparent',
+                          }}
+                        >
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" fontWeight={i === 0 ? 700 : 500}>
+                              {TEXT_TYPE_LABELS[t.type] ?? t.type}
+                            </Typography>
+                            {t.date && (
+                              <Typography variant="caption" color="text.secondary">
+                                {fmtDate(t.date)}
+                              </Typography>
+                            )}
+                          </Box>
+                          {i === 0 && (
+                            <MuiChip label="Most current" size="small" color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
+                          )}
+                          {href && (
+                            <MuiButton
+                              variant="text"
+                              size="small"
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              endIcon={<OpenInNew sx={{ fontSize: '0.85rem !important' }} />}
+                              sx={{ fontWeight: 600 }}
+                            >
+                              Read
+                            </MuiButton>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
                 </MuiCardContent>
               </MuiCard>
             )}
