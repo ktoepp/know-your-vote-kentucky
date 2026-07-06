@@ -47,7 +47,7 @@ function buildFallbackHistory(bill: KYBill): KyBillDetailEnrichment['history'] {
 /**
  * Roll calls rendered on the bill page come from ky_votes (populated by syncKyVotes),
  * not a live getRollCall enrichment — so page traffic no longer scales LegiScan quota.
- * Mapped to the shape BillDetailView consumes (yea/nay/nv/date/desc/roll_call_id).
+ * Mapped to the shape BillDetailView consumes (yea/nay/nv/absent/date/desc/roll_call_id).
  * nv_count is NULL on rows synced before migration 035; the UI hides the NV chip until
  * a re-sync fills it, so Yea/Nay stay accurate meanwhile.
  */
@@ -57,7 +57,7 @@ async function fetchDbVotes(
 ): Promise<KyBillDetailEnrichment['votes']> {
   const { data, error } = await supabase
     .from('ky_votes')
-    .select('roll_call_id, date, description, yea_count, nay_count, nv_count, passed')
+    .select('roll_call_id, date, description, yea_count, nay_count, nv_count, absent_count, passed')
     .eq('bill_id', billId)
     .order('date', { ascending: true, nullsFirst: true })
     .order('roll_call_id', { ascending: true });
@@ -69,6 +69,7 @@ async function fetchDbVotes(
     yea: v.yea_count ?? 0,
     nay: v.nay_count ?? 0,
     nv: v.nv_count ?? 0,
+    absent: v.absent_count ?? 0,
     passed: v.passed ?? null,
   })) as KyBillDetailEnrichment['votes'];
 }
