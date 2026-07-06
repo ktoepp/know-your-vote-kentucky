@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Box, Chip, Link, Typography } from '@mui/material';
+import { ExpandableText } from '@/components/ui/ExpandableText';
 
 /**
  * Inline label + body for AI-generated summaries on list cards and tooltips.
@@ -102,9 +103,18 @@ export function AiGeneratedBlock({
         </Typography>
         {beta && <Chip label="Beta" size="small" color="warning" variant="outlined" sx={{ fontWeight: 600 }} />}
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, whiteSpace: 'pre-line' }}>
-        {renderSummaryBody(children)}
-      </Typography>
+      {typeof children === 'string' ? (
+        <ExpandableText
+          text={children}
+          moreLabel="Show full summary"
+          renderText={renderSummaryBody}
+          typographyProps={{ variant: 'body2', color: 'text.secondary', sx: { lineHeight: 1.7, whiteSpace: 'pre-line' } }}
+        />
+      ) : (
+        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, whiteSpace: 'pre-line' }}>
+          {renderSummaryBody(children)}
+        </Typography>
+      )}
       {(officialHref || feedbackHref) && (
         <Typography variant="body2" sx={{ mt: 1.5 }}>
           {officialHref && (
