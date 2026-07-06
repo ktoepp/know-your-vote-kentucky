@@ -1308,3 +1308,17 @@ All four live call sites now import it: `ky-content-generation` (`KY_CONTENT_MOD
 - **Known follow-on:** `topics[]` feeds `summaryInputHash`, so the next `backfill:bill-summaries` run without `--only-missing` will regenerate summaries for re-tagged bills that have one — expected, bounded (only active-session bills carry summaries), not urgent.
 
 **Revisit if:** the weekly audit's topic leg flags Judiciary over/under-reach, or the boilerplate list grows past a handful (at that point consider a smarter referral-clause stripper instead of enumerated phrases).
+
+---
+
+## 2026-07-05 — Scheduled health check (GitHub Actions + Vercel MCP)
+
+**Scope:** no Sentry/Datadog connector is attached to this session; the only monitoring-capable connectors are GitHub (Actions run history) and Vercel MCP. Reviewed all 5 workflows' run history back to the 2026-06-23 health check.
+
+- **No active incidents.** Nothing red at the time of this check; all workflows' most recent runs are green.
+- **accuracy-audit.yml confirmed stable post-fix** — run #9 (2026-07-05) succeeded, holding the § 2026-06-28 quota-stop-is-a-skip fix.
+- **New, self-healed:** `sync-ky-bills-status.yml` failed 4 times between 2026-07-01 and 2026-07-03 (runs #174/#177/#180/#181), each on a `60000ms` LegiScan API timeout (`getSessionList` and `masterlistraw`, both exhausted 5/5 retries plus the workflow's own one retry). Each failure was followed by a clean run within hours on the next 6h cron tick — treated as transient upstream LegiScan slowness, not a code regression, since nothing shipped to the sync path in that window. Worth re-checking if the timeout rate keeps climbing; 4 failures in 3 days is new (none in the two weeks prior).
+- **New, unresolved:** `legislator-links-weekly.yml` run #14 (2026-06-29) failed — not on the LegiScan quota hold (that was a non-fatal skip within a sync that otherwise succeeded 141/141), but because `verify:legislator-links` itself exited 1, meaning it found a genuinely broken outbound legislator link. No fix has landed; the specific URL lives in that run's `reports/legislator-links.json` artifact. Next scheduled run is 2026-07-06.
+- **Persisting gap:** the Vercel MCP connector still returns zero projects for this team/org (same as 2026-06-23), so Vercel cron health (digest, committee materials, enrollment actions, health-check) and Sentry-surfaced runtime errors remain unverifiable from a Claude session. Two health-check cycles now with no remediation — either the MCP connector needs to be pointed at the right Vercel project, or this class of check should move to a manual dashboard review cadence instead of relying on the MCP.
+
+Full detail and run links: [TASKS.md § Ops notes (2026-07-05 health check)](./TASKS.md#ops-notes-2026-07-05-health-check).
