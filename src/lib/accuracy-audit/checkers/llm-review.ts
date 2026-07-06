@@ -82,9 +82,10 @@ async function reviewSummaries(
     description: string | null;
     ai_summary: string | null;
     legiscan_subjects: { subject_name?: string }[] | null;
+    editor_notes: string | null;
   }>(db, {
     table: 'ky_bills',
-    select: 'bill_number, title, description, ai_summary, legiscan_subjects',
+    select: 'bill_number, title, description, ai_summary, legiscan_subjects, editor_notes',
     seed: cfg.seed,
     limit: cfg.llmSample,
     filter: (q) => q.not('ai_summary', 'is', null).neq('ai_summary', ''),
@@ -100,10 +101,13 @@ async function reviewSummaries(
       .map((s) => s?.subject_name?.trim())
       .filter((s): s is string => !!s),
     summary: clip(b.ai_summary as string),
+    // Same lesson as the description clip: the generator sees editor_notes, so the auditor
+    // must too, or note-grounded claims read as fabricated (migration 038, FEEDBACK.md #4).
+    ...(b.editor_notes?.trim() ? { editorNotes: clip(b.editor_notes, 600) } : {}),
   }));
   if (items.length === 0) return 0;
 
-  const prompt = `You are auditing AI-generated plain-language summaries on a Kentucky General Assembly transparency website. Each "summary" is 2-3 sentences and MAY end with a "Who it may affect:" clause naming impacted Kentuckians. For each bill, judge it against the bill's "title", "description", and official "subjects".
+  const prompt = `You are auditing AI-generated plain-language summaries on a Kentucky General Assembly transparency website. Each "summary" is 2-3 sentences and MAY end with a "Who it may affect:" clause naming impacted Kentuckians. For each bill, judge it against the bill's "title", "description", and official "subjects". Some bills include "editorNotes": facts a human editor verified against the official bill text. Treat editorNotes as valid grounding — do NOT flag summary claims or audiences they support.
 
 Flag a summary when:
 - it states a fabricated fact or a claim that contradicts the title/description; OR

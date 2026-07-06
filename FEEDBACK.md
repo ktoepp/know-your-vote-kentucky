@@ -39,6 +39,17 @@
 
 ## Open
 
+### 2026-07-06 — HB904 charitable-gaming device placement squeezes small veterans posts  [#4]
+- Source: email (via HB904 bill-page "See a problem? Tell us" mailto)
+- From: Amvets post trustee (name/email in artifact)
+- Verbatim:
+  > These small Veterans posts typically dont have the room to locate all machines in one condoned area in clear view of the gaming officer. […] We rely on our gaming to keep our patrons coming in, and right now we dont have a clear way to comply with the new law.
+  > ~ Asks KYvKY to support an amendment exempting private clubs — out of scope (non-partisan), but the impact gap on our page is real.
+- Theme: content, bill-summaries, data-accuracy, veterans
+- Artifact: docs/feedback/2026-07-06-amvets-trustee-hb904.md (incl. verification against Acts ch. 184 §29 / KRS 238.538(11) — provision confirmed, no VSO exemption)
+- Action: → PR #146 (`editor_notes` verified-facts mechanism + HB904 summary/who-it-affects update + Bill Text Versions card) + [decisions.md §2026-07-06](./decisions.md#2026-07-06--editor-verified-notes-channel-for-ai-bill-summaries-extends--2026-06-26--bill-text-versions-ui); HB904 note set + summary regenerated; 2026-session `legiscan_texts` backfilled; reply drafted (thank + probe)
+- Status: in-progress (move to Actioned once PR #146 merges + reply sent)
+
 ### 2026-06-23 — Add "Women & Families" topic on /bills  [#3]
 - Source: in-person (iMessage group chat "KY Fried Women")
 - From: Katie Greene

@@ -89,6 +89,10 @@ export interface KYBill {
   legiscan_texts?: unknown[] | null;
   /** Detail page view count; absent in older API responses until column exists. */
   view_count?: number | null;
+  /** Editor-verified facts fed into the AI summary prompt + input hash (migration 038). Verified facts only. */
+  editor_notes?: string | null;
+  /** When editor_notes was last set via scripts/set-bill-editor-note.ts. */
+  editor_notes_updated_at?: string | null;
   created_at: string;
   updated_at: string;
   source: string | null;

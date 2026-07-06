@@ -55,6 +55,7 @@ type SummaryRow = Pick<
   | 'topics'
   | 'legiscan_subjects'
   | 'ai_summary'
+  | 'editor_notes'
 > & { ai_summary_input_hash: string | null };
 
 /** Stable hash of the fields that feed the summary; regen only when this changes. */
@@ -64,11 +65,15 @@ function summaryInputHash(row: SummaryRow): string {
     .filter((s): s is string => !!s)
     .sort();
   const topics = (row.topics ?? []).slice().sort();
+  // editor_notes joins the hash ONLY when set: adding the key unconditionally would
+  // change every bill's hash and mass-regenerate the whole session via the sync cron.
+  const editorNotes = row.editor_notes?.trim();
   const payload = JSON.stringify({
     title: row.title ?? '',
     description: row.description ?? '',
     topics,
     subjects: subjectNames,
+    ...(editorNotes ? { editor_notes: editorNotes } : {}),
   });
   return createHash('sha1').update(payload).digest('hex');
 }
@@ -103,7 +108,7 @@ async function main() {
     let q = db
       .from('ky_bills')
       .select(
-        'id, bill_number, session, title, description, status, chamber, topics, legiscan_subjects, ai_summary, ai_summary_input_hash',
+        'id, bill_number, session, title, description, status, chamber, topics, legiscan_subjects, ai_summary, ai_summary_input_hash, editor_notes',
       )
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1);

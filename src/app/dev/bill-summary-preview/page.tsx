@@ -12,7 +12,16 @@ export const dynamic = 'force-dynamic';
  */
 
 // Verbatim samples from `npm run backfill:bill-summaries:dry` (2026-06-26).
-const SAMPLES: { billNumber: string; title: string; summary: string }[] = [
+// HB 904 is a hand-written approximation of editor-notes-enriched output (migration 038);
+// replace with the real dry-run text once the HB904 note is set.
+const SAMPLES: { billNumber: string; title: string; summary: string; editorVerified?: boolean }[] = [
+  {
+    billNumber: 'HB 904',
+    title: 'AN ACT relating to gaming.',
+    editorVerified: true,
+    summary:
+      'This law, called the Wagering Consumer Protection Act, makes major changes to how Kentucky oversees gambling-related activities, raising the participation age for sports wagering and charitable gaming from 18 to 21 and increasing licensing fees. It also requires all electronic pull-tab devices at a licensed charitable gaming site to sit in a single cordoned-off area readily visible to the gaming chairperson, with entrance monitoring and ID checks where under-21s are allowed on the premises.\n\nWho it may affect: people who participate in sports wagering or charitable gaming; veterans service organizations such as VFW, AMVETS, and American Legion posts, fraternal orders, and similar private clubs that run charitable gaming; and businesses that distribute or manufacture gaming supplies.',
+  },
   {
     billNumber: 'HB 408',
     title: 'AN ACT relating to end-of-life options.',
@@ -41,8 +50,9 @@ export default function DevBillSummaryPreview() {
         AI summary section — preview
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Dev-only. Renders the bill-detail summary card (beta) with real dry-run output: with an
-        audience clause, and a trivial bill where the clause is correctly omitted.
+        Dev-only. Renders the bill-detail summary card (beta) with real dry-run output: an
+        editor-notes-enriched summary (HB 904), one with an audience clause, and a trivial bill
+        where the clause is correctly omitted.
       </Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {SAMPLES.map((s) => (
@@ -57,6 +67,7 @@ export default function DevBillSummaryPreview() {
                   officialLabel="Open official bill text (PDF)"
                   billNumber={s.billNumber}
                   beta
+                  editorVerified={s.editorVerified}
                 >
                   {s.summary}
                 </AiGeneratedBlock>
