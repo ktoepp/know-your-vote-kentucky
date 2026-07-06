@@ -13,7 +13,7 @@ import './load-env';
 import * as React from 'react';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { render } from '@react-email/render';
+import { render } from 'react-email';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { WelcomeEmail } from '../src/lib/email/welcome-email';

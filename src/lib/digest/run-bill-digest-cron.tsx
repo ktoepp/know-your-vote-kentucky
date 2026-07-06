@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render } from '@react-email/render';
+import { render } from 'react-email';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import {
