@@ -5,7 +5,7 @@
  * { sent: false } if already sent. Not called from /auth/verify while welcome is paused.
  */
 import { NextResponse, type NextRequest } from 'next/server';
-import { render } from '@react-email/render';
+import { render } from 'react-email';
 import { Resend } from 'resend';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';

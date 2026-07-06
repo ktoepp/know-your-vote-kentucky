@@ -76,9 +76,12 @@ export interface LegiScanSessionPerson {
 const LEGISCAN_QUERY_COUNTER_KEY = 'legiscan_query_counter';
 /** Persisted in `ky_sync_state` so cron/CLI runs can fall back when `getSessionList` is slow. */
 const LEGISCAN_KY_SESSIONS_KEY = 'legiscan_ky_sessions';
+/** Per-session `ky_sync_state` keys (`<prefix><session_id>`) backing the `getMasterListRaw` fallback. */
+const LEGISCAN_KY_MASTERLIST_RAW_KEY_PREFIX = 'legiscan_ky_masterlist_raw_';
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const SESSIONS_PERSIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MASTERLIST_RAW_PERSIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RATE_DELAY = 500;
 const MAX_RETRIES = 5;
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -87,6 +90,11 @@ const QUOTA_GUARD_TTL_MS = 60_000;
 
 type PersistedKySessionsPayload = {
   sessions: LegiScanSession[];
+  fetched_at: string;
+};
+
+type PersistedKyMasterListRawPayload = {
+  bills: LegiScanMasterListRawBill[];
   fetched_at: string;
 };
 
@@ -248,6 +256,66 @@ export class KyLegiScanClient {
     }
   }
 
+  private async readPersistedKyMasterListRaw(
+    sessionId: number,
+  ): Promise<LegiScanMasterListRawBill[] | null> {
+    if (!supabaseAdmin) return null;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('ky_sync_state')
+        .select('payload, updated_at')
+        .eq('key', `${LEGISCAN_KY_MASTERLIST_RAW_KEY_PREFIX}${sessionId}`)
+        .maybeSingle();
+      if (error) {
+        console.warn(`[KyLegiScan] Failed to read cached masterlistraw ${sessionId}: ${error.message}`);
+        return null;
+      }
+      const payload = data?.payload as PersistedKyMasterListRawPayload | null;
+      const bills = Array.isArray(payload?.bills) ? payload.bills : null;
+      if (!bills?.length) return null;
+      const fetchedAt = payload?.fetched_at || data?.updated_at;
+      if (fetchedAt) {
+        const ageMs = Date.now() - new Date(fetchedAt).getTime();
+        if (ageMs > MASTERLIST_RAW_PERSIST_TTL_MS) {
+          console.warn(
+            `[KyLegiScan] Cached masterlistraw for session ${sessionId} is stale (${Math.round(ageMs / 86_400_000)}d old); ignoring`,
+          );
+          return null;
+        }
+      }
+      return bills;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[KyLegiScan] Failed to read cached masterlistraw ${sessionId}: ${msg}`);
+      return null;
+    }
+  }
+
+  private async persistKyMasterListRaw(
+    sessionId: number,
+    bills: LegiScanMasterListRawBill[],
+  ): Promise<void> {
+    if (!supabaseAdmin || !bills.length) return;
+    try {
+      const payload: PersistedKyMasterListRawPayload = {
+        bills,
+        fetched_at: new Date().toISOString(),
+      };
+      const { error } = await supabaseAdmin.from('ky_sync_state').upsert(
+        {
+          key: `${LEGISCAN_KY_MASTERLIST_RAW_KEY_PREFIX}${sessionId}`,
+          payload,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' },
+      );
+      if (error) throw error;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[KyLegiScan] Failed to persist masterlistraw cache ${sessionId}: ${msg}`);
+    }
+  }
+
   async fetchSessions(): Promise<LegiScanSession[]> {
     console.log('[KyLegiScan] Fetching KY sessions');
     try {
@@ -279,9 +347,27 @@ export class KyLegiScanClient {
 
   async fetchMasterListRaw(sessionId: number): Promise<LegiScanMasterListRawBill[]> {
     console.log(`[KyLegiScan] Fetching masterlistraw for session ${sessionId}`);
-    const d = await this.request<any>({ op: 'getMasterListRaw', id: String(sessionId) });
-    if (!d?.masterlist) return [];
-    return Object.values(d.masterlist).filter((b: any) => b && b.bill_id) as LegiScanMasterListRawBill[];
+    try {
+      const d = await this.request<any>({ op: 'getMasterListRaw', id: String(sessionId) });
+      if (!d?.masterlist) return [];
+      const bills = Object.values(d.masterlist).filter(
+        (b: any) => b && b.bill_id,
+      ) as LegiScanMasterListRawBill[];
+      if (bills.length > 0) {
+        await this.persistKyMasterListRaw(sessionId, bills);
+      }
+      return bills;
+    } catch (err: unknown) {
+      const cached = await this.readPersistedKyMasterListRaw(sessionId);
+      if (cached?.length) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[KyLegiScan] getMasterListRaw failed for session ${sessionId} (${msg}); using ${cached.length} cached bill(s)`,
+        );
+        return cached;
+      }
+      throw err;
+    }
   }
 
   async fetchDatasetList(state: string = 'KY'): Promise<LegiScanDatasetListEntry[]> {
