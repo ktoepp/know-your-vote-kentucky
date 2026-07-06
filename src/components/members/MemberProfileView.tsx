@@ -34,33 +34,14 @@ import { ChamberChip, CommitteeKindChip } from '@/components/ui/Chip';
 import type { MemberRecentRollVote, MemberSponsoredBill, MemberVoteRecord } from '@/lib/member-profile-data';
 import type { MemberCommitteeAssignment } from '@/lib/ky-member-committees';
 import type { VoteBucket } from '@/lib/legiscan-vote-tally';
+import { memberVoteLabel, voteBucketChipColor } from '@/lib/vote-display';
 
-type VoteFilter = 'all' | 'yea' | 'nay' | 'nv_absent' | 'unknown';
+type VoteFilter = 'all' | VoteBucket;
 
 const FILTERED_VOTE_DISPLAY_CAP = 50;
 
-function rollVoteChipColor(bucket: VoteBucket): 'success' | 'error' | 'warning' | 'default' {
-  if (bucket === 'yea') return 'success';
-  if (bucket === 'nay') return 'error';
-  if (bucket === 'nv' || bucket === 'absent') return 'warning';
-  return 'default';
-}
-
-function rollVoteLabel(bucket: VoteBucket, raw: string | null): string {
-  if (raw?.trim()) return raw.trim();
-  if (bucket === 'yea') return 'Yea';
-  if (bucket === 'nay') return 'Nay';
-  if (bucket === 'nv') return 'Not voting';
-  if (bucket === 'absent') return 'Absent';
-  return 'Other';
-}
-
 function matchesVoteFilter(bucket: VoteBucket, filter: VoteFilter): boolean {
-  if (filter === 'all') return true;
-  if (filter === 'yea') return bucket === 'yea';
-  if (filter === 'nay') return bucket === 'nay';
-  if (filter === 'nv_absent') return bucket === 'nv' || bucket === 'absent';
-  return bucket === 'unknown';
+  return filter === 'all' || bucket === filter;
 }
 
 function CommitteeAssignmentTile({ assignment }: { assignment: MemberCommitteeAssignment }) {
@@ -142,8 +123,8 @@ function VoteRollCallList({ rows }: { rows: MemberRecentRollVote[] }) {
                   )}
                   <Chip
                     size="small"
-                    label={rollVoteLabel(r.myBucket, r.myVote)}
-                    color={rollVoteChipColor(r.myBucket)}
+                    label={memberVoteLabel(r.myBucket, r.myVote)}
+                    color={voteBucketChipColor(r.myBucket)}
                     variant="outlined"
                   />
                   {r.description && (
@@ -359,15 +340,25 @@ export function MemberProfileView({
                               aria-pressed={voteFilter === 'nay'}
                               onClick={() => toggleVoteFilter('nay')}
                             />
-                            {(tally.notVoting > 0 || tally.absent > 0) && (
+                            {tally.notVoting > 0 && (
                               <Chip
                                 size="small"
                                 color="warning"
-                                variant={voteFilter === 'nv_absent' ? 'filled' : 'outlined'}
-                                label={`Not voting / absent: ${tally.notVoting + tally.absent}`}
+                                variant={voteFilter === 'nv' ? 'filled' : 'outlined'}
+                                label={`Not voting: ${tally.notVoting}`}
                                 clickable
-                                aria-pressed={voteFilter === 'nv_absent'}
-                                onClick={() => toggleVoteFilter('nv_absent')}
+                                aria-pressed={voteFilter === 'nv'}
+                                onClick={() => toggleVoteFilter('nv')}
+                              />
+                            )}
+                            {tally.absent > 0 && (
+                              <Chip
+                                size="small"
+                                variant={voteFilter === 'absent' ? 'filled' : 'outlined'}
+                                label={`Absent: ${tally.absent}`}
+                                clickable
+                                aria-pressed={voteFilter === 'absent'}
+                                onClick={() => toggleVoteFilter('absent')}
                               />
                             )}
                             {tally.unknown > 0 && (
