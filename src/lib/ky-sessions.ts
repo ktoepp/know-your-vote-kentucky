@@ -18,6 +18,13 @@ export interface KYSessionMilestones {
   vetoRecessEnd?: string;
   /** Final sine die adjournment. Often equals session.end. */
   sineDie?: string;
+  /**
+   * Default effective date for this session's acts — 90 days after sine die per
+   * Ky. Const. §55, as published by the Attorney General. Store the published
+   * date, don't derive it: the AG's day-counting convention differs from naive
+   * sineDie + 90. Leave undefined until the AG opinion (or LRC notice) is out.
+   */
+  actsEffectiveDate?: string;
 }
 
 export interface KYSessionRecord {
@@ -40,6 +47,8 @@ export const KY_SESSIONS: KYSessionRecord[] = [
       vetoRecessStart: '2026-04-02',
       vetoRecessEnd: '2026-04-14',
       sineDie: '2026-04-15',
+      // AG opinion confirms July 15, 2026 for acts of the 2026 RS.
+      actsEffectiveDate: '2026-07-15',
     },
   },
   { name: '2025 Regular Session', start: '2025-01-07', end: '2025-04-15', type: 'regular' },
@@ -187,6 +196,18 @@ export function sessionHasEnded(sessionName: string | null | undefined, asOf: Da
   if (!session) return false;
   const cutoff = session.milestones?.sineDie ?? session.end;
   return atNoon(asOf.toISOString().slice(0, 10)) > atEndOfDay(cutoff);
+}
+
+/**
+ * Default effective date (ISO) for acts from the named session, when confirmed.
+ * Null for unknown sessions or sessions without a published date — callers should
+ * show nothing rather than compute their own 90-day math (see `actsEffectiveDate`).
+ */
+export function getKySessionActsEffectiveDate(sessionName: string | null | undefined): string | null {
+  if (!sessionName) return null;
+  const normalized = sessionName.trim().toLowerCase();
+  const session = KY_SESSIONS.find((s) => s.name.toLowerCase() === normalized);
+  return session?.milestones?.actsEffectiveDate ?? null;
 }
 
 /** Ongoing window → that session; otherwise the most recent session (for bill/vote display). */
