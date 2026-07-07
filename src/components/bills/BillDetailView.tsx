@@ -72,6 +72,7 @@ import {
   legiscanActionIndicatesVetoOverride,
   legiscanHistoryIndicatesVetoOverride,
 } from '@/lib/map-legiscan-bill-status';
+import { getKyEnactedBillEffectiveDateNotice } from '@/lib/ky-bill-effective-date';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import type { KyBillDetailEnrichment } from '@/lib/ky-bill-detail-server';
 
@@ -627,6 +628,8 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
     return bill.status;
   })();
 
+  const effectiveDateNotice = getKyEnactedBillEffectiveDateNotice({ bill, effectiveStatus, history });
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <MuiContainer maxWidth="lg" sx={{ py: 3 }}>
@@ -774,6 +777,17 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
                 <Typography component="div" variant="body1" fontWeight={500} sx={{ fontSize: '1.02rem' }}>
                   <BillHistoryActionText text={bill.last_action} component="div" />
+                </Typography>
+              </Box>
+            )}
+
+            {effectiveDateNotice && (
+              <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.success.main, 0.08) }}>
+                <Typography variant="body1" fontWeight={600} sx={{ fontSize: '1.02rem' }}>
+                  {effectiveDateNotice.headline}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                  {effectiveDateNotice.detail}
                 </Typography>
               </Box>
             )}
