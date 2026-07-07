@@ -16,6 +16,12 @@
  * rows already exist so it's always the update path). Quota-hold aware: stops cleanly if
  * the client-level hold engages mid-run; re-running continues where it left off.
  *
+ * Hash-gated (LegiScan dataset best practices): compares each session's dataset_hash from
+ * getDatasetList against ky_legiscan_datasets and SKIPS sessions whose hash is unchanged
+ * since last import — re-pulling an unchanged dataset returns identical bills and cannot
+ * fill a gap (bills still missing history simply aren't in that dataset version). After a
+ * clean import it records the hash so the next run skips that session entirely.
+ *
  * Requires LEGISCAN_API_KEY, SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL.
  */
 import './load-env';
@@ -53,6 +59,33 @@ async function fetchAllMissingBills(): Promise<MissingBill[]> {
     if (data.length < PAGE) break;
   }
   return out;
+}
+
+/** Session hashes we've already imported, keyed by session_id. */
+async function fetchStoredDatasetHashes(): Promise<Map<number, string>> {
+  const db = supabaseAdmin!;
+  const { data, error } = await db.from('ky_legiscan_datasets').select('session_id, dataset_hash');
+  if (error) throw new Error(`Read ky_legiscan_datasets failed: ${error.message}`);
+  const map = new Map<number, string>();
+  for (const row of data || []) {
+    if (row.session_id != null && row.dataset_hash) map.set(Number(row.session_id), String(row.dataset_hash));
+  }
+  return map;
+}
+
+/** Record the imported dataset_hash so future runs skip this session while unchanged. */
+async function recordDatasetImport(entry: { session_id: number; dataset_hash: string; access_key: string }): Promise<void> {
+  const db = supabaseAdmin!;
+  const { error } = await db.from('ky_legiscan_datasets').upsert(
+    {
+      session_id: entry.session_id,
+      dataset_hash: entry.dataset_hash,
+      access_key: entry.access_key,
+      last_imported_at: new Date().toISOString(),
+    },
+    { onConflict: 'session_id' },
+  );
+  if (error) throw new Error(`ky_legiscan_datasets upsert: ${error.message}`);
 }
 
 /** Dataset zip → bill payloads (same JSON shape as getBill's `bill`). */
@@ -98,12 +131,43 @@ async function main() {
   const client = getKyLegiScanClient();
   const datasetList = DRY_RUN ? [] : await client.fetchDatasetList('KY');
   const entryBySession = new Map(datasetList.map((e) => [e.session_id, e]));
+  const storedHashes = DRY_RUN ? new Map<number, string>() : await fetchStoredDatasetHashes();
 
   // Newest session first so the most-viewed bills fill first if we stop early.
   const sessionIds = [...bySession.keys()].sort((a, b) => b - a);
-  const toProcess = sessionIds.slice(0, Number.isFinite(SESSION_LIMIT) ? SESSION_LIMIT : sessionIds.length);
+
+  // Hash-gate BEFORE applying the download limit: a session whose dataset_hash
+  // matches what we last imported can't yield new history (the missing bills
+  // aren't in that dataset version), so re-downloading it is exactly the wasted
+  // activity LegiScan flags. The --limit then caps only real downloads.
+  let skippedUnchanged = 0;
+  let skippedNotInList = 0;
+  const downloadable: number[] = [];
+  for (const sessionId of sessionIds) {
+    if (DRY_RUN) {
+      downloadable.push(sessionId);
+      continue;
+    }
+    const entry = entryBySession.get(sessionId);
+    if (!entry) {
+      skippedNotInList += 1;
+      console.warn(`  session ${sessionId}: not in getDatasetList — skipping ${bySession.get(sessionId)!.length} bill(s)`);
+      continue;
+    }
+    if (storedHashes.get(sessionId) === entry.dataset_hash) {
+      skippedUnchanged += 1;
+      console.log(
+        `  session ${sessionId}: dataset hash unchanged since last import — skipping ${bySession.get(sessionId)!.length} still-missing bill(s) (history not in this dataset version)`,
+      );
+      continue;
+    }
+    downloadable.push(sessionId);
+  }
+
+  const toProcess = downloadable.slice(0, Number.isFinite(SESSION_LIMIT) ? SESSION_LIMIT : downloadable.length);
   console.log(
-    `${sessionIds.length} session(s) have gaps; processing ${toProcess.length}` +
+    `${sessionIds.length} session(s) have gaps; ${skippedUnchanged} unchanged, ${skippedNotInList} not in list, ` +
+      `${downloadable.length} downloadable → processing ${toProcess.length}` +
       `${DRY_RUN ? ' [DRY RUN — no LegiScan calls, no writes]' : ''}.`,
   );
 
@@ -169,6 +233,7 @@ async function main() {
 
     const CONCURRENCY = 10;
     let sessionUpdated = 0;
+    let sessionWriteErrors = 0;
     for (let i = 0; i < updates.length; i += CONCURRENCY) {
       const chunk = updates.slice(i, i + CONCURRENCY);
       const results = await Promise.all(
@@ -176,21 +241,32 @@ async function main() {
       );
       for (let j = 0; j < results.length; j++) {
         if (results[j].error) {
-          writeErrors += 1;
+          sessionWriteErrors += 1;
           console.error(`  session ${sessionId} bill ${chunk[j].id}: ${results[j].error!.message}`);
         } else {
           sessionUpdated += 1;
         }
       }
     }
+    writeErrors += sessionWriteErrors;
     updated += sessionUpdated;
+
+    // Record the hash only after a clean import so we don't skip a session whose
+    // writes partially failed — an errored run should retry next time. A session
+    // that filled 0 bills but had no errors is still fully imported, so record it
+    // (that's the closed-session-with-permanent-gaps case we must stop re-pulling).
+    if (sessionWriteErrors === 0) {
+      await recordDatasetImport(entry);
+    }
     console.log(
-      `  session ${sessionId} (${entry.session_name}): dataset has ${datasetBills.length} bills → updated ${sessionUpdated}/${sessionBills.length} missing`,
+      `  session ${sessionId} (${entry.session_name}): dataset has ${datasetBills.length} bills → updated ${sessionUpdated}/${sessionBills.length} missing` +
+        `${sessionWriteErrors ? ` (${sessionWriteErrors} write errors — hash not recorded, will retry)` : ''}`,
     );
   }
 
   console.log(
-    `\nupdated=${updated} notInDataset=${notInDataset} noHistoryInDataset=${noHistoryInDataset} writeErrors=${writeErrors} ` +
+    `\nupdated=${updated} notInDataset=${notInDataset} noHistoryInDataset=${noHistoryInDataset} ` +
+      `skippedUnchanged=${skippedUnchanged} skippedNotInList=${skippedNotInList} writeErrors=${writeErrors} ` +
       `${quotaStopped ? '[STOPPED ON QUOTA HOLD] ' : ''}${DRY_RUN ? '[DRY RUN - no writes]' : '[APPLIED]'}`,
   );
   if (quotaStopped) {
