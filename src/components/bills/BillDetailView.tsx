@@ -12,6 +12,7 @@ import {
   Divider as MuiDivider,
   Button as MuiButton,
   Grid as MuiGrid,
+  Link as MuiLink,
   Tooltip as MuiTooltip,
   ToggleButton,
   ToggleButtonGroup,
@@ -997,6 +998,17 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
         </MuiGrid>
 
         <BillHearingsSection billId={bill.id} />
+
+        {/* General page feedback — the AI-summary block has its own summary-scoped link */}
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 4, textAlign: 'center' }}>
+          Something wrong on this page?{' '}
+          <MuiLink
+            href={`mailto:katie@kyvky.com?subject=${encodeURIComponent(`Problem on ${bill.bill_number} page`)}`}
+            underline="hover"
+          >
+            Tell us
+          </MuiLink>
+        </Typography>
       </MuiContainer>
     </Box>
   );
