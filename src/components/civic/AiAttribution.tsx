@@ -125,7 +125,7 @@ export function AiGeneratedBlock({
           {officialHref && feedbackHref && <Box component="span" sx={{ mx: 1, color: 'text.disabled' }}>·</Box>}
           {feedbackHref && (
             <Link href={feedbackHref} underline="hover">
-              See a problem? Tell us
+              Report a problem with the summary
             </Link>
           )}
         </Typography>
