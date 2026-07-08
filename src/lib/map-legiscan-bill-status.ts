@@ -16,18 +16,16 @@ export const LEGISCAN_STATUS_MAP: Record<number, string> = {
   12: 'Draft',
 };
 
-/** True when action text reflects a completed or attempted veto override (not a bare veto). */
+/**
+ * True when action text reflects a completed or attempted veto override (not a bare veto).
+ * Matches every singular/plural form KY's LRC emits — "veto overridden", "vetoes overridden"
+ * (budget bills), "veto override", "overrode the veto". NOTE: the substring "override" does NOT
+ * appear in "overridden", so we match the "overrid"/"overrod" roots rather than "override".
+ */
 export function legiscanActionIndicatesVetoOverride(action: string | null | undefined): boolean {
   const a = (action || '').toLowerCase();
-  if (!a) return false;
-  return (
-    a.includes('veto override') ||
-    a.includes('veto overridden') ||
-    a.includes('overrode the veto') ||
-    a.includes('override of the veto') ||
-    a.includes('override the veto') ||
-    a.includes('override of veto')
-  );
+  if (!a.includes('veto')) return false;
+  return a.includes('overrid') || a.includes('overrod') || a.includes('override');
 }
 
 export function legiscanHistoryIndicatesVetoOverride(
@@ -42,15 +40,19 @@ export function legiscanHistoryIndicatesVetoOverride(
 /**
  * True when action text reflects a *full* veto that kills the bill (governor vetoes the entire
  * bill and it is not overridden). Deliberately excludes:
- *   - veto overrides ("override" — the bill still becomes law), and
- *   - line-item vetoes ("line item" — only appropriations lines are struck; the bill still
- *     becomes law and is chaptered, e.g. SB197 2026RS → Acts Ch. 202).
+ *   - veto overrides in any form ("overrid"/"overrod" — "veto overridden", "vetoes overridden";
+ *     the bill still becomes law),
+ *   - line-item / line vetoes ("line item" / "line veto" — only appropriations lines are struck;
+ *     the bill still becomes law and is chaptered, e.g. SB197 2026RS → Acts Ch. 202), and
+ *   - procedural postings that merely reference a veto ("posted for consideration of Governor's
+ *     veto") rather than the veto action itself.
  */
 export function legiscanActionIndicatesFullVeto(action: string | null | undefined): boolean {
   const a = (action || '').toLowerCase();
   if (!a.includes('veto')) return false;
-  if (a.includes('override')) return false;
-  if (a.includes('line item') || a.includes('line-item')) return false;
+  if (a.includes('overrid') || a.includes('overrod') || a.includes('override')) return false;
+  if (a.includes('line item') || a.includes('line-item') || a.includes('line veto')) return false;
+  if (a.includes('posted') || a.includes('consideration of')) return false;
   return true;
 }
 
@@ -110,9 +112,14 @@ export function mapLegiScanBillStatus(
   if (action.includes('signed by governor')) return 'Signed';
 
   if (action.includes('delivered to secretary of state')) {
-    // Override was ruled out above. A veto (status code 5, or a full-veto action anywhere in
-    // history) means the bill did NOT become law, even though it was filed with the SoS.
-    if (statusCode === 5 || historyHasFullVeto) return 'Vetoed';
+    // Override was ruled out above. KY appends "Acts Ch. NNN" to the SoS filing ONLY when the
+    // bill actually became law — after a signing, a veto override, OR a line-item veto (the bill
+    // still stands). A plain veto that is never overridden is filed with the SoS with NO chapter
+    // number (e.g. SB70/SJR74 2026RS). Treat the chapter designation as the authoritative
+    // became-law signal so an enacted bill is never mislabeled "Vetoed" — this is the backstop
+    // against any full-veto false positive from an appropriations bill's line-veto history.
+    const becameLaw = action.includes('acts ch');
+    if (!becameLaw && (statusCode === 5 || historyHasFullVeto)) return 'Vetoed';
     return 'Chaptered';
   }
 

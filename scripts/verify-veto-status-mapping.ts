@@ -51,6 +51,35 @@ const cases: Case[] = [
     expected: 'Chaptered',
   },
   {
+    // Appropriations bills use PLURAL "vetoes overridden" + "line items vetoed" and DID become law
+    // (Acts Ch.). Must NOT be labeled "Vetoed". (Regression: HB2/HB500/HB501/HB503/HB504/HB757 26RS.)
+    name: 'HB757 26RS — line items vetoed then vetoes overridden (still law)',
+    statusCode: 0,
+    lastAction: 'delivered to Secretary of State (Acts Ch. 161)',
+    history: [
+      { action: 'line items vetoed' },
+      { action: "posted for consideration of Governor's line vetoes" },
+      { action: 'vetoes overridden' },
+      { action: 'delivered to Secretary of State (Acts Ch. 161)' },
+    ],
+    expected: 'Veto Override',
+  },
+  {
+    // "Acts Ch." on the SoS filing is the authoritative became-law signal: even if a stray veto
+    // action slips through the full-veto filter, an enacted bill must never read "Vetoed".
+    name: 'Enacted bill with Acts Ch. is never Vetoed (became-law backstop)',
+    statusCode: 5,
+    lastAction: 'delivered to Secretary of State (Acts Ch. 300)',
+    history: [{ action: 'delivered to Secretary of State (Acts Ch. 300)' }],
+    expected: 'Chaptered',
+  },
+  {
+    name: 'Plural "vetoes overridden" on last action alone → Veto Override',
+    statusCode: 4,
+    lastAction: 'vetoes overridden',
+    expected: 'Veto Override',
+  },
+  {
     name: 'HB869 26RS — signed then chaptered',
     statusCode: 8,
     lastAction: 'delivered to Secretary of State (Acts Ch. 198)',
