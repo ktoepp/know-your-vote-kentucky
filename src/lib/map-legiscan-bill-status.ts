@@ -40,6 +40,30 @@ export function legiscanHistoryIndicatesVetoOverride(
 }
 
 /**
+ * True when action text reflects a *full* veto that kills the bill (governor vetoes the entire
+ * bill and it is not overridden). Deliberately excludes:
+ *   - veto overrides ("override" — the bill still becomes law), and
+ *   - line-item vetoes ("line item" — only appropriations lines are struck; the bill still
+ *     becomes law and is chaptered, e.g. SB197 2026RS → Acts Ch. 202).
+ */
+export function legiscanActionIndicatesFullVeto(action: string | null | undefined): boolean {
+  const a = (action || '').toLowerCase();
+  if (!a.includes('veto')) return false;
+  if (a.includes('override')) return false;
+  if (a.includes('line item') || a.includes('line-item')) return false;
+  return true;
+}
+
+export function legiscanHistoryIndicatesFullVeto(
+  history: ReadonlyArray<{ action?: string | null }>,
+): boolean {
+  for (const h of history) {
+    if (legiscanActionIndicatesFullVeto(h.action)) return true;
+  }
+  return false;
+}
+
+/**
  * Map LegiScan status code + last_action into `ky_bills.status` display text.
  * Kentucky: filing with the Secretary of State follows both governor signing and veto override,
  * so it must not be stored as `Signed` unless the action explicitly says the governor signed.
@@ -58,21 +82,41 @@ export function legiscanHistoryIndicatesVetoOverride(
  *    Instead, once the status code indicates passage of at least one chamber, we let the code
  *    win over the action text. (Documented in TASKS.md § "Status mapper doesn't preserve
  *    furthest progress".)
+ *
+ * 3. "Delivered to Secretary of State" is ambiguous — KY files the bill with the SoS after a
+ *    governor signing, after a veto override, AND after a plain (non-overridden) veto. Because
+ *    LegiScan reports that filing as the single `last_action`, the SoS text alone cannot tell
+ *    an enacted bill from a vetoed one. We disambiguate with the LegiScan status code and, when
+ *    available, the full action `history`: a bill vetoed and never overridden must map to
+ *    `Vetoed`, not `Chaptered`. (Regression: SB70 2026RS was vetoed 04/23 and showed "Chaptered"
+ *    because its last action was the SoS filing.)
+ *
+ * `history` (optional) is the LegiScan getBill action history; pass it wherever available so the
+ * veto/override milestones — which precede the final SoS filing — can be seen.
  */
-export function mapLegiScanBillStatus(statusCode: number, lastAction: string): string {
+export function mapLegiScanBillStatus(
+  statusCode: number,
+  lastAction: string,
+  history?: ReadonlyArray<{ action?: string | null }>,
+): string {
   const action = (lastAction || '').toLowerCase();
+  const historyHasOverride = history ? legiscanHistoryIndicatesVetoOverride(history) : false;
+  const historyHasFullVeto = history ? legiscanHistoryIndicatesFullVeto(history) : false;
 
-  if (legiscanActionIndicatesVetoOverride(lastAction) || statusCode === 7) {
+  if (legiscanActionIndicatesVetoOverride(lastAction) || statusCode === 7 || historyHasOverride) {
     return 'Veto Override';
   }
 
   if (action.includes('signed by governor')) return 'Signed';
 
   if (action.includes('delivered to secretary of state')) {
+    // Override was ruled out above. A veto (status code 5, or a full-veto action anywhere in
+    // history) means the bill did NOT become law, even though it was filed with the SoS.
+    if (statusCode === 5 || historyHasFullVeto) return 'Vetoed';
     return 'Chaptered';
   }
 
-  if (action.includes('vetoed by governor') || (action.includes('veto') && !action.includes('override'))) {
+  if (legiscanActionIndicatesFullVeto(lastAction) || statusCode === 5) {
     return 'Vetoed';
   }
 

@@ -152,7 +152,11 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
 
     const lastAction = latestAction(bill);
 
-    const expectedStatus = mapLegiScanBillStatus(bill.status, lastAction.action);
+    const expectedStatus = mapLegiScanBillStatus(
+      bill.status,
+      lastAction.action,
+      Array.isArray(bill.history) ? bill.history : undefined,
+    );
     if (expectedStatus && norm(expectedStatus) !== norm(row.status)) {
       findings.push(diffFinding('fail', 'bills', row.bill_number, 'status', expectedStatus, row.status));
     }

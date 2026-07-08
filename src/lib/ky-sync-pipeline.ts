@@ -813,7 +813,11 @@ async function syncKyBillsByHash(
         title: detail.title,
         description: detail.description || null,
         session: session.session_name,
-        status: mapLegiScanBillStatus(detail.status ?? raw.status, lastActionFromDetail),
+        status: mapLegiScanBillStatus(
+          detail.status ?? raw.status,
+          lastActionFromDetail,
+          Array.isArray(detail.history) ? detail.history : undefined,
+        ),
         chamber: chamberFromBillNumber(raw.number),
         last_action: lastActionFromDetail || null,
         last_action_date: detail.last_action_date || null,

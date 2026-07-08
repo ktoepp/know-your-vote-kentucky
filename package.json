@@ -24,6 +24,7 @@
     "check:legiscan-quota": "tsx scripts/check-quota.ts",
     "slack:smoke-test": "tsx scripts/slack-smoke-test.ts",
     "verify:votes": "tsx scripts/verify-legiscan-vote-counts.ts",
+    "verify:bill-status": "tsx scripts/verify-veto-status-mapping.ts",
     "verify:legislator-links": "tsx scripts/verify-legislator-external-links.ts",
     "spot-check:bill-links": "tsx scripts/spot-check-bill-external-links.ts",
     "preview:digest": "tsx scripts/preview-bill-digest.ts",
