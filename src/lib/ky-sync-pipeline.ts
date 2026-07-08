@@ -523,6 +523,10 @@ async function buildBillRowsForSession(
       title: bill.title,
       description: bill.description || null,
       session: latestSession.session_name,
+      // Master-list summaries carry no action history, so the mapper leans on the LegiScan status
+      // code (5 = Vetoed) to tell a vetoed bill from a chaptered one when both show "delivered to
+      // Secretary of State". The change-hash detail sync (history-aware) and backfill:veto-status
+      // are the authoritative correction path if a summary-only row slips through.
       status: mapLegiScanBillStatus(bill.status, bill.last_action || ''),
       chamber: chamberFromBillNumber(bill.number),
       last_action: bill.last_action || null,
@@ -620,6 +624,8 @@ async function buildBillRowsQuotaSession(
       title: bill.title,
       description: bill.description || null,
       session: session.session_name,
+      // See note above: no history in the quota master-list path; status code disambiguates the
+      // SoS-delivery veto/chaptered case, with the detail sync + backfill:veto-status as backstop.
       status: mapLegiScanBillStatus(bill.status, bill.last_action || ''),
       chamber: chamberFromBillNumber(bill.number),
       last_action: bill.last_action || null,

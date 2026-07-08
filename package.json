@@ -38,6 +38,8 @@
     "backfill:bill-summaries:dry": "tsx scripts/backfill-bill-summaries.ts --dry-run",
     "backfill:bill-history": "tsx scripts/backfill-bill-history-texts.ts",
     "backfill:bill-history:dry": "tsx scripts/backfill-bill-history-texts.ts --dry-run",
+    "backfill:veto-status": "tsx scripts/backfill-veto-status.ts",
+    "backfill:veto-status:dry": "tsx scripts/backfill-veto-status.ts --dry-run",
     "audit:legiscan-subjects": "tsx scripts/audit-legiscan-subjects.ts",
     "diagnose:legislators": "tsx scripts/diagnose-legislators.ts",
     "diagnose:committee-duplicates": "tsx scripts/diagnose-committee-duplicates.ts",
