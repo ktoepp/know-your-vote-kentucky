@@ -53,12 +53,14 @@
   --error-tint:    #FEF2F2;
   --warning:       #D97706;
 
-  /* Chamber & party */
+  /* Chamber & party
+     House was #16A34A (same as --success). Reassigned to cyan-700 so
+     chamber signal is distinct from "passed / signed" green throughout the app. */
   --chamber-senate:#6B21A8;
-  --chamber-house: #16A34A;
+  --chamber-house: #0891B2;
   --party-r:       #DC2626;
   --party-d:       #2563EB;
-  --party-i:       #D97706;
+  --party-i:       #64748B;
   --party-fg:      #FFFFFF;
 
   /* Elevation */

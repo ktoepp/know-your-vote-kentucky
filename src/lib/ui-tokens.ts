@@ -39,7 +39,7 @@ export const TYPE = {
   heroTitle: { variant: 'h3' as const, fontWeight: 700 },
   pageTitle: { variant: 'h4' as const, fontWeight: 700 },
   /** In-body section headings — sans-serif to match subtitle2-style labels (e.g. “Trending now”). */
-  sectionTitle: { variant: 'subtitle2' as const, fontWeight: 700 },
+  sectionTitle: { variant: 'subtitle2' as const, fontWeight: 600 },
   cardTitle: { variant: 'h6' as const, fontWeight: 700 },
   subsection: { variant: 'subtitle1' as const, fontWeight: 600 },
   body: { variant: 'body1' as const },
