@@ -93,6 +93,16 @@ export function legiscanHistoryIndicatesFullVeto(
  *    `Vetoed`, not `Chaptered`. (Regression: SB70 2026RS was vetoed 04/23 and showed "Chaptered"
  *    because its last action was the SoS filing.)
  *
+ * 4. "Acts Ch." is the authoritative became-law signal WHEREVER it appears in the action text —
+ *    not only on a "delivered to Secretary of State" filing. KY sometimes never files a separate
+ *    SoS action at all: the veto action itself is the bill's final recorded action, e.g.
+ *    "line items vetoed (Acts Ch. 239)". LegiScan's numeric status code doesn't distinguish a
+ *    line-item veto (bill still becomes law) from a full veto (bill dies) — both come through as
+ *    code 5 — so a chapter number on the action text must win over the code. This check runs
+ *    before the statusCode===5 fallback below so it isn't defeated by that ambiguity.
+ *    (Regression: HB604/HB92 2022RS, HB1/HB3 2010SS — each mapped to "Vetoed" because their
+ *    last_action never contains "delivered to secretary of state", only the line-item-veto text.)
+ *
  * `history` (optional) is the LegiScan getBill action history; pass it wherever available so the
  * veto/override milestones — which precede the final SoS filing — can be seen.
  */
@@ -111,15 +121,18 @@ export function mapLegiScanBillStatus(
 
   if (action.includes('signed by governor')) return 'Signed';
 
+  // Override and signing were ruled out above. "Acts Ch. NNN" appears ONLY when the bill actually
+  // became law — after a signing, a veto override, or a line-item veto (the rest of the bill still
+  // stands) — regardless of whether that chapter number lands on a "delivered to Secretary of
+  // State" filing or directly on the veto action itself (e.g. "line items vetoed (Acts Ch. 239)",
+  // which KY sometimes records with no separate SoS-filing step at all). A plain veto that is never
+  // overridden carries no chapter number (e.g. SB70/SJR74 2026RS). Checking this before the
+  // statusCode===5 fallback below matters because LegiScan codes both a line-item veto and a full
+  // veto as 5 — the chapter designation is the only reliable way to tell them apart.
+  if (action.includes('acts ch')) return 'Chaptered';
+
   if (action.includes('delivered to secretary of state')) {
-    // Override was ruled out above. KY appends "Acts Ch. NNN" to the SoS filing ONLY when the
-    // bill actually became law — after a signing, a veto override, OR a line-item veto (the bill
-    // still stands). A plain veto that is never overridden is filed with the SoS with NO chapter
-    // number (e.g. SB70/SJR74 2026RS). Treat the chapter designation as the authoritative
-    // became-law signal so an enacted bill is never mislabeled "Vetoed" — this is the backstop
-    // against any full-veto false positive from an appropriations bill's line-veto history.
-    const becameLaw = action.includes('acts ch');
-    if (!becameLaw && (statusCode === 5 || historyHasFullVeto)) return 'Vetoed';
+    if (statusCode === 5 || historyHasFullVeto) return 'Vetoed';
     return 'Chaptered';
   }
 
