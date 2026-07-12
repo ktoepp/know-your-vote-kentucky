@@ -80,6 +80,16 @@ const cases: Case[] = [
     expected: 'Veto Override',
   },
   {
+    // The veto action is the bill's only recorded action after "delivered to Governor" — KY never
+    // filed a separate "delivered to Secretary of State" step for this bill, so the chapter number
+    // must be read directly off the veto action text. (Regression: HB604/HB92 2022RS, HB1/HB3
+    // 2010SS mapped to "Vetoed" via the statusCode===5 fallback before this case was fixed.)
+    name: 'HB604 22RS — line-item veto is the final action, no SoS filing step (still law)',
+    statusCode: 5,
+    lastAction: 'line items vetoed (Acts Ch. 239)',
+    expected: 'Chaptered',
+  },
+  {
     name: 'HB869 26RS — signed then chaptered',
     statusCode: 8,
     lastAction: 'delivered to Secretary of State (Acts Ch. 198)',

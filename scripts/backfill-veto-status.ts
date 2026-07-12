@@ -1,19 +1,24 @@
 #!/usr/bin/env npx tsx
 /**
- * One-shot correction for bills that were vetoed (and never overridden) but are stored as an
- * enacted status ("Chaptered"/"Signed"). Root cause + forward fix: see
- * src/lib/map-legiscan-bill-status.ts § "Delivered to Secretary of State" is ambiguous.
+ * One-shot correction for bills whose stored status disagrees with what the (fixed) mapper would
+ * compute today, in either direction:
+ *   - vetoed (and never overridden) but stored as an enacted status ("Chaptered"/"Signed"), or
+ *   - enacted via a line-item veto or override but stored as plain "Vetoed".
+ * Root cause + forward fix: see src/lib/map-legiscan-bill-status.ts §§ "Delivered to Secretary of
+ * State" is ambiguous / "Acts Ch." is the authoritative became-law signal.
  *
  * Kentucky files a bill with the Secretary of State after a signing, a veto override, AND a
- * plain veto — so rows synced before the mapper fix have "delivered to Secretary of State" as
- * their last_action and were mislabeled "Chaptered". This re-runs the (fixed) mapper against
- * each candidate row using its already-stored `legiscan_history`, so it needs NO LegiScan
+ * plain veto — and sometimes never files a separate SoS action at all, recording the chapter
+ * number directly on the veto action ("line items vetoed (Acts Ch. 239)"). Rows synced before
+ * either mapper fix landed can be mislabeled in both directions. This re-runs the (fixed) mapper
+ * against each candidate row using its already-stored `legiscan_history`, so it needs NO LegiScan
  * quota by default. Rows whose history is NULL are reported (and, with --fetch, pulled via
  * getBill — 1 quota point each).
  *
- * Safety: only rows whose recomputed status is "Vetoed" or "Veto Override" are changed. The
- * script never downgrades a bill to an earlier stage — it only corrects an enacted-looking
- * status to the veto outcome the history proves.
+ * Safety: only rows whose recomputed status is "Vetoed", "Veto Override", or "Chaptered" are
+ * changed, and only when it differs from the current value. The script never regresses a bill to
+ * an earlier legislative stage (e.g. back to "In Committee") — it only corrects a stored veto/
+ * enactment outcome to what the history proves actually happened.
  *
  *   npx tsx scripts/backfill-veto-status.ts --dry-run            # preview, no writes
  *   npx tsx scripts/backfill-veto-status.ts                      # apply to active session
@@ -35,11 +40,15 @@ const FETCH_MISSING = process.argv.includes('--fetch');
 const sessionArg = process.argv.find((a) => a.startsWith('--session='));
 const SESSION = sessionArg ? sessionArg.split('=')[1] ?? '' : null;
 
-// Statuses that imply the bill became law — the only ones a hidden veto can be masquerading as.
-const ENACTED_LOOKING = ['Chaptered', 'Signed'];
+// Statuses worth rechecking against the current mapper: enacted-looking rows that might hide an
+// uncaught veto, AND "Vetoed" rows that might actually have become law (line-item veto or
+// override) once the Acts-Ch. signal is read correctly. Deliberately excludes every other status
+// (e.g. "In Committee", "Passed") — those aren't candidates for this specific veto/enactment
+// mismatch.
+const RECHECK_STATUSES = ['Chaptered', 'Signed', 'Vetoed'];
 // The only recomputed outcomes we will write. Guards against passing an unknown numeric status
 // code (not stored on ky_bills) accidentally downgrading a row to "Introduced".
-const CORRECTABLE_TO = new Set(['Vetoed', 'Veto Override']);
+const CORRECTABLE_TO = new Set(['Vetoed', 'Veto Override', 'Chaptered']);
 
 type HistoryEntry = { action?: string | null };
 
@@ -55,14 +64,14 @@ async function main() {
   let q = db
     .from('ky_bills')
     .select('id, bill_number, legiscan_id, status, last_action, legiscan_history')
-    .in('status', ENACTED_LOOKING)
+    .in('status', RECHECK_STATUSES)
     .order('last_action_date', { ascending: false, nullsFirst: false });
   if (sessionName) q = q.eq('session', sessionName);
 
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   const bills = data ?? [];
-  console.log(`Scope: ${scope} — ${bills.length} enacted-looking bill(s) to re-check.\n`);
+  console.log(`Scope: ${scope} — ${bills.length} bill(s) to re-check.\n`);
 
   const client = FETCH_MISSING ? getKyLegiScanClient() : null;
   let corrected = 0;
