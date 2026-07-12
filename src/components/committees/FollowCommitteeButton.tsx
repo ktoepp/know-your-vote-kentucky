@@ -5,6 +5,7 @@ import { Button, CircularProgress } from '@mui/material';
 import { Bookmark, BookmarkBorder } from '@mui/icons-material';
 import NextLink from 'next/link';
 import { useUser } from '@/app/lib/UserContext';
+import { trackCommitteeFollowed, trackCommitteeUnfollowed } from '@/lib/analytics';
 
 type Props = {
   /** Committee UUID or slug. */
@@ -93,6 +94,8 @@ export function FollowCommitteeButton({ committeeId, size = 'small' }: Props) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error || 'Request failed');
       setState('idle');
+      if (next) trackCommitteeFollowed(committeeId);
+      else trackCommitteeUnfollowed(committeeId);
     } catch (err: unknown) {
       setFollowing(prev);
       setErrMsg(err instanceof Error ? err.message : 'Request failed');

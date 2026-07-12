@@ -107,12 +107,25 @@ export function CommitteeKindChip({
   return <MetaChip label={displayLabel} tone={tone} size={size} variant={variant} {...rest} />;
 }
 
+/**
+ * Chamber-specific colors live outside the MUI palette because MUI's `secondary`
+ * (currently green) collides with `success` — reusing it for Senate would make a
+ * Senate chamber chip visually identical to a "Passed" status chip. Instead we
+ * pull hues from the `--chamber-*` CSS variables so the House/Senate signal is
+ * an independent dimension from status.
+ */
+const CHAMBER_COLORS: Record<string, { bg: string; fg: string }> = {
+  house: { bg: 'var(--chamber-house)', fg: 'var(--party-fg)' },
+  senate: { bg: 'var(--chamber-senate)', fg: 'var(--party-fg)' },
+};
+
 export function ChamberChip({
   chamber,
   label,
   tone,
   variant = 'filled',
   size = 'medium',
+  sx,
   ...rest
 }: ChamberChipProps) {
   const normalized = String(chamber || '').toLowerCase();
@@ -125,21 +138,69 @@ export function ChamberChip({
         : normalized === 'joint'
           ? 'Joint'
           : String(chamber));
-  const inferredTone: ChipTone =
-    tone ??
-    (normalized === 'senate'
-      ? 'secondary'
-      : normalized === 'house'
-        ? 'primary'
-        : normalized === 'joint'
-          ? 'info'
-          : 'default');
+
+  if (tone) {
+    return (
+      <MetaChip
+        label={displayLabel}
+        tone={tone}
+        variant={variant}
+        size={size}
+        sx={sx}
+        {...rest}
+      />
+    );
+  }
+
+  const preset = CHAMBER_COLORS[normalized];
+  if (preset && variant === 'filled') {
+    return (
+      <MetaChip
+        label={displayLabel}
+        tone="default"
+        variant="filled"
+        size={size}
+        sx={combineSx(
+          {
+            bgcolor: preset.bg,
+            color: preset.fg,
+            borderColor: preset.bg,
+            '& .MuiChip-label': { color: 'inherit' },
+          },
+          sx,
+        )}
+        {...rest}
+      />
+    );
+  }
+  if (preset) {
+    return (
+      <MetaChip
+        label={displayLabel}
+        tone="default"
+        variant="outlined"
+        size={size}
+        sx={combineSx(
+          {
+            color: preset.bg,
+            borderColor: preset.bg,
+            '& .MuiChip-label': { color: 'inherit' },
+          },
+          sx,
+        )}
+        {...rest}
+      />
+    );
+  }
+
+  const inferredTone: ChipTone = normalized === 'joint' ? 'info' : 'default';
   return (
     <MetaChip
       label={displayLabel}
       tone={inferredTone}
       variant={variant}
       size={size}
+      sx={sx}
       {...rest}
     />
   );

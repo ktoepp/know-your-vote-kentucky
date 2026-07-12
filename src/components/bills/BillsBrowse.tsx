@@ -54,6 +54,7 @@ import { KY_TOPICS } from '@/lib/ky-topic-classifier';
 import { LANDING_TOPICS } from '@/components/home/landing-data';
 import { FOLLOW_COPY } from '@/lib/follow-labels';
 import { useUser } from '@/app/lib/UserContext';
+import { trackTopicFilterUsed } from '@/lib/analytics';
 
 export type BillsBrowseChamberMode = KyBillsBrowseChamberMode;
 
@@ -108,8 +109,12 @@ export function BillsBrowse({
     (next: string) => {
       setTopicFilter(next);
       const p = new URLSearchParams(searchParams.toString());
-      if (next) p.set('topic', next);
-      else p.delete('topic');
+      if (next) {
+        p.set('topic', next);
+        trackTopicFilterUsed(next, { source: 'bills_browse' });
+      } else {
+        p.delete('topic');
+      }
       const qs = p.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },

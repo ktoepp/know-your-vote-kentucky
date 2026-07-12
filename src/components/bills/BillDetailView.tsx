@@ -34,7 +34,7 @@ import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBl
 import { MemberName } from '@/components/civic/MemberName';
 import { BillNumber } from '@/components/bills/BillNumber';
 import { BillStatusMetaChip } from '@/components/bills/BillStatusMetaChip';
-import { MetaChip } from '@/components/ui/Chip';
+import { ChamberChip, MetaChip } from '@/components/ui/Chip';
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { legislatorRoleDistrictLineFromSponsor } from '@/lib/legislator-display';
 import {
@@ -651,11 +651,10 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                 const chamberKey = bill.chamber === 'house' ? 'house' : 'senate';
                 const chamberTip = governmentTooltips[chamberKey];
                 const chip = (
-                  <MuiChip
-                    label={bill.chamber === 'house' ? 'House' : 'Senate'}
-                    color={bill.chamber === 'senate' ? 'secondary' : 'primary'}
+                  <ChamberChip
+                    chamber={bill.chamber}
                     size="medium"
-                    sx={{ fontSize: '0.9rem', fontWeight: 600, '& .MuiChip-label': { px: 1.25 } }}
+                    sx={{ fontSize: '0.9rem', '& .MuiChip-label': { px: 1.25 } }}
                   />
                 );
                 return chamberTip ? (

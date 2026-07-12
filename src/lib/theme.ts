@@ -211,7 +211,6 @@ export const lightTheme = createTheme({
         root: {
           borderRadius: 9999,
           borderWidth: 1,
-          borderColor: slate[200],
           fontFamily: FONT_SANS,
           fontSize: '0.75rem',
           fontWeight: 600,
@@ -220,11 +219,22 @@ export const lightTheme = createTheme({
           '&.MuiChip-sizeLarge': { fontSize: '0.875rem',  height: 32 },
         },
         label: { color: 'inherit' },
-        outlined: (props: any) => ({
-          borderColor: slate[200],
-          color: props.theme.palette.text.primary,
-          backgroundColor: 'transparent',
-        }),
+        /**
+         * Default outlined chip: slate border, primary text. Non-default color
+         * (success/error/warning/info) yields to MUI's built-in outlinedSuccess
+         * / outlinedError classes so status chips render in their proper hue —
+         * this override used to wipe them and every "Signed" / "Vetoed" chip
+         * silently rendered neutral gray.
+         */
+        outlined: (props: any) => {
+          const colorName: string | undefined = props.ownerState?.color;
+          if (colorName && colorName !== 'default') return {};
+          return {
+            borderColor: slate[200],
+            color: props.theme.palette.text.primary,
+            backgroundColor: 'transparent',
+          };
+        },
       },
     },
     MuiTextField: {
@@ -325,10 +335,6 @@ export const lightTheme = createTheme({
   },
 } as ThemeOptions);
 
-// Dark mode is out of scope (guidelines §14). Keep `darkTheme` as a light-theme
-// alias so any unmigrated import keeps working without a second palette to maintain.
-export const darkTheme = lightTheme;
-
-export type ThemeMode = 'light' | 'dark' | 'system';
-
-export const getTheme = (_mode?: ThemeMode) => lightTheme;
+// Dark mode is out of scope (guidelines §14); `lightTheme` is the single source.
+// Prior `darkTheme` alias, `ThemeMode`, and `getTheme(mode)` shim were removed —
+// nothing consumed them and the aliases invited "dark mode is coming" confusion.

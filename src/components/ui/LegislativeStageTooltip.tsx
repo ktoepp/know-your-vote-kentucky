@@ -1,5 +1,23 @@
 'use client';
 
+import React from 'react';
+import { Box, Typography } from '@mui/material';
+import {
+  AccessTime,
+  AccountBalance,
+  Assignment,
+  Cancel,
+  Description,
+  Draw,
+  Edit,
+  Gavel,
+  HowToVote,
+  MenuBook,
+  Mic,
+  RemoveCircleOutline,
+  TaskAlt,
+  type SvgIconComponent,
+} from '@mui/icons-material';
 import { Tooltip } from './Tooltip';
 import { getTooltipContent } from '@/lib/tooltipContent';
 
@@ -12,139 +30,73 @@ interface LegislativeStageTooltipProps {
   showProgress?: boolean;
 }
 
-// Stage icons for visual identification
-const stageIcons: Record<string, string> = {
-  introduced: '📄',
-  referred: '📋',
-  reported: '✅',
-  passed: '🏛️',
-  enrolled: '📜',
-  enacted: '⚖️',
-  vetoed: '❌',
-  failed: '💀',
-  markup: '✏️',
-  hearing: '🎤',
-  floorVote: '🗳️',
-  cloture: '⏰',
-  timeline_introduced: '📄',
-  timeline_committee: '📋',
-  timeline_committee_amendments: '✏️',
-  timeline_vote: '🗳️',
-  timeline_passed: '🏛️',
-  timeline_signed: '✍️'
+const stageIcons: Record<string, SvgIconComponent> = {
+  introduced: Description,
+  referred: Assignment,
+  reported: TaskAlt,
+  passed: AccountBalance,
+  enrolled: MenuBook,
+  enacted: Gavel,
+  vetoed: Cancel,
+  failed: RemoveCircleOutline,
+  markup: Edit,
+  hearing: Mic,
+  floorVote: HowToVote,
+  cloture: AccessTime,
+  timeline_introduced: Description,
+  timeline_committee: Assignment,
+  timeline_committee_amendments: Edit,
+  timeline_vote: HowToVote,
+  timeline_passed: AccountBalance,
+  timeline_signed: Draw,
 };
 
-export const LegislativeStageTooltip = ({ 
+export const LegislativeStageTooltip = ({
   stage,
   children,
   position = 'top',
   className = '',
   showIcon = true,
-  showProgress = false
+  showProgress = false,
 }: LegislativeStageTooltipProps) => {
   const tooltipContent = getTooltipContent(stage);
-  const icon = stageIcons[stage] || '📋';
+  const IconComponent = stageIcons[stage] || Assignment;
 
   if (!tooltipContent) {
     return <>{children}</>;
   }
-  
+
   const content = (
-    <div className="legislative-stage-tooltip text-left text-slate-900 dark:text-slate-50 max-w-full">
-      <div className="stage-header mb-2 flex items-center gap-2">
+    <Box sx={{ color: 'text.primary', textAlign: 'left', maxWidth: '100%' }}>
+      <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
         {showIcon && (
-          <span className="text-lg" aria-hidden>
-            {icon}
-          </span>
+          <IconComponent
+            aria-hidden
+            sx={{ fontSize: '1.125rem', color: 'primary.main' }}
+          />
         )}
-        <strong className="font-semibold text-sm text-inherit">
+        <Typography component="strong" variant="body2" sx={{ fontWeight: 600 }}>
           {tooltipContent.title}
-        </strong>
-      </div>
-      
-      <div className="stage-content mb-2">
-        <p className={`text-sm leading-relaxed text-slate-700 dark:text-slate-300`}>
-          {tooltipContent.content}
-        </p>
-      </div>
-      
+        </Typography>
+      </Box>
+
+      <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.5 }}>
+        {tooltipContent.content}
+      </Typography>
+
       {showProgress && (
-        <div className="stage-progress pt-2 border-t border-gray-600">
-          <div className="text-xs text-gray-400">
-            <span className="font-medium">Stage:</span> {stage.replace('timeline_', '').replace(/_/g, ' ')}
-          </div>
-        </div>
+        <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            <Box component="span" sx={{ fontWeight: 600 }}>Stage:</Box>{' '}
+            {stage.replace('timeline_', '').replace(/_/g, ' ')}
+          </Typography>
+        </Box>
       )}
-    </div>
+    </Box>
   );
-  
+
   return (
-    <Tooltip
-      content={content}
-      position={position}
-      className={className}
-      maxWidth="max-w-md"
-    >
-      {children}
-    </Tooltip>
-  );
-};
-
-// Specialized component for bill status tooltips
-interface BillStatusTooltipProps {
-  status: string;
-  children: React.ReactNode;
-  position?: 'top' | 'bottom' | 'left' | 'right';
-  className?: string;
-  showStage?: boolean;
-}
-
-export const BillStatusTooltip = ({ 
-  status,
-  children,
-  position = 'top',
-  className = '',
-  showStage = true
-}: BillStatusTooltipProps) => {
-  const tooltipContent = getTooltipContent(status);
-  const icon = stageIcons[status] || '📋';
-
-  if (!tooltipContent) {
-    return <>{children}</>;
-  }
-  
-  const content = (
-    <div className="bill-status-tooltip text-left text-slate-900 dark:text-slate-50 max-w-full">
-      <div className="status-header mb-2 flex items-center gap-2">
-        <span className="text-lg" aria-hidden>{icon}</span>
-        <strong className="font-semibold text-sm text-inherit">
-          {tooltipContent.title}
-        </strong>
-      </div>
-      
-      <div className="status-content mb-2">
-        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-          {tooltipContent.content}
-        </p>
-      </div>
-      
-      {showStage && (
-        <div className="status-stage pt-2 border-t border-gray-600">
-          <div className="text-xs text-gray-400">
-            <span className="font-medium">Current Status:</span> {status.replace(/_/g, ' ')}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-  
-  return (
-    <Tooltip
-      content={content}
-      position={position}
-      className={className}
-      maxWidth="max-w-md"
-    >
+    <Tooltip content={content} position={position} className={className} maxWidth="max-w-md">
       {children}
     </Tooltip>
   );

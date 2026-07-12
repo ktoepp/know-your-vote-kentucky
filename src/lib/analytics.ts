@@ -141,6 +141,59 @@ export const trackBillUnfollowed = (billId: string): void => {
   capture("bill_unfollowed", { bill_id: billId });
 };
 
+export const trackCommitteeFollowed = (committeeId: string): void => {
+  capture("committee_followed", { committee_id: committeeId });
+};
+
+export const trackCommitteeUnfollowed = (committeeId: string): void => {
+  capture("committee_unfollowed", { committee_id: committeeId });
+};
+
+export const trackTopicFilterUsed = (
+  topic: string,
+  props?: { source?: "bills_browse" | "home" | "search" },
+): void => {
+  capture("topic_filter_used", { topic, source: props?.source ?? "bills_browse" });
+};
+
+/**
+ * ZIP → district lookup on `/members/map`. Districts kept for cohort analysis
+ * (which districts are most-searched), zip kept coarse (5-digit) — do NOT log
+ * PII beyond that.
+ */
+export const trackDistrictMapLookup = (props: {
+  zip: string;
+  houseDistrict?: number | null;
+  senateDistrict?: number | null;
+}): void => {
+  capture("district_map_lookup", {
+    zip: props.zip,
+    house_district: props.houseDistrict ?? null,
+    senate_district: props.senateDistrict ?? null,
+  });
+};
+
+/**
+ * Fired when a user picks a result from the global search box, /search page,
+ * or (future) ⌘K command palette. `rank` is 0-indexed position within its list;
+ * `source` tells dashboards which surface produced the click.
+ */
+export const trackSearchResultClicked = (props: {
+  query: string;
+  resultType: "bill" | "member" | "committee" | "meeting";
+  resultId: string;
+  rank: number;
+  source: "nav_bar" | "search_page" | "command_palette";
+}): void => {
+  capture("search_result_clicked", {
+    search_term: props.query,
+    result_type: props.resultType,
+    result_id: props.resultId,
+    rank: props.rank,
+    source: props.source,
+  });
+};
+
 export const trackPreferencesSaved = (
   props?: Record<string, unknown>,
 ): void => {

@@ -7,9 +7,9 @@ import {
   Container,
   Link as MuiLink,
   Typography,
-  CircularProgress,
   Alert,
   Paper,
+  Skeleton,
   TextField,
   InputAdornment,
   Button,
@@ -456,7 +456,19 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
         )}
 
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-        {loading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>}
+        {loading && (
+          <Box role="status" aria-live="polite" aria-label="Searching bills" sx={{ mt: 1 }}>
+            <Skeleton variant="text" width={220} sx={{ fontSize: '0.875rem', mb: 1 }} />
+            <Skeleton variant="text" width={180} sx={{ fontSize: '0.875rem', mb: 3 }} />
+            <CardGrid>
+              {Array.from({ length: 6 }, (_, i) => (
+                <CardGridItem key={i}>
+                  <Skeleton variant="rounded" height={190} sx={{ borderRadius: 3 }} />
+                </CardGridItem>
+              ))}
+            </CardGrid>
+          </Box>
+        )}
 
         {searched && !loading && bills && (
           <>

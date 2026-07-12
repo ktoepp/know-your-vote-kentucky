@@ -54,6 +54,7 @@ import {
 } from '@/components/members/district-map-tokens';
 import { KY_DISTRICT_MAPBOX_STYLE } from '@/lib/ky-district-mapbox-style';
 import { mapboxGeocodeAddress, mapboxGeocodeSuggest, type MapboxGeocodeSuggestion } from '@/lib/mapbox-geocode';
+import { trackDistrictMapLookup } from '@/lib/analytics';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -367,6 +368,7 @@ export default function DistrictMapExplorer() {
         setResolvedLabel(`ZIP ${q}`);
         setMarker({ lng: data.lng, lat: data.lat });
         resolvePoint(data.lng, data.lat);
+        trackDistrictMapLookup({ zip: q });
         mapRef.current?.getMap()?.easeTo({ center: [data.lng, data.lat], zoom: 10.5, duration: 900 });
       } else {
         if (!MAPBOX_TOKEN) {

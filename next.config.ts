@@ -58,6 +58,11 @@ const nextConfig: NextConfig = {
         destination: '/',
         permanent: false,
       },
+      {
+        source: '/browse',
+        destination: '/bills',
+        permanent: true,
+      },
     ];
   },
   eslint: {

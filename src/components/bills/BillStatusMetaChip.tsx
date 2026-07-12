@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Check } from '@mui/icons-material';
-import { Box, Chip as MuiChip, Tooltip, Typography } from '@mui/material';
+import { Block, Check, GavelOutlined } from '@mui/icons-material';
+import { Box, Tooltip, Typography } from '@mui/material';
 import type { KYBill } from '@/types/kentucky';
-import { MetaChip } from '@/components/ui/Chip';
+import { MetaChip, type ChipTone } from '@/components/ui/Chip';
 import { useTooltips } from '@/lib/TooltipContext';
 import {
   billStatusChipLabel,
@@ -70,6 +70,36 @@ type BillStatusMetaChipProps = {
   variant?: 'card' | 'detail';
 };
 
+type StatusVisual = {
+  tone: ChipTone;
+  icon?: React.ReactElement;
+};
+
+function statusVisual(
+  status: string,
+  bill: KYBill,
+): StatusVisual {
+  const s = status.trim().toLowerCase();
+  const signed = isSignedByGovernorBillStatus(status);
+  const chaptered = s.includes('chaptered');
+  const overridden = s.includes('veto override') || s.includes('vetoes overridden');
+  const vetoed = !overridden && s.includes('vetoed');
+
+  if (overridden) {
+    return { tone: 'success', icon: <GavelOutlined sx={{ fontSize: '1.125rem !important' }} /> };
+  }
+  if (vetoed) {
+    return { tone: 'error', icon: <Block sx={{ fontSize: '1.125rem !important' }} /> };
+  }
+  if (signed || chaptered) {
+    return { tone: 'success', icon: <Check sx={{ fontSize: '1.125rem !important' }} /> };
+  }
+  if (classifyKyBillBrowseBucket(bill) === 'passed') {
+    return { tone: 'success', icon: <Check sx={{ fontSize: '1.125rem !important' }} /> };
+  }
+  return { tone: 'default' };
+}
+
 export function BillStatusMetaChip({ bill, statusOverride, variant = 'card' }: BillStatusMetaChipProps) {
   const rawStatus = statusOverride ?? bill.status;
   const billForBucket = statusOverride != null && statusOverride !== bill.status ? { ...bill, status: statusOverride } : bill;
@@ -81,45 +111,19 @@ export function BillStatusMetaChip({ bill, statusOverride, variant = 'card' }: B
       ? 'Adjourned Sine Die'
       : rawStatus;
 
-  const signed = isSignedByGovernorBillStatus(status);
-  const chaptered = status.trim().toLowerCase().includes('chaptered');
-  const passed = !signed && !chaptered && classifyKyBillBrowseBucket(billForBucket) === 'passed';
-  const showCheck = signed || chaptered || passed;
-  const label = signed ? billStatusChipLabel(status) : formatBillLabelText(status);
+  const { tone, icon } = statusVisual(status, billForBucket);
+  const label = isSignedByGovernorBillStatus(status) ? billStatusChipLabel(status) : formatBillLabelText(status);
 
-  let chip: React.ReactElement;
-  if (variant === 'detail') {
-    chip = (
-      <MuiChip
-        icon={showCheck ? <Check sx={{ fontSize: '1.125rem !important' }} /> : undefined}
-        label={label}
-        size="medium"
-        color={showCheck ? 'success' : 'default'}
-        variant={showCheck ? 'outlined' : 'filled'}
-        sx={{
-          fontSize: '0.9rem',
-          fontWeight: 600,
-          '& .MuiChip-label': { px: 1.25 },
-          ...(showCheck && {
-            color: 'success.main',
-            borderColor: 'success.main',
-            '& .MuiChip-icon': { color: 'success.main' },
-          }),
-        }}
-      />
-    );
-  } else if (showCheck) {
-    chip = (
-      <MetaChip
-        icon={<Check sx={{ fontSize: '1.125rem !important' }} />}
-        label={label}
-        tone="success"
-        variant="outlined"
-      />
-    );
-  } else {
-    chip = <MetaChip label={label} tone="default" variant="outlined" />;
-  }
+  const chip = (
+    <MetaChip
+      icon={icon}
+      label={label}
+      tone={tone}
+      variant="outlined"
+      size="medium"
+      sx={variant === 'detail' ? { fontSize: '0.9rem', '& .MuiChip-label': { px: 1.25 } } : undefined}
+    />
+  );
 
   return <BillStatusTooltipShell status={status}>{chip}</BillStatusTooltipShell>;
 }

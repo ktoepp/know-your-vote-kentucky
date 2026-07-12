@@ -93,17 +93,6 @@ export default function RootLayout({
         <noscript>
           <link rel="stylesheet" href="https://use.typekit.net/yru3sto.css" />
         </noscript>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              // Always use light mode
-              (function() {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.setAttribute('data-theme', 'light');
-              })()
-            `,
-          }}
-        />
         <JsonLd data={buildSiteJsonLd()} />
       </head>
       <body className="flex min-h-screen flex-col" suppressHydrationWarning>
