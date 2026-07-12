@@ -28,6 +28,10 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
     autocapture: true,
     // Create profiles for anonymous visitors too; identify() upgrades them when users sign in.
     person_profiles: "always",
+    // Feed uncaught exceptions to PostHog Error Tracking (self-driving crash signal).
+    // Duplicates Sentry on purpose: Sentry stays authoritative; PostHog just needs the signal
+    // to tie crashes to sessions/users. Must also be enabled in PostHog UI → Error Tracking.
+    capture_exceptions: true,
   });
 }
 
