@@ -35,25 +35,55 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
   });
 }
 
-Sentry.init({
-  dsn,
+function initSentry() {
+  Sentry.init({
+    dsn,
 
-  enabled:
-    !!dsn && (process.env.NODE_ENV === "production" || reportInDev),
+    enabled:
+      !!dsn && (process.env.NODE_ENV === "production" || reportInDev),
 
-  sendDefaultPii: true,
+    sendDefaultPii: true,
 
-  // 100% in dev, 10% in production
-  tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
+    // 100% in dev, 10% in production
+    tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
 
-  enableLogs: true,
+    enableLogs: true,
 
-  /**
-   * Session Replay is intentionally disabled: it ships a large client bundle and records DOM
-   * continuously on sampled sessions, which noticeably hurts main-thread time and LCP/INP.
-   * Errors and traces still report via this SDK; re-enable replayIntegration only if you need replays.
-   */
-});
+    /**
+     * Session Replay is intentionally disabled: it ships a large client bundle and records DOM
+     * continuously on sampled sessions, which noticeably hurts main-thread time and LCP/INP.
+     * Errors and traces still report via this SDK; re-enable replayIntegration only if you need replays.
+     */
+  });
+}
 
-// Hook into App Router navigation transitions
+/**
+ * Defer Sentry init off the critical path. On main it ran at module eval and
+ * showed up as a ~1.17s `sentry-tracing-init` user-timing mark on the mobile
+ * PSI trace — biggest single contributor to the 3.2s main-thread total. We
+ * accept a small risk that errors thrown before the idle callback fires
+ * aren't captured; the browser's built-in error handling still logs them and
+ * users almost never trip on first-second-of-load bugs.
+ *
+ * In dev we init synchronously so devs see errors immediately.
+ */
+if (typeof window === "undefined" || process.env.NODE_ENV !== "production") {
+  initSentry();
+} else {
+  const w: Window & { requestIdleCallback?: typeof requestIdleCallback } = window;
+  if (typeof w.requestIdleCallback === "function") {
+    w.requestIdleCallback(initSentry, { timeout: 5000 });
+  } else if (document.readyState === "complete") {
+    // Safari <= 17-ish has no requestIdleCallback; run after `load` so we're
+    // definitely past LCP.
+    setTimeout(initSentry, 2000);
+  } else {
+    w.addEventListener("load", () => setTimeout(initSentry, 2000), { once: true });
+  }
+}
+
+/**
+ * `captureRouterTransitionStart` is exported at module load, before Sentry is
+ * initialised. It's a no-op until init completes — safe to route through.
+ */
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
