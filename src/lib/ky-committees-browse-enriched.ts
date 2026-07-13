@@ -7,6 +7,7 @@ import { fetchKyLegislatorRosterForCommittees } from '@/lib/ky-legislator-roster
 import { buildCommitteeMemberDisplay, type CommitteeMemberDisplay } from '@/lib/ky-committee-members';
 import { classifyTopics } from '@/lib/ky-topic-classifier';
 import { kyTodayIso } from '@/lib/ky-committee-display';
+import { legislatorAvatarDescriptor, type LegislatorAvatarDescriptor } from '@/lib/ky-member-utils';
 
 function createAnonClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -21,22 +22,36 @@ function isLeadershipRole(roleLabel: string | null): boolean {
   return r.includes('chair') || r.includes('vice');
 }
 
+export type KYCommitteeLeaderCardEntry = {
+  name: string;
+  roleLabel: string;
+  portrait: LegislatorAvatarDescriptor;
+};
+
 export type KYCommitteeBrowseCard = KYCommittee & {
-  leadershipNames: string[];
+  leadership: KYCommitteeLeaderCardEntry[];
   topicTags: string[];
   /** Soonest non-cancelled meeting on/after today, ISO date; null when none scheduled. */
   nextMeetingDate: string | null;
 };
 
-function leadershipFromMembers(members: CommitteeMemberDisplay[]): string[] {
-  const names: string[] = [];
+function leadershipFromMembers(members: CommitteeMemberDisplay[]): KYCommitteeLeaderCardEntry[] {
+  const seen = new Set<string>();
+  const entries: KYCommitteeLeaderCardEntry[] = [];
   for (const m of members) {
     if (!isLeadershipRole(m.roleLabel)) continue;
-    const label = m.roleLabel ? `${m.displayName} (${m.roleLabel})` : m.displayName;
-    if (!names.includes(label)) names.push(label);
-    if (names.length >= 4) break;
+    const roleLabel = m.roleLabel!;
+    const key = `${m.displayName}::${roleLabel}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push({
+      name: m.displayName,
+      roleLabel,
+      portrait: legislatorAvatarDescriptor(m.legislator, m.displayName),
+    });
+    if (entries.length >= 4) break;
   }
-  return names;
+  return entries;
 }
 
 const getCachedCommitteeMeetingRefs = unstable_cache(
@@ -80,7 +95,7 @@ export async function fetchKyCommitteesBrowseEnriched(): Promise<KYCommitteeBrow
   const cards = committees.map((committee) => {
     const committeeMeetings = meetingsByCommittee.get(committee.id) ?? [];
     const members = buildCommitteeMemberDisplay(committee, committeeMeetings, roster);
-    const leadershipNames = leadershipFromMembers(members);
+    const leadership = leadershipFromMembers(members);
     const topicTags = classifyTopics(committee.name, '').slice(0, 3);
     const nextMeetingDate = committeeMeetings
       .filter((m) => m.status !== 'cancelled' && m.meeting_date >= today)
@@ -88,7 +103,7 @@ export async function fetchKyCommitteesBrowseEnriched(): Promise<KYCommitteeBrow
 
     return {
       ...committee,
-      leadershipNames,
+      leadership,
       topicTags,
       nextMeetingDate,
       _memberCount: members.length,

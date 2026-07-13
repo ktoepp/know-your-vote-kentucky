@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Avatar, Box, IconButton, Typography } from '@mui/material';
+import { Box, IconButton, Typography } from '@mui/material';
 import { Bookmark as BookmarkFilled, CalendarMonth } from '@mui/icons-material';
 import { Bookmark } from 'lucide-react';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { MetaChip } from '@/components/ui/Chip';
 import { CommitteeTagRow } from '@/components/committees/CommitteeTagRow';
+import { LegislatorAvatar } from '@/components/members/LegislatorAvatar';
 import type { KYCommitteeBrowseCard } from '@/lib/ky-committees-browse-enriched';
 import { iconRemSx } from '@/lib/ui-tokens';
 import { formatKyMeetingDate, normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
@@ -21,19 +22,7 @@ export interface KYCommitteeCardProps {
 export function KYCommitteeCard({ committee, following = false, onToggleFollow }: KYCommitteeCardProps) {
   const href = `/committees/${encodeURIComponent(committee.slug)}`;
   const displayName = normalizeKyGaDisplayName(committee.name);
-  const leaders = committee.leadershipNames.slice(0, 2).map((entry) => {
-    const match = entry.match(/^(.+?)\s+\(([^)]+)\)$/);
-    const name = normalizeKyGaDisplayName(match?.[1] ?? entry);
-    const role = match?.[2] ?? 'Committee leader';
-    const initials = name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase();
-    return { name, role, initials };
-  });
+  const leaders = committee.leadership.slice(0, 2);
 
   const followButton = onToggleFollow ? (
     <IconButton
@@ -99,22 +88,22 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
           {leaders.length > 0 ? (
             <Box sx={{ display: 'grid', gap: 1 }}>
               {leaders.map((leader) => (
-                <Box key={`${leader.name}-${leader.role}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Avatar
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      bgcolor: 'primary.light',
-                      color: 'primary.contrastText',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {leader.initials || '?'}
-                  </Avatar>
+                <Box
+                  key={`${leader.name}-${leader.roleLabel}`}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                >
+                  <LegislatorAvatar
+                    src={leader.portrait.src}
+                    alt={leader.portrait.alt}
+                    initials={leader.portrait.initials}
+                    party={leader.portrait.party}
+                    showPartyBadge={leader.portrait.showPartyBadge}
+                    imgProps={leader.portrait.imgProps}
+                    sx={{ width: 36, height: 36, fontSize: '0.72rem', fontWeight: 700 }}
+                  />
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.2 }}>
-                      {leader.role}
+                      {leader.roleLabel}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.2 }}>
                       {leader.name}
