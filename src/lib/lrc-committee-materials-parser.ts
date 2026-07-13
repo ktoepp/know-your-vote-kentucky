@@ -204,5 +204,11 @@ export const LRC_COMMITTEE_DOCUMENTS_BASE_URL =
   'https://apps.legislature.ky.gov/CommitteeDocuments';
 
 export function lrcCommitteeDocumentsUrl(rsn: number): string {
-  return `${LRC_COMMITTEE_DOCUMENTS_BASE_URL}/${rsn}`;
+  // Trailing slash is load-bearing: LRC nests each meeting folder under the
+  // committee-RSN directory (e.g. /CommitteeDocuments/13/44515/…), and the
+  // page's hrefs are relative (./44515/…). Without the slash, `new URL()`
+  // treats `/{rsn}` as a filename and drops it, producing the old flat
+  // /CommitteeDocuments/{meeting_id}/… URLs that started returning 404 when
+  // LRC migrated the layout.
+  return `${LRC_COMMITTEE_DOCUMENTS_BASE_URL}/${rsn}/`;
 }
