@@ -53,6 +53,8 @@ type NavLinkConfig = {
   label: string;
   icon: React.ReactElement<{ sx?: SxProps<Theme> }>;
   priority: 'primary';
+  /** Opt out of viewport prefetch when the destination pulls heavy chunks (e.g. mapbox-gl). */
+  prefetch?: false;
 };
 
 // Primary navigation links - Kentucky civic engagement
@@ -86,6 +88,7 @@ const navLinks: NavLinkConfig[] = [
     label: 'Find my legislators',
     icon: <KentuckyStateIcon />,
     priority: 'primary',
+    prefetch: false,
   },
 ];
 
@@ -457,6 +460,7 @@ export default function Navigation() {
                 key={item.href}
                 component={Link}
                 href={item.href}
+                prefetch={item.prefetch}
                 sx={{
                   color: isActive(item.href) ? 'primary.main' : 'text.primary',
                   backgroundColor: isActive(item.href) ? 'rgba(0,0,0,0.06)' : 'transparent',
@@ -571,6 +575,7 @@ export default function Navigation() {
                   <ListItemButton
                     component={Link}
                     href={item.href}
+                    prefetch={item.prefetch}
                     onClick={() => setMobileMenuOpen(false)}
                     sx={{
                       borderRadius: 2,

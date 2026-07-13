@@ -14,12 +14,15 @@ function HeroCtaButton({
   animationData,
   fallbackIcon,
   primary = false,
+  prefetch,
 }: {
   href: string;
   label: string;
   animationData?: object;
   fallbackIcon?: ReactNode;
   primary?: boolean;
+  /** Opt out of viewport prefetch when the destination pulls heavy chunks (e.g. mapbox-gl). */
+  prefetch?: false;
 }) {
   const { lottieRef, handleMouseEnter, handleMouseLeave } = useHoverLottieControls();
 
@@ -33,6 +36,7 @@ function HeroCtaButton({
     <Button
       component={Link}
       href={href}
+      prefetch={prefetch}
       variant="contained"
       size="large"
       {...(startIcon ? { startIcon } : {})}
@@ -55,6 +59,7 @@ export function LandingHeroCtas() {
         animationData={searchAnimation}
         fallbackIcon={<Place sx={{ fontSize: 20 }} aria-hidden />}
         primary
+        prefetch={false}
       />
       <HeroCtaButton
         href="/bills"

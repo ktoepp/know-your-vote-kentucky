@@ -1,8 +1,13 @@
 'use client';
 
 import { Box } from '@mui/material';
-import Lottie, { type LottieRefCurrentProps } from 'lottie-react';
+import dynamic from 'next/dynamic';
+import type { LottieRefCurrentProps } from 'lottie-react';
 import { useCallback, useRef, type RefObject } from 'react';
+
+// Split lottie-react (~150 KB w/ lottie-web) out of the initial chunk; hover
+// icons can render blank until the player arrives without hurting LCP.
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 export function useHoverLottieControls() {
   const lottieRef = useRef<LottieRefCurrentProps>(null);
