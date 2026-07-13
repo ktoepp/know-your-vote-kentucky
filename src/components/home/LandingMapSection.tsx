@@ -41,7 +41,10 @@ export function LandingMapSection() {
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) setMapInView(true);
       },
-      { rootMargin: '400px 0px' },
+      // Small runway so the tiles show up as the user scrolls in, but not so
+      // large it fires on initial render (400px would trigger on a ~640px
+      // mobile viewport since the section sits ~900px down the page).
+      { rootMargin: '100px 0px' },
     );
     observer.observe(el);
     return () => observer.disconnect();
