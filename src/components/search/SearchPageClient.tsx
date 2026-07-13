@@ -363,8 +363,15 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                 {suggestionsLoading &&
-                  [1, 2, 3, 4].map((k) => (
-                    <Chip key={k} label="…" size="small" aria-hidden sx={{ opacity: 0.4, '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }} />
+                  [96, 120, 84, 108].map((width, k) => (
+                    <Skeleton
+                      key={k}
+                      variant="rounded"
+                      width={width}
+                      height={24}
+                      aria-hidden
+                      sx={{ borderRadius: 16 }}
+                    />
                   ))}
                 {!suggestionsLoading &&
                   subjectSuggestions.map((s) => (
