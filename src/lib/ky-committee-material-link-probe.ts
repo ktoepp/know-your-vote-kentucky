@@ -11,7 +11,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const MATERIAL_PROBE_HEADERS = {
   'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; link-probe)',
-  Accept: 'text/html',
+  // Accept: */* — LRC's IIS returns 406 Not Acceptable when Accept is text/html
+  // and the file is a PDF/DOCX (which is nearly every material). That mislabeled
+  // every valid link as ambiguous, so link_status stayed NULL and nothing ever
+  // recorded as "ok".
+  Accept: '*/*',
 };
 
 export const PROBE_TIMEOUT_MS = 15_000;
