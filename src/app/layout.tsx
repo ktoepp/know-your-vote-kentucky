@@ -79,6 +79,11 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://use.typekit.net" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://p.typekit.net" crossOrigin="anonymous" />
+        {/* PostHog init runs from instrumentation-client.ts; PSI estimates a 360ms
+            LCP win from a preconnect since the assets host and the ingest host
+            differ. Both origins are pinged before scripts arrive. */}
+        <link rel="preconnect" href="https://us-assets.i.posthog.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://us.i.posthog.com" crossOrigin="anonymous" />
         {/* Typekit (aesthet-nova headings) loaded non-blocking: it cost ~870ms
             of render-block on throttled mobile. The preload starts the fetch at
             head-parse; the inline script attaches the stylesheet without

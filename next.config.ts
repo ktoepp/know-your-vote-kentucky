@@ -12,6 +12,19 @@ const nextConfig: NextConfig = {
   /** Native WebSocket impl used by Supabase Realtime when Node is below 22 (see supabaseAdminCore.ts). */
   serverExternalPackages: ["ws"],
   /**
+   * Turn `import { Foo } from '@mui/material'` into per-file deep imports at
+   * build time, so unused MUI/icon/lottie modules are tree-shaken instead of
+   * shipping in the shared client chunk. Cuts hundreds of KiB from the home
+   * page's `unused JavaScript` PSI opportunity.
+   */
+  experimental: {
+    optimizePackageImports: [
+      '@mui/material',
+      '@mui/icons-material',
+      'lottie-react',
+    ],
+  },
+  /**
    * Expose Vercel's deployment environment to the browser bundle. `VERCEL_ENV`
    * ("production" | "preview" | "development") is a build-time system var on
    * Vercel; baking it in as `NEXT_PUBLIC_VERCEL_ENV` lets client code (PostHog
