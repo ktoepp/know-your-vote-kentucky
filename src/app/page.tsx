@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
 import { preload } from 'react-dom';
 import { Box } from '@mui/material';
+import { HomeAuthHero } from '@/components/home/HomeAuthHero';
 import { HomePageContent } from '@/components/home/HomePageContent';
 import { LandingHero } from '@/components/home/LandingHero';
+import { LandingHeroReturning } from '@/components/home/LandingHeroReturning';
+import { LandingPersonalStrip } from '@/components/home/LandingPersonalStrip';
 import { SessionBannerServer } from '@/components/home/SessionBannerServer';
 import { LANDING_HERO_IMAGE_URL } from '@/components/home/landingHeroStyles';
 import { fetchKyCurrentSessionBillCount } from '@/lib/ky-bills-browse-server';
@@ -23,9 +26,23 @@ export default async function HomePage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <SessionBannerServer />
-      {/* Passed as a prop so the hero stays server-rendered (in the SSR HTML,
-          not gated on client auth resolution) inside the client component. */}
-      <HomePageContent currentSessionBillCount={currentSessionBillCount} marketingHero={<LandingHero />} />
+      {/* Both hero variants render server-side and arrive at the tiny
+          `HomeAuthHero` client island as pre-rendered nodes; the island only
+          picks which one to show once `useUser()` resolves. */}
+      <HomePageContent
+        currentSessionBillCount={currentSessionBillCount}
+        authHero={
+          <HomeAuthHero
+            marketingHero={<LandingHero />}
+            returningHero={
+              <>
+                <LandingHeroReturning />
+                <LandingPersonalStrip />
+              </>
+            }
+          />
+        }
+      />
     </Box>
   );
 }
