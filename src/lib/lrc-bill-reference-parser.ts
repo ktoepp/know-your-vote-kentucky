@@ -29,6 +29,29 @@ const SESSION_IN_PARENS =
 const SESSION_AFTER_HYPHEN =
   /-\s*((?:\d{4}\s+)?(?:Regular|Extraordinary|Special)\s+Session)\b/i;
 
+/**
+ * LRC agenda shorthand — "25RS SB 15" / "24SS HB 2" / "22EX HB 1" — expanded
+ * from the 2-digit year + session code that appears anywhere in the line.
+ * Covers a large fraction of interim-review agenda items that omit the
+ * long-form "(2025 Regular Session)" callout.
+ */
+const SESSION_SHORTHAND = /\b(\d{2})(RS|SS|EX)\b/i;
+const SESSION_KIND_LABELS: Record<string, string> = {
+  RS: 'Regular Session',
+  SS: 'Special Session',
+  EX: 'Extraordinary Session',
+};
+
+function expandSessionShorthand(text: string): string | null {
+  const m = text.match(SESSION_SHORTHAND);
+  if (!m) return null;
+  const yy = parseInt(m[1], 10);
+  const kind = SESSION_KIND_LABELS[m[2].toUpperCase()];
+  if (!kind || !Number.isFinite(yy)) return null;
+  const year = yy >= 70 ? 1900 + yy : 2000 + yy;
+  return `${year} ${kind}`;
+}
+
 const PATTERNS: { kind: LrcBillReferenceKind; re: RegExp }[] = [
   { kind: 'HB', re: /\bHouse\s+Bill\s+(\d+)\b/gi },
   { kind: 'SB', re: /\bSenate\s+Bill\s+(\d+)\b/gi },
@@ -69,6 +92,7 @@ export function extractLrcBillReferences(text: string): LrcBillReference[] {
   if (!text?.trim()) return [];
   const found: LrcBillReference[] = [];
   const seen = new Set<string>();
+  const shorthandSession = expandSessionShorthand(text);
 
   for (const { kind, re } of PATTERNS) {
     const regex = new RegExp(re.source, re.flags);
@@ -77,7 +101,8 @@ export function extractLrcBillReferences(text: string): LrcBillReference[] {
       const number = parseInt(m[1], 10);
       if (!Number.isFinite(number)) continue;
       const raw = m[0];
-      const sessionLabel = sessionAfterIndex(text, m.index + raw.length);
+      const sessionLabel =
+        sessionAfterIndex(text, m.index + raw.length) ?? shorthandSession;
       const ref: LrcBillReference = { kind, number, sessionLabel, raw };
       const key = refKey(ref);
       if (seen.has(key)) continue;

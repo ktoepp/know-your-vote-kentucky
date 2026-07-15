@@ -7,9 +7,7 @@ import {
   Card,
   Divider,
   IconButton,
-  List,
-  ListItem,
-  ListItemText,
+  Stack,
   Typography,
 } from '@mui/material';
 import { Bookmark as BookmarkFilled } from '@mui/icons-material';
@@ -20,7 +18,7 @@ import {
   normalizeKyGaAgendaLine,
   normalizeKyGaDisplayName,
 } from '@/lib/ky-committee-display';
-import { BillNumber } from '@/components/bills/BillNumber';
+import { AgendaLine } from '@/components/committees/AgendaLine';
 
 export interface AgendaSearchResultsProps {
   items: KYCommitteeAgendaItemWithMeeting[];
@@ -36,8 +34,8 @@ export function AgendaSearchResults({
 }: AgendaSearchResultsProps) {
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
-      <List disablePadding>
-        {items.map((item, i) => {
+      <Stack divider={<Divider />}>
+        {items.map((item) => {
           const meeting = item.ky_committee_meetings;
           const committee = meeting?.ky_committees;
           const committeeId = committee?.id ? String(committee.id) : '';
@@ -69,58 +67,37 @@ export function AgendaSearchResults({
             </IconButton>
           ) : null;
           return (
-            <React.Fragment key={item.id}>
-              {i > 0 && <Divider component="li" />}
-              <ListItem
-                alignItems="flex-start"
-                sx={{ py: 1.5, px: 2, display: 'flex', gap: 0.5 }}
-              >
-                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                <ListItemText
-                  primary={
-                    <Typography variant="body1" fontWeight={500}>
-                      {item.ky_bill_id ? (
-                        <Link
-                          href={`/bills/${item.ky_bill_id}`}
-                          style={{ textDecoration: 'underline', textUnderlineOffset: 2 }}
-                        >
-                          {normalizeKyGaAgendaLine(item.raw_text)}
-                        </Link>
-                      ) : (
-                        normalizeKyGaAgendaLine(item.raw_text)
-                      )}
-                    </Typography>
-                  }
-                  secondary={
-                    <Typography component="div" variant="body2" color="text.secondary" sx={{ pt: 0.5 }}>
-                      {meeting?.meeting_date && (
-                        <span>{formatKyMeetingDate(meeting.meeting_date)}</span>
-                      )}
-                      {committee && (
-                        <>
-                          {' · '}
-                          <Link href={`/committees/${encodeURIComponent(committee.slug)}`}>
-                            {normalizeKyGaDisplayName(committee.name)}
-                          </Link>
-                        </>
-                      )}
-                      {item.ky_bill_id && item.bill_number && (
-                        <>
-                          {' · '}
-                          <BillNumber billNumber={item.bill_number} size="compact" href={`/bills/${item.ky_bill_id}`} />
-                        </>
-                      )}
-                    </Typography>
-                  }
-                  secondaryTypographyProps={{ component: 'div' }}
-                />
-                </Box>
-                {followControl}
-              </ListItem>
-            </React.Fragment>
+            <Box
+              key={item.id}
+              sx={{ py: 1.5, px: 2, display: 'flex', alignItems: 'flex-start', gap: 0.5 }}
+            >
+              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                <Typography variant="body1" sx={{ lineHeight: 1.55 }}>
+                  <AgendaLine
+                    rawText={normalizeKyGaAgendaLine(item.raw_text)}
+                    billNumber={item.bill_number}
+                    billId={item.ky_bill_id}
+                  />
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ pt: 0.5 }}>
+                  {meeting?.meeting_date && (
+                    <span>{formatKyMeetingDate(meeting.meeting_date)}</span>
+                  )}
+                  {committee && (
+                    <>
+                      {meeting?.meeting_date ? ' · ' : ''}
+                      <Link href={`/committees/${encodeURIComponent(committee.slug)}`}>
+                        {normalizeKyGaDisplayName(committee.name)}
+                      </Link>
+                    </>
+                  )}
+                </Typography>
+              </Box>
+              {followControl}
+            </Box>
           );
         })}
-      </List>
+      </Stack>
     </Card>
   );
 }

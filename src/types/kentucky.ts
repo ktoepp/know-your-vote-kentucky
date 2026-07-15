@@ -152,6 +152,8 @@ export interface KYCommitteeAgendaItem {
   bill_number: string | null;
   bill_session_label: string | null;
   ky_bill_id: string | null;
+  /** Nesting depth in the source LRC agenda block; 0 = top-level. */
+  depth: number;
   created_at: string;
 }
 

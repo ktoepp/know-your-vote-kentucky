@@ -7,22 +7,20 @@ import {
   Card,
   CardContent,
   Divider,
-  List,
-  ListItem,
-  ListItemText,
   Stack,
   Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYCommitteeAgendaItemWithMeeting } from '@/types/kentucky';
-import { ICON_REM, TYPE } from '@/lib/ui-tokens';
+import { TYPE } from '@/lib/ui-tokens';
 import {
   formatKyMeetingDate,
   LRC_LEGISLATIVE_CALENDAR_URL,
   normalizeKyGaAgendaLine,
   normalizeKyGaDisplayName,
 } from '@/lib/ky-committee-display';
+import { AgendaLine } from '@/components/committees/AgendaLine';
 
 const AGENDA_SELECT = `
   *,
@@ -101,51 +99,43 @@ export function BillHearingsSection({ billId }: BillHearingsSectionProps) {
           that reference this bill.
         </Typography>
 
-        <Card variant="outlined" sx={{ borderRadius: 2 }}>
-          <List disablePadding>
-            {items.map((item, i) => {
-              const meeting = item.ky_committee_meetings;
-              const committee = meeting?.ky_committees;
-              return (
-                <React.Fragment key={item.id}>
-                  {i > 0 && <Divider component="li" />}
-                  <ListItem alignItems="flex-start" sx={{ py: 1.5 }}>
-                    <ListItemText
-                      primary={
-                        <Typography variant="body1" fontWeight={500}>
-                          {normalizeKyGaAgendaLine(item.raw_text)}
-                        </Typography>
-                      }
-                      secondary={
-                        <Stack spacing={0.5} sx={{ pt: 0.5 }}>
-                          {meeting?.meeting_date && (
-                            <Typography variant="caption" color="text.secondary">
-                              {formatKyMeetingDate(meeting.meeting_date)}
-                              {meeting.time_and_location ? ` · ${meeting.time_and_location}` : ''}
-                            </Typography>
-                          )}
-                          {committee && (
-                            <Typography variant="caption" color="text.secondary">
-                              <Link
-                                href={`/committees/${encodeURIComponent(committee.slug)}`}
-                                style={{ fontWeight: 600 }}
-                              >
-                                {normalizeKyGaDisplayName(committee.name)}
-                              </Link>
-                              {' · '}
-                              <Link href="/meetings">All meetings</Link>
-                            </Typography>
-                          )}
-                        </Stack>
-                      }
-                      secondaryTypographyProps={{ component: 'div' }}
-                    />
-                  </ListItem>
-                </React.Fragment>
-              );
-            })}
-          </List>
-        </Card>
+        <Stack divider={<Divider flexItem />} spacing={1.5}>
+          {items.map((item) => {
+            const meeting = item.ky_committee_meetings;
+            const committee = meeting?.ky_committees;
+            return (
+              <Box key={item.id}>
+                <Typography variant="body1" sx={{ lineHeight: 1.55 }}>
+                  <AgendaLine
+                    rawText={normalizeKyGaAgendaLine(item.raw_text)}
+                    billNumber={item.bill_number}
+                    billId={item.ky_bill_id}
+                    isSelfBill
+                  />
+                </Typography>
+                <Typography variant="caption" color="text.secondary" component="div" sx={{ pt: 0.5 }}>
+                  {meeting?.meeting_date && (
+                    <>
+                      {formatKyMeetingDate(meeting.meeting_date)}
+                      {meeting.time_and_location ? ` · ${meeting.time_and_location}` : ''}
+                    </>
+                  )}
+                  {committee && (
+                    <>
+                      {meeting?.meeting_date ? ' · ' : ''}
+                      <Link
+                        href={`/committees/${encodeURIComponent(committee.slug)}`}
+                        style={{ fontWeight: 600 }}
+                      >
+                        {normalizeKyGaDisplayName(committee.name)}
+                      </Link>
+                    </>
+                  )}
+                </Typography>
+              </Box>
+            );
+          })}
+        </Stack>
       </CardContent>
     </Card>
   );

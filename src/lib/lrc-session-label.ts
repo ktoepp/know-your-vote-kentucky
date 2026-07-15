@@ -18,3 +18,17 @@ export function billSessionLookupKey(billNumber: string, sessionLabel: string | 
   const sess = normalizeKySessionLabel(sessionLabel).toLowerCase();
   return `${bn}|${sess}`;
 }
+
+/**
+ * When an agenda line names a bill with no session ("SB 58: …"), the LRC
+ * convention is that it refers to the most recent regular session — which
+ * for KY is always the current calendar year's `RS`. Interim committees
+ * reviewing enacted bills use this shorthand constantly.
+ */
+export function inferSessionLabelFromMeetingDate(
+  meetingDate: string | null | undefined,
+): string | null {
+  const m = /^(\d{4})-\d{2}-\d{2}/.exec(meetingDate ?? '');
+  if (!m) return null;
+  return `${m[1]} Regular Session`;
+}
