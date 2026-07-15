@@ -21,6 +21,8 @@
     "sync:ky:bills:status": "tsx scripts/manual-sync.ts bills --use-change-hash --skip-bill-sponsor-details",
     "sync:ky:dry": "tsx scripts/manual-sync.ts --dry-run",
     "bulk-seed:ky": "tsx scripts/ky-legiscan-bulk-seed.ts",
+    "sync:ky:dataset": "tsx scripts/sync-ky-dataset.ts",
+    "sync:ky:dataset:dry": "tsx scripts/sync-ky-dataset.ts --dry-run",
     "check:legiscan-quota": "tsx scripts/check-quota.ts",
     "slack:smoke-test": "tsx scripts/slack-smoke-test.ts",
     "verify:votes": "tsx scripts/verify-legiscan-vote-counts.ts",
