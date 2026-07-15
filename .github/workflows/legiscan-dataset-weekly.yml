@@ -1,0 +1,103 @@
+# Weekly LegiScan Dataset reconcile — belt-and-suspenders against a missed
+# change_hash update in sync-ky-bills-status. LegiScan regenerates state
+# datasets weekly (Sun 04-05 ET); one getDataset pull is ~2 quota points and
+# ships an entire session's bills/history/texts/roll-calls as a ZIP. Hash-
+# gated against ky_legiscan_datasets so unchanged sessions cost 0 downloads.
+#
+# Paired with accuracy-audit.yml (Sun 07:00 UTC): this fires at 08:00 UTC so
+# any late-arriving change_hash updates get reconciled before the following
+# week starts. Sends a Slack digest on change/error only.
+#
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   LEGISCAN_API_KEY, NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY
+# Optional Slack (same webhooks as sync-ky-bills-status.yml):
+#   SLACK_WEBHOOK_STATUS_REPORTS, SLACK_WEBHOOK_ERRORS, SLACK_WEBHOOK_SYNC, SLACK_WEBHOOK_URL,
+#   SLACK_SYNC_NOTIFY_CLI=true
+name: LegiScan dataset weekly reconcile
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Cap sessions processed per run (blank = all changed sessions).'
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry-run: skip DB writes and dataset downloads.'
+        type: boolean
+        default: false
+  schedule:
+    # Sundays 08:00 UTC — one hour after accuracy-audit (07:00 UTC), well after
+    # LegiScan's Sunday 04-05 ET dataset regen window.
+    - cron: '0 8 * * 0'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: legiscan-dataset-weekly
+  cancel-in-progress: false
+
+jobs:
+  dataset-reconcile:
+    name: LegiScan dataset weekly reconcile
+    runs-on: ubuntu-latest
+    # Whole-session ZIPs decode fast; a fresh regular-session dataset (~1700
+    # bills, thousands of history rows) upserts in well under a minute. 15
+    # minutes is comfortable headroom for the rare case where several sessions
+    # changed hashes at once.
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+      SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+      SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+      SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SLACK_SYNC_NOTIFY_CLI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Reconcile LegiScan datasets
+        id: dataset_sync
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              EXTRA="--dry-run"
+            fi
+            if [ -n "${{ inputs.limit }}" ]; then
+              EXTRA="$EXTRA --limit=${{ inputs.limit }}"
+            fi
+          fi
+          npm run sync:ky:dataset -- ${EXTRA}
+
+      - name: Slack notify on workflow failure
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+        run: |
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
+            exit 0
+          fi
+          if [ -f .slack-notified ]; then
+            echo "Skip Slack: sync script already posted the failure to #errors."
+            exit 0
+          fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"*KY Vote — LegiScan dataset weekly reconcile failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$WEBHOOK"
