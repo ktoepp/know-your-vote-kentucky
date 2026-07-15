@@ -21,6 +21,12 @@ export interface LrcCalendarMemberRef {
 
 export interface LrcCalendarAgendaItem {
   rawText: string;
+  /**
+   * Nesting depth (0 = top-level). LRC agenda blocks use one leading TAB
+   * per indent level, so counting leading tabs on each split line recovers
+   * the source hierarchy that .text() collapses away.
+   */
+  depth: number;
   billReferences: LrcBillReference[];
 }
 
@@ -101,19 +107,37 @@ function parseMembers($: cheerio.CheerioAPI, $members: cheerio.Cheerio<Element>)
   return out;
 }
 
-function splitAgendaLines(agendaText: string): string[] {
+interface AgendaSourceLine {
+  text: string;
+  depth: number;
+}
+
+/**
+ * Split the agenda block preserving depth: LRC uses one leading TAB per
+ * indent level (visible in the raw HTML — see fixtures/lrc/*.html). Count
+ * tabs before collapsing whitespace so the source hierarchy survives.
+ */
+function splitAgendaLines(agendaText: string): AgendaSourceLine[] {
   return agendaText
     .split(/\n+/)
-    .map((line) => line.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim())
-    .filter((line) => line.length > 0);
+    .map((raw): AgendaSourceLine | null => {
+      const tabMatch = raw.match(/^\t+/);
+      const depth = tabMatch ? tabMatch[0].length : 0;
+      const text = raw.replace(/^\t+/, '').replace(/\s+/g, ' ').trim();
+      return text.length > 0 ? { text, depth } : null;
+    })
+    .filter((line): line is AgendaSourceLine => line !== null);
 }
 
 function parseAgendaBlock($agenda: cheerio.Cheerio<Element>): LrcCalendarAgendaItem[] {
-  const full = $agenda.text().replace(/^Agenda:\s*/i, '').trim();
+  // Trim only around the outer "Agenda:" prefix — keep in-line whitespace so
+  // splitAgendaLines can read leading tabs on each line.
+  const full = $agenda.text().replace(/^\s*Agenda:\s*/i, '').replace(/\s+$/, '');
   if (!full) return [];
-  return splitAgendaLines(full).map((rawText) => ({
-    rawText,
-    billReferences: extractLrcBillReferences(rawText),
+  return splitAgendaLines(full).map(({ text, depth }) => ({
+    rawText: text,
+    depth,
+    billReferences: extractLrcBillReferences(text),
   }));
 }
 

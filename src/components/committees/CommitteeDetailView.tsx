@@ -12,9 +12,6 @@ import {
   Container,
   Divider,
   Link as MuiLink,
-  List,
-  ListItem,
-  ListItemText,
   Stack,
   Typography,
 } from '@mui/material';
@@ -34,7 +31,6 @@ import { MetaChip } from '@/components/ui/Chip';
 import type { KYCommittee, KYCommitteeAgendaItem, KYCommitteeMeeting } from '@/types/kentucky';
 import { FOCUS_RING, ICON_REM, SECTION_TITLE_DISPLAY_SX, TYPE, iconRemSx } from '@/lib/ui-tokens';
 import {
-  formatAgendaItemKind,
   formatKyMeetingDate,
   kyTodayIso,
   LRC_LEGISLATIVE_CALENDAR_URL,
@@ -42,6 +38,88 @@ import {
   normalizeKyGaDisplayName,
   resolveKyCommitteeParent,
 } from '@/lib/ky-committee-display';
+import { AgendaLine, isAgendaSubBullet } from '@/components/committees/AgendaLine';
+
+interface AgendaNode {
+  item: KYCommitteeAgendaItem;
+  children: AgendaNode[];
+}
+
+/**
+ * Build a tree from the flat, sort_order-ranked agenda rows using `depth`
+ * (captured from the source LRC calendar's tab indentation). Any row deeper
+ * than the last stack head is attached as its child. Rows whose depth
+ * exceeds the current tree by more than one level (rare — stray formatting)
+ * clamp to `top + 1` so nothing is dropped.
+ *
+ * Falls back to the pre-depth-column era: for legacy rows where every depth
+ * is 0, consecutive raw_text bullet lines fold under the last non-bullet
+ * row so historic meetings still nest until the backfill catches them.
+ */
+function buildAgendaTree(items: KYCommitteeAgendaItem[]): AgendaNode[] {
+  const allDepthZero = items.every((it) => (it.depth ?? 0) === 0);
+  const roots: AgendaNode[] = [];
+  const stack: AgendaNode[] = [];
+
+  for (const item of items) {
+    let d = item.depth ?? 0;
+    if (allDepthZero && isAgendaSubBullet(item.raw_text) && stack.length > 0) {
+      d = stack.length; // legacy fallback: promote bullet to child of prior line
+    }
+    if (d > stack.length) d = stack.length; // clamp overshoot
+    stack.length = d;
+    const node: AgendaNode = { item, children: [] };
+    if (stack.length === 0) {
+      roots.push(node);
+    } else {
+      stack[stack.length - 1].children.push(node);
+    }
+    stack.push(node);
+  }
+  return roots;
+}
+
+function AgendaNodeList({ nodes, depth }: { nodes: AgendaNode[]; depth: number }) {
+  const isRoot = depth === 0;
+  const ListTag: 'ol' | 'ul' = isRoot ? 'ol' : 'ul';
+  return (
+    <Box
+      component={ListTag}
+      sx={{
+        listStyleType: isRoot ? 'decimal' : depth === 1 ? 'disc' : 'circle',
+        m: 0,
+        mt: isRoot ? 0.75 : 0.5,
+        pl: isRoot ? { xs: 3, sm: 3.5 } : 3,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: isRoot ? 1.5 : 0.5,
+        color: isRoot ? 'text.primary' : 'text.secondary',
+        '& > li': {
+          pl: isRoot ? 0.75 : 0.25,
+          lineHeight: isRoot ? 1.6 : 1.55,
+          fontSize: isRoot ? '1rem' : depth === 1 ? '0.94rem' : '0.9rem',
+          '&::marker': {
+            color: isRoot ? 'text.secondary' : 'text.disabled',
+            fontWeight: isRoot ? 600 : 400,
+          },
+        },
+      }}
+    >
+      {nodes.map((node) => (
+        <li key={node.item.id}>
+          <AgendaLine
+            rawText={normalizeKyGaAgendaLine(node.item.raw_text)}
+            billNumber={node.item.bill_number}
+            billId={node.item.ky_bill_id}
+          />
+          {node.children.length > 0 && (
+            <AgendaNodeList nodes={node.children} depth={depth + 1} />
+          )}
+        </li>
+      ))}
+    </Box>
+  );
+}
 import { CommitteeMembersSection } from '@/components/committees/CommitteeMembersSection';
 import { CommitteeMaterialsSection } from '@/components/committees/CommitteeMaterialsSection';
 import { FollowCommitteeButton } from '@/components/committees/FollowCommitteeButton';
@@ -62,39 +140,11 @@ export interface CommitteeDetailViewProps {
 
 function MeetingAgendaBlock({ items, expanded }: { items: KYCommitteeAgendaItem[]; expanded: boolean }) {
   if (!items.length) return null;
+  const tree = buildAgendaTree(items);
   return (
     <Box sx={{ mt: 1.5 }}>
       <Collapse in={expanded}>
-        <Card variant="outlined" sx={{ borderRadius: 2, mt: 0.5 }}>
-          <List dense disablePadding>
-            {items.map((item, i) => (
-              <React.Fragment key={item.id}>
-                {i > 0 && <Divider component="li" />}
-                <ListItem alignItems="flex-start" sx={{ py: 1.25 }}>
-                  <ListItemText
-                    primary={
-                      item.ky_bill_id ? (
-                        <Link
-                          href={`/bills/${item.ky_bill_id}`}
-                          style={{ textDecoration: 'underline', textUnderlineOffset: 2, fontWeight: 600 }}
-                        >
-                          {normalizeKyGaAgendaLine(item.raw_text)}
-                        </Link>
-                      ) : (
-                        normalizeKyGaAgendaLine(item.raw_text)
-                      )
-                    }
-                    secondary={
-                      [formatAgendaItemKind(item.item_kind), item.bill_session_label]
-                        .filter(Boolean)
-                        .join(' · ') || undefined
-                    }
-                  />
-                </ListItem>
-              </React.Fragment>
-            ))}
-          </List>
-        </Card>
+        <AgendaNodeList nodes={tree} depth={0} />
       </Collapse>
     </Box>
   );

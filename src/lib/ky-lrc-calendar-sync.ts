@@ -17,7 +17,12 @@ import {
 } from './lrc-bill-reference-parser';
 import { normalizeKyGaAgendaLine, normalizeKyGaDisplayName } from './ky-committee-display';
 import { recordCalendarHearingScheduledEvents } from './ky-calendar-hearing-history';
-import { billSessionLookupKey, normalizeBillNumberForLookup, normalizeKySessionLabel } from './lrc-session-label';
+import {
+  billSessionLookupKey,
+  inferSessionLabelFromMeetingDate,
+  normalizeBillNumberForLookup,
+  normalizeKySessionLabel,
+} from './lrc-session-label';
 import type { SyncOptions, SyncResult } from './ky-sync-pipeline';
 
 export const LRC_LEGISLATIVE_CALENDAR_URL = 'https://apps.legislature.ky.gov/legislativecalendar';
@@ -155,7 +160,10 @@ function billPairsFromMeetings(meetings: LrcCalendarMeeting[]) {
       const refs = item.billReferences.length ? item.billReferences : extractLrcBillReferences(item.rawText);
       const primary = primaryBillFromLine(refs);
       if (primary.billNumber) {
-        billPairs.push({ billNumber: primary.billNumber, sessionLabel: primary.sessionLabel });
+        billPairs.push({
+          billNumber: primary.billNumber,
+          sessionLabel: primary.sessionLabel ?? inferSessionLabelFromMeetingDate(m.meetingDate),
+        });
       }
     }
   }
@@ -297,8 +305,14 @@ export async function upsertLrcCalendarMeetings(
     const agendaRows = meeting.agendaItems.map((item, idx) => {
       const refs = item.billReferences.length ? item.billReferences : extractLrcBillReferences(item.rawText);
       const primary = primaryBillFromLine(refs);
+      // Fall back to the session that was current on the meeting's date when the
+      // agenda line names a bill without a session marker ("SB 58: …"). Interim
+      // committees review enacted bills this way constantly.
+      const resolvedSession = primary.billNumber
+        ? primary.sessionLabel ?? inferSessionLabelFromMeetingDate(meeting.meetingDate)
+        : null;
       const lookupKey = primary.billNumber
-        ? billSessionLookupKey(primary.billNumber, primary.sessionLabel)
+        ? billSessionLookupKey(primary.billNumber, resolvedSession)
         : '';
       return {
         meeting_id: meetingRecord.id,
@@ -306,8 +320,9 @@ export async function upsertLrcCalendarMeetings(
         raw_text: normalizeKyGaAgendaLine(item.rawText),
         item_kind: classifyAgendaKind(item.rawText, refs),
         bill_number: primary.billNumber,
-        bill_session_label: primary.sessionLabel,
+        bill_session_label: resolvedSession,
         ky_bill_id: lookupKey ? billIdByKey.get(lookupKey) ?? null : null,
+        depth: item.depth,
       };
     });
 
