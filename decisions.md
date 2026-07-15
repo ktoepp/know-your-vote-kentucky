@@ -1399,3 +1399,172 @@ Two same-day reversals of the § 2026-07-06 editor-notes UI (the *mechanism* is 
 
 - **No "editor-verified" surface on the frontend** — neither the long overline (first pass) nor the chip (second pass). Katie's call: don't market verification until there are subject-matter experts behind the word. The attribution stays the plain "AI-generated — always verify with primary sources", which remains truthful (notes are inputs; the text is model-written). **Revisit when:** SMEs join and verification has a person/process worth naming.
 - **`AiGeneratedBlock` grey box removed** — it rendered a bordered/tinted box inside the page's `MuiCard`, double-containing the summary. The block is now plain content; the card provides the single container. Both call sites (bill detail, `/dev/bill-summary-preview`) wrap it in a card, so nothing loses containment.
+
+---
+
+## 2026-07-08 — Bill-status mapper is history-aware for veto outcomes (PRs #153 + #155)
+
+Kentucky files bills with the Secretary of State after **three** different outcomes — signature, override, and full veto — and LegiScan reports every SoS filing as an identical `last_action` string. The mapper had `"delivered to secretary of state" → Chaptered` **before** the veto check, so SB70 (2026 RS; vetoed 04-23, never overridden — **not law**) rendered as **Chaptered**.
+
+- **PR #153 (2026-07-08) — SoS branch is now history-aware.** `mapLegiScanBillStatus` takes an optional `history` param; the SoS branch disambiguates via status code `5 = Vetoed` and, when history is available, `legiscanHistoryIndicatesFullVeto()`. Line-item vetoes (e.g. SB197) and successful overrides (e.g. SB251) are explicitly excluded so they correctly keep `Chaptered` / `Veto Override`. The accuracy checker was passing the **same** buggy mapper as its "expected" value, silently masking the class — now threaded `bill.history` in as well.
+  - **Why not upstream:** LegiScan is doing the right thing; the ambiguity is Kentucky's SoS wording, and only history-plus-status-code can disambiguate.
+  - **Rollout:** `scripts/backfill-veto-status.ts` re-maps already-stored rows using their persisted `legiscan_history` — **zero LegiScan quota by default**; `--fetch` only for rows whose history is NULL. The daily `change_hash` sync will not self-heal these (a long-vetoed bill's hash never changes again), so the backfill is required.
+  - **Regression guard:** `npm run verify:bill-status` covers SB70, override-still-law, line-item-still-chaptered, signed-still-chaptered, forward-referral preserved.
+
+- **PR #155 (2026-07-12) — `Acts Ch.` beats the SoS branch entirely.** Follow-up: KY sometimes never records a separate SoS filing — the veto action itself is the final recorded action (e.g. `line items vetoed (Acts Ch. 239)`). Line-item vetoes without a subsequent SoS action fell through to the status-code-5 fallback and mapped to `Vetoed` — but the bill actually became law minus the line-item strikes. The `action.includes('acts ch')` check now runs ahead of the SoS branch and wins regardless: chapter designation = became law, in every reachable code path. `backfill-veto-status` was widened to also re-check rows currently stored as `Vetoed` so it fixes pre-fix mislabels in both directions. The verifier is up to **13/13 cases** covering both regression sets. Full context is captured in the [Veto/override status mapping memory](https://github.com/ktoepp/know-your-vote-kentucky/) and TASKS.md history.
+
+**Revisit if:** LRC introduces a new became-law wording (unlikely — chapter number is the constitutional record), or a future veto still reads `Chaptered` after the backfill.
+
+---
+
+## 2026-07-11 — UX polish sweep + `MuiChip` outlined-color regression (PR #154)
+
+Coordinated Track A / Track D / Track E slice from the "velvety-globe" plan. Findings worth remembering:
+
+- **Theme regression uncovered while fixing the Vetoed chip:** `theme.ts` had an `MuiChip.styleOverrides.outlined` that unconditionally set `color: text.primary` and `borderColor: slate[200]` — silently wiping every `color="success"/"error"/"warning"/…` on outlined chips app-wide. That is why "Signed by Governor," "Passed," "Beta," "Not a current member," and search-filter chips all read as neutral gray. **Fix:** yield to MUI's built-in colored variants when a non-default `color` prop is set. Blast-radius audit run across bill detail, browse, search, members, committees, meetings, design-system — every color change was one where the code explicitly asked for a semantic tone.
+- **Vetoed chip is now red (Block icon), Veto Override is green (Gavel).** Both were silently gray under the outlined-color regression.
+- **Chamber chip color collision cleaned up** — Senate no longer clashes with `success` (bill-status green).
+- **Dead code deleted** — `DarkModeToggle`, `useDarkMode`, `darkTheme` alias, layout force-strip script. `/browse` placeholder → 308 → `/bills`. Full Tailwind removal deferred (touches 14 files).
+- **PostHog events added:** `topic_filter_used`, `committee_followed`/`_unfollowed`, `district_map_lookup`, plus a `search_result_clicked` stub for a future command palette.
+
+**Revisit if:** another sitewide chip color shift is reported (audit whether a new `styleOverride` swallows a semantic color prop). **Lesson:** theme `styleOverrides.<variant>` blocks that set `color`/`borderColor` unconditionally are hostile to MUI's built-in color system — always conditional-on-`ownerState.color==='default'`.
+
+---
+
+## 2026-07-12 — Nested LRC committee-material URLs + probe `Accept` header (PR #156)
+
+Two related fixes so committee **Meeting materials** links resolve. LRC moved every committee's file storage from `/CommitteeDocuments/{meeting_id}/…` to `/CommitteeDocuments/{committee_rsn}/{meeting_id}/…`, and every stored URL started 404-ing; simultaneously, the link probe was returning ambiguous for every PDF because LRC's IIS server rejected our `Accept: text/html` with **406 Not Acceptable**.
+
+- **Parser:** `lrcCommitteeDocumentsUrl(rsn)` now returns `.../CommitteeDocuments/{rsn}/` **with trailing slash**. LRC page hrefs are relative `./{meeting_id}/…`; without the slash, `new URL()` treats `/{rsn}` as a filename and drops it, yielding the old flat path. Small fix, load-bearing.
+- **Probe:** `MATERIAL_PROBE_HEADERS` now sends `Accept: */*` so probes can classify ok/dead against IIS.
+- **Backfill applied to primary:** rewrote all **910 rows** in `ky_committee_materials` in place — inserted `{lrc_rsn}/` after `/CommitteeDocuments/`, cleared `link_status`/`link_checked_at`, re-ran `npm run probe:committee-links`. **Before: 0 ok / 732 dead / 178 unknown. After: 905 ok / 5 dead / 0 unknown.** The 5 remaining `dead` are legitimate 404s (LRC removed 3 tentative agendas, renamed one file, one is a stray `Thumbs.db`).
+
+**Revisit if:** committees' Meeting-materials sections start showing "Link unavailable" chips on recent meetings again (LRC could restructure a third time; investigate the parser first).
+
+---
+
+## 2026-07-12 — PostHog captures uncaught exceptions (PR #157)
+
+Added `capture_exceptions: true` to the PostHog SDK init. Enables the crash signal PostHog Error Tracking / self-driving analytics needs to tie exceptions to sessions/users. **Sentry remains authoritative for triage and source maps**; PostHog just gets the signal — this is deliberately not a rerouting change, and Sentry issue counts should be unaffected. Operator step (one-time): PostHog project → Settings → Error Tracking → Enable.
+
+**Revisit if:** PostHog error volume diverges materially from Sentry's (may indicate a category Sentry filters that PostHog doesn't, or a source-map mismatch).
+
+---
+
+## 2026-07-12 — Home mobile PSI regression recovery: two-slice P0 / P1 split (PRs #160 + #161)
+
+Home-page mobile PSI regressed **74 → 50** since the 2026-07-03 perf pass. LCP 7.2s (1.85s render delay), TBT 700ms, 467 KiB unused JS. Split into two review-sized PRs — the P0 slice is low-risk and covers most of the loss; the P1 slice restructures the boundary and defers a safety-critical SDK.
+
+**PR #160 — P0, low-risk fixes:**
+
+- **`<Link prefetch={false}>` on `/members/map`** everywhere it appears in nav (desktop + mobile) and the hero CTA. Kills the mapbox-gl chunk from every home visit — the real reason cold home loads pulled Mapbox tiles.
+- **`LandingMapSection` `IntersectionObserver` `rootMargin` tightened 400px → 100px.** At 400px the observer fired on initial render because the map slot sits ~900px down a ~640px viewport — which is why PSI saw 394 KiB of Mapbox tile traffic on home even without scrolling.
+- **`next/dynamic` for `lottie-react`** in `HoverLottie` — splits the ~150 KB player into its own async chunk.
+- **`experimental.optimizePackageImports` for `@mui/material`, `@mui/icons-material`, `lottie-react`** — deep-import tree-shaking attacking the 467 KiB unused-JS bucket.
+- **Preconnect `us-assets.i.posthog.com` + `us.i.posthog.com`** — PSI-estimated 360 ms LCP savings.
+- **Numbers:** `/` route JS 94.8 kB → **15.3 kB (−84%)**; First Load JS 515 kB → 436 kB (−15%).
+
+**PR #161 — P1, structural:**
+
+- **`HomePageContent` is now a server component.** The auth-branching hero moved into a small `HomeAuthHero` client island that receives both pre-rendered hero variants as props. `LandingTopics` / `LandingHeroReturning` / `LandingPersonalStrip` no longer import from any client component, so they stop shipping JS at all. `LandingFeatures` / `LandingMapSection` stay client (they own local state) but hydrate as independent islands instead of one blocking wave.
+- **Deferred `Sentry.init` off the critical path.** On main it ran at module eval and produced a ~1.17s `sentry-tracing-init` user-timing mark — the single biggest contributor to the 3.2s main-thread total. Prod uses `requestIdleCallback` (5s timeout); Safari falls back to `setTimeout(2s)` after `load`. Dev stays synchronous so errors surface immediately. `captureRouterTransitionStart` stays exported at module load; it's a no-op until init completes.
+- **Tradeoff (accepted, still holds under PR #167):** errors thrown between module eval and idle-init aren't sent to Sentry — browser default handling still logs them, and first-second failures are rare.
+- **Bundle delta is small here** (`/` route −0.7 kB); the real win is TBT / main-thread time.
+
+**Revisit if:** home PSI drops back into the 60s or Sentry event volume drops materially in the first seconds of a session. **Follow-ups already noted (some now shipped):** modern browserslist (46 KiB legacy polyfill), tighter nav-logo `sizes`, defer PostHog init (~21ms MT).
+
+---
+
+## 2026-07-13 — Committee-card leadership portraits (PR #159)
+
+Closes the deferred "portraits for committee-card leadership avatars" item from the 2026-07-04 UX pass. `KYCommitteeCard` previously rendered chair/vice-chair as initials-only MUI Avatars because the browse enricher discarded every field of the matched `KYLegislator` except the display name.
+
+- **Data plumbing** — `KYCommitteeBrowseCard.leadershipNames: string[]` → `.leadership: KYCommitteeLeaderCardEntry[]`; entries built via `legislatorAvatarDescriptor()` — the **canonical helper** in `ky-member-utils.ts` — so portraits + alt text + party badge match `/members`, bill sponsors, and map tooltips. Only two files consumed the field; both changed in the same PR.
+- **Render** — swapped MUI `<Avatar>` for the shared `<LegislatorAvatar>` at 36×36 (up from 32; the D/R/I party rim badge needs a hair more room).
+- **Deliberate non-goals:** `CommitteeMeetingCard` unchanged (the 2026-07-04 UX pass decluttered meeting cards to time/place/agenda on purpose; a browse-card click already carries chair-face context forward). No `images.remotePatterns` change either — state portrait hosts (`legislature.ky.gov`) are already allowlisted and `LegislatorAvatar` handles optimizer failure with initials per the PR #120 pattern.
+
+**Revisit if:** a new portrait host appears that isn't allowlisted (optimizer will fail closed to initials — visible via missing photos on `/committees`).
+
+---
+
+## 2026-07-15 — SEO/GEO deferreds cleared: agenda previews on browse cards + Event/FAQPage JSON-LD (PR #162)
+
+Cleared three deferred items from prior passes in one sweep:
+
+- **Agenda previews on `/committees` browse cards** — `fetchKyCommitteesBrowseEnriched` now batches **one** `IN (nextMeetingIds)` query against `ky_committee_agenda_items` (no N+1) and attaches up to 3 normalized preview lines per card; `KYCommitteeCard` renders them as a tight disc list under the "Next meeting" footer, one-line truncated. Closes the "agenda previews on browse cards" half of the 2026-07-04 UX pass (portraits half shipped in PR #159 above).
+- **`Event` JSON-LD on `/meetings`** — new `buildMeetingEventJsonLd()`. Parses the leading `"H:MM am|pm"` from `time_and_location` and resolves the `America/New_York` offset with `Intl.DateTimeFormat` — so summer/winter DST is correct on future dates (`-04:00` in EDT, `-05:00` in EST); no manual month-boundary math. Emits one `Event` per non-cancelled upcoming meeting (`eventStatus`, `eventAttendanceMode: OfflineEventAttendanceMode`, `organizer` GovernmentOrganization, `location` Place when parseable), capped at 40 nodes. Cancelled meetings and rows without parseable times degrade cleanly to bare `meeting_date`. Emitted alongside a `BreadcrumbList`.
+- **`FAQPage` JSON-LD on `/glossary`** — each glossary term becomes a `Question` (name = term title as **displayed**, matching Google's "match visible content" guidance) with the plain-text definition as `acceptedAnswer.text`. All 76 questions verified in the SSR HTML.
+
+**Tradeoff:** Google's rich-result surface for `FAQPage` is narrow post-2023 (limited to authoritative government/health sources by default), but the markup remains valid for generative engines — the point is GEO, not a rich-snippet play.
+
+**Revisit if:** GSC starts flagging structured-data errors for `/meetings` or `/glossary` (offset math is the most likely regression risk).
+
+---
+
+## 2026-07-15 — Shell-bundle-trim investigation: 259 kB "shared by all" reattributed (PR #164)
+
+Investigated the "~250 KB gz MUI/emotion" shared-bundle lever from the PR #121 deferred list. **First Load JS is unchanged on every route** — the attribution was wrong. The 259 kB "shared by all" chunk is `5857` (~130 kB gz), which is **Sentry SDK + Next.js router runtime**, not MUI/emotion. MUI already sits in per-route vendor chunks (`9426`, `2362`, `2013`) that `experimental.optimizePackageImports` tree-shakes.
+
+Kept the two changes that ARE net-positive code hygiene:
+
+- **Deleted dead `GlobalSearchBar` in `Navigation.tsx`** — 130-line client component that imported `TextField` + `InputAdornment` but was never rendered anywhere (grep confirmed one match — its own definition). Tree-shaking already removed it from the bundle, but the source noise made Navigation harder to audit.
+- **`MuiTooltip` → native `title` on 2 desktop nav icons** (Search + tooltip-toggle). Both icons already carry `aria-label` (screen-reader coverage unchanged); Popper/Grow overhead is gone. The tooltip-toggle still exposes `aria-pressed` so on/off state is announced.
+- **Numbers:** `app/layout-*.js` chunk 40 kB → 26 kB uncompressed; net FirstLoadJS = **0 kB** — the removed components live in shared vendor chunks that other routes were already pulling.
+
+**Real lever, verified in the same session:** Sentry SDK deferral. `instrumentation-client.ts` already put `Sentry.init()` on `requestIdleCallback`, but the SDK **module** bundled upfront because `import * as Sentry from '@sentry/nextjs'` ran at module load AND `Sentry.captureRouterTransitionStart` was re-exported synchronously for Next's router hook. Both required a proxy pattern — see § 2026-07-15 — Sentry SDK dynamic import (PR #167) below.
+
+**Lesson:** "shared by all" chunk attribution can be wrong. `next build`'s per-route table shows the shape; `webpack-bundle-analyzer` on a prod build shows what's actually inside. Don't defer a lever on unverified attribution — measure the chunk first.
+
+---
+
+## 2026-07-15 — Weekly LegiScan dataset reconcile (PR #165)
+
+Closes the "Use LegiScan Dataset Pull API for a weekly full-reconcile" engineering follow-up from PR #102 (LegiScan quota guard). **Belt-and-suspenders against a missed `change_hash` update** in the every-6h `sync-ky-bills-status` job — one `getDataset` pull ships an entire session's bills / history / texts / roll-calls as a ZIP for ~2 quota points.
+
+- **Cadence:** Sundays **08:00 UTC**, one hour after `accuracy-audit.yml`, well after LegiScan's Sunday 04–05 ET dataset regeneration window.
+- **Hash-gate is load-bearing:** `getDatasetList` (1 quota point regardless) → diff each session's `dataset_hash` against `ky_legiscan_datasets` → only `getDataset` for sessions whose hash changed. Zero downloads when nothing changed — matches the existing dataset-hash-gating memo, which is what avoided the earlier LegiScan pushback about repeated unchanged pulls.
+- **Shared code path:** parse/upsert helpers extracted from `scripts/ky-legiscan-bulk-seed.ts` into `src/lib/ky-legiscan-dataset-import.ts` so the operator backfill and the cron cannot drift.
+- **Quota-hold behaviour mirrors `syncKyBills`** (per § 2026-06-27): start-of-run guard skips cleanly and records `success` with the hold reason on `ky_sources` (`/admin/sync-status` stays green, `#errors` doesn't page); mid-run `LegiscanQuotaHoldError` defers remaining sessions to next week and reports `success` in the Slack digest.
+- **Slack digest via `notifySyncSlack`** — change/error only, matching every other sync workflow.
+- **Verified locally against primary:** 24 historic sessions correctly hash-skipped at zero downloads; only `2026 Regular Session` reported as changed.
+
+**Deliberate non-goals:** not a replacement for the 6h status sync — this reconciles what the status sync's hash-gate might have skipped. If both agree, this run does nothing.
+
+**Revisit if:** we start seeing weekly `#status-reports` posts for sessions other than the active one (would suggest the 6h sync is genuinely missing updates rather than the reconcile being a no-op).
+
+---
+
+## 2026-07-15 — Hierarchical committee agendas + 2025 backfill (PR #166)
+
+Two orthogonal items that were both cheapest to ship together (both touched the LRC calendar parser + sync):
+
+**Agenda hierarchy — depth signal was thrown away at scrape time.** LRC agendas use leading `\t` indentation to nest sub-items under their section (e.g. `Budget Review: Justice → Louisville Metro grant → Boone County grant`). The parser was collapsing whitespace before counting depth, so every row rendered as a sibling and grandchildren looked like top-level items.
+
+- **Scraper:** `lrcLegislativeCalendarParser` now counts leading `\t`s **before** whitespace collapse; new `LrcCalendarAgendaItem.depth`.
+- **Schema:** migration **039** — `ky_committee_agenda_items.depth SMALLINT NOT NULL DEFAULT 0`. Sync writes it on insert.
+- **Render:** shared `AgendaLine` + recursive `AgendaNodeList` used by `MeetingAgendaBlock` / `AgendaSearchResults` / `BillHearingsSection` — numbered `ol` at the top, disc/circle `ul`s beneath. Only the bill designation inline-links (drops the whole-line underline + the redundant `BillNumber` chip that duplicated it). Pre-depth meetings still fall back to the legacy `•`-fold grouping.
+
+**Bill resolution — interim agendas were dropping bill links.** Interim meetings reference bills in LRC shorthand (`25RS SB 15`, `24SS HB 2`, `22EX HB 1`) and often as bare mentions (`SB 58: …`) whose session is implied by the meeting date. Both failed to resolve.
+
+- `lrc-bill-reference-parser` now recognizes the LRC shorthand.
+- `inferSessionLabelFromMeetingDate()` fills bare mentions with `"{YYYY} Regular Session"`, at both pair-collection **and** insert-lookup so keys match.
+
+**2025 backfill via existing `backfill-lrc-calendar-wayback`.** Ran across 2025 — **95 meetings, 66 committees, 935 agenda rows, 94 with `member_refs`, 70% with depth, 93/93 non-BR bill mentions resolved**. The 5 unlinked rows are BR pre-file drafts (`ky_bills` doesn't track BRs — data-source ceiling, not a parser bug). Also filled the 2026 gap outside the Apr 15 – Jul 8 Wayback window: 46 of 87 meetings got full hierarchy; the 38 inside that gap keep the legacy bullet grouping (still cleaner than before).
+
+**Deliberate non-goals:** no BR support (LegiScan doesn't expose pre-file drafts as bill records); no re-parse of already-stored 2026 meetings outside the backfill window (the ongoing weekly sync captures depth + session automatically from here forward).
+
+**Revisit if:** LRC changes the agenda HTML structure (`\t`-based depth is fragile against an editorial pass — the parser guards with `depth ≤ 8`, but material breakage would show up as everything landing at depth 0 again).
+
+---
+
+## 2026-07-15 — Sentry SDK dynamic import (~82 kB off every route's First Load JS) (PR #167)
+
+Real lever surfaced by the PR #164 investigation. `Sentry.init()` was already on `requestIdleCallback` (per PR #161), but the SDK **module** still bundled upfront for two reasons: `import * as Sentry from '@sentry/nextjs'` ran at module load in `instrumentation-client.ts`, and `Sentry.captureRouterTransitionStart` was re-exported **synchronously** for Next's App Router hook, forcing the SDK into the shared chunk.
+
+- **Fix:** switch to a dynamic `import("@sentry/nextjs")` inside the existing idle callback so the SDK moves to a lazy chunk that loads after LCP. Export `onRouterTransitionStart` as a **proxy** that buffers `(href, navigationType)` tuples in a **bounded ring (cap 32)** until the real handler resolves, then flushes and swaps to a direct delegate. The bound is deliberate — an unbounded queue is a memory-leak footgun if the SDK never resolves (Safari fallback path notwithstanding).
+- **Numbers (measured via `next build`):** shared-by-all **259 kB → 175 kB (−84 kB, −32%)**; every route drops ~82 kB (`/` 435→353, `/bills` 484→402, `/feed` 489→412, `/search` 469→387, `/members` 450→368, `/committees` 434→352; API routes 259→176). Sentry SDK now on lazy `chunks/2367.js` (131 kB gz); `next start` waterfall shows it initiated at ms=137 by webpack dynamic import, not preloaded.
+- **Smoke-tested:** SDK v10.63.0 loads post-idle; multiple client navigations succeed with no proxy-shim console errors.
+
+**Tradeoff (carried over from PR #161, unchanged):** errors thrown in the first ~1–2 s before idle fires aren't captured by Sentry. Browser default error handling still logs them. First-second failures are rare in practice, and we accepted this cost during the PR #161 idle-init deferral.
+
+**Revisit if:** Sentry ingest volume drops noticeably per-session (would suggest the buffer is dropping events after cap), or if a user reports a first-second reproducible error we can't see in Sentry.
