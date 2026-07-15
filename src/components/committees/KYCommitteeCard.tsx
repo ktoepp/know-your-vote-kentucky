@@ -117,11 +117,44 @@ export function KYCommitteeCard({ committee, following = false, onToggleFollow }
       }
       footer={
         committee.nextMeetingDate ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-            <CalendarMonth sx={{ ...iconRemSx('inline'), color: 'primary.main' }} aria-hidden />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Next meeting · {formatKyMeetingDate(committee.nextMeetingDate)}
-            </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <CalendarMonth sx={{ ...iconRemSx('inline'), color: 'primary.main' }} aria-hidden />
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Next meeting · {formatKyMeetingDate(committee.nextMeetingDate)}
+              </Typography>
+            </Box>
+            {committee.nextMeetingAgendaPreview.length > 0 && (
+              <Box
+                component="ul"
+                aria-label="Agenda preview"
+                sx={{
+                  listStyle: 'disc',
+                  m: 0,
+                  pl: 2.5,
+                  display: 'grid',
+                  gap: 0.25,
+                  '& li::marker': { color: 'text.disabled', fontSize: '0.7em' },
+                }}
+              >
+                {committee.nextMeetingAgendaPreview.map((line, i) => (
+                  <Typography
+                    key={i}
+                    component="li"
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      lineHeight: 1.35,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {line.raw}
+                  </Typography>
+                ))}
+              </Box>
+            )}
           </Box>
         ) : (
           <Typography variant="body2" color="text.secondary">

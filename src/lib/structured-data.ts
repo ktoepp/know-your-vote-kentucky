@@ -1,4 +1,4 @@
-import type { KYBill, KYLegislator, KYCommittee } from '@/types/kentucky';
+import type { KYBill, KYCommittee, KYCommitteeMeetingBrowse, KYLegislator } from '@/types/kentucky';
 import { publicSiteOrigin } from '@/lib/site-canonical';
 import { formatKyLegislatorDistrict } from '@/lib/bill-display';
 import { kyMemberTitleShort, normalizeLegislatorPhotoUrl } from '@/lib/ky-member-utils';
@@ -138,6 +138,117 @@ export function buildLegislatorJsonLd(leg: KYLegislator, path: string): JsonLdNo
     };
   }
   return node;
+}
+
+/**
+ * Parse the leading "H:MM am|pm ET …" from an LRC `time_and_location` string.
+ * Returns null when the string doesn't carry a 12-hour clock time (e.g., cancelled
+ * meetings whose fields devolve to bare "9:00 ET").
+ */
+function parseKyMeetingTimeAndLocation(
+  timeAndLocation: string | null,
+): { time: string; location: string | null } | null {
+  if (!timeAndLocation) return null;
+  const match = timeAndLocation.match(/^\s*(\d{1,2}):(\d{2})\s*(am|pm)/i);
+  if (!match) return null;
+  const hh = parseInt(match[1]!, 10);
+  const mm = parseInt(match[2]!, 10);
+  const meridiem = match[3]!.toLowerCase();
+  if (hh < 1 || hh > 12 || mm < 0 || mm > 59) return null;
+  const hour24 =
+    meridiem === 'pm' ? (hh === 12 ? 12 : hh + 12) : hh === 12 ? 0 : hh;
+  const time = `${String(hour24).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+  const commaIdx = timeAndLocation.indexOf(',');
+  const location = commaIdx >= 0 ? timeAndLocation.slice(commaIdx + 1).trim() || null : null;
+  return { time, location };
+}
+
+/** UTC offset for America/New_York on a given ISO date, e.g. "-04:00" (EDT) or "-05:00" (EST). */
+function etOffsetForDate(dateIso: string): string {
+  const d = new Date(`${dateIso}T12:00:00Z`);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    timeZoneName: 'longOffset',
+  }).formatToParts(d);
+  const tz = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT-05:00';
+  return tz.replace(/^GMT/, '') || '-05:00';
+}
+
+/**
+ * schema.org/Event for a Kentucky General Assembly committee meeting. Returns null
+ * when the meeting has no attached committee (defensive — the join is server-side).
+ */
+export function buildMeetingEventJsonLd(meeting: KYCommitteeMeetingBrowse): JsonLdNode | null {
+  const committee = meeting.ky_committees;
+  if (!committee) return null;
+  const committeeName = normalizeKyGaDisplayName(committee.name);
+  const parsed = parseKyMeetingTimeAndLocation(meeting.time_and_location);
+  const startDate = parsed
+    ? `${meeting.meeting_date}T${parsed.time}${etOffsetForDate(meeting.meeting_date)}`
+    : meeting.meeting_date;
+  const url = absoluteUrl(
+    `/committees/${encodeURIComponent(committee.slug)}#meeting-${meeting.id}`,
+  );
+  const node: JsonLdNode = {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: `${committeeName} meeting`,
+    startDate,
+    eventStatus:
+      meeting.status === 'cancelled'
+        ? 'https://schema.org/EventCancelled'
+        : 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    url,
+    organizer: {
+      '@type': 'GovernmentOrganization',
+      name: committeeName,
+      url: absoluteUrl(`/committees/${encodeURIComponent(committee.slug)}`),
+    },
+  };
+  if (parsed?.location) {
+    node.location = {
+      '@type': 'Place',
+      name: parsed.location,
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: 'Frankfort',
+        addressRegion: 'KY',
+        addressCountry: 'US',
+      },
+    };
+  }
+  return node;
+}
+
+export interface GlossaryFaqEntry {
+  title: string;
+  content: string;
+}
+
+/**
+ * schema.org/FAQPage for the site glossary. Each entry becomes a Question whose
+ * name is the term (as displayed on the page) and whose Answer text is the plain
+ * definition — matches the visible on-page content per Google's structured-data
+ * guidance.
+ */
+export function buildGlossaryFaqJsonLd(
+  entries: GlossaryFaqEntry[],
+  path: string,
+): JsonLdNode {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    url: absoluteUrl(path),
+    mainEntity: entries.map((entry) => ({
+      '@type': 'Question',
+      name: entry.title,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: entry.content,
+      },
+    })),
+  };
 }
 
 /** schema.org/GovernmentOrganization for a Kentucky General Assembly committee. */
