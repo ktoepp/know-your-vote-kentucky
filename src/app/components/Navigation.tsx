@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { alpha, useTheme, type Theme, type SxProps } from '@mui/material/styles';
 import {
   AppBar,
@@ -13,8 +13,6 @@ import {
   IconButton,
   Typography,
   Container,
-  TextField,
-  InputAdornment,
   Collapse,
   List,
   ListItem,
@@ -23,7 +21,6 @@ import {
   ListItemText,
   Divider,
   Avatar,
-  Tooltip as MuiTooltip,
   Menu,
   MenuItem,
 } from '@mui/material';
@@ -39,11 +36,9 @@ import {
   Help as HelpIcon,
 } from '@mui/icons-material';
 import { KentuckyStateIcon } from '@/components/icons/KentuckyStateIcon';
-import { useThemeUtils } from '@/components/ui/ThemeUtils';
 import { useTooltips } from '@/lib/TooltipContext';
 import { useUser } from "../lib/UserContext";
 import { ICON_REM } from '@/lib/ui-tokens';
-import { canonicalizeKyBillSearchInput } from '@/lib/ky-search-bills';
 
 /** Served from `public/branding/` so deploys include it (`/branding/` is gitignored for source exports). */
 const NAV_WORDMARK_SRC = '/branding/Logo-03.png';
@@ -116,141 +111,6 @@ function isNavPathActive(path: string, pathname: string): boolean {
   return pathname === path;
 }
 
-
-const SEARCH_FIELD_SENTINEL = 'Search';
-
-function GlobalSearchBar({ tone = 'default' }: { tone?: 'default' | 'onPrimary' }) {
-  const theme = useTheme();
-  const onPrimary = tone === 'onPrimary';
-  const router = useRouter();
-  const pathname = usePathname();
-  const [value, setValue] = useState(SEARCH_FIELD_SENTINEL);
-  const [focused, setFocused] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (pathname === '/search') {
-      const q = new URLSearchParams(window.location.search).get('q') || '';
-      setValue(q || SEARCH_FIELD_SENTINEL);
-    } else {
-      setValue(SEARCH_FIELD_SENTINEL);
-    }
-  }, [pathname]);
-
-  const hasRealQuery =
-    value.trim() !== '' && value.trim() !== SEARCH_FIELD_SENTINEL;
-
-  const submit = () => {
-    const q = value.trim();
-    if (!q || q === SEARCH_FIELD_SENTINEL) {
-      router.push('/search');
-      return;
-    }
-    router.push(`/search?q=${encodeURIComponent(canonicalizeKyBillSearchInput(q))}`);
-  };
-
-  const inputColor = onPrimary
-    ? value === SEARCH_FIELD_SENTINEL && !focused
-      ? alpha(theme.palette.primary.contrastText, 0.75)
-      : theme.palette.primary.contrastText
-    : value === SEARCH_FIELD_SENTINEL && !focused
-      ? theme.palette.mode === 'dark'
-        ? 'rgba(255,255,255,0.75)'
-        : theme.palette.text.secondary
-      : theme.palette.mode === 'dark'
-        ? theme.palette.primary.contrastText
-        : theme.palette.text.primary;
-
-  return (
-    <Box
-      component="form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-      sx={{ width: { xs: '100%', md: 320 } }}
-    >
-      <TextField
-        name="q"
-        value={value}
-        autoComplete="off"
-        onChange={(e) => setValue(e.target.value)}
-        onFocus={(e) => {
-          setFocused(true);
-          if (value === SEARCH_FIELD_SENTINEL) {
-            requestAnimationFrame(() => e.target.select());
-          }
-        }}
-        onBlur={() => {
-          setFocused(false);
-          if (value.trim() === '') {
-            setValue(SEARCH_FIELD_SENTINEL);
-          }
-        }}
-        variant="outlined"
-        size="small"
-        fullWidth
-        inputProps={{
-          'aria-label': 'Search bills and members',
-          title: 'Search bills (e.g. HB 23) or members by name',
-        }}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            backgroundColor: onPrimary
-              ? alpha(theme.palette.primary.contrastText, 0.12)
-              : theme.palette.mode === 'dark'
-                ? 'rgba(255,255,255,0.15)'
-                : 'rgba(0,0,0,0.05)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: 2,
-            '& fieldset': {
-              borderColor: onPrimary
-                ? alpha(theme.palette.primary.contrastText, 0.35)
-                : theme.palette.mode === 'dark'
-                  ? 'rgba(255,255,255,0.3)'
-                  : 'rgba(0,0,0,0.2)',
-            },
-            '&:hover fieldset': {
-              borderColor: onPrimary
-                ? alpha(theme.palette.primary.contrastText, 0.55)
-                : theme.palette.mode === 'dark'
-                  ? 'rgba(255,255,255,0.5)'
-                  : 'rgba(0,0,0,0.3)',
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: onPrimary ? alpha(theme.palette.primary.contrastText, 0.95) : theme.palette.primary.main,
-            },
-          },
-          '& .MuiInputBase-input': {
-            fontSize: '1rem',
-            color: inputColor,
-          },
-        }}
-        InputProps={{
-          endAdornment: hasRealQuery ? (
-            <InputAdornment position="end">
-              <IconButton
-                type="submit"
-                size="small"
-                edge="end"
-                aria-label="Submit search"
-                sx={{
-                  color: onPrimary
-                    ? theme.palette.primary.contrastText
-                    : theme.palette.mode === 'dark'
-                      ? theme.palette.primary.contrastText
-                      : theme.palette.primary.main,
-                }}
-              >
-                <SearchIcon sx={{ fontSize: ICON_REM.nav }} />
-              </IconButton>
-            </InputAdornment>
-          ) : undefined,
-        }}
-      />
-    </Box>
-  );
-}
 
 function TooltipToggleMenuItem({ onClose }: { onClose?: () => void }) {
   const { tooltipsEnabled, toggleTooltips } = useTooltips();
@@ -355,7 +215,6 @@ export default function Navigation() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const { getHoverBackground } = useThemeUtils();
   const { tooltipsEnabled, toggleTooltips } = useTooltips();
   const { user, loading } = useUser();
 
@@ -392,13 +251,13 @@ export default function Navigation() {
   }, [mobileMenuOpen]);
 
   return (
-    <AppBar 
-      position="sticky" 
+    <AppBar
+      position="sticky"
       elevation={0}
       color="inherit"
       sx={{
-        backgroundColor: theme.palette.mode === 'dark' 
-          ? theme.palette.background.paper 
+        backgroundColor: theme.palette.mode === 'dark'
+          ? theme.palette.background.paper
           : '#ffffff',
         color: 'text.primary',
         borderBottom: `1px solid ${theme.palette.divider}`,
@@ -448,7 +307,7 @@ export default function Navigation() {
               </Box>
             </Link>
           </Box>
-          
+
           {/* Desktop Navigation Links */}
           <Box
             component="nav"
@@ -477,51 +336,48 @@ export default function Navigation() {
               </Button>
             ))}
           </Box>
-          
+
           {/* Spacer */}
           <Box sx={{ flexGrow: 1 }} />
-          
-          {/* Desktop search icon */}
+
+          {/* Desktop search icon. Native `title` replaces MuiTooltip so Popper
+              stays out of the shell chunk; the icon-button's aria-label already
+              covers assistive tech. */}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', mx: 1 }}>
-            <MuiTooltip title="Search bills and members" placement="bottom">
-              <IconButton
-                component={Link}
-                href="/search"
-                aria-label="Search"
-                sx={{
-                  color: theme.palette.text.primary,
-                  p: 1.25,
-                  borderRadius: 2,
-                  '&:hover': { backgroundColor: 'rgba(0,0,0,0.05)' },
-                }}
-              >
-                <SearchIcon sx={{ fontSize: ICON_REM.nav }} />
-              </IconButton>
-            </MuiTooltip>
+            <IconButton
+              component={Link}
+              href="/search"
+              aria-label="Search"
+              title="Search bills and members"
+              sx={{
+                color: theme.palette.text.primary,
+                p: 1.25,
+                borderRadius: 2,
+                '&:hover': { backgroundColor: 'rgba(0,0,0,0.05)' },
+              }}
+            >
+              <SearchIcon sx={{ fontSize: ICON_REM.nav }} />
+            </IconButton>
           </Box>
 
           {/* Right side items */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-              <MuiTooltip
+              <IconButton
+                onClick={toggleTooltips}
+                aria-label={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
+                aria-pressed={tooltipsEnabled}
                 title={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
-                placement="bottom"
+                sx={{
+                  color: 'text.primary',
+                  p: 1.25,
+                  borderRadius: 2,
+                  backgroundColor: tooltipsEnabled ? 'rgba(0,0,0,0.06)' : 'transparent',
+                  '&:hover': { backgroundColor: 'rgba(0,0,0,0.08)' },
+                }}
               >
-                <IconButton
-                  onClick={toggleTooltips}
-                  aria-label={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
-                  aria-pressed={tooltipsEnabled}
-                  sx={{
-                    color: 'text.primary',
-                    p: 1.25,
-                    borderRadius: 2,
-                    backgroundColor: tooltipsEnabled ? 'rgba(0,0,0,0.06)' : 'transparent',
-                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.08)' },
-                  }}
-                >
-                  <HelpIcon sx={{ fontSize: ICON_REM.nav, opacity: tooltipsEnabled ? 1 : 0.55 }} aria-hidden />
-                </IconButton>
-              </MuiTooltip>
+                <HelpIcon sx={{ fontSize: ICON_REM.nav, opacity: tooltipsEnabled ? 1 : 0.55 }} aria-hidden />
+              </IconButton>
             </Box>
             {/* User menu */}
             <UserMenu />
@@ -534,15 +390,15 @@ export default function Navigation() {
                 aria-controls="site-primary-nav-mobile"
                 aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
                 sx={{
-                  color: theme.palette.mode === 'dark' 
-                    ? theme.palette.primary.contrastText 
+                  color: theme.palette.mode === 'dark'
+                    ? theme.palette.primary.contrastText
                     : theme.palette.text.primary,
                   p: 1.5,
                   borderRadius: 2,
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    backgroundColor: theme.palette.mode === 'dark' 
-                      ? 'rgba(255,255,255,0.1)' 
+                    backgroundColor: theme.palette.mode === 'dark'
+                      ? 'rgba(255,255,255,0.1)'
                       : 'rgba(0,0,0,0.05)',
                   },
                 }}
@@ -553,7 +409,7 @@ export default function Navigation() {
           </Box>
         </Toolbar>
       </Container>
-      
+
       {/* Mobile menu */}
       <Collapse in={mobileMenuOpen} timeout={300}>
         <Box
@@ -667,4 +523,4 @@ export default function Navigation() {
       </Collapse>
     </AppBar>
   );
-} 
+}
