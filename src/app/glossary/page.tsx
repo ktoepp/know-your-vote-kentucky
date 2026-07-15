@@ -8,6 +8,8 @@ import {
   type TooltipContent,
 } from '@/lib/tooltipContent';
 import { GlossaryBrowser, type GlossaryEntry } from '@/components/glossary/GlossaryBrowser';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { buildBreadcrumbJsonLd, buildGlossaryFaqJsonLd } from '@/lib/structured-data';
 
 export const metadata: Metadata = {
   title: 'Glossary | Know Your Vote Kentucky',
@@ -38,9 +40,21 @@ export default function GlossaryPage() {
   const categories = TOOLTIP_CATEGORY_ORDER.filter((c) => entriesByCategory[c].length > 0).map(
     (category) => ({ category, entries: entriesByCategory[category] }),
   );
+  const faqEntries = categories.flatMap((c) =>
+    c.entries.map((e) => ({ title: e.title, content: e.content })),
+  );
 
   return (
     <Container maxWidth="md" sx={{ py: { xs: 4, sm: 6 } }}>
+      <JsonLd
+        data={[
+          buildBreadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Glossary', path: '/glossary' },
+          ]),
+          buildGlossaryFaqJsonLd(faqEntries, '/glossary'),
+        ]}
+      />
       <Typography id={GLOSSARY_TOP_ANCHOR} variant="h3" component="h1" fontWeight={700} gutterBottom sx={{ scrollMarginTop: 96 }}>
         Glossary
       </Typography>
