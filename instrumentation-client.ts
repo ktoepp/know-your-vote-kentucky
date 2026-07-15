@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/nextjs";
 import posthog from "posthog-js";
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
@@ -35,55 +34,98 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
   });
 }
 
-function initSentry() {
-  Sentry.init({
-    dsn,
-
-    enabled:
-      !!dsn && (process.env.NODE_ENV === "production" || reportInDev),
-
-    sendDefaultPii: true,
-
-    // 100% in dev, 10% in production
-    tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
-
-    enableLogs: true,
-
-    /**
-     * Session Replay is intentionally disabled: it ships a large client bundle and records DOM
-     * continuously on sampled sessions, which noticeably hurts main-thread time and LCP/INP.
-     * Errors and traces still report via this SDK; re-enable replayIntegration only if you need replays.
-     */
-  });
-}
-
 /**
- * Defer Sentry init off the critical path. On main it ran at module eval and
- * showed up as a ~1.17s `sentry-tracing-init` user-timing mark on the mobile
- * PSI trace — biggest single contributor to the 3.2s main-thread total. We
- * accept a small risk that errors thrown before the idle callback fires
- * aren't captured; the browser's built-in error handling still logs them and
- * users almost never trip on first-second-of-load bugs.
- *
- * In dev we init synchronously so devs see errors immediately.
+ * Sentry is dynamically imported so the SDK (~130 kB gz) moves off the shared
+ * chunk and loads after LCP. The prior `import * as Sentry from "@sentry/nextjs"`
+ * put the whole SDK on every route's First Load JS even though `Sentry.init` was
+ * already deferred to `requestIdleCallback`.
  */
-if (typeof window === "undefined" || process.env.NODE_ENV !== "production") {
-  initSentry();
-} else {
-  const w: Window & { requestIdleCallback?: typeof requestIdleCallback } = window;
-  if (typeof w.requestIdleCallback === "function") {
-    w.requestIdleCallback(initSentry, { timeout: 5000 });
-  } else if (document.readyState === "complete") {
-    // Safari <= 17-ish has no requestIdleCallback; run after `load` so we're
-    // definitely past LCP.
-    setTimeout(initSentry, 2000);
-  } else {
-    w.addEventListener("load", () => setTimeout(initSentry, 2000), { once: true });
+
+type CaptureRouterTransitionStart = (href: string, navigationType: string) => void;
+
+let realCaptureRouterTransitionStart: CaptureRouterTransitionStart | null = null;
+const pendingRouterTransitions: Array<[string, string]> = [];
+const MAX_BUFFERED_TRANSITIONS = 32;
+
+async function loadAndInitSentry() {
+  try {
+    const Sentry = await import("@sentry/nextjs");
+    Sentry.init({
+      dsn,
+
+      enabled:
+        !!dsn && (process.env.NODE_ENV === "production" || reportInDev),
+
+      sendDefaultPii: true,
+
+      // 100% in dev, 10% in production
+      tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
+
+      enableLogs: true,
+
+      /**
+       * Session Replay is intentionally disabled: it ships a large client bundle and records DOM
+       * continuously on sampled sessions, which noticeably hurts main-thread time and LCP/INP.
+       * Errors and traces still report via this SDK; re-enable replayIntegration only if you need replays.
+       */
+    });
+    realCaptureRouterTransitionStart = Sentry.captureRouterTransitionStart;
+    for (const [href, navType] of pendingRouterTransitions) {
+      try {
+        realCaptureRouterTransitionStart(href, navType);
+      } catch {
+        // Swallow — flushing a buffered nav event should never break the page.
+      }
+    }
+    pendingRouterTransitions.length = 0;
+  } catch {
+    // SDK failed to load (network hiccup, ad-blocker). Browser default error
+    // handling still runs; we just lose Sentry telemetry for this session.
   }
 }
 
 /**
- * `captureRouterTransitionStart` is exported at module load, before Sentry is
- * initialised. It's a no-op until init completes — safe to route through.
+ * Defer Sentry off the critical path. The mobile PSI trace previously showed a
+ * ~1.17s `sentry-tracing-init` user-timing mark — biggest single contributor to
+ * the 3.2s main-thread total. Deferring loses errors thrown in the first
+ * ~1–2s of load; the browser still logs them, and users almost never trip
+ * first-second bugs.
+ *
+ * In dev we init immediately so devs see errors right away.
  */
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+if (typeof window !== "undefined") {
+  if (process.env.NODE_ENV !== "production") {
+    void loadAndInitSentry();
+  } else {
+    const w: Window & { requestIdleCallback?: typeof requestIdleCallback } = window;
+    if (typeof w.requestIdleCallback === "function") {
+      w.requestIdleCallback(() => void loadAndInitSentry(), { timeout: 5000 });
+    } else if (document.readyState === "complete") {
+      // Safari <= 17-ish has no requestIdleCallback; run after `load` so we're
+      // definitely past LCP.
+      setTimeout(() => void loadAndInitSentry(), 2000);
+    } else {
+      w.addEventListener(
+        "load",
+        () => setTimeout(() => void loadAndInitSentry(), 2000),
+        { once: true },
+      );
+    }
+  }
+}
+
+/**
+ * Next's App Router calls this on every client-side navigation. Exported
+ * synchronously — required by the router hook contract — so it acts as a proxy
+ * that buffers events until the real Sentry handler resolves. Buffer is capped
+ * so a stuck idle callback can't leak memory.
+ */
+export const onRouterTransitionStart: CaptureRouterTransitionStart = (href, navigationType) => {
+  if (realCaptureRouterTransitionStart) {
+    realCaptureRouterTransitionStart(href, navigationType);
+    return;
+  }
+  if (pendingRouterTransitions.length < MAX_BUFFERED_TRANSITIONS) {
+    pendingRouterTransitions.push([href, navigationType]);
+  }
+};
