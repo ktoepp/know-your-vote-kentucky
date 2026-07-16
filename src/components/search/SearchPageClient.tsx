@@ -292,7 +292,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                     arrow
                     enterTouchDelay={0}
                     leaveTouchDelay={5000}
-                    title="Bill numbers work with or without spaces or dashes (HB23, HB 23, HB-23). Searching just a number — like 23 — finds every bill type with that number."
+                    title="Bill numbers work with or without spaces or dashes (HB23, HB 23, HB-23). Searching just a number (23) finds every bill type with that number."
                   >
                     <IconButton aria-label="Search tips" size="small" sx={{ mr: 0.5 }}>
                       <InfoOutlined fontSize="small" />
