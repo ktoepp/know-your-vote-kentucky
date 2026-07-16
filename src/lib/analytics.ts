@@ -71,6 +71,26 @@ export const trackSearch = (
   });
 };
 
+/**
+ * Fired after every /search execution, success or failure, so search health is
+ * measurable in PostHog (F1: timeouts were invisible — only found by hand-testing).
+ * `error` carries the internal failure message (never user-facing copy); null on
+ * success. `result_count` is null when the search failed before returning rows.
+ */
+export const trackSearchPerformed = (props: {
+  query: string;
+  resultCount: number | null;
+  durationMs: number;
+  error?: string | null;
+}): void => {
+  capture("search_performed", {
+    query: props.query,
+    result_count: props.resultCount,
+    duration_ms: Math.round(props.durationMs),
+    error: props.error ?? null,
+  });
+};
+
 export const trackGraphInteraction = (
   action: string,
   nodeType: string,

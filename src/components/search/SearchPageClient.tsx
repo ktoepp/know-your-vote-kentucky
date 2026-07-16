@@ -30,6 +30,7 @@ import { KYBillCard } from '@/components/bills/KYBillCard';
 import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { withTimeout } from '@/lib/async-utils';
+import { trackSearchPerformed } from '@/lib/analytics';
 import {
   buildKyBillSearchFiltersFromUrlSearch,
   canonicalizeKyBillSearchInput,
@@ -49,6 +50,17 @@ import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
 
 /** Enough merged hits for several pages at 25/50/100; search runs multiple parallel `ilike` legs. */
 const SEARCH_FETCH_LIMIT = 500;
+
+/** Plain-language copy (F1): what happened + what to do, no Postgres vocabulary. */
+const SEARCH_TIMEOUT_COPY =
+  'Search took too long. Try fewer or more specific words — or browse by topic.';
+const SEARCH_FAILED_COPY =
+  'Search hit a problem on our end. Try again in a moment — or browse by topic.';
+
+/** Postgres statement timeout (57014) or our own client-side withTimeout. */
+function isSearchTimeoutError(message: string): boolean {
+  return message === SEARCH_TIMEOUT_COPY || /statement timeout|57014|timed out/i.test(message);
+}
 
 export interface SearchPageClientProps {
   legislatorRoster: KYLegislatorRoster[];
@@ -84,21 +96,35 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
     setError(null);
     setSearched(true);
     setNonBillType(null);
+    const startedAt = performance.now();
+    const q = searchQuery.trim();
     try {
       if (!supabase) {
         setBills([]);
         setLoading(false);
         return;
       }
-      const q = searchQuery.trim();
       const nextBills = await withTimeout(
         fetchKyBillsMatchingSearch(supabase, q, SEARCH_FETCH_LIMIT, filters),
         25_000,
-        'Search timed out. Check your connection or try a shorter query.',
+        SEARCH_TIMEOUT_COPY,
       );
       setBills(nextBills);
+      trackSearchPerformed({
+        query: q,
+        resultCount: nextBills.length,
+        durationMs: performance.now() - startedAt,
+      });
     } catch (err: any) {
-      setError(err.message || 'Search failed');
+      const raw = String(err?.message || err || 'unknown search error');
+      const timedOut = isSearchTimeoutError(raw);
+      setError(timedOut ? SEARCH_TIMEOUT_COPY : SEARCH_FAILED_COPY);
+      trackSearchPerformed({
+        query: q,
+        resultCount: null,
+        durationMs: performance.now() - startedAt,
+        error: raw === SEARCH_TIMEOUT_COPY ? 'client_timeout_25s' : raw.slice(0, 300),
+      });
     } finally {
       setLoading(false);
     }
@@ -462,7 +488,19 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
           </Alert>
         )}
 
-        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+        {error && (
+          <Alert
+            severity="error"
+            sx={{ mb: 3 }}
+            action={
+              <Button color="inherit" size="small" component={Link} href="/bills">
+                Browse by topic
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        )}
         {loading && (
           <Box role="status" aria-live="polite" aria-label="Searching bills" sx={{ mt: 1 }}>
             <Skeleton variant="text" width={220} sx={{ fontSize: '0.875rem', mb: 1 }} />

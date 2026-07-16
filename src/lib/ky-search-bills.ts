@@ -403,10 +403,13 @@ export async function fetchKyBillsMatchingSearch(
   } else {
     let ftsRows: KYBill[] | null = null;
     if (safe.length >= 2 && !omitKyBillsPlainSearchRpc) {
-      const ftsRes = await supabase.rpc('ky_bills_plain_search', {
-        search_query: safe,
-        max_rows: mergeCap,
-      });
+      // Vertical filter keeps the stored `search_vector` column (migration 040) out of the payload.
+      const ftsRes = await supabase
+        .rpc('ky_bills_plain_search', {
+          search_query: safe,
+          max_rows: mergeCap,
+        })
+        .select(KY_BILL_SEARCH_SELECT);
       if (ftsRes.error) {
         if (isMissingKyBillsPlainSearchRpc(ftsRes.error)) {
           omitKyBillsPlainSearchRpc = true;
