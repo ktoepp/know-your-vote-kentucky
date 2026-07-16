@@ -4,6 +4,8 @@ A critical pass over the digest email against four criteria: **accurate, concise
 
 Findings are ranked within each section. "Fix" lines are recommendations, not applied changes.
 
+> **Status:** all findings below were subsequently addressed on this branch (template, cron, detail formatter, and voice-and-tone.md §2). This document is kept as the point-in-time review record.
+
 ---
 
 ## Accuracy

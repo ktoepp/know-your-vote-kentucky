@@ -89,25 +89,29 @@ Sent daily or weekly based on user preference, only when there are events to rep
 
 **Subject:** `Kentucky bill digest — {date}` (e.g., `Kentucky bill digest — May 13, 2026`)
 
-**Preview text:** `{n} bill(s) with new activity`
+**Preview text:** describes only what the digest contains, joined with a comma when both parts are present: `{n} bill(s) with new activity` / `{n} committee update(s)` / `3 bills with new activity, 2 committee updates`.
 
 **Heading:** `Kentucky bill digest`
 
-**Subheading:** `Status updates for bills and topics you follow.`
+**Subheading:** generated from the sections actually present — `Status updates for {bills / topics / committees, joined with "and"} you follow.` (e.g., `Status updates for bills and committees you follow.`). Never claims a source the digest doesn't include.
 
-**Structure — grouped by reason.** Bills are split into up to two sections so the reader sees *why* each bill is included. A section is shown only when it has bills:
+**Structure — grouped by reason.** Updates are split into up to three sections so the reader sees *why* each item is included. A section is shown only when it has content:
 - `Bills you follow` — bills the user follows individually.
-- `From topics you follow` — bills matched by a followed topic. Each such bill is annotated with the matched topic(s): `Matches your {topic} topic` / `Matches your {topicA, topicB} topics`.
+- `Topics you follow` — bills matched by a followed topic. Each such bill is annotated with the matched topic(s): `Matches your {topic} topic` / `Matches your {topicA} and {topicB} topics` (serial "and", Oxford comma for three or more).
+- `Committees you follow` — one block per committee, with one line per calendar change: `New meeting: {weekday, month day} — {time and location}` / `Agenda updated for …` / `Meeting cancelled: …`. Repeated updates to the same meeting are de-duplicated.
 
 A bill the user both follows and matches by topic appears once, under `Bills you follow`.
 
-**Event lines.** Each line states the bill's latest recorded action verbatim (the legislative last-action text), followed by the observed time in parentheses — no event-category label. Identical actions on the same bill are de-duplicated.
+**Event lines.** Each line states the bill's recorded action verbatim (the legislative last-action text), followed by `(recorded {Mon D})` — the date our sync observed it, deliberately date-only and labeled "recorded" because it is not the time the legislature acted. No event-category label when action text exists; when a payload has no action text, the line falls back to the event label ("Floor action", "Signed into law"), never to the bill title. Multiple lines under one bill read oldest to newest. Identical actions on the same bill are de-duplicated before the cap is applied, so the overflow count is honest.
+
+**Links.** Both the bill number and the bill title link to the bill page (the title quietly, in body color). Committee names link to the committee page.
 
 **Overflow line (when events are capped):**
-> {n} additional update(s) not shown — [view all followed bills].
+> {n} more update(s) not shown — [see all recent activity].
+> Links to the profile activity feed, which covers bills, topics, and committees — not the followed-bills list, which can't show topic-matched overflow.
 
 **Footer:**
-> You're getting this because you follow bills or topics on Know Your Vote Kentucky.
+> You're getting this because you follow bills, topics, or committees on Know Your Vote Kentucky. Status lines quote the legislative record as written — the [glossary] explains the terms.
 > [Change frequency or topics] · [Unsubscribe] · [Privacy] · [Terms]
 
 ---

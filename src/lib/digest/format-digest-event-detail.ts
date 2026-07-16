@@ -22,6 +22,24 @@ export function formatDigestEventLabel(
   return KY_DIGEST_EVENT_LABELS[eventType as KyDigestEventType] ?? eventType;
 }
 
+/**
+ * Human-readable meeting date ("Tuesday, July 22") from a `YYYY-MM-DD` payload
+ * string. Parsed as a plain calendar date — no timezone conversion — so the
+ * displayed day always matches the LRC calendar. Falls back to the raw string.
+ */
+export function formatMeetingDate(raw: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
+  if (!m) return raw.trim();
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (Number.isNaN(d.getTime())) return raw.trim();
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 /** Human-readable line for digest email / profile activity from a history payload. */
 export function formatDigestEventDetail(
   eventType: string,
@@ -33,11 +51,11 @@ export function formatDigestEventDetail(
     return p.last_action.trim();
   }
   if (eventType === 'hearing_scheduled' && p.source === 'lrc-calendar') {
-    const committee = typeof p.committee_name === 'string' ? p.committee_name : '';
-    const date = typeof p.meeting_date === 'string' ? p.meeting_date : '';
-    if (committee || date) {
-      return [committee, date].filter(Boolean).join(' — ');
-    }
+    const committee = typeof p.committee_name === 'string' ? p.committee_name.trim() : '';
+    const date = typeof p.meeting_date === 'string' ? formatMeetingDate(p.meeting_date) : '';
+    if (committee && date) return `Scheduled for hearing: ${committee}, ${date}`;
+    if (committee) return `Scheduled for hearing: ${committee}`;
+    if (date) return `Scheduled for hearing: ${date}`;
   }
   return (billTitle ?? '').trim();
 }
