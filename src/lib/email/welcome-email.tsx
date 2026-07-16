@@ -10,6 +10,7 @@ import {
   Text,
 } from 'react-email';
 import * as React from 'react';
+import { KYVKY_POSTAL_ADDRESS } from '@/lib/kyvky-contact';
 
 export function WelcomeEmail(props: {
   displayName?: string | null;
@@ -82,6 +83,9 @@ export function WelcomeEmail(props: {
             <Link href={privacyHref} style={link}>Privacy</Link>
             {' · '}
             <Link href={termsHref} style={link}>Terms</Link>
+          </Text>
+          <Text style={{ ...muted, marginTop: 6 }}>
+            Know Your Vote Kentucky · {KYVKY_POSTAL_ADDRESS}
           </Text>
         </Container>
       </Body>

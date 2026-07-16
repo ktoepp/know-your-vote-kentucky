@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import {
   BillDigestEmail,
+  joinWithAnd,
   type BillDigestGroup,
   type BillDigestLine,
   type BillDigestSection,
@@ -13,23 +14,34 @@ import {
   type KyDigestEventType,
 } from '@/lib/ky-notification-preferences';
 import { billMatchesTopicFilters, matchedTopicFilters } from '@/lib/ky-topic-legiscan-mapping';
-import { formatDigestEventDetail } from '@/lib/digest/format-digest-event-detail';
+import {
+  formatDigestEventDetail,
+  formatDigestEventLabel,
+  formatMeetingDate,
+} from '@/lib/digest/format-digest-event-detail';
 import { publicSiteOrigin } from '@/lib/site-canonical';
 import { kyBillSlug } from '@/lib/ky-bill-slug';
+import { KYVKY_POSTAL_ADDRESS } from '@/lib/kyvky-contact';
 
 const DIGEST_CAP = 10;
+/** Committee updates get their own cap; the remainder counts toward the overflow line. */
+const COMMITTEE_DIGEST_CAP = 10;
 
 function milestoneScore(eventType: string): number {
   return KY_DIGEST_MAJOR_MILESTONE_SET.has(eventType as KyDigestEventType) ? 1 : 0;
 }
 
+/**
+ * Calendar date we recorded the event ("Jul 15"), rendered in the email as
+ * "(recorded Jul 15)". Deliberately date-only: `observed_at` is when our sync
+ * noticed the event, not when the legislature acted, so a clock time would
+ * overstate what we know.
+ */
 function formatObserved(iso: string): string {
   try {
-    return new Date(iso).toLocaleString('en-US', {
+    return new Date(iso).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
       timeZone: 'America/New_York',
     });
   } catch {
@@ -37,12 +49,12 @@ function formatObserved(iso: string): string {
   }
 }
 
-function formatDigestDate(d: Date): string {
+/** Short subject-line date ("Jul 16") — the counts carry the information. */
+function formatDigestDateShort(d: Date): string {
   try {
     return d.toLocaleDateString('en-US', {
-      month: 'long',
+      month: 'short',
       day: 'numeric',
-      year: 'numeric',
       timeZone: 'America/New_York',
     });
   } catch {
@@ -219,10 +231,13 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const windowMs = pref.digest_frequency === 'weekly' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
     let windowStart = new Date(now.getTime() - windowMs).toISOString();
 
+    // Only delivered digests advance the window — a 'failed' send must not
+    // swallow its window's events, or they are never delivered at all.
     const { data: lastLog } = await supabaseAdmin
       .from('ky_notifications_log')
       .select('digest_window_end')
       .eq('user_id', uid)
+      .neq('delivery_status', 'failed')
       .order('sent_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -258,6 +273,8 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     // and `committee_meeting_cancelled` as separate toggles (mapped to the matching DB
     // event_type values minus the `committee_` prefix).
     const committeeGroups: BillDigestGroup[] = [];
+    let committeeOverflow = 0;
+    let committeeEventIds: number[] = [];
     const committeeEventTypeMap: Record<string, KyDigestEventType> = {
       meeting_scheduled: 'committee_meeting_scheduled',
       agenda_updated: 'committee_agenda_updated',
@@ -286,37 +303,92 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           .limit(40);
 
         const origin = publicSiteOrigin();
-        for (const ev of (committeeEvents ?? []) as CommitteeEventRow[]) {
+        const rows = (committeeEvents ?? []) as CommitteeEventRow[];
+
+        // "Agenda updated" carries no new information when the same meeting's
+        // "New meeting" announcement is already in this digest — suppress it.
+        const scheduledMeetingKeys = new Set(
+          rows
+            .filter((ev) => ev.event_type === 'meeting_scheduled')
+            .map((ev) => `${ev.committee_id}::${String(ev.event_payload.meeting_date ?? '')}`),
+        );
+
+        const seenCommitteeEvents = new Set<string>();
+        const keptEvents: Array<{
+          id: number;
+          committeeId: string;
+          committeeName: string;
+          committeeSlug: string;
+          detail: string;
+          observedAtIso: string;
+        }> = [];
+        for (const ev of rows) {
           const payload = ev.event_payload;
-          const committeeName = String(payload.committee_name ?? 'Committee');
+          const committeeName = typeof payload.committee_name === 'string' ? payload.committee_name.trim() : '';
+          if (!committeeName) continue; // nothing to identify the committee by
           const committeeSlug = String(payload.committee_slug ?? ev.committee_id);
           const meetingDate = String(payload.meeting_date ?? '');
           const timeAndLocation = payload.time_and_location ? String(payload.time_and_location) : null;
           const locSuffix = timeAndLocation ? ` — ${timeAndLocation}` : '';
+          const friendlyDate = meetingDate ? formatMeetingDate(meetingDate) : 'date not listed';
 
-          let title: string;
+          if (
+            ev.event_type === 'agenda_updated' &&
+            scheduledMeetingKeys.has(`${ev.committee_id}::${meetingDate}`)
+          ) {
+            continue;
+          }
+          const dedupeKey = [ev.committee_id, ev.event_type, meetingDate, timeAndLocation ?? ''].join('::');
+          if (seenCommitteeEvents.has(dedupeKey)) continue;
+          seenCommitteeEvents.add(dedupeKey);
+
           let detail: string;
           switch (ev.event_type) {
             case 'agenda_updated':
-              title = 'Agenda updated';
-              detail = `Updated agenda for ${meetingDate}${locSuffix}`;
+              detail = `Agenda updated: ${friendlyDate}${locSuffix}`;
               break;
             case 'meeting_cancelled':
-              title = 'Meeting cancelled';
-              detail = `Cancelled: ${meetingDate}${locSuffix}`;
+              detail = `Meeting cancelled: ${friendlyDate}${locSuffix}`;
               break;
             case 'meeting_scheduled':
             default:
-              title = 'New meeting added to the calendar';
-              detail = `New meeting: ${meetingDate}${locSuffix}`;
+              detail = `New meeting: ${friendlyDate}${locSuffix}`;
               break;
           }
-          committeeGroups.push({
-            billNumber: committeeName,
-            billTitle: title,
-            billHref: `${origin}/committees/${encodeURIComponent(committeeSlug)}`,
-            lines: [{ detail, observedAt: formatObserved(ev.observed_at) }],
+          keptEvents.push({
+            id: ev.id,
+            committeeId: ev.committee_id,
+            committeeName,
+            committeeSlug,
+            detail,
+            observedAtIso: ev.observed_at,
           });
+        }
+
+        // Rows arrive newest-first, so the slice keeps the most recent updates;
+        // the remainder counts toward the overflow line.
+        const shownEvents = keptEvents.slice(0, COMMITTEE_DIGEST_CAP);
+        committeeOverflow = keptEvents.length - shownEvents.length;
+        committeeEventIds = shownEvents.map((e) => e.id);
+
+        // Oldest first within the section, matching the bills' story order.
+        shownEvents.sort(
+          (a, b) => new Date(a.observedAtIso).getTime() - new Date(b.observedAtIso).getTime(),
+        );
+        const byCommittee = new Map<string, BillDigestGroup>();
+        for (const ev of shownEvents) {
+          let group = byCommittee.get(ev.committeeId);
+          if (!group) {
+            group = {
+              billNumber: ev.committeeName,
+              billTitle: '',
+              billHref: `${origin}/committees/${encodeURIComponent(ev.committeeSlug)}`,
+              lines: [],
+            };
+            byCommittee.set(ev.committeeId, group);
+            committeeGroups.push(group);
+          }
+          group.lines.push({ detail: ev.detail, observedAt: formatObserved(ev.observedAtIso) });
         }
       }
     }
@@ -331,10 +403,33 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       ms: milestoneScore(h.event_type),
     }));
     scored.sort((a, b) => b.ms - a.ms || new Date(b.observed_at).getTime() - new Date(a.observed_at).getTime());
-    const top = scored.slice(0, DIGEST_CAP);
-    const overflow = Math.max(0, scored.length - DIGEST_CAP);
 
-    const byBill = new Map<string, HistoryRow[]>();
+    // Resolve each event to its display line, then dedupe identical actions on the
+    // same bill (one transition can emit several event rows, e.g. passed_chamber +
+    // floor_vote) BEFORE capping, so the overflow count matches reality. When the
+    // payload has no last-action text, fall back to the event label ("Floor action")
+    // rather than repeating the bill title as if it were the event. The dedupe key
+    // includes the recorded date so distinct events that share fallback text
+    // (three "New cosponsor" days apart) are not collapsed into one.
+    const seenDetails = new Set<string>();
+    const deduped: Array<HistoryRow & { ms: number; detail: string }> = [];
+    for (const h of scored) {
+      const bill = billById.get(String(h.bill_id));
+      if (!bill) continue;
+      if (!bill.bill_number && !bill.title) continue; // nothing to identify the bill by
+      const payload = h.event_payload as Record<string, unknown>;
+      const detail =
+        formatDigestEventDetail(h.event_type, payload, null, { hearingVerb: true }) ||
+        formatDigestEventLabel(h.event_type, payload);
+      const key = `${h.bill_id}::${detail.trim().toLowerCase()}::${formatObserved(h.observed_at)}`;
+      if (!detail.trim() || seenDetails.has(key)) continue;
+      seenDetails.add(key);
+      deduped.push({ ...h, detail });
+    }
+    const top = deduped.slice(0, DIGEST_CAP);
+    const overflow = deduped.length - top.length + committeeOverflow;
+
+    const byBill = new Map<string, Array<HistoryRow & { detail: string }>>();
     for (const h of top) {
       const k = String(h.bill_id);
       if (!byBill.has(k)) byBill.set(k, []);
@@ -347,23 +442,14 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     for (const [billId, evs] of byBill) {
       const bill = billById.get(billId);
       if (!bill) continue;
-      // Lead each line with the raw last-action text; dedupe identical actions
-      // (one transition can emit several event rows, e.g. passed_chamber + floor_vote).
-      const seenDetails = new Set<string>();
-      const lines: BillDigestLine[] = [];
-      for (const h of evs) {
-        const detail = formatDigestEventDetail(
-          h.event_type,
-          h.event_payload as Record<string, unknown>,
-          bill.title,
-        );
-        const key = detail.trim().toLowerCase();
-        if (!key || seenDetails.has(key)) continue;
-        seenDetails.add(key);
-        lines.push({ detail, observedAt: formatObserved(h.observed_at) });
-      }
+      // Oldest first within a bill, so multiple events read in story order.
+      evs.sort((a, b) => new Date(a.observed_at).getTime() - new Date(b.observed_at).getTime());
+      const lines: BillDigestLine[] = evs.map((h) => ({
+        detail: h.detail,
+        observedAt: formatObserved(h.observed_at),
+      }));
       const group: BillDigestGroup = {
-        billNumber: bill.bill_number || 'Bill',
+        billNumber: bill.bill_number || '',
         billTitle: bill.title || '',
         billHref: `${origin}/bills/${(bill.bill_number && kyBillSlug({ bill_number: bill.bill_number, session: bill.session })) || billId}`,
         lines,
@@ -378,7 +464,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
 
     const sections: BillDigestSection[] = [
       { heading: 'Bills you follow', groups: followedGroups },
-      { heading: 'From topics you follow', groups: topicGroups },
+      { heading: 'Topics you follow', groups: topicGroups },
       { heading: 'Committees you follow', groups: committeeGroups },
     ].filter((s) => s.groups.length > 0);
 
@@ -387,29 +473,78 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       continue;
     }
     const totalBills = followedGroups.length + topicGroups.length;
-    const totalItems = totalBills + committeeGroups.length;
+    const committeeUpdateCount = committeeGroups.reduce((n, g) => n + g.lines.length, 0);
 
     const unsubscribeToken = pref.unsubscribe_token as string;
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
-    const followedBillsHref = `${origin}/bills?follows=me`;
+    // Profile activity covers followed bills and committees (NOT topic-matched
+    // bills) — the overflow copy in the template is scoped to match. When
+    // topic-matched updates were cut, the closest destination is the bills
+    // browse filtered by topic, so surface those topics alongside.
+    const moreHref = `${origin}/profile#activity`;
+    const overflowTopicSet = new Set<string>();
+    for (const h of deduped.slice(DIGEST_CAP)) {
+      if (followedSet.has(String(h.bill_id))) continue;
+      const bill = billById.get(String(h.bill_id));
+      if (!bill) continue;
+      for (const t of matchedTopicFilters(bill.topics, bill.legiscan_subjects, topicFilters)) {
+        overflowTopicSet.add(t);
+      }
+    }
+    const glossaryHref = `${origin}/glossary`;
     const preferencesHref = `${origin}/profile#notifications`;
     const privacyHref = `${origin}/privacy`;
     const termsHref = `${origin}/terms`;
 
-    const previewText = `${totalItems} update${totalItems === 1 ? '' : 's'} from bills and committees you follow`;
-    const subject = `Kentucky bill digest — ${formatDigestDate(now)}`;
+    // Describe only what this digest actually contains.
+    const previewParts: string[] = [];
+    if (totalBills > 0) {
+      previewParts.push(`${totalBills} bill${totalBills === 1 ? '' : 's'} with new activity`);
+    }
+    if (committeeUpdateCount > 0) {
+      previewParts.push(`${committeeUpdateCount} committee update${committeeUpdateCount === 1 ? '' : 's'}`);
+    }
+    const previewText = joinWithAnd(previewParts);
+    const scopeParts: string[] = [];
+    if (followedGroups.length > 0) scopeParts.push('bills');
+    if (topicGroups.length > 0) scopeParts.push('topics');
+    if (committeeGroups.length > 0) scopeParts.push('committees');
+    const introText = `Status updates for ${joinWithAnd(scopeParts)} you follow.`;
+    // A digest with no bill sections shouldn't call itself a bill digest.
+    const heading = totalBills > 0 ? 'Kentucky bill digest' : 'Kentucky committee digest';
+    // The inbox column already shows the date, so the subject's variable slot
+    // carries the counts; a short date keeps each day's subject distinct so
+    // threading clients don't collapse digests together.
+    const subjectCounts: string[] = [];
+    if (totalBills > 0) subjectCounts.push(`${totalBills} bill${totalBills === 1 ? '' : 's'}`);
+    if (committeeUpdateCount > 0) {
+      subjectCounts.push(
+        totalBills > 0
+          ? `${committeeUpdateCount} committee update${committeeUpdateCount === 1 ? '' : 's'}`
+          : `${committeeUpdateCount} update${committeeUpdateCount === 1 ? '' : 's'}`,
+      );
+    }
+    const subject = `${heading} — ${formatDigestDateShort(now)}: ${subjectCounts.join(', ')}`;
 
     const needsHtml = renderPreview || !(dryRun || !resend);
     const emailEl = (
       <BillDigestEmail
         previewText={previewText}
+        logoSrc={`${origin}/branding/Logo-03.png`}
+        homeHref={origin}
+        heading={heading}
+        introText={introText}
         sections={sections}
+        billsBrowseHref={`${origin}/bills`}
         moreCount={overflow}
-        followedBillsHref={followedBillsHref}
+        moreHref={moreHref}
+        overflowTopics={[...overflowTopicSet]}
+        glossaryHref={glossaryHref}
         preferencesHref={preferencesHref}
         unsubscribeHref={unsubscribeHref}
         privacyHref={privacyHref}
         termsHref={termsHref}
+        postalAddress={KYVKY_POSTAL_ADDRESS}
       />
     );
     const html = needsHtml ? await render(emailEl) : '';
@@ -446,6 +581,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           digest_window_start: windowStart,
           digest_window_end: windowEnd,
           event_ids: top.map((t) => t.id),
+          committee_event_ids: committeeEventIds,
           delivery_status: 'failed',
         });
         continue;
@@ -456,6 +592,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
         digest_window_start: windowStart,
         digest_window_end: windowEnd,
         event_ids: top.map((t) => t.id),
+        committee_event_ids: committeeEventIds,
         resend_message_id: sendData?.id ?? null,
         delivery_status: 'sent',
       });

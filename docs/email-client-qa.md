@@ -15,7 +15,9 @@ Manual pass after template copy changes (especially Bill Watch alignment). Send 
 - [ ] Plain-text part present (`render(..., { plainText: true })`)
 - [ ] Unsubscribe link works (GET page + one-click POST)
 - [ ] Bill links use `https://kyvky.com`
-- [ ] Footer: privacy, terms, preference link
+- [ ] Logo loads (`/branding/Logo-03.png`) and links to the site home; alt text shows when images are blocked
+- [ ] Footer: privacy, terms, preference link, postal address
+- [ ] Dark mode: heading/links/borders legible (prefers-color-scheme clients)
 
 ## Welcome email
 

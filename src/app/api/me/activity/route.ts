@@ -181,7 +181,9 @@ export async function GET(request: NextRequest) {
       const payload = (row.event_payload ?? {}) as Record<string, unknown>;
       const label = formatDigestEventLabel(eventType, payload);
 
-      const detail = formatDigestEventDetail(eventType, payload, meta?.title ?? null) || null;
+      // No title fallback: the row already shows the bill title, and repeating
+      // it as the detail caption says nothing about what happened.
+      const detail = formatDigestEventDetail(eventType, payload, null) || null;
       if (eventType === 'hearing_scheduled' && typeof payload.meeting_date === 'string') {
         hearingKeysFromHistory.add(`${billId}|${payload.meeting_date}`);
       }

@@ -14,6 +14,15 @@ type DigestHistoryBill = {
   event_label: string;
 };
 
+type DigestHistoryCommittee = {
+  id: string;
+  name: string;
+  slug: string | null;
+  event_type: string;
+  event_label: string;
+  meeting_date: string | null;
+};
+
 type DigestHistoryEntry = {
   id: number;
   sent_at: string;
@@ -21,7 +30,21 @@ type DigestHistoryEntry = {
   digest_window_end: string;
   delivery_status: 'sent' | 'failed' | 'bounced';
   bills: DigestHistoryBill[];
+  committees: DigestHistoryCommittee[];
 };
+
+function committeeEventLabel(eventType: string): string {
+  switch (eventType) {
+    case 'meeting_scheduled':
+      return 'New meeting scheduled';
+    case 'agenda_updated':
+      return 'Agenda updated';
+    case 'meeting_cancelled':
+      return 'Meeting cancelled';
+    default:
+      return 'Committee update';
+  }
+}
 
 export async function GET(request: NextRequest) {
   const auth = await getAuthedUser(request);
@@ -35,7 +58,7 @@ export async function GET(request: NextRequest) {
 
   const logRes = await auth.supabase
     .from('ky_notifications_log')
-    .select('id, sent_at, digest_window_start, digest_window_end, event_ids, delivery_status')
+    .select('id, sent_at, digest_window_start, digest_window_end, event_ids, committee_event_ids, delivery_status')
     .eq('delivery_status', 'sent')
     .order('sent_at', { ascending: false })
     .limit(limit);
@@ -52,6 +75,7 @@ export async function GET(request: NextRequest) {
     digest_window_end: string;
     delivery_status: 'sent' | 'failed' | 'bounced';
     event_ids: number[] | null;
+    committee_event_ids: number[] | null;
   }>;
 
   if (logRows.length === 0) {
@@ -60,6 +84,9 @@ export async function GET(request: NextRequest) {
 
   const allEventIds = Array.from(
     new Set(logRows.flatMap((r) => (r.event_ids ?? []).filter((n) => Number.isFinite(n)))),
+  );
+  const allCommitteeEventIds = Array.from(
+    new Set(logRows.flatMap((r) => (r.committee_event_ids ?? []).filter((n) => Number.isFinite(n)))),
   );
 
   // ky_bill_status_history is service-role only; admin client required to expand event_ids.
@@ -132,6 +159,37 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Committee events (v1.5): name/slug/meeting date live in the event payload.
+  const committeeEventMap = new Map<
+    number,
+    { committee_id: string; event_type: string; name: string; slug: string | null; meeting_date: string | null }
+  >();
+  if (allCommitteeEventIds.length > 0) {
+    const cevRes = await supabaseAdmin
+      .from('ky_committee_events')
+      .select('id, committee_id, event_type, event_payload')
+      .in('id', allCommitteeEventIds);
+    if (cevRes.error) {
+      console.error('ky_committee_events select:', cevRes.error);
+      return NextResponse.json({ error: cevRes.error.message }, { status: 500 });
+    }
+    for (const row of (cevRes.data ?? []) as Array<{
+      id: number;
+      committee_id: string;
+      event_type: string;
+      event_payload: Record<string, unknown> | null;
+    }>) {
+      const p = row.event_payload ?? {};
+      committeeEventMap.set(row.id, {
+        committee_id: row.committee_id,
+        event_type: row.event_type,
+        name: typeof p.committee_name === 'string' ? p.committee_name : 'Committee',
+        slug: typeof p.committee_slug === 'string' ? p.committee_slug : null,
+        meeting_date: typeof p.meeting_date === 'string' ? p.meeting_date : null,
+      });
+    }
+  }
+
   const entries: DigestHistoryEntry[] = logRows.map((r) => {
     const ids = r.event_ids ?? [];
     // Dedupe by bill so the same bill doesn't appear twice per digest when it had multiple events.
@@ -150,6 +208,23 @@ export async function GET(request: NextRequest) {
         event_label: formatDigestEventLabel(ev.event_type, ev.event_payload),
       });
     }
+    const seenCommittees = new Set<string>();
+    const committees: DigestHistoryCommittee[] = [];
+    for (const cid of r.committee_event_ids ?? []) {
+      const cev = committeeEventMap.get(cid);
+      if (!cev) continue;
+      const key = `${cev.committee_id}::${cev.event_type}::${cev.meeting_date ?? ''}`;
+      if (seenCommittees.has(key)) continue;
+      seenCommittees.add(key);
+      committees.push({
+        id: cev.committee_id,
+        name: cev.name,
+        slug: cev.slug,
+        event_type: cev.event_type,
+        event_label: committeeEventLabel(cev.event_type),
+        meeting_date: cev.meeting_date,
+      });
+    }
     return {
       id: r.id,
       sent_at: r.sent_at,
@@ -157,6 +232,7 @@ export async function GET(request: NextRequest) {
       digest_window_end: r.digest_window_end,
       delivery_status: r.delivery_status,
       bills: expanded,
+      committees,
     };
   });
 
