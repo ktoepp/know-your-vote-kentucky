@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
   Container,
+  IconButton,
   Link as MuiLink,
   Typography,
   Alert,
@@ -18,10 +19,11 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Tooltip,
 } from '@mui/material';
 import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import { gaChamberFilterLabel } from '@/lib/ky-committee-display';
-import { Cancel, Search, Gavel, ArrowForward } from '@mui/icons-material';
+import { Cancel, Search, Gavel, ArrowForward, InfoOutlined } from '@mui/icons-material';
 import ListSubheader from '@mui/material/ListSubheader';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
@@ -41,7 +43,7 @@ import {
 } from '@/lib/ky-search-bills';
 import { parseKyBillSessionParam } from '@/lib/ky-bills-browse-url';
 import { parseGaChamberParam } from '@/lib/ky-ga-browse-url';
-import { KY_BILL_SESSION_OPTIONS } from '@/lib/ky-sessions';
+import { KY_BILL_SESSION_OPTIONS, getCivicDataSessionName } from '@/lib/ky-sessions';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
@@ -83,6 +85,8 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [nonBillType, setNonBillType] = useState<string | null>(null);
+  /** Default-session search found nothing, so the shown results span all sessions. */
+  const [sessionBroadened, setSessionBroadened] = useState(false);
   const legislators = legislatorRoster;
   const filterKey = searchParams.toString();
   const { pageSize: searchPageSize, setPageSize: setSearchPageSize } = usePersistedPageSize('search', 25);
@@ -90,12 +94,17 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
   const { rows: subjectSuggestions, loading: suggestionsLoading } = useKySearchSuggestionSubjects({ limit: 14 });
   const { followedBillIds, followedTopics, authed: followAuthed } = useFollowedBillsAndTopics();
 
-  const performSearch = useCallback(async (searchQuery: string, filters: KyBillSearchFilters) => {
+  const performSearch = useCallback(async (
+    searchQuery: string,
+    filters: KyBillSearchFilters,
+    opts?: { broadenIfEmpty?: boolean; sessionScope?: 'default' | 'explicit' | 'all' },
+  ) => {
     if (!searchQuery.trim()) return;
     setLoading(true);
     setError(null);
     setSearched(true);
     setNonBillType(null);
+    setSessionBroadened(false);
     const startedAt = performance.now();
     const q = searchQuery.trim();
     try {
@@ -104,16 +113,30 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
         setLoading(false);
         return;
       }
-      const nextBills = await withTimeout(
+      let nextBills = await withTimeout(
         fetchKyBillsMatchingSearch(supabase, q, SEARCH_FETCH_LIMIT, filters),
         25_000,
         SEARCH_TIMEOUT_COPY,
       );
+      // Defaulting to the current session must never hide matches that only exist in
+      // earlier sessions (e.g. a 2018 bill number, or a topic that last moved in 2025):
+      // when the default scope comes up empty, widen to all sessions and say so.
+      let broadened = false;
+      if (opts?.broadenIfEmpty && filters.session && nextBills.length === 0) {
+        nextBills = await withTimeout(
+          fetchKyBillsMatchingSearch(supabase, q, SEARCH_FETCH_LIMIT, { ...filters, session: undefined }),
+          25_000,
+          SEARCH_TIMEOUT_COPY,
+        );
+        broadened = nextBills.length > 0;
+      }
+      setSessionBroadened(broadened);
       setBills(nextBills);
       trackSearchPerformed({
         query: q,
         resultCount: nextBills.length,
         durationMs: performance.now() - startedAt,
+        sessionScope: broadened ? 'default_broadened' : opts?.sessionScope,
       });
     } catch (err: any) {
       const raw = String(err?.message || err || 'unknown search error');
@@ -165,7 +188,15 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
 
     setNonBillType(null);
     const filters = buildKyBillSearchFiltersFromUrlSearch(searchParams);
-    void performSearch(q, filters);
+    // No session in the URL → default to the current session (F5); `session=all` is the
+    // explicit opt-out. buildKyBillSearchFiltersFromUrlSearch treats 'all' as unset already.
+    const explicitAll = searchParams.get('session') === 'all';
+    const usingDefaultSession = !explicitAll && !filters.session;
+    if (usingDefaultSession) filters.session = getCivicDataSessionName();
+    void performSearch(q, filters, {
+      broadenIfEmpty: usingDefaultSession,
+      sessionScope: explicitAll ? 'all' : usingDefaultSession ? 'default' : 'explicit',
+    });
   }, [canonicalUrlQ, contentType, filterKey, performSearch, searchParams]);
 
   const pushSearchUrl = (nextQuery: string, overrides?: Partial<Record<string, string>>) => {
@@ -196,6 +227,11 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
   const statusSelect = searchParams.get('status') || 'all';
   const committeeSelect = searchParams.get('committee') || '';
   const sessionSelect = parseKyBillSessionParam(searchParams.get('session'));
+  const sessionParamIsAll = searchParams.get('session') === 'all';
+  const defaultSession = getCivicDataSessionName();
+  /** Session the visible results are scoped to; '' = spanning all sessions. */
+  const effectiveSession = sessionParamIsAll || sessionBroadened ? '' : sessionSelect || defaultSession;
+  const showAllSessions = effectiveSession === '';
 
   const committeeChipLabel = useMemo(() => {
     if (!committeeSelect) return '';
@@ -209,7 +245,10 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
 
   const setFilterParam = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (!value || value === 'all') params.delete(key);
+    // For `session`, 'all' is a real choice (all sessions) — deleting the param means
+    // "default to the current session" instead. Everywhere else 'all' still means unset.
+    const isUnset = key === 'session' ? !value : !value || value === 'all';
+    if (isUnset) params.delete(key);
     else params.set(key, value);
     const qRaw = (params.get('q') || query).trim();
     const q = qRaw ? canonicalizeKyBillSearchInput(qRaw) : '';
@@ -218,6 +257,13 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
   };
 
   const totalResults = bills?.length ?? 0;
+
+  // All-session views sort by session (newest first) so results group under session
+  // headers; the stable sort preserves relevance order within each session.
+  const displayBills = useMemo(() => {
+    if (!bills || !showAllSessions) return bills;
+    return [...bills].sort((a, b) => String(b.session ?? '').localeCompare(String(a.session ?? '')));
+  }, [bills, showAllSessions]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -240,14 +286,23 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                   <Search sx={{ color: 'primary.main', opacity: 0.92 }} aria-hidden />
                 </InputAdornment>
               ),
-              endAdornment: <Button type="submit" variant="contained" disabled={loading}>Search</Button>,
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Tooltip
+                    arrow
+                    enterTouchDelay={0}
+                    leaveTouchDelay={5000}
+                    title="Bill numbers work with or without spaces or dashes (HB23, HB 23, HB-23). Searching just a number — like 23 — finds every bill type with that number."
+                  >
+                    <IconButton aria-label="Search tips" size="small" sx={{ mr: 0.5 }}>
+                      <InfoOutlined fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Button type="submit" variant="contained" disabled={loading}>Search</Button>
+                </InputAdornment>
+              ),
             }}
           />
-          <Typography variant="body2" color="text.primary" component="p" sx={{ mt: 1, mx: 0.5, lineHeight: 1.5 }}>
-            Bill numbers work with or without spaces and common punctuation ({`HB23`}, {`HB 23`}, {`HB-23`}). Typing{' '}
-            <Box component="span" sx={{ fontWeight: 600 }}>only a number</Box> finds every designation with that
-            numeral (House, Senate, and resolutions together).
-          </Typography>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2, flexWrap: 'wrap', alignItems: { xs: 'stretch', sm: 'flex-end' } }}>
             <Box>
               <Typography
@@ -303,12 +358,14 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               <Select
                 labelId="search-filter-session-label"
                 label="Session"
-                value={sessionSelect}
+                value={sessionParamIsAll ? 'all' : sessionSelect || defaultSession}
                 onChange={(e) => setFilterParam('session', e.target.value as string)}
               >
-                <MenuItem value="">All sessions</MenuItem>
+                <MenuItem value="all">All sessions</MenuItem>
                 {KY_BILL_SESSION_OPTIONS.map((s) => (
-                  <MenuItem key={s} value={s}>{s}</MenuItem>
+                  <MenuItem key={s} value={s}>
+                    {s === defaultSession ? `${s} (current)` : s}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -341,7 +398,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
           </Box>
 
           {/* Active filter chips */}
-          {(chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect || sessionSelect) && (
+          {(chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect || sessionSelect || sessionParamIsAll) && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1.5, alignItems: 'center' }}>
               <Typography variant="caption" sx={{ fontWeight: 700, mr: 0.5, color: 'text.primary' }}>
                 Active filters:
@@ -367,6 +424,9 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               )}
               {sessionSelect && (
                 <Chip label={sessionSelect} size="small" onDelete={() => setFilterParam('session', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
+              )}
+              {sessionParamIsAll && (
+                <Chip label="All sessions" size="small" onDelete={() => setFilterParam('session', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
               )}
               <Chip label="Clear all" size="small" onClick={() => {
                 const params = new URLSearchParams(searchParams.toString());
@@ -517,9 +577,28 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
 
         {searched && !loading && bills && (
           <>
+            {sessionBroadened && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                No matches in the {defaultSession}, so these results include earlier sessions.
+              </Alert>
+            )}
             <Typography variant="body2" color="text.secondary" role="status" sx={{ mb: 1 }}>
               {totalResults >= SEARCH_FETCH_LIMIT ? `${SEARCH_FETCH_LIMIT}+` : totalResults} result
               {totalResults !== 1 ? 's' : ''} for &quot;{query}&quot;
+              {showAllSessions ? ' across all sessions' : ` in the ${effectiveSession}`}
+              {!showAllSessions && (
+                <>
+                  {' · '}
+                  <MuiLink
+                    component="button"
+                    type="button"
+                    onClick={() => setFilterParam('session', 'all')}
+                    sx={{ verticalAlign: 'baseline', fontWeight: 600 }}
+                  >
+                    Search all sessions
+                  </MuiLink>
+                </>
+              )}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Also search{' '}
@@ -573,34 +652,69 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               </Paper>
             )}
 
-            {bills.length > 0 && (
+            {displayBills && displayBills.length > 0 && (
               <Box sx={{ mb: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <Gavel color="primary" />
-                  <Typography variant="h6" component="h2" fontWeight={600}>Bills ({bills.length})</Typography>
+                  <Typography variant="h6" component="h2" fontWeight={600}>Bills ({displayBills.length})</Typography>
                 </Box>
                 <PaginatedSection
-                  items={bills}
+                  items={displayBills}
                   pageSize={searchPageSize}
                   pageSizeOptions={[...PAGE_SIZE_CHOICES]}
                   onPageSizeChange={(n) => setSearchPageSize(toPageSizeChoice(n))}
-                  resetKey={`bill-${query}-${bills.length}-${bills[0]?.id ?? ''}-${searchPageSize}`}
+                  resetKey={`bill-${query}-${displayBills.length}-${displayBills[0]?.id ?? ''}-${searchPageSize}`}
                   variant="responsive"
                 >
-                  {(pageBills) => (
-                    <CardGrid>
-                      {pageBills.map((bill) => (
-                        <CardGridItem key={bill.id}>
-                          <KYBillCard
-                            bill={bill}
-                            legislators={legislators}
-                            followedBillIds={followAuthed ? followedBillIds : null}
-                            followedTopics={followAuthed ? followedTopics : null}
-                          />
-                        </CardGridItem>
-                      ))}
-                    </CardGrid>
-                  )}
+                  {(pageBills) => {
+                    const renderCards = (list: KYBill[]) => (
+                      <CardGrid>
+                        {list.map((bill) => (
+                          <CardGridItem key={bill.id}>
+                            <KYBillCard
+                              bill={bill}
+                              legislators={legislators}
+                              followedBillIds={followAuthed ? followedBillIds : null}
+                              followedTopics={followAuthed ? followedTopics : null}
+                            />
+                          </CardGridItem>
+                        ))}
+                      </CardGrid>
+                    );
+                    if (!showAllSessions) return renderCards(pageBills);
+                    // Mixed-session pages get session headers (F5): items arrive
+                    // session-sorted, so consecutive runs are whole groups.
+                    const groups: { session: string; items: KYBill[] }[] = [];
+                    for (const b of pageBills) {
+                      const label = b.session || 'Other sessions';
+                      const last = groups[groups.length - 1];
+                      if (last && last.session === label) last.items.push(b);
+                      else groups.push({ session: label, items: [b] });
+                    }
+                    return (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                        {groups.map((g) => (
+                          <Box key={g.session} component="section" aria-label={g.session}>
+                            <Typography
+                              variant="subtitle2"
+                              component="h3"
+                              sx={{
+                                fontWeight: 700,
+                                mb: 1,
+                                color: 'text.secondary',
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.5,
+                                fontSize: '0.75rem',
+                              }}
+                            >
+                              {g.session}
+                            </Typography>
+                            {renderCards(g.items)}
+                          </Box>
+                        ))}
+                      </Box>
+                    );
+                  }}
                 </PaginatedSection>
                 <Button component={Link} href="/bills" endIcon={<ArrowForward />} sx={{ mt: 1 }}>Browse all bills</Button>
               </Box>
