@@ -203,7 +203,8 @@ export function ProfileDigestHistorySection({ mockEntries }: Props = {}) {
                   </Box>
                   {entry.bills.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
-                      Activity recorded, but the underlying events are no longer available.
+                      No bill updates in this digest — it contained committee updates, or the
+                      underlying events are no longer available.
                     </Typography>
                   ) : (
                     <Stack spacing={0.75} sx={{ width: '100%' }}>

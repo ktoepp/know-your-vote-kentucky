@@ -23,6 +23,8 @@ import { publicSiteOrigin } from '@/lib/site-canonical';
 import { kyBillSlug } from '@/lib/ky-bill-slug';
 
 const DIGEST_CAP = 10;
+/** Committee updates get their own cap; the remainder counts toward the overflow line. */
+const COMMITTEE_DIGEST_CAP = 10;
 
 function milestoneScore(eventType: string): number {
   return KY_DIGEST_MAJOR_MILESTONE_SET.has(eventType as KyDigestEventType) ? 1 : 0;
@@ -228,10 +230,13 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const windowMs = pref.digest_frequency === 'weekly' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
     let windowStart = new Date(now.getTime() - windowMs).toISOString();
 
+    // Only delivered digests advance the window — a 'failed' send must not
+    // swallow its window's events, or they are never delivered at all.
     const { data: lastLog } = await supabaseAdmin
       .from('ky_notifications_log')
       .select('digest_window_end')
       .eq('user_id', uid)
+      .neq('delivery_status', 'failed')
       .order('sent_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -267,6 +272,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     // and `committee_meeting_cancelled` as separate toggles (mapped to the matching DB
     // event_type values minus the `committee_` prefix).
     const committeeGroups: BillDigestGroup[] = [];
+    let committeeOverflow = 0;
     const committeeEventTypeMap: Record<string, KyDigestEventType> = {
       meeting_scheduled: 'committee_meeting_scheduled',
       agenda_updated: 'committee_agenda_updated',
@@ -295,19 +301,40 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           .limit(40);
 
         const origin = publicSiteOrigin();
-        // Group events under one block per committee (mirroring the bill layout)
-        // and dedupe repeated updates to the same meeting.
-        const byCommittee = new Map<string, BillDigestGroup>();
+        const rows = (committeeEvents ?? []) as CommitteeEventRow[];
+
+        // "Agenda updated" carries no new information when the same meeting's
+        // "New meeting" announcement is already in this digest — suppress it.
+        const scheduledMeetingKeys = new Set(
+          rows
+            .filter((ev) => ev.event_type === 'meeting_scheduled')
+            .map((ev) => `${ev.committee_id}::${String(ev.event_payload.meeting_date ?? '')}`),
+        );
+
         const seenCommitteeEvents = new Set<string>();
-        for (const ev of (committeeEvents ?? []) as CommitteeEventRow[]) {
+        const keptEvents: Array<{
+          committeeId: string;
+          committeeName: string;
+          committeeSlug: string;
+          detail: string;
+          observedAtIso: string;
+        }> = [];
+        for (const ev of rows) {
           const payload = ev.event_payload;
-          const committeeName = String(payload.committee_name ?? 'Committee');
+          const committeeName = typeof payload.committee_name === 'string' ? payload.committee_name.trim() : '';
+          if (!committeeName) continue; // nothing to identify the committee by
           const committeeSlug = String(payload.committee_slug ?? ev.committee_id);
           const meetingDate = String(payload.meeting_date ?? '');
           const timeAndLocation = payload.time_and_location ? String(payload.time_and_location) : null;
           const locSuffix = timeAndLocation ? ` — ${timeAndLocation}` : '';
           const friendlyDate = meetingDate ? formatMeetingDate(meetingDate) : 'date not listed';
 
+          if (
+            ev.event_type === 'agenda_updated' &&
+            scheduledMeetingKeys.has(`${ev.committee_id}::${meetingDate}`)
+          ) {
+            continue;
+          }
           const dedupeKey = [ev.committee_id, ev.event_type, meetingDate, timeAndLocation ?? ''].join('::');
           if (seenCommitteeEvents.has(dedupeKey)) continue;
           seenCommitteeEvents.add(dedupeKey);
@@ -315,7 +342,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           let detail: string;
           switch (ev.event_type) {
             case 'agenda_updated':
-              detail = `Agenda updated for ${friendlyDate}${locSuffix}`;
+              detail = `Agenda updated: ${friendlyDate}${locSuffix}`;
               break;
             case 'meeting_cancelled':
               detail = `Meeting cancelled: ${friendlyDate}${locSuffix}`;
@@ -325,19 +352,38 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
               detail = `New meeting: ${friendlyDate}${locSuffix}`;
               break;
           }
+          keptEvents.push({
+            committeeId: ev.committee_id,
+            committeeName,
+            committeeSlug,
+            detail,
+            observedAtIso: ev.observed_at,
+          });
+        }
 
-          let group = byCommittee.get(ev.committee_id);
+        // Rows arrive newest-first, so the slice keeps the most recent updates;
+        // the remainder counts toward the overflow line.
+        const shownEvents = keptEvents.slice(0, COMMITTEE_DIGEST_CAP);
+        committeeOverflow = keptEvents.length - shownEvents.length;
+
+        // Oldest first within the section, matching the bills' story order.
+        shownEvents.sort(
+          (a, b) => new Date(a.observedAtIso).getTime() - new Date(b.observedAtIso).getTime(),
+        );
+        const byCommittee = new Map<string, BillDigestGroup>();
+        for (const ev of shownEvents) {
+          let group = byCommittee.get(ev.committeeId);
           if (!group) {
             group = {
-              billNumber: committeeName,
+              billNumber: ev.committeeName,
               billTitle: '',
-              billHref: `${origin}/committees/${encodeURIComponent(committeeSlug)}`,
+              billHref: `${origin}/committees/${encodeURIComponent(ev.committeeSlug)}`,
               lines: [],
             };
-            byCommittee.set(ev.committee_id, group);
+            byCommittee.set(ev.committeeId, group);
             committeeGroups.push(group);
           }
-          group.lines.push({ detail, observedAt: formatObserved(ev.observed_at) });
+          group.lines.push({ detail: ev.detail, observedAt: formatObserved(ev.observedAtIso) });
         }
       }
     }
@@ -357,23 +403,26 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     // same bill (one transition can emit several event rows, e.g. passed_chamber +
     // floor_vote) BEFORE capping, so the overflow count matches reality. When the
     // payload has no last-action text, fall back to the event label ("Floor action")
-    // rather than repeating the bill title as if it were the event.
+    // rather than repeating the bill title as if it were the event. The dedupe key
+    // includes the recorded date so distinct events that share fallback text
+    // (three "New cosponsor" days apart) are not collapsed into one.
     const seenDetails = new Set<string>();
     const deduped: Array<HistoryRow & { ms: number; detail: string }> = [];
     for (const h of scored) {
       const bill = billById.get(String(h.bill_id));
       if (!bill) continue;
       if (!bill.bill_number && !bill.title) continue; // nothing to identify the bill by
+      const payload = h.event_payload as Record<string, unknown>;
       const detail =
-        formatDigestEventDetail(h.event_type, h.event_payload as Record<string, unknown>, null) ||
-        formatDigestEventLabel(h.event_type, h.event_payload as Record<string, unknown>);
-      const key = `${h.bill_id}::${detail.trim().toLowerCase()}`;
+        formatDigestEventDetail(h.event_type, payload, null, { hearingVerb: true }) ||
+        formatDigestEventLabel(h.event_type, payload);
+      const key = `${h.bill_id}::${detail.trim().toLowerCase()}::${formatObserved(h.observed_at)}`;
       if (!detail.trim() || seenDetails.has(key)) continue;
       seenDetails.add(key);
       deduped.push({ ...h, detail });
     }
     const top = deduped.slice(0, DIGEST_CAP);
-    const overflow = deduped.length - top.length;
+    const overflow = deduped.length - top.length + committeeOverflow;
 
     const byBill = new Map<string, Array<HistoryRow & { detail: string }>>();
     for (const h of top) {
@@ -423,8 +472,8 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
 
     const unsubscribeToken = pref.unsubscribe_token as string;
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
-    // Profile activity shows recent events across bills, topics, AND committees —
-    // the only destination that can surface updates cut by the cap.
+    // Profile activity covers followed bills and committees (NOT topic-matched
+    // bills) — the overflow copy in the template is scoped to match.
     const moreHref = `${origin}/profile#activity`;
     const glossaryHref = `${origin}/glossary`;
     const preferencesHref = `${origin}/profile#notifications`;
@@ -439,18 +488,21 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     if (committeeUpdateCount > 0) {
       previewParts.push(`${committeeUpdateCount} committee update${committeeUpdateCount === 1 ? '' : 's'}`);
     }
-    const previewText = previewParts.join(', ');
+    const previewText = joinWithAnd(previewParts);
     const scopeParts: string[] = [];
     if (followedGroups.length > 0) scopeParts.push('bills');
     if (topicGroups.length > 0) scopeParts.push('topics');
     if (committeeGroups.length > 0) scopeParts.push('committees');
     const introText = `Status updates for ${joinWithAnd(scopeParts)} you follow.`;
-    const subject = `Kentucky bill digest — ${formatDigestDate(now)}`;
+    // A digest with no bill sections shouldn't call itself a bill digest.
+    const heading = totalBills > 0 ? 'Kentucky bill digest' : 'Kentucky committee digest';
+    const subject = `${heading} — ${formatDigestDate(now)}`;
 
     const needsHtml = renderPreview || !(dryRun || !resend);
     const emailEl = (
       <BillDigestEmail
         previewText={previewText}
+        heading={heading}
         introText={introText}
         sections={sections}
         moreCount={overflow}

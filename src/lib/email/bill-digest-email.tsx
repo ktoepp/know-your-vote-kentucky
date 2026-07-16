@@ -33,20 +33,39 @@ export type BillDigestSection = {
   groups: BillDigestGroup[];
 };
 
-/** "A" / "A and B" / "A, B, and C" — for topic notes and the intro scope line. */
+/** "A" / "A and B" / "A, B, and C" — for topic notes, preview text, and the intro scope line. */
 export function joinWithAnd(items: string[]): string {
   if (items.length <= 1) return items[0] ?? '';
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
 }
 
+/**
+ * Dark-mode overrides for clients that honor prefers-color-scheme (Apple Mail
+ * and others). Clients that ignore it keep the inline light palette.
+ */
+const darkModeStyles = `
+  @media (prefers-color-scheme: dark) {
+    .dg-bg { background-color: #0f172a !important; }
+    .dg-ink { color: #e2e8f0 !important; }
+    .dg-muted { color: #94a3b8 !important; }
+    .dg-link { color: #93c5fd !important; }
+    .dg-border { border-color: #334155 !important; }
+  }
+`;
+
 export function BillDigestEmail(props: {
   previewText: string;
+  /** "Kentucky bill digest", or "Kentucky committee digest" for committee-only sends. */
+  heading: string;
   /** Scope line under the heading, generated from the sections present. */
   introText: string;
   sections: BillDigestSection[];
   moreCount: number;
-  /** Destination for the overflow line — must show activity from every followed source. */
+  /**
+   * Destination for the overflow line. Must be phrased honestly: profile
+   * activity covers followed bills and committees, NOT topic-matched bills.
+   */
   moreHref: string;
   glossaryHref: string;
   preferencesHref: string;
@@ -56,6 +75,7 @@ export function BillDigestEmail(props: {
 }) {
   const {
     previewText,
+    heading,
     introText,
     sections,
     moreCount,
@@ -69,34 +89,38 @@ export function BillDigestEmail(props: {
 
   return (
     <Html>
-      <Head />
+      <Head>
+        <style>{darkModeStyles}</style>
+      </Head>
       <Preview>{previewText}</Preview>
-      <Body style={main}>
+      <Body style={main} className="dg-bg">
         <Container style={container}>
-          <Heading style={h1}>Kentucky bill digest</Heading>
-          <Text style={muted}>{introText}</Text>
+          <Heading style={h1} className="dg-ink">{heading}</Heading>
+          <Text style={muted} className="dg-muted">{introText}</Text>
           {sections.map((section) => (
             <Section key={section.heading} style={{ marginTop: 24 }}>
-              <Text style={sectionHeading}>{section.heading}</Text>
+              <Text style={sectionHeading} className="dg-muted">{section.heading}</Text>
               {section.groups.map((g) => (
-                <Section key={g.billHref} style={billBlock}>
-                  {g.billNumber && (
-                    <Link href={g.billHref} style={billLink}>
-                      <strong>{g.billNumber}</strong>
-                    </Link>
-                  )}
-                  {g.billTitle && (
-                    <Text style={title}>
-                      <Link href={g.billHref} style={titleLink}>{g.billTitle}</Link>
-                    </Text>
-                  )}
+                <Section key={g.billHref} style={billBlock} className="dg-border">
+                  {/* One anchor per group: the blue number signals the link, the
+                      title rides along for a full-width target, and the plain-text
+                      part prints the URL once instead of twice. */}
+                  <Link href={g.billHref} style={groupLink}>
+                    {g.billNumber && (
+                      <strong style={numberText} className="dg-link">{g.billNumber}</strong>
+                    )}
+                    {g.billNumber && g.billTitle && <br />}
+                    {g.billTitle && (
+                      <span style={titleText} className="dg-ink">{g.billTitle}</span>
+                    )}
+                  </Link>
                   {g.matchedTopics && g.matchedTopics.length > 0 && (
-                    <Text style={topicNote}>Matches your {joinWithAnd(g.matchedTopics)} topic{g.matchedTopics.length === 1 ? '' : 's'}</Text>
+                    <Text style={topicNote} className="dg-muted">Matches your {joinWithAnd(g.matchedTopics)} topic{g.matchedTopics.length === 1 ? '' : 's'}</Text>
                   )}
                   {g.lines.map((line, i) => (
-                    <Text key={i} style={lineText}>
+                    <Text key={i} style={lineText} className="dg-ink">
                       {line.detail}{' '}
-                      <span style={mutedSm}>(recorded {line.observedAt})</span>
+                      <span style={mutedSm} className="dg-muted">(recorded&nbsp;{line.observedAt})</span>
                     </Text>
                   ))}
                 </Section>
@@ -104,25 +128,29 @@ export function BillDigestEmail(props: {
             </Section>
           ))}
           {moreCount > 0 && (
-            <Text style={{ marginTop: 16 }}>
-              {moreCount} more update{moreCount === 1 ? '' : 's'} not shown —{' '}
-              <Link href={moreHref}>see all recent activity</Link>.
+            <Text style={{ marginTop: 16 }} className="dg-ink">
+              {moreCount} more update{moreCount === 1 ? '' : 's'} not shown.{' '}
+              <Link href={moreHref} style={inlineLink} className="dg-link">Your profile</Link>{' '}
+              lists recent activity for bills and committees you follow.
             </Text>
           )}
-          <Section style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
-            <Text style={footerText}>
+          <Section style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #e2e8f0' }} className="dg-border">
+            <Text style={footerText} className="dg-muted">
               You&rsquo;re getting this because you follow bills, topics, or committees on Know Your Vote Kentucky.
-              Status lines quote the legislative record as written — the{' '}
-              <Link href={glossaryHref} style={footerLink}>glossary</Link> explains the terms.
             </Text>
-            <Text style={footerLinks}>
-              <Link href={preferencesHref} style={footerLink}>Change frequency or topics</Link>
+            <Text style={footerText} className="dg-muted">
+              Bill status lines quote the legislature&rsquo;s official action text where available — the{' '}
+              <Link href={glossaryHref} style={inlineLink} className="dg-link">glossary</Link> explains the terms.
+              Dates in parentheses show when Know Your Vote Kentucky recorded each update, which can lag the action itself.
+            </Text>
+            <Text style={footerLinks} className="dg-muted">
+              <Link href={preferencesHref} style={inlineLink} className="dg-link">Change digest settings</Link>
               {' · '}
-              <Link href={unsubscribeHref} style={footerLink}>Unsubscribe</Link>
+              <Link href={unsubscribeHref} style={inlineLink} className="dg-link">Unsubscribe</Link>
               {' · '}
-              <Link href={privacyHref} style={footerLink}>Privacy</Link>
+              <Link href={privacyHref} style={inlineLink} className="dg-link">Privacy</Link>
               {' · '}
-              <Link href={termsHref} style={footerLink}>Terms</Link>
+              <Link href={termsHref} style={inlineLink} className="dg-link">Terms</Link>
             </Text>
           </Section>
         </Container>
@@ -135,7 +163,7 @@ const main = { backgroundColor: '#f8fafc', fontFamily: 'sans-serif' };
 const container = { margin: '0 auto', padding: '24px 16px', maxWidth: 560 };
 const h1 = { fontSize: 22, margin: '0 0 8px' };
 const muted = { color: '#64748b', fontSize: 14, margin: '0 0 8px' };
-const mutedSm = { color: '#64748b', fontSize: 12 };
+const mutedSm = { color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' as const };
 const sectionHeading = {
   fontSize: 13,
   fontWeight: 600,
@@ -150,10 +178,10 @@ const billBlock = {
   paddingBottom: 16,
   marginBottom: 16,
 };
-const billLink = { fontSize: 16, color: '#1e40af' };
-const title = { fontSize: 14, margin: '4px 0 8px' };
-const titleLink = { color: '#0f172a', textDecoration: 'none' };
+const groupLink = { display: 'block', textDecoration: 'none', marginBottom: 8 };
+const numberText = { fontSize: 16, color: '#1e40af' };
+const titleText = { fontSize: 14, lineHeight: '1.45', color: '#1e293b' };
 const lineText = { fontSize: 13, margin: '4px 0', color: '#334155' };
 const footerText = { fontSize: 12, color: '#64748b', margin: '0 0 6px', lineHeight: '1.5' };
 const footerLinks = { fontSize: 12, color: '#64748b', margin: 0 };
-const footerLink = { color: '#1e40af', textDecoration: 'underline' };
+const inlineLink = { color: '#1e40af', textDecoration: 'underline' };

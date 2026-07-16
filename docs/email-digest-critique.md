@@ -4,7 +4,7 @@ A critical pass over the digest email against four criteria: **accurate, concise
 
 Findings are ranked within each section. "Fix" lines are recommendations, not applied changes.
 
-> **Status:** all findings below were subsequently addressed on this branch (template, cron, detail formatter, and voice-and-tone.md §2). This document is kept as the point-in-time review record.
+> **Status:** all findings below were subsequently addressed on this branch (template, cron, detail formatter, and voice-and-tone.md §2). A second critique (two independent reviewers: logic and copy/design) then re-examined the fixed version; its findings and their outcomes are recorded at the end of this document.
 
 ---
 
@@ -138,3 +138,34 @@ The committee *name* sits in the bill-number slot and the event name ("Agenda up
 | High (accuracy of what's claimed) | Scope-phrase mismatch; overflow/preview counts; title-repeated-as-event fallback; hearing line has no verb |
 | Medium (actionability) | Link the bill title; humanize meeting dates; fix overflow link destination; timestamp honesty ("recorded", timezone) |
 | Low (polish) | Committee block dedupe/merge; line ordering; heading parallelism; "and" join; "Bill" fallback; glossary pointer; sync voice-and-tone.md §2 with v1.5 |
+
+---
+
+# Second critique (post-fix review)
+
+Two independent reviewers re-examined the revised digest: one adversarial pass over the cron/formatter logic, one over copy and rendered design. Findings and outcomes:
+
+## Fixed in the follow-up commit
+
+1. **Overflow link promised what the destination can't show (high).** The first fix pointed "see all recent activity" at `/profile#activity`, but the activity feed only covers *followed* bills and committees — never topic-matched bills — and the code comment claimed otherwise. Reworded to "**Your profile** lists recent activity for bills and committees you follow": names the profile (so the login prompt is unsurprising), claims only what the feed covers, and moves the URL off sentence-final punctuation in the plain-text part.
+2. **Footer sourcing claim became false.** "Status lines quote the legislative record as written" was untrue for label-fallback lines ("Floor action"), constructed hearing lines, and every committee line. Now: "Bill status lines quote the legislature's official action text where available," plus an explicit explanation that parenthetical dates are when KYVKY recorded each update (also resolving the "recorded" / "legislative record" word collision).
+3. **Committee updates bypassed the cap and overflow count.** Committee events now have their own cap (10) and the remainder feeds the shared overflow line.
+4. **Committee lines rendered newest-first** while bill lines read oldest-first. Now sorted ascending like bills.
+5. **Bill dedupe collapsed distinct same-label events.** Three "New cosponsor" events days apart deduped to one. Key now includes the recorded date.
+6. **"New meeting" + "Agenda updated" for the same meeting said everything twice.** Agenda-updated lines are suppressed when the same meeting's announcement is already in the digest.
+7. **Committee-only digests were titled "Kentucky bill digest."** Subject and heading now switch to "Kentucky committee digest" when no bill sections exist.
+8. **Shared-formatter regressions in the profile.** The hearing verb ("Scheduled for hearing:") double-labeled the activity view's event chip — now opt-in, used only by the email. The activity route's bill-title fallback (title repeated as detail) removed.
+9. **`formatMeetingDate` rolled invalid dates over** (`2026-00-15` → Dec 15, 2025) instead of falling back to the raw string. Round-trip validation added.
+10. **Failed sends swallowed their window (pre-existing).** The last-sent lookup now ignores `delivery_status='failed'` rows, so events from a failed send are re-delivered next run.
+11. **Missing committee name rendered a bold link labeled "Committee."** Such events are skipped, mirroring the bill-identity guard.
+12. **Link inconsistencies and plain-text noise.** Bill number + title now share one anchor (one URL per bill in plain text, full-width tap target); overflow/footer links share one style (brand blue, underlined) instead of react-email's default `#067df7`; `(recorded {date})` no longer wraps mid-phrase; preview-text parts join with "and"; footer CTA renamed "Change digest settings" (it governs event types and committees, not just frequency/topics); committee line grammar made parallel (`New meeting:` / `Agenda updated:` / `Meeting cancelled:`); basic `prefers-color-scheme: dark` overrides added.
+13. **Digest-history empty state** claimed "events no longer available" for committee-only digests (whose event ids aren't logged). Copy now names the committee-updates case.
+
+## Known limitations (deliberate, documented)
+
+- **Topic-matched overflow has no destination.** No page can list recent events for topic-matched bills the user doesn't follow; the overflow copy is scoped honestly instead. A topic-activity view would close this properly.
+- **Committee query truncation.** The upstream query still fetches at most 40 committee events per user per window; rows beyond that are not counted in the overflow line. With the new per-digest cap of 10 this requires an extreme week to matter.
+- **Committee event ids aren't logged to `ky_notifications_log.event_ids`** (the column feeds bill-oriented digest history). Follow-up if committee history matters.
+- **No sender postal address in the footer.** CAN-SPAM/bulk-sender guidelines expect one; needs the organization's real mailing address — not something to invent in code. Add one muted footer line when available.
+- **Dark mode** is handled for `prefers-color-scheme` clients only; Gmail's forced dark transforms (`[data-ogsc]`) are untargeted.
+- **Subject date redundancy.** The inbox column already shows the date; the counts live only in preview text. Kept as-is for a stable, doc-specified subject identity — revisit if open rates suggest the subject should carry the counts.
