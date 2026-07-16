@@ -5,6 +5,7 @@ import { alpha } from '@mui/material/styles';
 import Link from 'next/link';
 import { CheckCircle2, Eye, ChevronRight } from 'lucide-react';
 import type { KYBill } from '@/types/kentucky';
+import { kyBillPath } from '@/lib/ky-bill-slug';
 import { BillNumber } from '@/components/bills/BillNumber';
 import { billStatusChipLabel, formatBillLabelText } from '@/lib/bill-display';
 
@@ -106,7 +107,7 @@ export function HomeCuratedBillList({ title, caption, bills, line, emptyMessage,
                 <Box
                   key={bill.id}
                   component={Link}
-                  href={`/bills/${bill.id}`}
+                  href={kyBillPath(bill)}
                   aria-label={rowLabel}
                   sx={{
                     display: 'block',

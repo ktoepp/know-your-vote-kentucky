@@ -29,6 +29,7 @@ import { groupLegislatorExternalLinks, labelForLinkHost } from '@/lib/legislator
 import { ICON_REM, INTERACTION, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
 import { BillNumber } from '@/components/bills/BillNumber';
 import { formatKyIsoDateShort } from '@/lib/bill-display';
+import { kyBillPath } from '@/lib/ky-bill-slug';
 import { shortKyCommitteeLabel } from '@/lib/ky-committee-display';
 import { ChamberChip, CommitteeKindChip } from '@/components/ui/Chip';
 import type { MemberRecentRollVote, MemberSponsoredBill, MemberVoteRecord } from '@/lib/member-profile-data';
@@ -101,7 +102,7 @@ function VoteRollCallList({ rows }: { rows: MemberRecentRollVote[] }) {
               primary={
                 r.bill ? (
                   <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.5 }}>
-                    <BillNumber billNumber={r.bill.bill_number} size="compact" href={`/bills/${r.bill.id}`} />
+                    <BillNumber billNumber={r.bill.bill_number} size="compact" href={kyBillPath(r.bill)} />
                     {r.bill.title ? (
                       <Typography component="span" color="text.secondary" variant="body2">
                         — {r.bill.title}

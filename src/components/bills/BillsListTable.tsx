@@ -20,6 +20,7 @@ import { BillNumber } from '@/components/bills/BillNumber';
 import { useTooltips } from '@/lib/TooltipContext';
 import type { KYBill } from '@/types/kentucky';
 import type { KyBillSortKey } from '@/lib/bill-display';
+import { kyBillPath } from '@/lib/ky-bill-slug';
 import {
   billStatusChipLabel,
   billStatusToTooltipKey,
@@ -40,7 +41,7 @@ export interface BillsListTableProps {
 }
 
 function billHref(bill: KYBill): string {
-  return `/bills/${bill.id}`;
+  return kyBillPath(bill);
 }
 
 function formatShortDate(iso: string | null | undefined): string {

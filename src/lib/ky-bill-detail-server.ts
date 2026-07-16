@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import type { KYBill } from '@/types/kentucky';
+import { parseKyBillSlug } from '@/lib/ky-bill-slug';
 
 /** Bill-detail enrichment shape consumed by BillDetailView. Now sourced entirely from the DB. */
 export type KyBillDetailEnrichment = {
@@ -122,10 +123,21 @@ export async function fetchKyBillDetailPageData(routeId: string): Promise<KyBill
 
   const normalised = routeId.toUpperCase().replace(/\s+/g, '');
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(routeId);
+  const slugParts = isUuid ? null : parseKyBillSlug(routeId);
 
   let billData: KYBill | null = null;
   if (isUuid) {
     const { data } = await supabase.from('ky_bills').select('*').eq('id', routeId).maybeSingle();
+    billData = (data as KYBill | null) ?? null;
+  } else if (slugParts) {
+    const { data } = await supabase
+      .from('ky_bills')
+      .select('*')
+      .ilike('bill_number', slugParts.billNumber)
+      .eq('session', slugParts.session)
+      .order('last_action_date', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
     billData = (data as KYBill | null) ?? null;
   } else {
     const { data: byNumber } = await supabase

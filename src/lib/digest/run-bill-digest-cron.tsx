@@ -15,6 +15,7 @@ import {
 import { billMatchesTopicFilters, matchedTopicFilters } from '@/lib/ky-topic-legiscan-mapping';
 import { formatDigestEventDetail } from '@/lib/digest/format-digest-event-detail';
 import { publicSiteOrigin } from '@/lib/site-canonical';
+import { kyBillSlug } from '@/lib/ky-bill-slug';
 
 const DIGEST_CAP = 10;
 
@@ -61,6 +62,7 @@ type BillRow = {
   id: string;
   bill_number: string | null;
   title: string | null;
+  session: string | null;
   topics: string[] | null;
   legiscan_subjects: Array<{ subject_id?: number; subject_name?: string }> | null;
 };
@@ -198,7 +200,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const chunk = billIds.slice(i, i + CHUNK);
     const { data: bills } = await supabaseAdmin
       .from('ky_bills')
-      .select('id, bill_number, title, topics, legiscan_subjects')
+      .select('id, bill_number, title, session, topics, legiscan_subjects')
       .in('id', chunk);
     for (const b of bills ?? []) {
       billById.set(String(b.id), b as BillRow);
@@ -363,7 +365,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       const group: BillDigestGroup = {
         billNumber: bill.bill_number || 'Bill',
         billTitle: bill.title || '',
-        billHref: `${origin}/bills/${billId}`,
+        billHref: `${origin}/bills/${(bill.bill_number && kyBillSlug({ bill_number: bill.bill_number, session: bill.session })) || billId}`,
         lines,
       };
       if (followedSet.has(billId)) {

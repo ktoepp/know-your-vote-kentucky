@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getCivicDataSessionName } from '@/lib/ky-sessions';
 import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-server';
 import { memberSlug } from '@/lib/ky-member-utils';
+import { kyBillSlug } from '@/lib/ky-bill-slug';
 
 export interface SitemapEntry {
   slug: string;
@@ -28,15 +29,19 @@ export async function fetchBillSitemapEntries(limit = 5000): Promise<SitemapEntr
   const session = getCivicDataSessionName();
   const { data, error } = await supabase
     .from('ky_bills')
-    .select('id, updated_at')
+    .select('id, bill_number, session, updated_at')
     .eq('session', session)
     .order('updated_at', { ascending: false })
     .limit(limit);
   if (error || !data) return [];
-  return (data as { id: string; updated_at: string | null }[]).map((row) => ({
-    slug: row.id,
-    lastModified: toDate(row.updated_at),
-  }));
+  // Advertise the canonical slug URL (F4) — UUID entries were what Google was ranking.
+  // UUID fallback only for rows whose slug can't be derived (those pages self-serve).
+  return (data as { id: string; bill_number: string; session: string | null; updated_at: string | null }[]).map(
+    (row) => ({
+      slug: kyBillSlug(row) ?? row.id,
+      lastModified: toDate(row.updated_at),
+    }),
+  );
 }
 
 export async function fetchCommitteeSitemapEntries(): Promise<SitemapEntry[]> {
