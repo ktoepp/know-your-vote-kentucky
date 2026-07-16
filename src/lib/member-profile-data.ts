@@ -155,7 +155,7 @@ export interface MemberRecentRollVote {
   chamber: 'house' | 'senate' | null;
   myVote: string | null;
   myBucket: VoteBucket;
-  bill: Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status'> | null;
+  bill: Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status' | 'session'> | null;
 }
 
 export interface MemberVoteRecord {
@@ -180,7 +180,7 @@ function emptyMemberVoteRecord(sessionName: string): MemberVoteRecord {
 
 function mapRollVotes(
   myVotes: { vote: KYVote; myVote: string | null; bucket: VoteBucket }[],
-  billById: Map<string, Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status'>>,
+  billById: Map<string, Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status' | 'session'>>,
 ): MemberRecentRollVote[] {
   return myVotes.map(({ vote, myVote, bucket }) => ({
     voteId: vote.id,
@@ -285,17 +285,17 @@ export async function fetchMemberVoteRecord(
   }
 
   const billIds = [...new Set(myVotes.map((m) => m.vote.bill_id))];
-  const billById = new Map<string, Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status'>>();
+  const billById = new Map<string, Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status' | 'session'>>();
 
   if (billIds.length) {
     const { data: bills } = await supabase
       .from('ky_bills')
-      .select('id, bill_number, title, status')
+      .select('id, bill_number, title, status, session')
       .in('id', billIds);
     for (const b of bills ?? []) {
       billById.set(
         b.id,
-        b as Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status'>,
+        b as Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status' | 'session'>,
       );
     }
   }

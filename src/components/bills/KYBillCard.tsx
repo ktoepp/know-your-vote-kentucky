@@ -17,6 +17,7 @@ import {
 import { legislatorAvatarSx, legislatorRoleDistrictLine } from '@/lib/legislator-display';
 import { LEGISLATOR_FIELD_LABEL_SX, LEGISLATOR_NAME_SX, LEGISLATOR_ROLE_LINE_SX } from '@/lib/ui-tokens';
 import { BillStatusMetaChip } from '@/components/bills/BillStatusMetaChip';
+import { kyBillPath } from '@/lib/ky-bill-slug';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { ChamberChip } from '@/components/ui/Chip';
 import { effectiveBillChamber, formatBillLabelText, formatKyIsoDateShort } from '@/lib/bill-display';
@@ -39,7 +40,7 @@ export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardPro
   });
   const actionDateCard = formatKyIsoDateShort(bill.last_action_date);
 
-  const detailHref = `/bills/${bill.id}`;
+  const detailHref = kyBillPath(bill);
 
   const primarySponsorLine =
     sponsorGroups.primary.length > 0
