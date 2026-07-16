@@ -82,12 +82,19 @@ export const trackSearchPerformed = (props: {
   resultCount: number | null;
   durationMs: number;
   error?: string | null;
+  /**
+   * Which session window the results were scoped to: `default` = current session
+   * (no explicit choice), `default_broadened` = current session found nothing so
+   * results auto-widened to all sessions, `explicit` = user-picked session, `all`.
+   */
+  sessionScope?: "default" | "default_broadened" | "explicit" | "all";
 }): void => {
   capture("search_performed", {
     query: props.query,
     result_count: props.resultCount,
     duration_ms: Math.round(props.durationMs),
     error: props.error ?? null,
+    session_scope: props.sessionScope ?? null,
   });
 };
 
