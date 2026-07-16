@@ -4,6 +4,7 @@ import {
   Head,
   Heading,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -56,36 +57,56 @@ const darkModeStyles = `
 
 export function BillDigestEmail(props: {
   previewText: string;
+  /** Absolute URL of the KYVKY logo (email clients need a hosted image). */
+  logoSrc: string;
+  /** Where the logo links (site home). */
+  homeHref: string;
   /** "Kentucky bill digest", or "Kentucky committee digest" for committee-only sends. */
   heading: string;
   /** Scope line under the heading, generated from the sections present. */
   introText: string;
   sections: BillDigestSection[];
+  /** Base URL of the bills browse page — topic annotations link to `?topic={t}`. */
+  billsBrowseHref: string;
   moreCount: number;
   /**
    * Destination for the overflow line. Must be phrased honestly: profile
    * activity covers followed bills and committees, NOT topic-matched bills.
    */
   moreHref: string;
+  /**
+   * The user's followed topics, shown after the overflow line when topic-matched
+   * updates were cut — the topic browse is the closest destination for those.
+   */
+  overflowTopics?: string[];
   glossaryHref: string;
   preferencesHref: string;
   unsubscribeHref: string;
   privacyHref: string;
   termsHref: string;
+  /** Sender postal address (CAN-SPAM), e.g. "PO Box 133, Bardstown, Kentucky 40004". */
+  postalAddress: string;
 }) {
   const {
     previewText,
+    logoSrc,
+    homeHref,
     heading,
     introText,
     sections,
+    billsBrowseHref,
     moreCount,
     moreHref,
+    overflowTopics,
     glossaryHref,
     preferencesHref,
     unsubscribeHref,
     privacyHref,
     termsHref,
+    postalAddress,
   } = props;
+
+  const topicBrowseHref = (topic: string) => `${billsBrowseHref}?topic=${encodeURIComponent(topic)}`;
 
   return (
     <Html>
@@ -95,6 +116,15 @@ export function BillDigestEmail(props: {
       <Preview>{previewText}</Preview>
       <Body style={main} className="dg-bg">
         <Container style={container}>
+          <Link href={homeHref} style={{ display: 'block', marginBottom: 16 }}>
+            <Img
+              src={logoSrc}
+              alt="Know Your Vote Kentucky"
+              width={220}
+              height={53}
+              style={{ display: 'block' }}
+            />
+          </Link>
           <Heading style={h1} className="dg-ink">{heading}</Heading>
           <Text style={muted} className="dg-muted">{introText}</Text>
           {sections.map((section) => (
@@ -115,7 +145,16 @@ export function BillDigestEmail(props: {
                     )}
                   </Link>
                   {g.matchedTopics && g.matchedTopics.length > 0 && (
-                    <Text style={topicNote} className="dg-muted">Matches your {joinWithAnd(g.matchedTopics)} topic{g.matchedTopics.length === 1 ? '' : 's'}</Text>
+                    <Text style={topicNote} className="dg-muted">
+                      Matches your{' '}
+                      {g.matchedTopics.map((t, i, arr) => (
+                        <React.Fragment key={t}>
+                          <Link href={topicBrowseHref(t)} style={topicLink} className="dg-muted">{t}</Link>
+                          {i < arr.length - 2 ? ', ' : i === arr.length - 2 ? (arr.length > 2 ? ', and ' : ' and ') : ''}
+                        </React.Fragment>
+                      ))}{' '}
+                      topic{g.matchedTopics.length === 1 ? '' : 's'}
+                    </Text>
                   )}
                   {g.lines.map((line, i) => (
                     <Text key={i} style={lineText} className="dg-ink">
@@ -132,6 +171,17 @@ export function BillDigestEmail(props: {
               {moreCount} more update{moreCount === 1 ? '' : 's'} not shown.{' '}
               <Link href={moreHref} style={inlineLink} className="dg-link">Your profile</Link>{' '}
               lists recent activity for bills and committees you follow.
+              {overflowTopics && overflowTopics.length > 0 && (
+                <>
+                  {' '}Bills matching your topics are in the bill browser:{' '}
+                  {overflowTopics.map((t, i, arr) => (
+                    <React.Fragment key={t}>
+                      <Link href={topicBrowseHref(t)} style={inlineLink} className="dg-link">{t}</Link>
+                      {i < arr.length - 1 ? ' · ' : ''}
+                    </React.Fragment>
+                  ))}
+                </>
+              )}
             </Text>
           )}
           <Section style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #e2e8f0' }} className="dg-border">
@@ -151,6 +201,9 @@ export function BillDigestEmail(props: {
               <Link href={privacyHref} style={inlineLink} className="dg-link">Privacy</Link>
               {' · '}
               <Link href={termsHref} style={inlineLink} className="dg-link">Terms</Link>
+            </Text>
+            <Text style={{ ...footerText, margin: '6px 0 0' }} className="dg-muted">
+              Know Your Vote Kentucky · {postalAddress}
             </Text>
           </Section>
         </Container>
@@ -173,6 +226,7 @@ const sectionHeading = {
   margin: '0 0 12px',
 };
 const topicNote = { fontSize: 12, color: '#64748b', margin: '0 0 6px' };
+const topicLink = { color: '#64748b', textDecoration: 'underline' };
 const billBlock = {
   borderBottom: '1px solid #e2e8f0',
   paddingBottom: 16,

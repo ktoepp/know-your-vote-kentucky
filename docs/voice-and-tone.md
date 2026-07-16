@@ -91,13 +91,15 @@ Sent daily or weekly based on user preference, only when there are events to rep
 
 **Preview text:** describes only what the digest contains, joined with "and" when both parts are present: `{n} bill(s) with new activity` / `{n} committee update(s)` / `3 bills with new activity and 2 committee updates`.
 
+**Header:** the KYVKY logo (`/branding/Logo-03.png`, linked to the site home) above the heading.
+
 **Heading:** matches the subject's base: `Kentucky bill digest` / `Kentucky committee digest`.
 
 **Subheading:** generated from the sections actually present — `Status updates for {bills / topics / committees, joined with "and"} you follow.` (e.g., `Status updates for bills and committees you follow.`). Never claims a source the digest doesn't include.
 
 **Structure — grouped by reason.** Updates are split into up to three sections so the reader sees *why* each item is included. A section is shown only when it has content:
 - `Bills you follow` — bills the user follows individually.
-- `Topics you follow` — bills matched by a followed topic. Each such bill is annotated with the matched topic(s): `Matches your {topic} topic` / `Matches your {topicA} and {topicB} topics` (serial "and", Oxford comma for three or more).
+- `Topics you follow` — bills matched by a followed topic. Each such bill is annotated with the matched topic(s): `Matches your {topic} topic` / `Matches your {topicA} and {topicB} topics` (serial "and", Oxford comma for three or more). Each topic name links to the bills browse filtered by that topic (`/bills?topic={t}`).
 - `Committees you follow` — one block per committee, one line per calendar change, in a parallel colon pattern: `New meeting: {weekday, month day} — {time and location}` / `Agenda updated: …` / `Meeting cancelled: …`. Repeated updates to the same meeting are de-duplicated, and `Agenda updated` is suppressed when the same meeting's `New meeting` line is already in the digest (it would carry no new information). Committee updates have their own cap; the remainder counts toward the overflow line.
 
 A bill the user both follows and matches by topic appears once, under `Bills you follow`.
@@ -107,13 +109,16 @@ A bill the user both follows and matches by topic appears once, under `Bills you
 **Links.** Each bill block is one link — the bill number (brand blue) and title (ink) share a single anchor to the bill page, so the tap target is large and the plain-text part prints each URL once. Committee names link to the committee page. All other links (overflow, glossary, footer) are brand blue and underlined.
 
 **Overflow line (when events are capped):**
-> {n} more update(s) not shown. [Your profile] lists recent activity for bills and committees you follow.
-> Links to the profile activity feed. Phrased carefully: the profile is named so the login prompt is unsurprising, and the sentence claims only what the feed covers (followed bills and committees — it cannot show topic-matched overflow).
+> {n} more update(s) not shown. [Your profile] lists recent activity for bills and committees you follow. Bills matching your topics are in the bill browser: [{topicA}] · [{topicB}]
+> Links to the profile activity feed. Phrased carefully: the profile is named so the login prompt is unsurprising, and the sentence claims only what the feed covers (followed bills and committees — it cannot show topic-matched overflow). The topic-browser sentence appears only when topic-matched updates were actually cut, and links each affected topic to `/bills?topic={t}` — the closest destination for them (note: the browse filters by KY topic tag only, while digest matching also uses LegiScan subjects, so coverage overlaps but is not identical).
 
 **Footer:**
 > You're getting this because you follow bills, topics, or committees on Know Your Vote Kentucky.
 > Bill status lines quote the legislature's official action text where available — the [glossary] explains the terms. Dates in parentheses show when Know Your Vote Kentucky recorded each update, which can lag the action itself.
 > [Change digest settings] · [Unsubscribe] · [Privacy] · [Terms]
+> Know Your Vote Kentucky · PO Box 133, Bardstown, Kentucky 40004
+
+The postal address (`KYVKY_POSTAL_ADDRESS` in `src/lib/kyvky-contact.ts`) appears in every outbound email footer, including the welcome email.
 
 ("Official action text where available", not "the legislative record as written" — hearing and committee lines are our own wording around calendar data, and "record/recorded" must not do double duty with the date label.)
 

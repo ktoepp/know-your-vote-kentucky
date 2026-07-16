@@ -21,6 +21,7 @@ import {
 } from '@/lib/digest/format-digest-event-detail';
 import { publicSiteOrigin } from '@/lib/site-canonical';
 import { kyBillSlug } from '@/lib/ky-bill-slug';
+import { KYVKY_POSTAL_ADDRESS } from '@/lib/kyvky-contact';
 
 const DIGEST_CAP = 10;
 /** Committee updates get their own cap; the remainder counts toward the overflow line. */
@@ -473,8 +474,19 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const unsubscribeToken = pref.unsubscribe_token as string;
     const unsubscribeHref = `${origin}/api/unsubscribe/${unsubscribeToken}`;
     // Profile activity covers followed bills and committees (NOT topic-matched
-    // bills) — the overflow copy in the template is scoped to match.
+    // bills) — the overflow copy in the template is scoped to match. When
+    // topic-matched updates were cut, the closest destination is the bills
+    // browse filtered by topic, so surface those topics alongside.
     const moreHref = `${origin}/profile#activity`;
+    const overflowTopicSet = new Set<string>();
+    for (const h of deduped.slice(DIGEST_CAP)) {
+      if (followedSet.has(String(h.bill_id))) continue;
+      const bill = billById.get(String(h.bill_id));
+      if (!bill) continue;
+      for (const t of matchedTopicFilters(bill.topics, bill.legiscan_subjects, topicFilters)) {
+        overflowTopicSet.add(t);
+      }
+    }
     const glossaryHref = `${origin}/glossary`;
     const preferencesHref = `${origin}/profile#notifications`;
     const privacyHref = `${origin}/privacy`;
@@ -502,16 +514,21 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const emailEl = (
       <BillDigestEmail
         previewText={previewText}
+        logoSrc={`${origin}/branding/Logo-03.png`}
+        homeHref={origin}
         heading={heading}
         introText={introText}
         sections={sections}
+        billsBrowseHref={`${origin}/bills`}
         moreCount={overflow}
         moreHref={moreHref}
+        overflowTopics={[...overflowTopicSet]}
         glossaryHref={glossaryHref}
         preferencesHref={preferencesHref}
         unsubscribeHref={unsubscribeHref}
         privacyHref={privacyHref}
         termsHref={termsHref}
+        postalAddress={KYVKY_POSTAL_ADDRESS}
       />
     );
     const html = needsHtml ? await render(emailEl) : '';
