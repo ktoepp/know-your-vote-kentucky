@@ -49,12 +49,12 @@ function formatObserved(iso: string): string {
   }
 }
 
-function formatDigestDate(d: Date): string {
+/** Short subject-line date ("Jul 16") — the counts carry the information. */
+function formatDigestDateShort(d: Date): string {
   try {
     return d.toLocaleDateString('en-US', {
-      month: 'long',
+      month: 'short',
       day: 'numeric',
-      year: 'numeric',
       timeZone: 'America/New_York',
     });
   } catch {
@@ -274,6 +274,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     // event_type values minus the `committee_` prefix).
     const committeeGroups: BillDigestGroup[] = [];
     let committeeOverflow = 0;
+    let committeeEventIds: number[] = [];
     const committeeEventTypeMap: Record<string, KyDigestEventType> = {
       meeting_scheduled: 'committee_meeting_scheduled',
       agenda_updated: 'committee_agenda_updated',
@@ -314,6 +315,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
 
         const seenCommitteeEvents = new Set<string>();
         const keptEvents: Array<{
+          id: number;
           committeeId: string;
           committeeName: string;
           committeeSlug: string;
@@ -354,6 +356,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
               break;
           }
           keptEvents.push({
+            id: ev.id,
             committeeId: ev.committee_id,
             committeeName,
             committeeSlug,
@@ -366,6 +369,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
         // the remainder counts toward the overflow line.
         const shownEvents = keptEvents.slice(0, COMMITTEE_DIGEST_CAP);
         committeeOverflow = keptEvents.length - shownEvents.length;
+        committeeEventIds = shownEvents.map((e) => e.id);
 
         // Oldest first within the section, matching the bills' story order.
         shownEvents.sort(
@@ -508,7 +512,19 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const introText = `Status updates for ${joinWithAnd(scopeParts)} you follow.`;
     // A digest with no bill sections shouldn't call itself a bill digest.
     const heading = totalBills > 0 ? 'Kentucky bill digest' : 'Kentucky committee digest';
-    const subject = `${heading} — ${formatDigestDate(now)}`;
+    // The inbox column already shows the date, so the subject's variable slot
+    // carries the counts; a short date keeps each day's subject distinct so
+    // threading clients don't collapse digests together.
+    const subjectCounts: string[] = [];
+    if (totalBills > 0) subjectCounts.push(`${totalBills} bill${totalBills === 1 ? '' : 's'}`);
+    if (committeeUpdateCount > 0) {
+      subjectCounts.push(
+        totalBills > 0
+          ? `${committeeUpdateCount} committee update${committeeUpdateCount === 1 ? '' : 's'}`
+          : `${committeeUpdateCount} update${committeeUpdateCount === 1 ? '' : 's'}`,
+      );
+    }
+    const subject = `${heading} — ${formatDigestDateShort(now)}: ${subjectCounts.join(', ')}`;
 
     const needsHtml = renderPreview || !(dryRun || !resend);
     const emailEl = (
@@ -565,6 +581,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           digest_window_start: windowStart,
           digest_window_end: windowEnd,
           event_ids: top.map((t) => t.id),
+          committee_event_ids: committeeEventIds,
           delivery_status: 'failed',
         });
         continue;
@@ -575,6 +592,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
         digest_window_start: windowStart,
         digest_window_end: windowEnd,
         event_ids: top.map((t) => t.id),
+        committee_event_ids: committeeEventIds,
         resend_message_id: sendData?.id ?? null,
         delivery_status: 'sent',
       });

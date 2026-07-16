@@ -15,6 +15,7 @@ import {
 import { HistoryOutlined } from '@mui/icons-material';
 import NextLink from 'next/link';
 import { useUser } from '@/app/lib/UserContext';
+import { formatKyMeetingDate } from '@/lib/ky-committee-display';
 
 type DigestHistoryBill = {
   id: string;
@@ -24,6 +25,15 @@ type DigestHistoryBill = {
   event_label: string;
 };
 
+type DigestHistoryCommittee = {
+  id: string;
+  name: string;
+  slug: string | null;
+  event_type: string;
+  event_label: string;
+  meeting_date: string | null;
+};
+
 export type DigestHistoryEntry = {
   id: number;
   sent_at: string;
@@ -31,6 +41,7 @@ export type DigestHistoryEntry = {
   digest_window_end: string;
   delivery_status: 'sent' | 'failed' | 'bounced';
   bills: DigestHistoryBill[];
+  committees?: DigestHistoryCommittee[];
 };
 
 const INITIAL_PAGE_SIZE = 10;
@@ -179,6 +190,15 @@ export function ProfileDigestHistorySection({ mockEntries }: Props = {}) {
                 ? entry.bills
                 : entry.bills.slice(0, BILLS_COLLAPSED);
               const hiddenCount = entry.bills.length - visibleBills.length;
+              const committees = entry.committees ?? [];
+              const countParts = [
+                entry.bills.length > 0
+                  ? `${entry.bills.length} ${entry.bills.length === 1 ? 'bill' : 'bills'}`
+                  : '',
+                committees.length > 0
+                  ? `${committees.length} committee ${committees.length === 1 ? 'update' : 'updates'}`
+                  : '',
+              ].filter(Boolean);
               return (
                 <ListItem
                   key={entry.id}
@@ -198,13 +218,12 @@ export function ProfileDigestHistorySection({ mockEntries }: Props = {}) {
                       {formatSentAt(entry.sent_at)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {entry.bills.length} {entry.bills.length === 1 ? 'bill' : 'bills'}
+                      {countParts.length > 0 ? countParts.join(' · ') : 'no items'}
                     </Typography>
                   </Box>
-                  {entry.bills.length === 0 ? (
+                  {entry.bills.length === 0 && committees.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
-                      No bill updates in this digest — it contained committee updates, or the
-                      underlying events are no longer available.
+                      The events in this digest are no longer available.
                     </Typography>
                   ) : (
                     <Stack spacing={0.75} sx={{ width: '100%' }}>
@@ -257,6 +276,43 @@ export function ProfileDigestHistorySection({ mockEntries }: Props = {}) {
                             : `Show all ${entry.bills.length} bills (${hiddenCount} more)`}
                         </Button>
                       )}
+                      {committees.map((c, i) => (
+                        <Box
+                          key={`${entry.id}-committee-${c.id}-${c.event_type}-${i}`}
+                          sx={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            alignItems: 'baseline',
+                            gap: 1,
+                          }}
+                        >
+                          {c.slug ? (
+                            <MuiLink
+                              component={NextLink}
+                              href={`/committees/${encodeURIComponent(c.slug)}`}
+                              fontWeight={600}
+                              underline="hover"
+                            >
+                              {c.name}
+                            </MuiLink>
+                          ) : (
+                            <Typography variant="body2" fontWeight={600}>
+                              {c.name}
+                            </Typography>
+                          )}
+                          <Chip
+                            label={c.event_label}
+                            size="small"
+                            variant="outlined"
+                            sx={{ height: 22 }}
+                          />
+                          {c.meeting_date && (
+                            <Typography variant="body2" color="text.secondary">
+                              {formatKyMeetingDate(c.meeting_date)}
+                            </Typography>
+                          )}
+                        </Box>
+                      ))}
                     </Stack>
                   )}
                 </ListItem>

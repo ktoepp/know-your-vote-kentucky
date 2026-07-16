@@ -87,7 +87,7 @@ Triggered once, after first email verification.
 
 Sent daily or weekly based on user preference, only when there are events to report.
 
-**Subject:** `Kentucky bill digest — {date}` (e.g., `Kentucky bill digest — May 13, 2026`). A digest with no bill sections uses `Kentucky committee digest — {date}` instead — the subject never names content the email doesn't contain.
+**Subject:** `Kentucky bill digest — {Mon D}: {counts}` (e.g., `Kentucky bill digest — May 13: 3 bills, 2 committee updates`). The inbox column already shows the date, so the subject's variable slot carries the counts; the short date keeps each day's subject distinct so threading clients don't collapse digests. A digest with no bill sections uses `Kentucky committee digest — {Mon D}: {n} updates` — the subject never names content the email doesn't contain.
 
 **Preview text:** describes only what the digest contains, joined with "and" when both parts are present: `{n} bill(s) with new activity` / `{n} committee update(s)` / `3 bills with new activity and 2 committee updates`.
 

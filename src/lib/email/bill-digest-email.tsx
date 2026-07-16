@@ -42,8 +42,11 @@ export function joinWithAnd(items: string[]): string {
 }
 
 /**
- * Dark-mode overrides for clients that honor prefers-color-scheme (Apple Mail
- * and others). Clients that ignore it keep the inline light palette.
+ * Dark-mode overrides. The media query covers clients that honor
+ * prefers-color-scheme (Apple Mail and others); the [data-ogsc]/[data-ogsb]
+ * selectors cover Gmail's forced dark transforms, which ignore the media query
+ * and stamp those attributes on recolored elements instead. Clients that
+ * support neither keep the inline light palette.
  */
 const darkModeStyles = `
   @media (prefers-color-scheme: dark) {
@@ -53,6 +56,11 @@ const darkModeStyles = `
     .dg-link { color: #93c5fd !important; }
     .dg-border { border-color: #334155 !important; }
   }
+  [data-ogsb] .dg-bg { background-color: #0f172a !important; }
+  [data-ogsc] .dg-ink { color: #e2e8f0 !important; }
+  [data-ogsc] .dg-muted { color: #94a3b8 !important; }
+  [data-ogsc] .dg-link { color: #93c5fd !important; }
+  [data-ogsc] .dg-border { border-color: #334155 !important; }
 `;
 
 export function BillDigestEmail(props: {

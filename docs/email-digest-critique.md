@@ -161,11 +161,17 @@ Two independent reviewers re-examined the revised digest: one adversarial pass o
 12. **Link inconsistencies and plain-text noise.** Bill number + title now share one anchor (one URL per bill in plain text, full-width tap target); overflow/footer links share one style (brand blue, underlined) instead of react-email's default `#067df7`; `(recorded {date})` no longer wraps mid-phrase; preview-text parts join with "and"; footer CTA renamed "Change digest settings" (it governs event types and committees, not just frequency/topics); committee line grammar made parallel (`New meeting:` / `Agenda updated:` / `Meeting cancelled:`); basic `prefers-color-scheme: dark` overrides added.
 13. **Digest-history empty state** claimed "events no longer available" for committee-only digests (whose event ids aren't logged). Copy now names the committee-updates case.
 
+## Follow-ups completed after the second critique
+
+- **Postal address** added to digest and welcome footers (`KYVKY_POSTAL_ADDRESS`, PO Box 133, Bardstown, Kentucky 40004).
+- **Topic overflow destination (partial).** Topic annotations and the overflow line now link to `/bills?topic={t}` for the affected topics — the closest existing destination.
+- **Committee event ids logged.** New `committee_event_ids` column (migration 041) written by the cron; digest history expands and displays committee updates, so committee-only digests no longer appear empty.
+- **Gmail dark mode** targeted via `[data-ogsc]`/`[data-ogsb]` selectors alongside the `prefers-color-scheme` block.
+- **Subject carries counts:** `Kentucky bill digest — Jul 16: 3 bills, 2 committee updates` (short date retained so threading clients keep each day distinct).
+- **KYVKY logo header** added, linked to the site home.
+
 ## Known limitations (deliberate, documented)
 
-- **Topic-matched overflow has no destination.** No page can list recent events for topic-matched bills the user doesn't follow; the overflow copy is scoped honestly instead. A topic-activity view would close this properly.
-- **Committee query truncation.** The upstream query still fetches at most 40 committee events per user per window; rows beyond that are not counted in the overflow line. With the new per-digest cap of 10 this requires an extreme week to matter.
-- **Committee event ids aren't logged to `ky_notifications_log.event_ids`** (the column feeds bill-oriented digest history). Follow-up if committee history matters.
-- **No sender postal address in the footer.** CAN-SPAM/bulk-sender guidelines expect one; needs the organization's real mailing address — not something to invent in code. Add one muted footer line when available.
-- **Dark mode** is handled for `prefers-color-scheme` clients only; Gmail's forced dark transforms (`[data-ogsc]`) are untargeted.
-- **Subject date redundancy.** The inbox column already shows the date; the counts live only in preview text. Kept as-is for a stable, doc-specified subject identity — revisit if open rates suggest the subject should carry the counts.
+- **Browse topic filter ≠ digest topic matching.** `/bills?topic=X` filters by the KY topic tag only; digest matching also uses regex-mapped LegiScan subjects (`ky-topic-legiscan-mapping.ts`), which can't be expressed as a clean database filter. The topic links are therefore a partial destination. Closing this fully means materializing mapped topics onto bills at sync time, or a dedicated topic-activity view.
+- **Committee query truncation.** The upstream query still fetches at most 40 committee events per user per window; rows beyond that are not counted in the overflow line. With the per-digest cap of 10 this requires an extreme week to matter.
+- **Dark mode** covers `prefers-color-scheme` clients and Gmail's `[data-ogsc]` transforms; other proprietary dark-mode recoloring (e.g. some Outlook variants) remains best-effort.
