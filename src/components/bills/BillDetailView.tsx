@@ -625,7 +625,8 @@ function HistoryTimeline({
     <Box sx={{ pl: 0 }}>
       {visible.map((item, i) => {
         const isLast = i === visible.length - 1 && (expanded || sorted.length <= collapseAt);
-        const isImportant = item.importance === 1;
+        /** A recorded roll call is substantive even when LegiScan's importance flag says otherwise. */
+        const isImportant = item.importance === 1 || (item.votes?.length ?? 0) > 0;
         /** LegiScan `importance === 1` marks major steps; both use solid fills (blue vs neutral grey). */
         const pinBg = isImportant
           ? theme.palette.primary.main
@@ -651,7 +652,7 @@ function HistoryTimeline({
               }} />
               {!isLast && <Box sx={{ width: 2, flexGrow: 1, bgcolor: theme.palette.divider, mt: 0.35 }} />}
             </Box>
-            <Box sx={{ pb: 0, minWidth: 0 }}>
+            <Box sx={{ pb: 0, minWidth: 0, flex: 1 }}>
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.125, lineHeight: 1.3 }}>
                 {fmtDate(item.date, { month: 'short', day: 'numeric', year: 'numeric' })}
                 {' · '}
@@ -1036,8 +1037,8 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
         </MuiCard>
 
         <MuiGrid container spacing={3}>
-          {/* Left column — History */}
-          <MuiGrid item xs={12} md={6}>
+          {/* Left column — History (wider: roll calls render inline since the merge) */}
+          <MuiGrid item xs={12} md={7}>
             {bill.ai_summary && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
@@ -1049,20 +1050,6 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                   >
                     {bill.ai_summary}
                   </AiGeneratedBlock>
-                </MuiCardContent>
-              </MuiCard>
-            )}
-
-            {/* Bill text versions — compact, deduped by stage, toggleable like the timeline */}
-            {texts.length > 0 && (
-              <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
-                <MuiCardContent>
-                  <Box sx={{ mb: 1 }}>
-                    <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight}>
-                      Bill Text Versions
-                    </Typography>
-                  </Box>
-                  <BillTextVersionsList texts={texts} />
                 </MuiCardContent>
               </MuiCard>
             )}
@@ -1080,8 +1067,8 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
             )}
           </MuiGrid>
 
-          {/* Right column — Sponsors */}
-          <MuiGrid item xs={12} md={6}>
+          {/* Right column — Sponsors + Text versions */}
+          <MuiGrid item xs={12} md={5}>
             {/* Sponsors */}
             {primarySponsors.length > 0 && (
               <MuiCard elevation={0} sx={{ mb: 3, borderRadius: 3, boxShadow: 'none', border: 'none' }}>
@@ -1132,7 +1119,19 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               </MuiCard>
             )}
 
-
+            {/* Bill text versions — compact, deduped by stage, toggleable like the timeline */}
+            {texts.length > 0 && (
+              <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+                <MuiCardContent>
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight}>
+                      Bill Text Versions
+                    </Typography>
+                  </Box>
+                  <BillTextVersionsList texts={texts} />
+                </MuiCardContent>
+              </MuiCard>
+            )}
           </MuiGrid>
         </MuiGrid>
 

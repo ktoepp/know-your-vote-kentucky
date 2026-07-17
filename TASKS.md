@@ -288,6 +288,14 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
 
 ## Backlog
 
+### `ky_votes` duplicate rows — sync-side dedupe + one-time cleanup
+
+Found 2026-07-17 while merging roll calls into the bill timeline: **152 duplicate groups** in `ky_votes` (same bill + date + yea/nay/absent), two flavors — (a) 51 rows with NULL `roll_call_id` that a later sync re-inserted with the id populated (two sync paths, no shared upsert key), and (b) LegiScan shipping one physical roll call twice under the same RCS#/RSN# with variant descriptions ("Third Reading" vs "Third Reading W/SCS 1"; a mislabeled "Veto Override" copy with identical tally/date). The bill page now dedupes at read time (`fetchDbVotes`), but the member-profile RPC (`get_votes_for_legislator`) and any other consumer still see raw rows.
+
+- [ ] One-time cleanup: delete NULL-`roll_call_id` rows that duplicate a keyed row; collapse same-RCS# duplicate pairs (keep the earliest `roll_call_id`).
+- [ ] Sync-side: give `syncKyVotes` and the dataset importer a shared conflict key (bill_id + roll-call number parsed from desc, or bill_id + date + tally) so the two paths upsert the same row instead of inserting twins.
+- [ ] After cleanup, consider removing the read-time dedupe in `fetchDbVotes` or keeping it as a guard.
+
 ### Backfill pre-2018 roll-call votes (`ky_votes`) — enables member Voting-record history
 
 The member profile now has a **shared legislative-session selector** (2026-07-17) covering both Sponsored bills and the Voting record. Sponsor data exists for every session (2010–2026), but roll-call `ky_votes` only exist from **2018 Regular Session onward** — for any earlier session the member's Voting record renders empty ("No recorded votes found for this session yet.") even though sponsored bills show. Coverage as of 2026-07-17 (votes per session): 2018 RS 799, 2019 RS 675 / Special 11, 2020 RS 605, 2021 RS 816 / Special 33, 2022 RS 946 / Special 4, 2023 RS 678, 2024 RS 844, 2025 RS 701, 2026 RS 967; **2010–2017 RS + specials = 0 votes**.

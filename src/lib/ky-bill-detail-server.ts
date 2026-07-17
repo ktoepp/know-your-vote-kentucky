@@ -63,7 +63,7 @@ async function fetchDbVotes(
     .order('date', { ascending: true, nullsFirst: true })
     .order('roll_call_id', { ascending: true });
   if (error || !data) return [];
-  return data.map((v) => ({
+  const mapped = data.map((v) => ({
     roll_call_id: v.roll_call_id ?? undefined,
     date: v.date ?? null,
     desc: v.description ?? null,
@@ -72,7 +72,29 @@ async function fetchDbVotes(
     nv: v.nv_count ?? 0,
     absent: v.absent_count ?? 0,
     passed: v.passed ?? null,
-  })) as KyBillDetailEnrichment['votes'];
+  }));
+  // Dedupe rows describing the same physical roll call. LegiScan ships some roll
+  // calls twice under one RCS#/RSN# (e.g. "Third Reading" + "Third Reading W/SCS 1",
+  // or a mislabeled "Veto Override" copy), and older sync paths inserted rows without
+  // roll_call_id that a later sync re-added with one. Identical (date, yea, nay,
+  // absent) on one bill is treated as one roll call; keep the row with a
+  // roll_call_id, then the one with NV populated, then the earliest (query is
+  // ordered by roll_call_id ascending, so first-seen wins ties).
+  const winners: typeof mapped = [];
+  const winnerIndexByKey = new Map<string, number>();
+  const score = (v: (typeof mapped)[number]) =>
+    (v.roll_call_id != null ? 2 : 0) + (v.nv > 0 ? 1 : 0);
+  for (const v of mapped) {
+    const key = `${v.date}|${v.yea}|${v.nay}|${v.absent}`;
+    const at = winnerIndexByKey.get(key);
+    if (at == null) {
+      winnerIndexByKey.set(key, winners.length);
+      winners.push(v);
+    } else if (score(v) > score(winners[at]!)) {
+      winners[at] = v;
+    }
+  }
+  return winners as KyBillDetailEnrichment['votes'];
 }
 
 /**
