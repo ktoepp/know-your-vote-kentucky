@@ -10,18 +10,16 @@ import {
   CardContent,
   Chip,
   Container,
-  Divider,
   FormControl,
   InputAdornment,
   InputLabel,
-  List,
-  ListItem,
-  ListItemText,
   MenuItem,
   Paper,
   Select,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import { ArrowBack, Description, Groups, HowToVote, Search } from '@mui/icons-material';
@@ -102,58 +100,95 @@ function CommitteeAssignmentTile({ assignment }: { assignment: MemberCommitteeAs
   );
 }
 
+interface RollVoteGroup {
+  key: string;
+  bill: MemberRecentRollVote['bill'];
+  rows: MemberRecentRollVote[];
+}
+
+/** Cluster consecutive roll calls on the same bill so the bill heading renders once per run. */
+function groupRollVotes(rows: MemberRecentRollVote[]): RollVoteGroup[] {
+  const groups: RollVoteGroup[] = [];
+  for (const r of rows) {
+    const prev = groups[groups.length - 1];
+    const billId = r.bill?.id ?? null;
+    if (prev && billId != null && prev.bill?.id === billId) {
+      prev.rows.push(r);
+    } else {
+      groups.push({ key: `${billId ?? 'none'}-${r.voteId}`, bill: r.bill, rows: [r] });
+    }
+  }
+  return groups;
+}
+
 function VoteRollCallList({ rows }: { rows: MemberRecentRollVote[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <List disablePadding>
-      {rows.map((r, j) => (
-        <React.Fragment key={r.voteId}>
-          {j > 0 && <Divider component="li" />}
-          <ListItem alignItems="flex-start" disablePadding sx={{ py: 1.25 }}>
-            <ListItemText
-              primary={
-                r.bill ? (
-                  <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.5 }}>
-                    <BillNumber billNumber={r.bill.bill_number} size="compact" href={kyBillPath(r.bill)} />
-                    {r.bill.title ? (
-                      <Typography component="span" color="text.secondary" variant="body2">
-                        — {r.bill.title}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    Bill
+    <Box>
+      {groupRollVotes(rows).map((g, i) => (
+        <Box
+          key={g.key}
+          sx={{ borderTop: i > 0 ? 1 : 0, borderColor: 'divider', pt: i > 0 ? 1.25 : 0, pb: 1.25, '&:last-of-type': { pb: 0 } }}
+        >
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.75, mb: 0.5 }}>
+            {g.bill ? (
+              <>
+                <BillNumber billNumber={g.bill.bill_number} size="compact" href={kyBillPath(g.bill)} />
+                {g.bill.title ? (
+                  <Typography
+                    component="span"
+                    color="text.secondary"
+                    variant="body2"
+                    sx={{
+                      overflow: 'hidden',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                  >
+                    {g.bill.title}
                   </Typography>
-                )
-              }
-              secondary={
-                <Box sx={{ pt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                  {r.date && (
-                    <Typography component="span" variant="caption" color="text.secondary">
-                      {formatKyIsoDateShort(r.date)}
-                    </Typography>
-                  )}
-                  <Chip
-                    size="small"
-                    label={memberVoteLabel(r.myBucket, r.myVote)}
-                    color={voteBucketChipColor(r.myBucket)}
-                    variant="outlined"
-                  />
-                  {r.description && (
-                    <Typography component="span" variant="caption" color="text.secondary">
-                      {r.description}
-                    </Typography>
-                  )}
-                </Box>
-              }
-              secondaryTypographyProps={{ component: 'div' }}
-            />
-          </ListItem>
-        </React.Fragment>
+                ) : null}
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Bill
+              </Typography>
+            )}
+          </Box>
+          {g.rows.map((r) => (
+            <Box
+              key={r.voteId}
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '76px 1fr auto', sm: '92px 1fr auto' },
+                gap: 1.25,
+                alignItems: 'center',
+                py: 0.5,
+                pl: 1.5,
+                ml: 0.25,
+                borderLeft: 2,
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                {r.date ? formatKyIsoDateShort(r.date) : ''}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {r.description || 'Roll call'}
+              </Typography>
+              <Chip
+                size="small"
+                label={memberVoteLabel(r.myBucket, r.myVote)}
+                color={voteBucketChipColor(r.myBucket)}
+                variant="outlined"
+              />
+            </Box>
+          ))}
+        </Box>
       ))}
-    </List>
+    </Box>
   );
 }
 
@@ -178,6 +213,7 @@ export function MemberProfileView({
   const pathname = usePathname();
   const [voteFilter, setVoteFilter] = useState<VoteFilter>('all');
   const [voteSearch, setVoteSearch] = useState('');
+  const [voteSort, setVoteSort] = useState<'newest' | 'oldest'>('newest');
   const normalizedVoteSearch = voteSearch.trim().toLowerCase();
 
   const showSessionSelector = sessionOptions.length > 1;
@@ -264,9 +300,16 @@ export function MemberProfileView({
 
   const filteredVotes = useMemo(() => {
     if (!voteRecord?.votes.length) return [];
-    if (isDefaultVoteView) return voteRecord.recent;
-    return matchedVotes.slice(0, FILTERED_VOTE_DISPLAY_CAP);
-  }, [isDefaultVoteView, matchedVotes, voteRecord]);
+    const base = isDefaultVoteView ? voteRecord.recent : matchedVotes.slice(0, FILTERED_VOTE_DISPLAY_CAP);
+    return [...base].sort((a, b) => {
+      // Null dates sort last in either direction.
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      const c = a.date.localeCompare(b.date);
+      return voteSort === 'newest' ? -c : c;
+    });
+  }, [isDefaultVoteView, matchedVotes, voteRecord, voteSort]);
 
   const filteredOverflow = useMemo(() => {
     if (isDefaultVoteView) return 0;
@@ -416,22 +459,39 @@ export function MemberProfileView({
                         </Typography>
                       ) : (
                         <>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            value={voteSearch}
-                            onChange={(e) => setVoteSearch(e.target.value)}
-                            placeholder="Search votes by bill number, title, or roll-call description"
-                            aria-label="Search voting record"
-                            sx={{ mb: 1.5 }}
-                            InputProps={{
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <Search sx={{ fontSize: ICON_REM.nav, color: 'text.secondary' }} aria-hidden />
-                                </InputAdornment>
-                              ),
-                            }}
-                          />
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1.5 }}>
+                            <TextField
+                              size="small"
+                              value={voteSearch}
+                              onChange={(e) => setVoteSearch(e.target.value)}
+                              placeholder="Search votes by bill number, title, or roll-call description"
+                              aria-label="Search voting record"
+                              sx={{ flex: '1 1 240px' }}
+                              InputProps={{
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <Search sx={{ fontSize: ICON_REM.nav, color: 'text.secondary' }} aria-hidden />
+                                  </InputAdornment>
+                                ),
+                              }}
+                            />
+                            <ToggleButtonGroup
+                              size="small"
+                              value={voteSort}
+                              exclusive
+                              onChange={(_, v: 'newest' | 'oldest' | null) => {
+                                if (v != null) setVoteSort(v);
+                              }}
+                              aria-label="Sort votes by date"
+                            >
+                              <ToggleButton value="newest" sx={{ textTransform: 'none', px: 1.5 }}>
+                                Newest first
+                              </ToggleButton>
+                              <ToggleButton value="oldest" sx={{ textTransform: 'none', px: 1.5 }}>
+                                Oldest first
+                              </ToggleButton>
+                            </ToggleButtonGroup>
+                          </Box>
                           <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 1 }} role="group" aria-label="Filter votes by outcome">
                             {voteFilter !== 'all' && (
                               <Chip
