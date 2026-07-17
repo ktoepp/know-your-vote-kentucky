@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Box,
   Button,
@@ -10,20 +11,32 @@ import {
   Chip,
   Container,
   Divider,
+  FormControl,
+  InputAdornment,
+  InputLabel,
   List,
   ListItem,
   ListItemText,
+  MenuItem,
   Paper,
+  Select,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
-import { ArrowBack, Description, Groups, HowToVote } from '@mui/icons-material';
+import { ArrowBack, Description, Groups, HowToVote, Search } from '@mui/icons-material';
 import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import type { KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { MemberSponsoredBills } from '@/components/members/MemberSponsoredBills';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
-import { kyLegislaturePublicUrl } from '@/lib/ky-member-utils';
+import {
+  isKentuckyGovernor,
+  kyLegislatorCampaignWebsite,
+  kyLegislaturePublicUrl,
+  normalizeBallotpediaHref,
+} from '@/lib/ky-member-utils';
+import { KENTUCKY_GOVERNOR_OFFICE_URL } from '@/components/civic/GovernorBeshearChip';
 import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
 import { groupLegislatorExternalLinks, labelForLinkHost } from '@/lib/legislator-link-normalize';
 import { ICON_REM, INTERACTION, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
@@ -148,6 +161,7 @@ export function MemberProfileView({
   leg,
   legislatorRoster,
   sessionName,
+  sessionOptions = [],
   sponsoredBills = [],
   voteRecord,
   committeeAssignments = [],
@@ -155,11 +169,24 @@ export function MemberProfileView({
   leg: KYLegislator;
   legislatorRoster: KYLegislator[];
   sessionName: string;
+  sessionOptions?: string[];
   sponsoredBills?: MemberSponsoredBill[];
   voteRecord?: MemberVoteRecord;
   committeeAssignments?: MemberCommitteeAssignment[];
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [voteFilter, setVoteFilter] = useState<VoteFilter>('all');
+  const [voteSearch, setVoteSearch] = useState('');
+  const normalizedVoteSearch = voteSearch.trim().toLowerCase();
+
+  const showSessionSelector = sessionOptions.length > 1;
+  const handleSessionChange = (next: string) => {
+    if (next === sessionName) return;
+    setVoteFilter('all');
+    setVoteSearch('');
+    router.push(`${pathname}?session=${encodeURIComponent(next)}`, { scroll: false });
+  };
 
   const hasLegiscan = legiscanMemberPersonUrl(leg.legiscan_id) != null;
   const isChamberMember = leg.chamber === 'house' || leg.chamber === 'senate';
@@ -167,7 +194,11 @@ export function MemberProfileView({
   const tally = voteRecord?.tally;
   const { social: socialLinks, other: otherLinks } = groupLegislatorExternalLinks(leg.external_links);
   const showDistrictMap = leg.chamber === 'house' || leg.chamber === 'senate';
+  const isFormerMember = leg.active === false;
   const officialProfileUrl = kyLegislaturePublicUrl(leg, legislatorRoster);
+  const ballotpediaUrl = normalizeBallotpediaHref(leg.ballotpedia);
+  const campaignUrl = isFormerMember ? null : kyLegislatorCampaignWebsite(leg);
+  const isGovernor = isKentuckyGovernor(leg);
   const profileSourceLinks = [
     ...(officialProfileUrl
       ? [
@@ -175,6 +206,33 @@ export function MemberProfileView({
             href: officialProfileUrl,
             label: 'Official profile (KY Legislature)',
             ariaLabel: `Official Kentucky Legislature profile for ${leg.name} (opens in a new tab)`,
+          },
+        ]
+      : []),
+    ...(ballotpediaUrl
+      ? [
+          {
+            href: ballotpediaUrl,
+            label: 'Ballotpedia',
+            ariaLabel: `Ballotpedia profile for ${leg.name} (opens in a new tab)`,
+          },
+        ]
+      : []),
+    ...(campaignUrl
+      ? [
+          {
+            href: campaignUrl,
+            label: 'Campaign website',
+            ariaLabel: `Campaign website for ${leg.name} (opens in a new tab)`,
+          },
+        ]
+      : []),
+    ...(isGovernor
+      ? [
+          {
+            href: KENTUCKY_GOVERNOR_OFFICE_URL,
+            label: "Governor's office",
+            ariaLabel: `Office of the Governor (opens in a new tab)`,
           },
         ]
       : []),
@@ -189,18 +247,31 @@ export function MemberProfileView({
     })),
   ].filter((link, i, arr) => arr.findIndex((l) => l.href === link.href) === i);
 
+  const matchedVotes = useMemo(() => {
+    if (!voteRecord?.votes.length) return [];
+    return voteRecord.votes.filter((v) => {
+      if (!matchesVoteFilter(v.myBucket, voteFilter)) return false;
+      if (!normalizedVoteSearch) return true;
+      const haystack = [v.bill?.bill_number, v.bill?.title, v.description]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedVoteSearch);
+    });
+  }, [voteFilter, voteRecord, normalizedVoteSearch]);
+
+  const isDefaultVoteView = voteFilter === 'all' && !normalizedVoteSearch;
+
   const filteredVotes = useMemo(() => {
     if (!voteRecord?.votes.length) return [];
-    if (voteFilter === 'all') return voteRecord.recent;
-    const matched = voteRecord.votes.filter((v) => matchesVoteFilter(v.myBucket, voteFilter));
-    return matched.slice(0, FILTERED_VOTE_DISPLAY_CAP);
-  }, [voteFilter, voteRecord]);
+    if (isDefaultVoteView) return voteRecord.recent;
+    return matchedVotes.slice(0, FILTERED_VOTE_DISPLAY_CAP);
+  }, [isDefaultVoteView, matchedVotes, voteRecord]);
 
   const filteredOverflow = useMemo(() => {
-    if (voteFilter === 'all' || !voteRecord?.votes.length) return 0;
-    const total = voteRecord.votes.filter((v) => matchesVoteFilter(v.myBucket, voteFilter)).length;
-    return Math.max(0, total - FILTERED_VOTE_DISPLAY_CAP);
-  }, [voteFilter, voteRecord]);
+    if (isDefaultVoteView) return 0;
+    return Math.max(0, matchedVotes.length - FILTERED_VOTE_DISPLAY_CAP);
+  }, [isDefaultVoteView, matchedVotes]);
 
   const toggleVoteFilter = (next: VoteFilter) => {
     setVoteFilter((prev) => (prev === next ? 'all' : next));
@@ -233,6 +304,7 @@ export function MemberProfileView({
               profileNameHeading="h1"
               legislatorRoster={legislatorRoster}
               showDistrictMinimap={false}
+              showFooterLinks={false}
             />
 
             {profileSourceLinks.length > 0 && (
@@ -260,6 +332,37 @@ export function MemberProfileView({
 
         {showLegislativeSections && (
           <>
+            {showSessionSelector && (
+              <Box
+                sx={{
+                  mt: 4,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 1.5,
+                }}
+              >
+                <FormControl size="small" sx={{ minWidth: 220 }}>
+                  <InputLabel id="member-session-label">Legislative session</InputLabel>
+                  <Select
+                    labelId="member-session-label"
+                    label="Legislative session"
+                    value={sessionName}
+                    onChange={(e) => handleSessionChange(e.target.value)}
+                  >
+                    {sessionOptions.map((s) => (
+                      <MenuItem key={s} value={s}>
+                        {s}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Typography variant="caption" color="text.secondary">
+                  Sponsored bills and voting record below reflect the selected session.
+                </Typography>
+              </Box>
+            )}
+
             {/* Sponsored bills */}
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
@@ -313,6 +416,22 @@ export function MemberProfileView({
                         </Typography>
                       ) : (
                         <>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            value={voteSearch}
+                            onChange={(e) => setVoteSearch(e.target.value)}
+                            placeholder="Search votes by bill number, title, or roll-call description"
+                            aria-label="Search voting record"
+                            sx={{ mb: 1.5 }}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search sx={{ fontSize: ICON_REM.nav, color: 'text.secondary' }} aria-hidden />
+                                </InputAdornment>
+                              ),
+                            }}
+                          />
                           <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 1 }} role="group" aria-label="Filter votes by outcome">
                             {voteFilter !== 'all' && (
                               <Chip
@@ -381,7 +500,7 @@ export function MemberProfileView({
                           {filteredVotes.length > 0 ? (
                             <>
                               <Typography component="h3" variant="subtitle2" color="text.primary" sx={{ mb: 0.5 }}>
-                                {voteFilter === 'all' ? 'Recent' : 'Matching votes'}
+                                {isDefaultVoteView ? 'Recent' : 'Matching votes'}
                               </Typography>
                               <VoteRollCallList rows={filteredVotes} />
                               {filteredOverflow > 0 && (

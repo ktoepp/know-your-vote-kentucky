@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getMemberProfilePageContext } from '@/lib/member-profile';
 import { getCivicDataSessionName } from '@/lib/ky-sessions';
-import { fetchSponsoredBillsForLegislator, fetchMemberVoteRecord } from '@/lib/member-profile-data';
+import {
+  fetchSponsoredBillsForLegislator,
+  fetchMemberVoteRecord,
+  fetchMemberSessionsForLegislator,
+} from '@/lib/member-profile-data';
 import { fetchCommitteeAssignmentsForLegislator } from '@/lib/ky-member-committees';
 import { fetchKyCommittees } from '@/lib/ky-committee-data';
 import { MemberProfileView } from '@/components/members/MemberProfileView';
@@ -13,7 +17,10 @@ import { buildLegislatorJsonLd, buildBreadcrumbJsonLd } from '@/lib/structured-d
 
 export const revalidate = 300;
 
-type PageProps = { params: Promise<{ slug: string }> };
+type PageProps = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ session?: string }>;
+};
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -38,12 +45,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function MemberProfilePage({ params }: PageProps) {
+export default async function MemberProfilePage({ params, searchParams }: PageProps) {
   const { slug } = await params;
+  const { session: requestedSession } = await searchParams;
   const ctx = await getMemberProfilePageContext(slug);
   if (!ctx) notFound();
   const { leg, roster } = ctx;
-  const sessionName = getCivicDataSessionName();
+  const sessionOptions = await fetchMemberSessionsForLegislator(leg);
+  // Honour ?session= only when it's one the member actually has activity in; otherwise default to the newest.
+  const sessionName =
+    requestedSession && sessionOptions.includes(requestedSession)
+      ? requestedSession
+      : sessionOptions[0] ?? getCivicDataSessionName();
   const committees = await fetchKyCommittees();
   const [sponsoredBills, voteRecord, committeeAssignments] = await Promise.all([
     fetchSponsoredBillsForLegislator(leg, { sessionName, limit: 30 }),
@@ -67,6 +80,7 @@ export default async function MemberProfilePage({ params }: PageProps) {
         leg={leg}
         legislatorRoster={roster}
         sessionName={sessionName}
+        sessionOptions={sessionOptions}
         sponsoredBills={sponsoredBills}
         voteRecord={voteRecord}
         committeeAssignments={committeeAssignments}

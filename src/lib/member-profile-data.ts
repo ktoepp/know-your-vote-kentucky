@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { KYBill, KYLegislator, KYVote } from '@/types/kentucky';
-import { getCivicDataSessionName } from '@/lib/ky-sessions';
+import { getCivicDataSessionName, KY_BILL_SESSION_OPTIONS } from '@/lib/ky-sessions';
 import { bucketLegiscanVoteText, type VoteBucket } from '@/lib/legiscan-vote-tally';
 import { matchLegislatorBySponsorName } from '@/lib/ky-member-utils';
 import {
@@ -191,6 +191,49 @@ function mapRollVotes(
     myBucket: bucket,
     bill: billById.get(vote.bill_id) ?? null,
   }));
+}
+
+/** Order session labels newest-first, using the canonical list; unknown labels sort last (desc). */
+function sortSessionsNewestFirst(sessions: string[]): string[] {
+  const rank = (s: string) => {
+    const i = KY_BILL_SESSION_OPTIONS.indexOf(s);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  return [...sessions].sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    return b.localeCompare(a);
+  });
+}
+
+/**
+ * Sessions this member has legislative activity in — i.e. sessions where a bill lists them as a
+ * sponsor/co-sponsor — newest first, always including the current default session so the profile's
+ * session selector never renders empty. Falls back to `[currentSession]` when the member has no
+ * resolvable LegiScan `people_id`.
+ */
+export async function fetchMemberSessionsForLegislator(leg: KYLegislator): Promise<string[]> {
+  const currentSession = getCivicDataSessionName();
+  const supabase = createAnonClient();
+  if (!supabase) return [currentSession];
+
+  const peopleId = leg.legiscan_id != null ? Number(leg.legiscan_id) : null;
+  if (peopleId == null || !Number.isFinite(peopleId)) return [currentSession];
+
+  const { data, error } = await supabase
+    .from('ky_bills')
+    .select('session')
+    .filter('sponsors', 'cs', JSON.stringify([{ people_id: peopleId }]));
+
+  if (error || !data) return [currentSession];
+
+  const sessions = new Set<string>([currentSession]);
+  for (const row of data) {
+    const s = (row as { session?: string }).session;
+    if (s) sessions.add(s);
+  }
+  return sortSessionsNewestFirst([...sessions]);
 }
 
 /**
