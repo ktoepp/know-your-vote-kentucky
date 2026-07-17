@@ -51,6 +51,20 @@ const cases: Case[] = [
     expected: 'Chaptered',
   },
   {
+    // Real-world shape where "Acts Ch." appears only on the line-item-veto action, not on the
+    // subsequent SoS filing step. statusCode=5 (LegiScan codes line-item vetoes as code 5,
+    // same as full vetoes) would previously cause a false "Vetoed". (Regression: SB197 2026RS
+    // stored with last_action="delivered to Secretary of State" and status "Vetoed" in prod.)
+    name: 'SB197-like — Acts Ch. in history only, last_action bare SoS filing (regression)',
+    statusCode: 5,
+    lastAction: 'delivered to Secretary of State',
+    history: [
+      { action: 'line items vetoed (Acts Ch. 202)' },
+      { action: 'delivered to Secretary of State' },
+    ],
+    expected: 'Chaptered',
+  },
+  {
     // Appropriations bills use PLURAL "vetoes overridden" + "line items vetoed" and DID become law
     // (Acts Ch.). Must NOT be labeled "Vetoed". (Regression: HB2/HB500/HB501/HB503/HB504/HB757 26RS.)
     name: 'HB757 26RS — line items vetoed then vetoes overridden (still law)',

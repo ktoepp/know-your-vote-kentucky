@@ -960,6 +960,28 @@ The Sunday audit (`accuracy-audit.yml`) has `timeout-minutes: 30`. The job start
 
 ---
 
+## 2026-07-17 — Bill status mapper: "Acts Ch." must also be checked in history entries
+
+**Bug:** `mapLegiScanBillStatus` checked `last_action` for "acts ch" but not individual history
+entries. When a line-item veto produces "line items vetoed (Acts Ch. NNN)" as an earlier action
+and a bare "delivered to Secretary of State" as the final `last_action`, the chapter number was
+invisible to the mapper. The `statusCode === 5` fallback (used for both full vetoes and
+line-item vetoes by LegiScan) then returned 'Vetoed' incorrectly. Spotted in the 2026-07-17
+accuracy spot-check: SB197 was displaying "Vetoed" in its status badge despite being enacted as
+Acts Chapter 202.
+
+**Fix:** Added `historyHasActsCh` (checks all history entries for "acts ch") and combined it
+with the existing `action.includes('acts ch')` guard. The "delivered to secretary of state"
+branch is unchanged — `historyHasActsCh` fires before it. All 14 regression cases pass including
+the new "SB197-like — Acts Ch. in history only" case.
+
+**Data:** The fix corrects future syncs. Rows already stored with the wrong status need
+`scripts/backfill-veto-status.ts` (with `--fetch` if `legiscan_history` is NULL). Run:
+`npx tsx scripts/backfill-veto-status.ts --dry-run` to preview scope, then without `--dry-run`
+to apply. SB197 2026RS is confirmed affected.
+
+---
+
 ## 2026-06-26 — LegiScan quota guard moved into the client + edge-triggered Slack alerts
 
 Branch `feat/legiscan-quota-guard-and-slack-dedupe` (commit `e32133c`, not merged). Triggered by Slack flag triage: `#errors` was getting `*LegiScan quota threshold (90%+)*` every sync tick (19 posts in 48h drifting 94.3% → 97.1%) and `#status-reports` was re-posting `bills: skipped — LegiScan quota XX% (>= 95% sync hold)` every hourly bills cron — both level-triggered alerts with no edge dedupe. Underneath the noise, monthly quota was still climbing ~840 calls in 48h *while bills sync was on hold the entire window*, so something else was leaking.

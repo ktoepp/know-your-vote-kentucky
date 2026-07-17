@@ -114,6 +114,14 @@ export function mapLegiScanBillStatus(
   const action = (lastAction || '').toLowerCase();
   const historyHasOverride = history ? legiscanHistoryIndicatesVetoOverride(history) : false;
   const historyHasFullVeto = history ? legiscanHistoryIndicatesFullVeto(history) : false;
+  // "Acts Ch." on ANY history entry (not just last_action) is an authoritative became-law signal.
+  // KY sometimes records the chapter number on an earlier action (e.g. "line items vetoed (Acts
+  // Ch. 202)") and the subsequent "delivered to Secretary of State" filing carries no chapter
+  // number — so checking only last_action misses these bills and the statusCode===5 fallback
+  // below incorrectly returns 'Vetoed'. (Regression: SB197 2026RS.)
+  const historyHasActsCh = history
+    ? history.some((h) => (h.action || '').toLowerCase().includes('acts ch'))
+    : false;
 
   if (legiscanActionIndicatesVetoOverride(lastAction) || statusCode === 7 || historyHasOverride) {
     return 'Veto Override';
@@ -129,7 +137,10 @@ export function mapLegiScanBillStatus(
   // overridden carries no chapter number (e.g. SB70/SJR74 2026RS). Checking this before the
   // statusCode===5 fallback below matters because LegiScan codes both a line-item veto and a full
   // veto as 5 — the chapter designation is the only reliable way to tell them apart.
-  if (action.includes('acts ch')) return 'Chaptered';
+  // Also check history entries — the chapter number may not appear in last_action when the SoS
+  // filing is a plain "delivered to Secretary of State" step that follows a "line items vetoed
+  // (Acts Ch. NNN)" action. (See historyHasActsCh above.)
+  if (action.includes('acts ch') || historyHasActsCh) return 'Chaptered';
 
   if (action.includes('delivered to secretary of state')) {
     if (statusCode === 5 || historyHasFullVeto) return 'Vetoed';
