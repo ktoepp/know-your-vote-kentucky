@@ -104,6 +104,43 @@ const cases: Case[] = [
     expected: 'Chaptered',
   },
   {
+    // KY's pre-~2018 records write the chapter citation with a comma ("Acts, ch. 194") — the old
+    // literal "acts ch" substring check did NOT match this, so the bill fell through to the
+    // statusCode===5 fallback and read "Vetoed" despite becoming law. (Regression: HB13 2017RS.)
+    name: 'HB13 17RS — line-item veto with comma-form "Acts, ch. 194" (still law)',
+    statusCode: 5,
+    lastAction: 'line items vetoed (Acts, ch. 194)',
+    expected: 'Chaptered',
+  },
+  {
+    // Comma form with no space before the number ("Acts, ch.149"). (Regression: HB303/HB304/HB10/
+    // HB129 2016RS.)
+    name: 'HB303 16RS — comma-form "Acts, ch.149" no space (still law)',
+    statusCode: 5,
+    lastAction: 'line items vetoed (Acts, ch.149)',
+    expected: 'Chaptered',
+  },
+  {
+    // A line-item veto is a became-law signal in its own right (Ky. Const. §88 strikes only distinct
+    // items; the rest of the appropriations bill becomes law) EVEN WHEN no chapter number is
+    // recorded anywhere. Previously this fell through to LEGISCAN_STATUS_MAP and the stored "Vetoed"
+    // was never corrected. (Regression: HB193 2021RS, HB306 2016RS.)
+    name: 'HB193 21RS — "line items vetoed" with no chapter number anywhere (still law)',
+    statusCode: 5,
+    lastAction: 'line items vetoed',
+    history: [{ action: 'passed' }, { action: 'line items vetoed' }],
+    expected: 'Chaptered',
+  },
+  {
+    // Guard: the broadened line-item became-law rule must NOT swallow a genuine FULL veto. A full
+    // veto that is never overridden and carries no chapter number still dies → "Vetoed".
+    name: 'Full veto, not overridden, no chapter → still Vetoed (guard)',
+    statusCode: 5,
+    lastAction: 'Vetoed and delivered with Veto Message to Secretary of State',
+    history: [{ action: 'passed' }, { action: 'Vetoed and delivered with Veto Message to Secretary of State' }],
+    expected: 'Vetoed',
+  },
+  {
     name: 'HB869 26RS — signed then chaptered',
     statusCode: 8,
     lastAction: 'delivered to Secretary of State (Acts Ch. 198)',

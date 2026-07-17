@@ -66,6 +66,40 @@ export function legiscanHistoryIndicatesFullVeto(
 }
 
 /**
+ * True when action text reflects a *line-item* (partial) veto. Under Ky. Const. §88 the Governor
+ * may disapprove "any part or parts of appropriation bills embracing distinct items" — only those
+ * distinct items fail; the REST OF THE BILL BECOMES LAW and is published in the Kentucky Acts with
+ * a chapter number. So a line-item veto is a became-law signal, NOT a bill-killing veto. KY's LRC
+ * records it as "line item(s) vetoed" (sometimes with the chapter number, e.g. "line items vetoed
+ * (Acts, ch. 194)", sometimes without). The chapter number's punctuation/spacing varies and may be
+ * absent entirely, so we key off the line-item-veto wording itself rather than the chapter string.
+ */
+export function legiscanActionIndicatesLineItemVeto(action: string | null | undefined): boolean {
+  const a = (action || '').toLowerCase();
+  if (!a.includes('veto')) return false;
+  return a.includes('line item') || a.includes('line-item') || a.includes('line veto');
+}
+
+export function legiscanHistoryIndicatesLineItemVeto(
+  history: ReadonlyArray<{ action?: string | null }>,
+): boolean {
+  for (const h of history) {
+    if (legiscanActionIndicatesLineItemVeto(h.action)) return true;
+  }
+  return false;
+}
+
+/**
+ * Matches Kentucky's "Acts chapter" enactment citation in any of the punctuation/spacing variants
+ * the LRC emits: "Acts Ch. 202", "Acts, ch. 194", "Acts, ch.149", "Acts Chapter 1". Every bill that
+ * becomes law — signed, unsigned after 10 days, overridden, or an appropriations bill that was only
+ * line-item vetoed — is published in the session's Acts with such a chapter number, so its presence
+ * anywhere in the action text is an authoritative became-law signal. (The earlier fix matched only
+ * the literal "acts ch" substring and missed the comma form "Acts, ch." used before ~2018.)
+ */
+export const ACTS_CHAPTER_RE = /acts\s*,?\s*ch/;
+
+/**
  * Map LegiScan status code + last_action into `ky_bills.status` display text.
  * Kentucky: filing with the Secretary of State follows both governor signing and veto override,
  * so it must not be stored as `Signed` unless the action explicitly says the governor signed.
@@ -93,15 +127,19 @@ export function legiscanHistoryIndicatesFullVeto(
  *    `Vetoed`, not `Chaptered`. (Regression: SB70 2026RS was vetoed 04/23 and showed "Chaptered"
  *    because its last action was the SoS filing.)
  *
- * 4. "Acts Ch." is the authoritative became-law signal WHEREVER it appears in the action text —
- *    not only on a "delivered to Secretary of State" filing. KY sometimes never files a separate
- *    SoS action at all: the veto action itself is the bill's final recorded action, e.g.
- *    "line items vetoed (Acts Ch. 239)". LegiScan's numeric status code doesn't distinguish a
- *    line-item veto (bill still becomes law) from a full veto (bill dies) — both come through as
- *    code 5 — so a chapter number on the action text must win over the code. This check runs
- *    before the statusCode===5 fallback below so it isn't defeated by that ambiguity.
- *    (Regression: HB604/HB92 2022RS, HB1/HB3 2010SS — each mapped to "Vetoed" because their
- *    last_action never contains "delivered to secretary of state", only the line-item-veto text.)
+ * 4. A became-law signal WHEREVER it appears in the action text (not only on a "delivered to
+ *    Secretary of State" filing) must win over the numeric status code, because LegiScan codes a
+ *    line-item veto — after which the bill STILL becomes law (Ky. Const. §88) — identically (5) to
+ *    a bill-killing full veto. KY sometimes never files a separate SoS action at all: the veto
+ *    action itself is the final recorded action, e.g. "line items vetoed (Acts Ch. 239)". Two forms
+ *    of the signal are recognized, on last_action and on every history entry:
+ *      (a) the Acts-chapter citation in any punctuation variant KY uses — "Acts Ch. 202",
+ *          "Acts, ch. 194", "Acts Chapter 1" (see ACTS_CHAPTER_RE); and
+ *      (b) a line-item veto itself ("line items vetoed"), which is a became-law signal even when NO
+ *          chapter number is recorded, since §88 line-item vetoes only strike distinct items.
+ *    This check runs before the statusCode===5 fallback so it isn't defeated by that ambiguity.
+ *    (Regression: SB197 2026RS; HB604/HB92 2022RS, HB1/HB3 2010SS; HB13 2017RS "Acts, ch. 194";
+ *    HB193 2021RS / HB306 2016RS "line items vetoed" with no chapter number.)
  *
  * `history` (optional) is the LegiScan getBill action history; pass it wherever available so the
  * veto/override milestones — which precede the final SoS filing — can be seen.
@@ -114,14 +152,24 @@ export function mapLegiScanBillStatus(
   const action = (lastAction || '').toLowerCase();
   const historyHasOverride = history ? legiscanHistoryIndicatesVetoOverride(history) : false;
   const historyHasFullVeto = history ? legiscanHistoryIndicatesFullVeto(history) : false;
-  // "Acts Ch." on ANY history entry (not just last_action) is an authoritative became-law signal.
-  // KY sometimes records the chapter number on an earlier action (e.g. "line items vetoed (Acts
-  // Ch. 202)") and the subsequent "delivered to Secretary of State" filing carries no chapter
-  // number — so checking only last_action misses these bills and the statusCode===5 fallback
-  // below incorrectly returns 'Vetoed'. (Regression: SB197 2026RS.)
-  const historyHasActsCh = history
-    ? history.some((h) => (h.action || '').toLowerCase().includes('acts ch'))
-    : false;
+  // Two became-law signals that can hide on an earlier history action rather than last_action:
+  //
+  //   1. The Acts-chapter citation ("Acts Ch. 202" / "Acts, ch. 194") — KY sometimes records the
+  //      chapter number on the veto action ("line items vetoed (Acts Ch. 202)") and the subsequent
+  //      "delivered to Secretary of State" filing carries no chapter number. (Regression: SB197.)
+  //   2. A line-item veto ("line items vetoed") — under Ky. Const. §88 only the disapproved items
+  //      fail and the rest of the bill becomes law, so this is a became-law signal even when NO
+  //      chapter number is present anywhere (KY's older records often omit it). (Regression: HB13
+  //      2017RS "Acts, ch. 194"; HB193 2021RS / HB306 2016RS "line items vetoed" with no chapter.)
+  //
+  // Both must be checked across last_action AND every history entry, before the statusCode===5
+  // fallback below — LegiScan codes a line-item veto the same (5) as a bill-killing full veto.
+  const becameLawByChapter =
+    ACTS_CHAPTER_RE.test(action) ||
+    (history ? history.some((h) => ACTS_CHAPTER_RE.test((h.action || '').toLowerCase())) : false);
+  const becameLawByLineItemVeto =
+    legiscanActionIndicatesLineItemVeto(lastAction) ||
+    (history ? legiscanHistoryIndicatesLineItemVeto(history) : false);
 
   if (legiscanActionIndicatesVetoOverride(lastAction) || statusCode === 7 || historyHasOverride) {
     return 'Veto Override';
@@ -139,8 +187,10 @@ export function mapLegiScanBillStatus(
   // veto as 5 — the chapter designation is the only reliable way to tell them apart.
   // Also check history entries — the chapter number may not appear in last_action when the SoS
   // filing is a plain "delivered to Secretary of State" step that follows a "line items vetoed
-  // (Acts Ch. NNN)" action. (See historyHasActsCh above.)
-  if (action.includes('acts ch') || historyHasActsCh) return 'Chaptered';
+  // (Acts Ch. NNN)" action — and treat a line-item veto itself as a became-law signal per §88,
+  // since KY's older records sometimes omit the chapter number entirely. (See the two became-law
+  // flags above.)
+  if (becameLawByChapter || becameLawByLineItemVeto) return 'Chaptered';
 
   if (action.includes('delivered to secretary of state')) {
     if (statusCode === 5 || historyHasFullVeto) return 'Vetoed';

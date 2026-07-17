@@ -148,7 +148,11 @@ export function buildBillRow(bill: any, sessionName: string, sessionId: number):
     title: bill?.title || '',
     description: bill?.description || null,
     session: sessionName,
-    status: mapLegiScanBillStatus(Number(bill?.status) || 0, lastAction || ''),
+    // Pass history so veto/override/line-item milestones that precede the final SoS filing are
+    // seen — otherwise a full dataset re-import silently reverts history-only corrections (a
+    // veto-overridden or line-item-enacted bill would drop back to a generic status). (See
+    // map-legiscan-bill-status §§3–4.)
+    status: mapLegiScanBillStatus(Number(bill?.status) || 0, lastAction || '', history),
     chamber: chamberFromBillNumber(bill?.bill_number || bill?.number || ''),
     last_action: lastAction,
     last_action_date: lastActionDate,

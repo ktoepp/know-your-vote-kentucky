@@ -84,7 +84,14 @@ async function main() {
       if (!detail) continue;
 
       const last = latestAction(detail);
-      const nextStatus = mapLegiScanBillStatus(Number(detail.status) || 0, last.action);
+      // Pass history so the mapper can see veto-override / line-item milestones that live on an
+      // earlier action, not last_action — without it this drift tool would recompute a generic
+      // status and undo history-only corrections (e.g. Veto Override → Chaptered).
+      const nextStatus = mapLegiScanBillStatus(
+        Number(detail.status) || 0,
+        last.action,
+        Array.isArray(detail.history) ? detail.history : undefined,
+      );
       const nextAction = last.action || null;
       const nextActionDate = last.date || detail.last_action_date || null;
 
