@@ -73,24 +73,39 @@ async function fetchDbVotes(
     absent: v.absent_count ?? 0,
     passed: v.passed ?? null,
   }));
-  // Dedupe rows describing the same physical roll call. LegiScan ships some roll
-  // calls twice under one RCS#/RSN# (e.g. "Third Reading" + "Third Reading W/SCS 1",
-  // or a mislabeled "Veto Override" copy), and older sync paths inserted rows without
-  // roll_call_id that a later sync re-added with one. Identical (date, yea, nay,
-  // absent) on one bill is treated as one roll call; keep the row with a
-  // roll_call_id, then the one with NV populated, then the earliest (query is
-  // ordered by roll_call_id ascending, so first-seen wins ties).
+  // Dedupe rows describing the same physical roll call (guard: primary dedupe ran as
+  // a one-time DB cleanup 2026-07-17, see TASKS.md). Two duplicate shapes exist:
+  // (a) rows without roll_call_id that a later sync re-added with one — dropped when
+  //     any keyed row shares their (date, yea, nay, absent) tally;
+  // (b) LegiScan shipping one RCS#/RSN# twice with variant descriptions ("Third
+  //     Reading" vs "Third Reading W/SCS 1", or a mislabeled "Veto Override" copy) —
+  //     collapsed only when the parsed roll-call number ALSO matches, because
+  //     genuinely distinct roll calls can share a date and tally (27 such pairs in
+  //     production). Prefer the row with NV populated; ties keep the earliest
+  //     roll_call_id (query order).
+  const tallyKey = (v: (typeof mapped)[number]) => `${v.date}|${v.yea}|${v.nay}|${v.absent}`;
+  const rcNumOf = (v: (typeof mapped)[number]) =>
+    /(?:RCS|RSN)#\s*(\d+)/i.exec(v.desc ?? '')?.[1] ?? null;
+
+  const keyedTallies = new Set(mapped.filter((v) => v.roll_call_id != null).map(tallyKey));
   const winners: typeof mapped = [];
   const winnerIndexByKey = new Map<string, number>();
-  const score = (v: (typeof mapped)[number]) =>
-    (v.roll_call_id != null ? 2 : 0) + (v.nv > 0 ? 1 : 0);
   for (const v of mapped) {
-    const key = `${v.date}|${v.yea}|${v.nay}|${v.absent}`;
+    if (v.roll_call_id == null) {
+      if (!keyedTallies.has(tallyKey(v))) winners.push(v);
+      continue;
+    }
+    const num = rcNumOf(v);
+    if (num == null) {
+      winners.push(v);
+      continue;
+    }
+    const key = `${tallyKey(v)}|${num}`;
     const at = winnerIndexByKey.get(key);
     if (at == null) {
       winnerIndexByKey.set(key, winners.length);
       winners.push(v);
-    } else if (score(v) > score(winners[at]!)) {
+    } else if (v.nv > 0 && winners[at]!.nv <= 0) {
       winners[at] = v;
     }
   }

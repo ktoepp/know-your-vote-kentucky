@@ -14,6 +14,7 @@ import { inflateRawSync } from 'node:zlib';
 import AdmZip from 'adm-zip';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { classifyTopics } from './ky-topic-classifier';
+import { dropDuplicateRollCallRows } from './ky-vote-dedupe';
 import { legiscanSubjectColumnsFromRawPayload } from './ky-legiscan-subjects';
 import { mapLegiScanBillStatus } from './map-legiscan-bill-status';
 import type { LegiScanDatasetListEntry } from './ky-legiscan-client';
@@ -276,10 +277,13 @@ export async function upsertLegislatorRows(db: SupabaseClient, rows: Record<stri
 
 export async function upsertVoteRows(db: SupabaseClient, rows: Record<string, unknown>[]): Promise<number> {
   if (rows.length === 0) return 0;
+  // LegiScan sometimes ships one physical roll call under two roll_call_ids; the
+  // (bill_id, roll_call_id) upsert key can't catch that, so filter twins first.
+  const { rows: deduped } = await dropDuplicateRollCallRows(db, rows);
   const BATCH = 200;
   let synced = 0;
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH);
+  for (let i = 0; i < deduped.length; i += BATCH) {
+    const batch = deduped.slice(i, i + BATCH);
     const { error } = await db.from('ky_votes').upsert(batch, { onConflict: 'bill_id,roll_call_id' });
     if (error) throw new Error(`ky_votes upsert batch ${i / BATCH + 1}: ${error.message}`);
     synced += batch.length;

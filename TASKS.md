@@ -292,9 +292,9 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
 
 Found 2026-07-17 while merging roll calls into the bill timeline: **152 duplicate groups** in `ky_votes` (same bill + date + yea/nay/absent), two flavors — (a) 51 rows with NULL `roll_call_id` that a later sync re-inserted with the id populated (two sync paths, no shared upsert key), and (b) LegiScan shipping one physical roll call twice under the same RCS#/RSN# with variant descriptions ("Third Reading" vs "Third Reading W/SCS 1"; a mislabeled "Veto Override" copy with identical tally/date). The bill page now dedupes at read time (`fetchDbVotes`), but the member-profile RPC (`get_votes_for_legislator`) and any other consumer still see raw rows.
 
-- [ ] One-time cleanup: delete NULL-`roll_call_id` rows that duplicate a keyed row; collapse same-RCS# duplicate pairs (keep the earliest `roll_call_id`).
-- [ ] Sync-side: give `syncKyVotes` and the dataset importer a shared conflict key (bill_id + roll-call number parsed from desc, or bill_id + date + tally) so the two paths upsert the same row instead of inserting twins.
-- [ ] After cleanup, consider removing the read-time dedupe in `fetchDbVotes` or keeping it as a guard.
+- [x] **One-time cleanup — ✅ ran against primary 2026-07-17.** 135 rows deleted (51 NULL-`roll_call_id` twins + 84 same-RCS# copies), all preserved in `ky_votes_dupe_backup_20260717`. 6,944 votes remain; the 27 groups sharing a date+tally under **different** RCS numbers were confirmed as genuinely distinct roll calls and kept. Drop the backup table once a few weeks pass without complaints.
+- [x] **Sync-side guard — ✅ done same day.** New `src/lib/ky-vote-dedupe.ts` (`dropDuplicateRollCallRows`): a roll call's physical identity is (bill, date, yea, nay, absent, RCS/RSN number parsed from desc); incoming rows duplicating that identity under a different `roll_call_id` are skipped, in-batch and against existing DB rows. Wired into both write paths — `syncKyVotes` and the dataset importer's `upsertVoteRows`. Rows without a parseable number are never cross-collapsed.
+- [x] Read-time dedupe in `fetchDbVotes` kept as a guard, and made RCS#-aware so it can't collapse the 27 legitimate same-tally pairs.
 
 ### Backfill pre-2018 roll-call votes (`ky_votes`) — enables member Voting-record history
 
