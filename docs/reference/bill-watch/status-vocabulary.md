@@ -19,7 +19,24 @@ Use for copy, digest event coverage, and browse filter labels — not as databas
 | Passed Senate | Senate floor passage | `passed_chamber` |
 | To Governor | Sent to Governor | `sent_to_governor` |
 | Signed by Governor | Became law | `signed_or_vetoed` |
-| Vetoed | Governor veto | `signed_or_vetoed` |
+| Vetoed | Governor veto (see KY nuance below) | `signed_or_vetoed` |
+
+### Enacted vs. vetoed — the Kentucky nuance
+
+The stored `ky_bills.status` distinguishes four end states, and **only one means the bill did *not* become law.** Getting this wrong is how SB197 2026RS came to display "Vetoed" while actually enacting as Acts Ch. 202 (see `decisions.md § 2026-07-17`). The rule, straight from KY law:
+
+| Stored status | Meaning | Became law? |
+|---------------|---------|-------------|
+| `Signed` | Governor signed it (or let it become law unsigned after 10 days) | ✅ yes |
+| `Veto Override` | Legislature overrode the veto — KY needs only a **simple majority** of each chamber | ✅ yes |
+| `Chaptered` | Enacted and published in the *Kentucky Acts* with a chapter number — **including a line-item veto**, where Ky. Const. §88 strikes only the disapproved items of an appropriations bill and the rest becomes law | ✅ yes |
+| `Vetoed` | A **full** veto that was **not** overridden | ❌ no |
+
+Practical implications for copy and code:
+
+- **"Vetoed" ≠ "there was a veto."** A line-item veto and an overridden veto both *became law*; reserve "Vetoed" for a full veto that stuck.
+- An **"Acts chapter" citation anywhere** in a bill's action history ("Acts Ch. 202", "Acts, ch. 194", "Acts Chapter 1") is a definitive *became-law* signal.
+- The mapping logic lives in `src/lib/map-legiscan-bill-status.ts`; the one-time corrector for already-stored rows is `scripts/backfill-veto-status.ts`.
 
 ## Alert types (settings checkboxes)
 

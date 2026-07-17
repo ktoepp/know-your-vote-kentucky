@@ -960,6 +960,55 @@ The Sunday audit (`accuracy-audit.yml`) has `timeout-minutes: 30`. The job start
 
 ---
 
+## 2026-07-17 — Bill status mapper: became-law detection grounded in KY law (line-item vetoes + chapter-citation variants)
+
+**Bug:** `mapLegiScanBillStatus` treated the literal substring `"acts ch"` as the only became-law
+signal. Two consequences, both surfacing bills that became law as `Vetoed`:
+- KY records the chapter number on an earlier history action ("line items vetoed (Acts Ch. 202)")
+  while the final `last_action` is a bare "delivered to Secretary of State" — the chapter number
+  was invisible, so the `statusCode === 5` fallback (LegiScan codes line-item AND full vetoes as 5)
+  returned `Vetoed`. Spotted in the 2026-07-17 accuracy spot-check: SB197 2026RS showed "Vetoed"
+  despite being enacted as Acts Ch. 202.
+- The `"acts ch"` substring does not match KY's older comma citation `"Acts, ch. 194"` nor the
+  chapter-less form `"line items vetoed"`, so the *same class* of bug persisted on 7 more bills.
+
+**KY law (Ky. Const. §88):** a line-item veto applies only to appropriations bills and strikes only
+the disapproved items — **the rest of the bill becomes law** and is published in the Kentucky Acts
+with a chapter number. A veto is overridden by a **simple majority** of each chamber (KY is unusual)
+and the bill then becomes law. So the *only* outcome that does NOT become law is a **full veto that
+is never overridden**; everything else (signed, unsigned-after-10-days, overridden, line-item
+vetoed) is enacted. The mapper must key off these legal facts, not chapter-string formatting.
+
+**Fix (`map-legiscan-bill-status.ts`):**
+- `ACTS_CHAPTER_RE = /acts\s*,?\s*ch/` matches every KY punctuation variant ("Acts Ch. 202",
+  "Acts, ch. 194", "Acts Chapter 1"), checked on `last_action` AND every history entry.
+- New `legiscanActionIndicatesLineItemVeto` — a line-item veto is itself a became-law → `Chaptered`
+  signal, even when no chapter number is recorded anywhere. Precedence unchanged: override → signed →
+  became-law (chapter or line-item) → SoS-disambiguation → full-veto/`Vetoed`.
+- 22 regression cases pass (`npm run verify:bill-status`), incl. comma-form and chapter-less
+  line-item cases and a full-veto guard.
+
+**Sync call-site hardening:** the mapper is only as good as the history handed to it. Patched the two
+paths that *had* history but dropped it — `ky-legiscan-dataset-import.ts` (full dataset re-import)
+and `scripts/refresh-bill-status-from-legiscan.ts` (drift tool) — to pass it, so a re-import/drift
+run no longer reverts history-only corrections (override, chapter-less line-item). The two
+`getMasterList` summary paths in `ky-sync-pipeline.ts` have no history by construction and continue
+to rely on the change-hash detail sync + backfill as the documented backstop.
+
+**Accuracy audit:** no change needed — `accuracy-audit/checkers/bills.ts` imports the same mapper and
+already passes history, so `expectedStatus` tracks the fix automatically once rows are backfilled.
+(It samples rather than full-scans and needs LegiScan detail/history to see these signals.)
+
+**Data backfill (applied 2026-07-17 via Supabase against `pmpadtydauuqysnxekno`):** 39 rows corrected
+across all sessions — 10 mislabeled `Vetoed` bills that actually became law (9 → `Chaptered`:
+HB1/HB3 2010SS, HB13 2017, HB10/HB129/HB303/HB304/HB306 2016, HB193 2021; 1 → `Veto Override`:
+HB225 2016), plus 29 budget bills relabeled `Chaptered → Veto Override` (their vetoes were overridden;
+override is the more precise became-law label). SB197 2026RS itself was already `Chaptered` in the DB
+(a re-sync had updated its `last_action` to carry the chapter number before this work). The one-time
+backfill is required because change-hash sync skips terminal bills whose hash never changes again.
+
+---
+
 ## 2026-06-26 — LegiScan quota guard moved into the client + edge-triggered Slack alerts
 
 Branch `feat/legiscan-quota-guard-and-slack-dedupe` (commit `e32133c`, not merged). Triggered by Slack flag triage: `#errors` was getting `*LegiScan quota threshold (90%+)*` every sync tick (19 posts in 48h drifting 94.3% → 97.1%) and `#status-reports` was re-posting `bills: skipped — LegiScan quota XX% (>= 95% sync hold)` every hourly bills cron — both level-triggered alerts with no edge dedupe. Underneath the noise, monthly quota was still climbing ~840 calls in 48h *while bills sync was on hold the entire window*, so something else was leaking.

@@ -51,6 +51,20 @@ const cases: Case[] = [
     expected: 'Chaptered',
   },
   {
+    // Real-world shape where "Acts Ch." appears only on the line-item-veto action, not on the
+    // subsequent SoS filing step. statusCode=5 (LegiScan codes line-item vetoes as code 5,
+    // same as full vetoes) would previously cause a false "Vetoed". (Regression: SB197 2026RS
+    // stored with last_action="delivered to Secretary of State" and status "Vetoed" in prod.)
+    name: 'SB197-like — Acts Ch. in history only, last_action bare SoS filing (regression)',
+    statusCode: 5,
+    lastAction: 'delivered to Secretary of State',
+    history: [
+      { action: 'line items vetoed (Acts Ch. 202)' },
+      { action: 'delivered to Secretary of State' },
+    ],
+    expected: 'Chaptered',
+  },
+  {
     // Appropriations bills use PLURAL "vetoes overridden" + "line items vetoed" and DID become law
     // (Acts Ch.). Must NOT be labeled "Vetoed". (Regression: HB2/HB500/HB501/HB503/HB504/HB757 26RS.)
     name: 'HB757 26RS — line items vetoed then vetoes overridden (still law)',
@@ -88,6 +102,43 @@ const cases: Case[] = [
     statusCode: 5,
     lastAction: 'line items vetoed (Acts Ch. 239)',
     expected: 'Chaptered',
+  },
+  {
+    // KY's pre-~2018 records write the chapter citation with a comma ("Acts, ch. 194") — the old
+    // literal "acts ch" substring check did NOT match this, so the bill fell through to the
+    // statusCode===5 fallback and read "Vetoed" despite becoming law. (Regression: HB13 2017RS.)
+    name: 'HB13 17RS — line-item veto with comma-form "Acts, ch. 194" (still law)',
+    statusCode: 5,
+    lastAction: 'line items vetoed (Acts, ch. 194)',
+    expected: 'Chaptered',
+  },
+  {
+    // Comma form with no space before the number ("Acts, ch.149"). (Regression: HB303/HB304/HB10/
+    // HB129 2016RS.)
+    name: 'HB303 16RS — comma-form "Acts, ch.149" no space (still law)',
+    statusCode: 5,
+    lastAction: 'line items vetoed (Acts, ch.149)',
+    expected: 'Chaptered',
+  },
+  {
+    // A line-item veto is a became-law signal in its own right (Ky. Const. §88 strikes only distinct
+    // items; the rest of the appropriations bill becomes law) EVEN WHEN no chapter number is
+    // recorded anywhere. Previously this fell through to LEGISCAN_STATUS_MAP and the stored "Vetoed"
+    // was never corrected. (Regression: HB193 2021RS, HB306 2016RS.)
+    name: 'HB193 21RS — "line items vetoed" with no chapter number anywhere (still law)',
+    statusCode: 5,
+    lastAction: 'line items vetoed',
+    history: [{ action: 'passed' }, { action: 'line items vetoed' }],
+    expected: 'Chaptered',
+  },
+  {
+    // Guard: the broadened line-item became-law rule must NOT swallow a genuine FULL veto. A full
+    // veto that is never overridden and carries no chapter number still dies → "Vetoed".
+    name: 'Full veto, not overridden, no chapter → still Vetoed (guard)',
+    statusCode: 5,
+    lastAction: 'Vetoed and delivered with Veto Message to Secretary of State',
+    history: [{ action: 'passed' }, { action: 'Vetoed and delivered with Veto Message to Secretary of State' }],
+    expected: 'Vetoed',
   },
   {
     name: 'HB869 26RS — signed then chaptered',

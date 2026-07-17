@@ -3,17 +3,21 @@
  * One-shot correction for bills whose stored status disagrees with what the (fixed) mapper would
  * compute today, in either direction:
  *   - vetoed (and never overridden) but stored as an enacted status ("Chaptered"/"Signed"), or
- *   - enacted via a line-item veto or override but stored as plain "Vetoed".
+ *   - enacted via a line-item veto or override but stored as plain "Vetoed", or
+ *   - overridden bills stored as the generic "Chaptered" (relabeled to the more precise
+ *     "Veto Override" once the override milestone in history is read).
  * Root cause + forward fix: see src/lib/map-legiscan-bill-status.ts §§ "Delivered to Secretary of
- * State" is ambiguous / "Acts Ch." is the authoritative became-law signal.
+ * State" is ambiguous / became-law detection (Acts-chapter citation in any punctuation variant, and
+ * a line-item veto as a became-law signal per Ky. Const. §88 even with no chapter number recorded).
  *
  * Kentucky files a bill with the Secretary of State after a signing, a veto override, AND a
  * plain veto — and sometimes never files a separate SoS action at all, recording the chapter
  * number directly on the veto action ("line items vetoed (Acts Ch. 239)"). Rows synced before
- * either mapper fix landed can be mislabeled in both directions. This re-runs the (fixed) mapper
- * against each candidate row using its already-stored `legiscan_history`, so it needs NO LegiScan
- * quota by default. Rows whose history is NULL are reported (and, with --fetch, pulled via
- * getBill — 1 quota point each).
+ * a mapper fix landed can be mislabeled in any of the directions above. This re-runs the (fixed)
+ * mapper against each candidate row using its already-stored `legiscan_history`, so it needs NO
+ * LegiScan quota by default. Rows whose history is NULL are reported (and, with --fetch, pulled via
+ * getBill — 1 quota point each). NOTE: the override/line-item signals often live only in `history`,
+ * so a row with NULL `legiscan_history` needs --fetch to be corrected at all.
  *
  * Safety: only rows whose recomputed status is "Vetoed", "Veto Override", or "Chaptered" are
  * changed, and only when it differs from the current value. The script never regresses a bill to
