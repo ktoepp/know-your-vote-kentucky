@@ -184,6 +184,52 @@ function deriveRollCallLabel(
   return chamberLabel ? `${chamberLabel} floor vote` : 'Floor vote';
 }
 
+/** ky_votes row as mapped by fetchDbVotes (ky-bill-detail-server). */
+interface BillVoteRow {
+  roll_call_id?: number;
+  date?: string | null;
+  desc?: string | null;
+  yea?: number;
+  nay?: number;
+  nv?: number;
+  absent?: number;
+  passed?: boolean | null;
+}
+
+/**
+ * Attach each roll call to the history entry it belongs to, mirroring
+ * deriveRollCallLabel's chamber + "yea-nay" tally match (same-date entry wins).
+ * Votes with no matching entry are returned separately so the timeline can
+ * synthesize a dated row for them instead of dropping them.
+ */
+function matchVotesToHistory(
+  votes: BillVoteRow[],
+  history: LegiScanHistory[],
+): { attached: Map<number, BillVoteRow[]>; unmatched: BillVoteRow[] } {
+  const attached = new Map<number, BillVoteRow[]>();
+  const unmatched: BillVoteRow[] = [];
+  const norm = (s: string) => s.replace(/\s+/g, ' ').toLowerCase();
+  for (const v of votes) {
+    const chamber = rollCallChamberFromDesc(v.desc);
+    const yea = Number(v.yea);
+    const nay = Number(v.nay);
+    let idx = -1;
+    if (Number.isFinite(yea) && Number.isFinite(nay)) {
+      const tally = `${yea}-${nay}`;
+      const candidates: number[] = [];
+      history.forEach((h, i) => {
+        if ((!chamber || !h.chamber || h.chamber === chamber) && h.action && norm(h.action).includes(tally)) {
+          candidates.push(i);
+        }
+      });
+      idx = candidates.find((i) => history[i]!.date === v.date) ?? candidates[0] ?? -1;
+    }
+    if (idx >= 0) attached.set(idx, [...(attached.get(idx) ?? []), v]);
+    else unmatched.push(v);
+  }
+  return { attached, unmatched };
+}
+
 /* ------------------------------------------------------------------ */
 /* Sub-components                                                       */
 /* ------------------------------------------------------------------ */
@@ -232,6 +278,112 @@ function VoteCountChip({ bucket, count }: { bucket: 'yea' | 'nay' | 'nv' | 'abse
     >
       {chip}
     </MuiTooltip>
+  );
+}
+
+/**
+ * Proportional roll-call tally bar. Segment order is fixed — Yea anchored left,
+ * Nay anchored right, Not voting / Absent between — so the green and red segments
+ * are never adjacent (keeps the bar legible under color-vision deficiency; the
+ * printed counts below remain the primary encoding).
+ */
+function VoteTallyBar({ yea, nay, nv, absent }: { yea: number; nay: number; nv: number; absent: number }) {
+  const theme = useTheme();
+  const total = yea + nay + nv + absent;
+  if (total <= 0) return null;
+  const segments = [
+    { key: 'yea', count: yea, color: theme.palette.success.main, label: 'Yea' },
+    { key: 'nv', count: nv, color: theme.palette.warning.main, label: 'Not voting' },
+    { key: 'absent', count: absent, color: theme.palette.grey[theme.palette.mode === 'dark' ? 400 : 500], label: 'Absent' },
+    { key: 'nay', count: nay, color: theme.palette.error.main, label: 'Nay' },
+  ].filter((s) => s.count > 0);
+  return (
+    <Box
+      role="img"
+      aria-label={`${yea} yea, ${nv} not voting, ${absent} absent, ${nay} nay`}
+      sx={{ display: 'flex', gap: '2px', height: 11, borderRadius: '5px', overflow: 'hidden' }}
+    >
+      {segments.map((s) => (
+        <MuiTooltip key={s.key} title={`${s.label} · ${s.count}`} arrow enterDelay={200}>
+          <Box sx={{ flexGrow: s.count, flexBasis: 0, minWidth: '3px', bgcolor: s.color }} />
+        </MuiTooltip>
+      ))}
+    </Box>
+  );
+}
+
+/**
+ * A roll call rendered inline in the legislative-history timeline: tally bar,
+ * the existing count chips (keeping their civic tooltips), and a quiet LegiScan
+ * source link. `showOutcome` adds a Passed/Failed chip for synthesized rows whose
+ * action text doesn't already state the result; it renders only when `passed`
+ * is present in the data — never computed from a threshold.
+ */
+function InlineRollCall({
+  vote,
+  billNumber,
+  showOutcome = false,
+}: {
+  vote: BillVoteRow;
+  billNumber: string;
+  showOutcome?: boolean;
+}) {
+  const theme = useTheme();
+  const rollId = vote.roll_call_id;
+  const legiscanVoteUrl =
+    rollId != null && Number.isFinite(Number(rollId))
+      ? legiscanRollCallPublicUrl(billNumber, Number(rollId))
+      : null;
+  return (
+    <Box
+      sx={{
+        mt: 1,
+        p: 1.25,
+        borderRadius: 2,
+        border: `1px solid ${theme.palette.divider}`,
+        bgcolor: alpha(theme.palette.background.default, 0.5),
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+      }}
+    >
+      <VoteTallyBar yea={vote.yea ?? 0} nay={vote.nay ?? 0} nv={vote.nv ?? 0} absent={vote.absent ?? 0} />
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+        {showOutcome && vote.passed != null && (
+          <MuiChip
+            size="small"
+            label={vote.passed ? 'Passed' : 'Failed'}
+            color={vote.passed ? 'success' : 'error'}
+            variant="filled"
+          />
+        )}
+        <VoteCountChip bucket="yea" count={vote.yea ?? 0} />
+        <VoteCountChip bucket="nay" count={vote.nay ?? 0} />
+        {(vote.nv ?? 0) > 0 && <VoteCountChip bucket="nv" count={vote.nv ?? 0} />}
+        {(vote.absent ?? 0) > 0 && <VoteCountChip bucket="absent" count={vote.absent ?? 0} />}
+      </Box>
+      {legiscanVoteUrl && (
+        <MuiLink
+          href={legiscanVoteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="LegiScan roll call (opens in a new tab)"
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.5,
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            color: 'text.secondary',
+            textDecoration: 'none',
+            '&:hover': { color: 'primary.main', textDecoration: 'underline' },
+          }}
+        >
+          LegiScan roll call
+          <OpenInNew sx={EXTERNAL_LINK_ICON_SX} aria-hidden />
+        </MuiLink>
+      )}
+    </Box>
   );
 }
 
@@ -398,20 +550,57 @@ function BillTextVersionsList({ texts }: { texts: LegiScanText[] }) {
   );
 }
 
-function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
+type TimelineEntry = LegiScanHistory & {
+  /** Roll calls attached to this action (rendered inline). */
+  votes?: BillVoteRow[];
+  /** True for rows synthesized from a vote with no matching history entry. */
+  synthetic?: boolean;
+};
+
+function HistoryTimeline({
+  history,
+  votes = [],
+  billNumber,
+}: {
+  history: LegiScanHistory[];
+  votes?: BillVoteRow[];
+  billNumber: string;
+}) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest');
   const [expanded, setExpanded] = useState(false);
   const collapseAt = 8;
 
+  const merged = useMemo<TimelineEntry[]>(() => {
+    const { attached, unmatched } = matchVotesToHistory(votes, history);
+    const entries: TimelineEntry[] = history.map((h, i) =>
+      attached.has(i) ? { ...h, votes: attached.get(i) } : h,
+    );
+    for (const v of unmatched) {
+      entries.push({
+        date: v.date ?? '',
+        action: deriveRollCallLabel({ ...v, date: v.date ?? undefined }, history),
+        chamber: rollCallChamberFromDesc(v.desc) ?? '',
+        importance: 1,
+        votes: [v],
+        synthetic: true,
+      });
+    }
+    return entries;
+  }, [history, votes]);
+
   const sorted = useMemo(() => {
-    const copy = [...history].sort((a, b) => a.date.localeCompare(b.date));
+    const copy = [...merged].sort((a, b) => a.date.localeCompare(b.date));
     if (sortOrder === 'newest') copy.reverse();
     return copy;
-  }, [history, sortOrder]);
+  }, [merged, sortOrder]);
 
-  const visible = expanded || sorted.length <= collapseAt ? sorted : sorted.slice(0, collapseAt);
+  /** Collapsed view keeps vote-bearing entries visible so roll calls never hide behind "Show all". */
+  const visible =
+    expanded || sorted.length <= collapseAt
+      ? sorted
+      : sorted.filter((e, i) => i < collapseAt || (e.votes?.length ?? 0) > 0);
 
   return (
     <Box>
@@ -496,6 +685,14 @@ function HistoryTimeline({ history }: { history: LegiScanHistory[] }) {
                   </Box>
                 )}
               </Typography>
+              {item.votes?.map((v, vi) => (
+                <InlineRollCall
+                  key={v.roll_call_id ?? `vote-${vi}`}
+                  vote={v}
+                  billNumber={billNumber}
+                  showOutcome={item.synthetic}
+                />
+              ))}
             </Box>
           </Box>
         );
@@ -586,6 +783,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
   const subjects = (detail?.subjects ?? []) as LegiScanSubject[];
   const history = (detail?.history ?? []) as LegiScanHistory[];
   const texts = (detail?.texts ?? []) as LegiScanText[];
+  const billVotes = (detail?.votes ?? []) as BillVoteRow[];
   const sponsors = (detail?.sponsors ?? []) as LegiScanSponsor[];
 
   // Most recent text version first
@@ -869,20 +1067,20 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               </MuiCard>
             )}
 
-            {/* History */}
-            {history.length > 0 && (
+            {/* History — roll calls render inline on their matching action */}
+            {(history.length > 0 || billVotes.length > 0) && (
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
                   <Box sx={{ mb: 2.5 }}>
                     <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight}>Legislative History</Typography>
                   </Box>
-                  <HistoryTimeline history={history} />
+                  <HistoryTimeline history={history} votes={billVotes} billNumber={bill.bill_number} />
                 </MuiCardContent>
               </MuiCard>
             )}
           </MuiGrid>
 
-          {/* Right column — Sponsors + Votes */}
+          {/* Right column — Sponsors */}
           <MuiGrid item xs={12} md={6}>
             {/* Sponsors */}
             {primarySponsors.length > 0 && (
@@ -934,64 +1132,6 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               </MuiCard>
             )}
 
-            {/* Votes summary */}
-            {detail?.votes && detail.votes.length > 0 && (
-              <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
-                <MuiCardContent>
-                  <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
-                    Roll calls
-                  </Typography>
-                  {detail.votes.map((v: any, i: number) => {
-                    const rollId = v.roll_call_id as number | undefined;
-                    const legiscanVoteUrl =
-                      rollId != null && Number.isFinite(Number(rollId))
-                        ? legiscanRollCallPublicUrl(bill.bill_number, Number(rollId))
-                        : null;
-                    const rowKey = rollId != null ? `rc-${rollId}` : `vote-${i}`;
-                    return (
-                      <Box
-                        key={rowKey}
-                        sx={{
-                          mb: i < detail.votes.length - 1 ? 1.5 : 0,
-                          p: 1.5,
-                          borderRadius: 2,
-                          bgcolor: alpha(theme.palette.background.default, 0.5),
-                          border: `1px solid ${theme.palette.divider}`,
-                        }}
-                      >
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {fmtDate(v.date)}
-                        </Typography>
-                        <Typography variant="body2" fontWeight={500} gutterBottom>
-                          {deriveRollCallLabel(v, history)}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1.25 }}>
-                          <VoteCountChip bucket="yea" count={v.yea} />
-                          <VoteCountChip bucket="nay" count={v.nay} />
-                          {v.nv > 0 && <VoteCountChip bucket="nv" count={v.nv} />}
-                          {v.absent > 0 && <VoteCountChip bucket="absent" count={v.absent} />}
-                        </Box>
-                        {legiscanVoteUrl && (
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                            <MuiButton
-                              component="a"
-                              size="small"
-                              variant="outlined"
-                              href={legiscanVoteUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              endIcon={<OpenInNew sx={EXTERNAL_LINK_ICON_SX} />}
-                            >
-                              LegiScan roll call
-                            </MuiButton>
-                          </Box>
-                        )}
-                      </Box>
-                    );
-                  })}
-                </MuiCardContent>
-              </MuiCard>
-            )}
 
           </MuiGrid>
         </MuiGrid>
