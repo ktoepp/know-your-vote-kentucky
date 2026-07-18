@@ -245,6 +245,10 @@ Use this when continuing **Follow committees v1.5**, **Wave 3 committee/data**, 
 
 Roadmap priority (2026-06-02): **launch operator checklist** → **Wave 3 committee/data**. Waves 1–2, committee calendar Phases 0–4, and **Follow committees v1.5** are all shipped.
 
+### Members roster views — fix/optimize → search, filtered, historical views (planned 2026-07-18)
+
+Spec: **[docs/specs/members-roster-views.md](./docs/specs/members-roster-views.md)**. Phase 0 (interaction-lag fix) shipped on `claude/members-page-lag-pv5qef` — see Recently completed. Next: Phase 1 (server-computed LRC link flag + active-only payload, deep-link auto-expand, card mount-cost trim, `profile_slug` migration 042), then URL-driven filters, richer search, and — pending interpretation confirm — historical/former-member views (needs the `ky_legislator_terms` model; the roster table has no term dates today, only `active`). Open questions at the bottom of the spec gate Phases 2b/4.
+
 ### Launch operator checklist (manual, not blocking code)
 
 See **[docs/launch-checklist.md](./docs/launch-checklist.md)**.
