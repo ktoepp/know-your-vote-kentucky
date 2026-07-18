@@ -1,11 +1,18 @@
-import { Box, Chip, Container, Typography } from '@mui/material';
+import { Box, Chip, Typography } from '@mui/material';
 import { LANDING_TOPICS } from '@/components/home/landing-data';
 
 export function LandingTopics() {
   return (
     <Box sx={{ mb: { xs: 6, md: 10 }, textAlign: 'center' }}>
       <Typography variant="h5" component="h2" fontWeight={700} gutterBottom>
-        Explore by topic
+        Bills by topic
+      </Typography>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ maxWidth: 560, mx: 'auto' }}
+      >
+        Bills grouped by subject. Topic tags are automated and can miss or mislabel some bills.
       </Typography>
       <Box
         sx={{
@@ -14,7 +21,7 @@ export function LandingTopics() {
           gap: 1,
           justifyContent: 'center',
           mt: 2,
-          // WCAG 2.5.5: topic chips here are the primary "Explore by topic"
+          // WCAG 2.5.5: topic chips here are the primary "Bills by topic"
           // affordance — 44px on touch, default on desktop.
           '& .MuiChip-clickable': {
             height: { xs: 44, sm: 'auto' },
@@ -33,7 +40,7 @@ export function LandingTopics() {
           />
         ))}
         <Chip
-          label="more →"
+          label="Browse bills →"
           component="a"
           href="/bills"
           clickable

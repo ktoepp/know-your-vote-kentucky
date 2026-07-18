@@ -1,11 +1,13 @@
+// Labels are human-first but keep click-scent with the browse filter's topic values
+// (the words should survive the click to /bills?topic=X).
 export const LANDING_TOPICS = [
-  { label: 'Education', topic: 'Education' },
-  { label: 'Agriculture', topic: 'Agriculture' },
-  { label: 'Transportation', topic: 'Transportation' },
-  { label: 'Health', topic: 'Healthcare' },
-  { label: 'Budget', topic: 'Budget' },
-  { label: 'Environment', topic: 'Environment' },
-  { label: 'Criminal justice', topic: 'Criminal Justice' },
+  { label: 'Schools & education', topic: 'Education' },
+  { label: 'Health care', topic: 'Healthcare' },
+  { label: 'Roads & transportation', topic: 'Transportation' },
+  { label: 'Budget & taxes', topic: 'Budget' },
+  { label: 'Farms & agriculture', topic: 'Agriculture' },
+  { label: 'Land, water & environment', topic: 'Environment' },
+  { label: 'Crime & criminal justice', topic: 'Criminal Justice' },
 ] as const;
 
 export const LANDING_FEATURE_CARDS = [
