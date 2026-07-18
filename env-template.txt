@@ -165,6 +165,16 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # Do NOT set NEXT_PUBLIC_VERCEL_ENV manually — it is derived at build time.
 # Internal-user / bot / IP filtering is configured in the PostHog UI, not here:
 # see docs/analytics-internal-traffic.md.
+#
+# Server-side PostHog query access (home page "Most viewed bills" ranked by unique
+# visitors per day). Both are required; when unset the section falls back to the
+# cumulative ky_bills.view_count ranking. The personal API key needs the Query Read
+# scope (PostHog → Settings → Personal API keys); the project id is the numeric id
+# in the PostHog project URL. POSTHOG_API_HOST is the *app* host (us.posthog.com),
+# not the ingest host (us.i.posthog.com); override only for EU cloud/self-host.
+# POSTHOG_PERSONAL_API_KEY=phx_xxxxxxxxxxxxxxxxxxxx
+# POSTHOG_PROJECT_ID=12345
+# POSTHOG_API_HOST=https://us.posthog.com
 
 # =============================================================================
 # OPTIONAL — Slack notifications

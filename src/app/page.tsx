@@ -9,6 +9,8 @@ import { LandingPersonalStrip } from '@/components/home/LandingPersonalStrip';
 import { SessionBannerServer } from '@/components/home/SessionBannerServer';
 import { LANDING_HERO_IMAGE_URL } from '@/components/home/landingHeroStyles';
 import { fetchKyCurrentSessionBillCount } from '@/lib/ky-bills-browse-server';
+import { fetchHomeLatestActionBills, fetchHomeTrendingBills } from '@/lib/ky-home-bill-highlights';
+import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-server';
 
 export const revalidate = 60;
 
@@ -22,7 +24,12 @@ export default async function HomePage() {
   // Hero is a CSS background (invisible to the browser preload scanner), so
   // kick the fetch off from the HTML head instead of waiting for hydration.
   preload(LANDING_HERO_IMAGE_URL, { as: 'image', fetchPriority: 'high' });
-  const currentSessionBillCount = await fetchKyCurrentSessionBillCount();
+  const [currentSessionBillCount, trending, latestActionBills, legislators] = await Promise.all([
+    fetchKyCurrentSessionBillCount(),
+    fetchHomeTrendingBills(),
+    fetchHomeLatestActionBills(),
+    fetchKyActiveLegislatorRosterSlim(),
+  ]);
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <SessionBannerServer />
@@ -31,6 +38,9 @@ export default async function HomePage() {
           picks which one to show once `useUser()` resolves. */}
       <HomePageContent
         currentSessionBillCount={currentSessionBillCount}
+        trendingBills={trending.bills}
+        latestActionBills={latestActionBills}
+        legislators={legislators}
         authHero={
           <HomeAuthHero
             marketingHero={<LandingHero />}

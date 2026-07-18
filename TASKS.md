@@ -8,6 +8,14 @@
 
 ## In Progress
 
+### Logged-out home page — topics copy + bill highlight carousels (2026-07-18, branch `claude/home-page-logged-out-updates-1evwf5`)
+
+- [x] "Explore by topic" → **"Bills by topic"** with human-first labels that keep click-scent with the browse filter values ("Schools & education" → `Education`, "Budget & taxes" → `Budget`, …), an honest-sourcing subheading ("Topic tags are automated and can miss or mislabel some bills."), and "more →" → "Browse bills →". Labels are shared with the `/bills` quick topic chips via `LANDING_TOPICS`, so the words survive the click.
+- [x] **"Most viewed bills" carousel** — ranked by unique visitors per day from PostHog's query API (`src/lib/ky-home-bill-highlights.ts`; HogQL uniq(distinct_id) on `/bills/*` pathnames, trailing day, cached 1h). Requires `POSTHOG_PERSONAL_API_KEY` + `POSTHOG_PROJECT_ID` (env-template.txt documents both; **not yet set in Vercel production**) — without them the section falls back to cumulative `ky_bills.view_count`, and the caption always states whichever metric actually ranked the list.
+- [x] **"Recent legislative action" carousel** — bills whose `legiscan_history` has a substantive step (LegiScan `importance=1`, i.e. non-clerical — same signal as the bill-detail timeline's "(clerical)" label) in the last 30 days; hides itself during quiet stretches rather than showing stale steps.
+- [x] Carousel component (`HomeBillCarousel`): scroll-snap row, whole-card links matching the `HomeCuratedBillList` row pattern, supplementary arrow buttons (hidden on xs), reduced-motion-aware smooth scroll, `section`+`aria-labelledby`/`describedby`. Placement: hero → features → map → carousels → topics. Design-reviewed for voice-and-tone + a11y before implementation.
+- [ ] Operator: create a PostHog personal API key (Query Read scope) and set `POSTHOG_PERSONAL_API_KEY` / `POSTHOG_PROJECT_ID` in Vercel production to activate the unique-visitors ranking.
+
 ### AI plain-language bill summaries (beta) — PR #103, 2026-06-26
 
 Revives the dormant `ky_bills.ai_summary` so each bill gets a 2–3 sentence plain-language summary that also names likely impacted Kentuckians (a "Who it may affect:" clause). Code is merge-ready and the **initial backfill has run against primary** (1,398 active-session bills summarized, 2026-06-26). Implements [FEEDBACK.md #1](./FEEDBACK.md); partially serves #3. Full rationale: [decisions.md § 2026-06-26](./decisions.md#2026-06-26--ai-plain-language-bill-descriptions-with-embedded-impact-audiences).
