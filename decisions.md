@@ -1617,3 +1617,26 @@ Real lever surfaced by the PR #164 investigation. `Sentry.init()` was already on
 **Tradeoff (carried over from PR #161, unchanged):** errors thrown in the first ~1–2 s before idle fires aren't captured by Sentry. Browser default error handling still logs them. First-second failures are rare in practice, and we accepted this cost during the PR #161 idle-init deferral.
 
 **Revisit if:** Sentry ingest volume drops noticeably per-session (would suggest the buffer is dropping events after cap), or if a user reports a first-second reproducible error we can't see in Sentry.
+
+---
+
+## 2026-07-18 — Daily "System health check" Routine: orphan-branch pileup
+
+**Symptom (operator: "too many open instances, sessions never finishing").** The scheduled **"System health check"** Routine (Claude Code trigger, daily 12:00 UTC) had left **11 orphaned `claude/funny-brahmagupta-*` branches** on GitHub (07-07 → 07-17), one per daily run, each a single `docs(tasks): … health check …` commit, **none opened as a PR**, **0 reaching `main`**. This is the same pattern cleaned up manually on 07-05 and (per the branches' own notes) 06-29→07-04 — it recurs because nothing in the automation closes the loop.
+
+**Root cause.** Each firing spawns a fresh session, the harness auto-assigns it a new per-session branch (`funny-brahmagupta-<suffix>`), the session commits its health-check note there, and — because a spawned session's standing instruction is "commit/push to your branch, do **not** open a PR unless explicitly asked" — it never opens a PR. So every run's output is stranded on a dead branch, the checked-in `TASKS.md` history freezes at the last human-merged date, and each new session re-derives the same "all systems nominal" note from scratch. The pile grows one branch/day forever.
+
+**What landed here (2026-07-18).**
+- **Salvage:** the only two unresolved findings across all 11 days (empty-message `/bills*` error; `unstable_cache` revalidation-logging pattern on `getCachedKyBillsBrowsePage`, `src/lib/ky-bills-browse-query.ts:216`) were consolidated into one `TASKS.md` ops note; the 11 nominal daily notes were dropped as noise. The 11 branches are now safe to delete.
+- **Branch deletion is blocked from the automated session** — this environment's egress policy 403s a git ref-deletion push (normal pushes succeed), and the GitHub MCP exposes no delete-ref tool. The 11 branches must be pruned manually (GitHub UI, or `git push origin --delete <branch>` from an unrestricted client).
+
+**The corrective change is a Routine-prompt edit, applied via the Claude Code web UI.** The scheduling API can update a trigger's name/cron/enabled/model but **not** its prompt; recreating the trigger via the API would silently drop the Vercel MCP grant (hard-won — see § 2026-07-06) and autofix-on-PR, so recreation was rejected. The health-check prompt gains an **Output-handling** section:
+
+> **Output handling (added 2026-07-18 — stop the orphan-branch pileup):**
+> - Do **not** create a new branch per run. If you have a finding to record, use the single rolling branch `chore/daily-health-check` (create it from `main` if absent, else fetch and reuse), commit there, and open a pull request against `main` titled "Daily health check — ops notes" if none is open, or push to the existing open PR if one is. **At most one open health-check PR at any time.**
+> - Only commit when there is a **new or still-open actionable finding** (an incident, a new error pattern, a regression, an escalation). On an all-systems-nominal day with nothing new, do **not** commit or push — just report the nominal result in-session.
+> - When you do write to `TASKS.md`, **consolidate**: update the latest ops-notes entry instead of appending a near-duplicate "all systems nominal" block.
+
+**Optimization:** the automation's git output becomes a single reviewable, mergeable PR that stays quiet unless a human needs to act — no manual salvage step, no per-day branch graveyard. **Cost:** all-nominal days leave no checked-in trail (accepted — the value is the exceptions, and the in-session report still exists). **Revisit if:** the rolling branch drifts far behind `main` and needs a periodic reset, or if a persistent-session trigger (one long-lived session reusing one branch) becomes preferable to per-run sessions.
+
+**The "kyvky.com accuracy spot check" Routine (13:05 UTC) was left as-is** — it produces real bill-status fixes and has not exhibited the pileup.
