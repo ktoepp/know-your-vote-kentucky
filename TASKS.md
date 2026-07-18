@@ -320,6 +320,15 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
 
 ## Backlog
 
+### `/members` page redesign — replace governor's-office photos with search/filter tiles
+
+Note-to-self, 2026-07-18: the three photos of the governor's office on `/members` should be replaced with tiles that let a visitor search the House and Senate sides. Those tiles become anchor links down to the senators/representatives listed below on the same page. Later pass: fill in real search filters (chamber, party, district, name), and backfill as many members as possible so search/filter coverage is complete.
+
+- [ ] Design + build House/Senate search tiles to replace the three governor's-office photos on `/members`.
+- [ ] Wire tiles as anchor links to the corresponding member list sections below.
+- [ ] Add search filters (chamber, party, district/name) once the tiles are in place.
+- [ ] Backfill any missing members so filtering has full coverage.
+
 ### `ky_votes` duplicate rows — sync-side dedupe + one-time cleanup
 
 Found 2026-07-17 while merging roll calls into the bill timeline: **152 duplicate groups** in `ky_votes` (same bill + date + yea/nay/absent), two flavors — (a) 51 rows with NULL `roll_call_id` that a later sync re-inserted with the id populated (two sync paths, no shared upsert key), and (b) LegiScan shipping one physical roll call twice under the same RCS#/RSN# with variant descriptions ("Third Reading" vs "Third Reading W/SCS 1"; a mislabeled "Veto Override" copy with identical tally/date). The bill page now dedupes at read time (`fetchDbVotes`), but the member-profile RPC (`get_votes_for_legislator`) and any other consumer still see raw rows.
