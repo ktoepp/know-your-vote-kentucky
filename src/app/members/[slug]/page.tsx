@@ -10,7 +10,7 @@ import {
 import { fetchCommitteeAssignmentsForLegislator } from '@/lib/ky-member-committees';
 import { fetchKyCommittees } from '@/lib/ky-committee-data';
 import { MemberProfileView } from '@/components/members/MemberProfileView';
-import { kyMemberTitleShort } from '@/lib/ky-member-utils';
+import { kyMemberTitleShort, memberProfilePath } from '@/lib/ky-member-utils';
 import { formatKyLegislatorDistrict } from '@/lib/bill-display';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { buildLegislatorJsonLd, buildBreadcrumbJsonLd } from '@/lib/structured-data';
@@ -32,14 +32,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const district = formatKyLegislatorDistrict(leg);
   const role = kyMemberTitleShort(leg);
   const desc = [role, district, 'Kentucky General Assembly'].filter(Boolean).join(' — ');
+  // Canonicalize alias slugs (legacy name variants, pre-042 URLs) to the member's stored slug.
+  const canonicalPath = memberProfilePath(leg);
   return {
     title: `${leg.name} | Know Your Vote Kentucky`,
     description: desc,
-    alternates: { canonical: `/members/${slug}` },
+    alternates: { canonical: canonicalPath },
     openGraph: {
       title: `${leg.name}`,
       description: desc,
-      url: `/members/${slug}`,
+      url: canonicalPath,
       type: 'profile',
     },
   };
@@ -63,7 +65,7 @@ export default async function MemberProfilePage({ params, searchParams }: PagePr
     fetchMemberVoteRecord(leg, { sessionName, maxRows: 200, recentLimit: 8 }),
     fetchCommitteeAssignmentsForLegislator(leg, committees),
   ]);
-  const path = `/members/${slug}`;
+  const path = memberProfilePath(leg);
   return (
     <>
       <JsonLd

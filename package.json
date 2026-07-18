@@ -59,6 +59,8 @@
     "spike:lrc:committee-materials": "tsx scripts/spike-lrc-committee-materials.ts",
     "audit:lrc:bill-refs": "tsx scripts/audit-lrc-agenda-bill-refs.ts",
     "verify:recent-ship": "tsx scripts/verify-recent-ship.ts",
+    "perf:members:stub": "node scripts/perf/members-postgrest-stub.mjs",
+    "perf:members:measure": "node scripts/perf/members-measure.mjs",
     "sync:ky:lrc-calendar": "tsx scripts/manual-sync.ts lrc-calendar",
     "sync:ky:lrc-calendar:dry": "tsx scripts/manual-sync.ts lrc-calendar --dry-run",
     "sync:ky:lrc-committee-materials": "tsx scripts/sync-lrc-committee-materials.ts",

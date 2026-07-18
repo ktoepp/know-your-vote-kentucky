@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getCivicDataSessionName } from '@/lib/ky-sessions';
 import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-server';
-import { memberSlug } from '@/lib/ky-member-utils';
+import { memberCanonicalSlug } from '@/lib/ky-member-utils';
 import { kyBillSlug } from '@/lib/ky-bill-slug';
 
 export interface SitemapEntry {
@@ -62,9 +62,8 @@ export async function fetchMemberSitemapEntries(): Promise<SitemapEntry[]> {
   const seen = new Set<string>();
   const entries: SitemapEntry[] = [];
   for (const leg of roster) {
-    const name = leg.name || leg.id;
-    if (!name) continue;
-    const slug = memberSlug(name);
+    if (!(leg.name || leg.id)) continue;
+    const slug = memberCanonicalSlug(leg);
     if (!slug || seen.has(slug)) continue;
     seen.add(slug);
     entries.push({ slug });

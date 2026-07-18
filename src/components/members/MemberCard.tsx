@@ -24,7 +24,7 @@ import {
   kyLegislaturePublicUrl,
   legislatorAvatarDescriptor,
   legislatorDisplayPhone,
-  memberSlug,
+  memberCanonicalSlug,
   normalizeBallotpediaHref,
 } from '@/lib/ky-member-utils';
 
@@ -58,7 +58,12 @@ export interface MemberCardProps {
   showFooterLinks?: boolean;
 }
 
-export function MemberCard({
+/**
+ * Memoized: `/members` renders dozens of these per section, and every search
+ * keystroke re-renders the parent — with stable `leg` / `legislatorRoster`
+ * identities the unchanged cards bail out of re-rendering entirely.
+ */
+export const MemberCard = React.memo(function MemberCard({
   leg,
   featured = false,
   showDistrictInSubtitle = true,
@@ -70,7 +75,7 @@ export function MemberCard({
 }: MemberCardProps) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
-  const anchorId = memberSlug(leg.name || leg.id);
+  const anchorId = memberCanonicalSlug(leg);
   const governor = isKentuckyGovernor(leg);
   /** Open States marks former members inactive after sync; links to LRC/LegiScan often describe the seat or current session, not this row. */
   const isFormerMember = leg.active === false;
@@ -350,4 +355,4 @@ export function MemberCard({
       />
     </Box>
   );
-}
+});
