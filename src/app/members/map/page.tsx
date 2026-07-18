@@ -1,18 +1,10 @@
-'use client';
+import NextLink from 'next/link';
+import { Box, Container, Link as MuiLink, Typography } from '@mui/material';
+import { DistrictMapExplorerIsland } from '@/components/members/DistrictMapExplorerIsland';
 
-import dynamic from 'next/dynamic';
-import { Suspense } from 'react';
-import { Box, CircularProgress, Container, Typography } from '@mui/material';
-
-const DistrictMapExplorer = dynamic(() => import('@/components/members/DistrictMapExplorer'), {
-  ssr: false,
-  loading: () => (
-    <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-      <CircularProgress />
-    </Box>
-  ),
-});
-
+// Server component shell: the heading, intro, and district/member links are in
+// the static HTML for the "find my legislator" search intent, while the Mapbox
+// explorer hydrates client-side in its island.
 export default function MembersDistrictMapPage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -24,10 +16,19 @@ export default function MembersDistrictMapPage() {
           <Typography variant="body1" color="text.secondary">
             Enter your address or ZIP code to find your Kentucky House and Senate representatives.
           </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Prefer to browse? See all 138{' '}
+            <MuiLink component={NextLink} href="/districts" underline="hover">
+              Kentucky legislative districts
+            </MuiLink>{' '}
+            or the full{' '}
+            <MuiLink component={NextLink} href="/members" underline="hover">
+              member roster
+            </MuiLink>
+            .
+          </Typography>
         </Box>
-        <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>}>
-          <DistrictMapExplorer />
-        </Suspense>
+        <DistrictMapExplorerIsland />
       </Container>
     </Box>
   );
