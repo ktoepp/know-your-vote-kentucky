@@ -5,6 +5,9 @@ import {
   fetchCommitteeSitemapEntries,
   fetchMemberSitemapEntries,
 } from '@/lib/sitemap-data';
+import { allKyDistrictRefs, kyDistrictPath } from '@/lib/ky-district-pages';
+import { KY_TOPICS } from '@/lib/ky-topic-classifier';
+import { kyTopicPath } from '@/lib/ky-topic-pages';
 
 type ChangeFreq = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
 
@@ -14,20 +17,27 @@ export const revalidate = 3600;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = publicSiteOrigin();
   const origin = base.startsWith('http') ? base : `https://${base}`;
-  const now = new Date();
 
   const staticPaths: { path: string; changeFrequency: ChangeFreq; priority: number }[] = [
     { path: '', changeFrequency: 'daily', priority: 1 },
     { path: '/bills', changeFrequency: 'daily', priority: 0.9 },
     { path: '/bills/house', changeFrequency: 'daily', priority: 0.85 },
     { path: '/bills/senate', changeFrequency: 'daily', priority: 0.85 },
+    { path: '/bills/topics', changeFrequency: 'weekly', priority: 0.75 },
     { path: '/meetings', changeFrequency: 'daily', priority: 0.85 },
     { path: '/committees', changeFrequency: 'weekly', priority: 0.8 },
     { path: '/members', changeFrequency: 'weekly', priority: 0.8 },
     { path: '/members/map', changeFrequency: 'monthly', priority: 0.75 },
+    { path: '/districts', changeFrequency: 'weekly', priority: 0.7 },
     { path: '/search', changeFrequency: 'weekly', priority: 0.75 },
     { path: '/about', changeFrequency: 'monthly', priority: 0.5 },
     { path: '/glossary', changeFrequency: 'monthly', priority: 0.5 },
+    { path: '/guides', changeFrequency: 'monthly', priority: 0.6 },
+    { path: '/guides/find-your-kentucky-legislator', changeFrequency: 'monthly', priority: 0.6 },
+    { path: '/guides/track-a-kentucky-bill', changeFrequency: 'monthly', priority: 0.6 },
+    { path: '/guides/how-a-kentucky-bill-becomes-a-law', changeFrequency: 'monthly', priority: 0.6 },
+    { path: '/guides/kentucky-general-assembly-sessions', changeFrequency: 'monthly', priority: 0.6 },
+    { path: '/legislature/resources', changeFrequency: 'monthly', priority: 0.5 },
     { path: '/privacy', changeFrequency: 'yearly', priority: 0.3 },
     { path: '/terms', changeFrequency: 'yearly', priority: 0.3 },
   ];
@@ -38,33 +48,55 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     fetchCommitteeSitemapEntries().catch(() => []),
   ]);
 
+  // `lastModified` is set only when a real content date exists — stamping "now" on
+  // every regeneration tells crawlers everything changed hourly and erodes lastmod trust.
   const billEntries: MetadataRoute.Sitemap = bills.map((b) => ({
     url: `${origin}/bills/${encodeURIComponent(b.slug)}`,
-    lastModified: b.lastModified ?? now,
+    lastModified: b.lastModified,
     changeFrequency: 'daily',
     priority: 0.7,
   }));
 
   const memberEntries: MetadataRoute.Sitemap = members.map((m) => ({
     url: `${origin}/members/${encodeURIComponent(m.slug)}`,
-    lastModified: m.lastModified ?? now,
+    lastModified: m.lastModified,
     changeFrequency: 'weekly',
     priority: 0.7,
   }));
 
   const committeeEntries: MetadataRoute.Sitemap = committees.map((c) => ({
     url: `${origin}/committees/${encodeURIComponent(c.slug)}`,
-    lastModified: c.lastModified ?? now,
+    lastModified: c.lastModified,
     changeFrequency: 'weekly',
     priority: 0.6,
   }));
 
   const staticEntries: MetadataRoute.Sitemap = staticPaths.map(({ path, changeFrequency, priority }) => ({
     url: `${origin}${path}`,
-    lastModified: now,
     changeFrequency,
     priority,
   }));
 
-  return [...staticEntries, ...billEntries, ...memberEntries, ...committeeEntries];
+  // All 138 district pages — fixed set, no DB dependency.
+  const districtEntries: MetadataRoute.Sitemap = allKyDistrictRefs().map((ref) => ({
+    url: `${origin}${kyDistrictPath(ref)}`,
+    changeFrequency: 'monthly',
+    priority: 0.6,
+  }));
+
+  // The 22 topic landing pages — fixed taxonomy, no DB dependency.
+  const topicEntries: MetadataRoute.Sitemap = KY_TOPICS.map((tag) => ({
+    url: `${origin}${kyTopicPath(tag)}`,
+    changeFrequency: 'daily',
+    priority: 0.7,
+  }));
+
+  return [
+    ...staticEntries,
+    ...billEntries,
+    ...memberEntries,
+    ...committeeEntries,
+    ...districtEntries,
+    ...topicEntries,
+  ];
 }

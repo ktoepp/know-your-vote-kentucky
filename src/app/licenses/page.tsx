@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import { Container, Typography, Link as MuiLink, Stack, Divider } from '@mui/material';
 import Link from 'next/link';
 import { APP_VERSION } from '@/lib/app-version';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Licenses & attributions | Know Your Vote Kentucky',
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Licenses & attributions',
   description: 'Open-source license and third-party data source attributions.',
-};
+  path: '/licenses',
+});
 
 export default function LicensesPage() {
   return (

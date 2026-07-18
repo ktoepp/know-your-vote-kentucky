@@ -15,6 +15,7 @@ import {
   LRC_COMMITTEES_INDEX_URL,
   LRC_LEGISLATIVE_CALENDAR_URL,
 } from '@/lib/ky-committee-display';
+import { buildPageMetadata } from '@/lib/seo';
 
 const EXTERNAL_RESOURCES = [
   {
@@ -50,11 +51,12 @@ const EXTERNAL_RESOURCES = [
   },
 ] as const;
 
-export const metadata = {
-  title: 'Frankfort resources | Know Your Vote Kentucky',
+export const metadata = buildPageMetadata({
+  title: 'Frankfort resources',
   description:
     'Neutral index of official Kentucky General Assembly sources — LRC calendar, committees, KET, and Bill Watch.',
-};
+  path: '/legislature/resources',
+});
 
 export default function LegislatureResourcesPage() {
   return (

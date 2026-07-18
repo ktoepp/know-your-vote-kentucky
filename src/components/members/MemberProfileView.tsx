@@ -13,6 +13,7 @@ import {
   FormControl,
   InputAdornment,
   InputLabel,
+  Link as MuiLink,
   MenuItem,
   Paper,
   Select,
@@ -41,6 +42,7 @@ import { ICON_REM, INTERACTION, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-
 import { BillNumber } from '@/components/bills/BillNumber';
 import { formatKyIsoDateShort } from '@/lib/bill-display';
 import { kyBillPath } from '@/lib/ky-bill-slug';
+import { kyDistrictPath, kyDistrictRefForLegislator, kyDistrictShortName } from '@/lib/ky-district-pages';
 import { shortKyCommitteeLabel } from '@/lib/ky-committee-display';
 import { ChamberChip, CommitteeKindChip } from '@/components/ui/Chip';
 import type { MemberRecentRollVote, MemberSponsoredBill, MemberVoteRecord } from '@/lib/member-profile-data';
@@ -230,6 +232,9 @@ export function MemberProfileView({
   const tally = voteRecord?.tally;
   const { social: socialLinks, other: otherLinks } = groupLegislatorExternalLinks(leg.external_links);
   const showDistrictMap = leg.chamber === 'house' || leg.chamber === 'senate';
+  // District landing page link under the map — current members only (a former
+  // member's old district page names their successor).
+  const districtRef = leg.active === false ? null : kyDistrictRefForLegislator(leg);
   const isFormerMember = leg.active === false;
   const officialProfileUrl = kyLegislaturePublicUrl(leg, legislatorRoster);
   const ballotpediaUrl = normalizeBallotpediaHref(leg.ballotpedia);
@@ -367,8 +372,17 @@ export function MemberProfileView({
           </Box>
 
           {showDistrictMap && (
-            <Box sx={{ pointerEvents: 'none' }}>
-              <LegislatorDistrictThumbnail leg={leg} size="profile" />
+            <Box>
+              <Box sx={{ pointerEvents: 'none' }}>
+                <LegislatorDistrictThumbnail leg={leg} size="profile" />
+              </Box>
+              {districtRef && (
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  <MuiLink component={Link} href={kyDistrictPath(districtRef)} underline="hover">
+                    {kyDistrictShortName(districtRef)} →
+                  </MuiLink>
+                </Typography>
+              )}
             </Box>
           )}
         </Box>

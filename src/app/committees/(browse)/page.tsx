@@ -1,12 +1,14 @@
 import { Suspense } from 'react';
 import { CommitteesBrowse } from '@/components/committees/CommitteesBrowse';
 import { fetchKyCommitteesBrowseEnriched } from '@/lib/ky-committees-browse-enriched';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Committees | Know Your Vote Kentucky',
+export const metadata = buildPageMetadata({
+  title: 'Kentucky General Assembly committees',
   description:
     'Kentucky General Assembly committees with meetings and agendas from the LRC legislative calendar.',
-};
+  path: '/committees',
+});
 
 export const revalidate = 300;
 

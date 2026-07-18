@@ -26,11 +26,14 @@ meeting schedules come from the Kentucky Legislative Research Commission (LRC).
 ## Primary sections
 
 - [Bills](${origin}/bills): Browse all bills in the active session. House and Senate filters at /bills/house and /bills/senate. Each bill detail page (/bills/{id}) shows title, description, sponsors, status, last action, votes, and committee history.
+- [Topics](${origin}/bills/topics): Bills grouped into 22 subject areas (education, healthcare, transportation, …) at /bills/topics/{topic}. Topic tags are automated and can miss or mislabel some bills.
 - [Members](${origin}/members): Roster of current Kentucky General Assembly legislators. Each profile (/members/{slug}) shows party, district, committee assignments, sponsored bills, and vote record. District map at /members/map.
+- [Districts](${origin}/districts): All 100 Kentucky House districts and 38 Senate districts at /districts/{chamber}-{number} (e.g. /districts/house-19), each with its current member, district map, and recent bills.
 - [Committees](${origin}/committees): All standing and interim committees. Each committee page (/committees/{slug}) lists members, scheduled meetings, agendas, and materials.
 - [Meetings](${origin}/meetings): Upcoming and recent committee meetings, with agenda items.
 - [Search](${origin}/search): Full-site search across bills, members, and committees.
 - [Glossary](${origin}/glossary): Plain-language explanations of legislative terms.
+- [Guides](${origin}/guides): Factual guides — finding your Kentucky state legislators, tracking a bill, how a bill becomes a law in Kentucky, and General Assembly session dates.
 - [About](${origin}/about): Project background, data sources, and methodology.
 
 ## Data sources
@@ -48,9 +51,10 @@ link to their /members/{slug} profile.
 
 ## Crawl policy
 
-Public content under /bills, /members, /committees, /meetings, /search, /about,
-/glossary, /privacy, /terms is indexable. Avoid /api, /auth, /dashboard,
-/admin, /dev. See ${origin}/robots.txt and ${origin}/sitemap.xml.
+Public content under /bills, /members, /districts, /committees, /meetings,
+/search, /about, /glossary, /privacy, /terms is indexable. Avoid /api, /auth,
+/dashboard, /admin, /dev, /profile. See ${origin}/robots.txt and
+${origin}/sitemap.xml.
 `;
 
   return new Response(body, {

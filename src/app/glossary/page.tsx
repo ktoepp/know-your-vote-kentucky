@@ -10,12 +10,14 @@ import {
 import { GlossaryBrowser, type GlossaryEntry } from '@/components/glossary/GlossaryBrowser';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { buildBreadcrumbJsonLd, buildGlossaryFaqJsonLd } from '@/lib/structured-data';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Glossary | Know Your Vote Kentucky',
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Kentucky legislative glossary',
   description:
     'Plain-English definitions of the legislative terms used across Know Your Vote Kentucky — bill types, status stages, committee terminology, voting procedures, and more.',
-};
+  path: '/glossary',
+});
 
 function buildEntriesByCategory(): Record<TooltipCategory, GlossaryEntry[]> {
   const empty = Object.fromEntries(
@@ -61,7 +63,12 @@ export default function GlossaryPage() {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4, lineHeight: 1.7 }}>
         Plain-English definitions of the terms you&apos;ll see across Know Your Vote Kentucky.
         Everything here is specific to the <strong>Kentucky General Assembly</strong> — the
-        rules and procedures differ from the U.S. Congress.
+        rules and procedures differ from the U.S. Congress. For the process the terms describe,
+        see{' '}
+        <Link href="/guides/how-a-kentucky-bill-becomes-a-law" style={{ textDecoration: 'underline' }}>
+          How a bill becomes a law in Kentucky
+        </Link>
+        .
       </Typography>
 
       <GlossaryBrowser categories={categories} topAnchorId={GLOSSARY_TOP_ANCHOR} />

@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { Container, Typography, Link as MuiLink, Stack } from '@mui/material';
 import Link from 'next/link';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Privacy policy | Know Your Vote Kentucky',
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Privacy policy',
   description: 'What Know Your Vote Kentucky collects, why, and how to manage or delete your data.',
-};
+  path: '/privacy',
+});
 
 const LAST_UPDATED = '2026-05-13';
 

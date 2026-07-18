@@ -1640,3 +1640,32 @@ Real lever surfaced by the PR #164 investigation. `Sentry.init()` was already on
 **Optimization:** the automation's git output becomes a single reviewable, mergeable PR that stays quiet unless a human needs to act — no manual salvage step, no per-day branch graveyard. **Cost:** all-nominal days leave no checked-in trail (accepted — the value is the exceptions, and the in-session report still exists). **Revisit if:** the rolling branch drifts far behind `main` and needs a periodic reset, or if a persistent-session trigger (one long-lived session reusing one branch) becomes preferable to per-run sessions.
 
 **The "kyvky.com accuracy spot check" Routine (13:05 UTC) was left as-is** — it produces real bill-status fixes and has not exhibited the pileup.
+
+---
+
+## 2026-07-18 — SEO pass 3: canonical bug, query-matching titles, district/topic/guide landing pages
+
+**Goal (owner request):** be found for four intents — (a) "my Kentucky legislator", (b) Kentucky bill queries, (c) "track Kentucky bills", (d) "how bills affect me". Branch `claude/kyvky-seo-optimization-9uypx0`, six commits.
+
+**Deindexing-class bug fixed.** The root layout's `alternates: { canonical: siteOrigin }` was inherited by every page that didn't set its own `alternates` — `/bills`, `/members`, `/search`, `/meetings`, `/glossary`, and every other browse/static page declared **the homepage** as its canonical (only the three detail routes overrode it). The root layout now sets no `alternates`; every indexable route sets a self-referencing canonical through the new `buildPageMetadata()` helper (`src/lib/seo.ts`). Same pass removed the inherited `openGraph.url` and the dead `keywords` meta. Filter URLs (`/bills?topic=X`) intentionally canonicalize to `/bills`.
+
+**Also fixed while in there:**
+- `/bills` and `/search` served an **empty body to crawlers** — `useSearchParams()` inside `<Suspense fallback={null}>` bailed the whole view (H1 included) out of the static HTML. H1 + intro + section links now render in the server shell outside the boundary.
+- **Bill sitemap silently truncated at ~1,000 rows** (single select vs. PostgREST's response cap; the 5,000 limit was never reached). Now paginates with `.range()`, includes the previous session so bills don't vanish on rollover, adds `/legislature/resources`, and stops stamping `lastModified: now` on every regeneration.
+- Titles rewritten to match real query phrasing (`Kentucky HB 208 (2026) — {catchline}` via `kyBillSeoCatchline`; `{Name} — Kentucky State Senator, District 12`; `Kentucky bills — {session}`); root layout now uses a title template.
+- Member alias slugs 308 to the stored canonical slug (mirrors bills); sponsor links resolve through the roster to canonical profile paths.
+- `generateStaticParams` for members/committees/top-100 bills; noindex on `/profile`, `/admin`, `/dev`.
+
+**New landing pages (the long tail where a small civic site can win):**
+- **`/districts` + 138 `/districts/{chamber}-{n}` pages** — current member, committed map thumbnail (doubles as per-district OG image), sponsored bills, committee assignments; `AdministrativeArea` JSON-LD (schema.org has no legislative-district type). Targets "kentucky house district 19" queries. All data existed; the pages didn't.
+- **`/bills/topics` + 22 topic pages** — hand-written neutral scope intro per topic, the mandated automated-tagging disclosure, 25 most recently active bills server-rendered via the existing browse fetch, follow-topic card. Home topic chips repointed here from `?topic=` filter URLs. Targets "kentucky education bills".
+- **`/guides` + 4 evergreen guides** (find-your-legislator, track-a-bill, how-a-bill-becomes-a-law, session dates) — static TSX like `/about`, no CMS; `Article` JSON-LD (no `HowTo` — Google retired it 2023; `FAQPage` stays glossary-only). Session dates and the §55 acts-effective date render live from `ky-sessions.ts` so they never go stale.
+- `/members/map` converted to a server shell (Mapbox explorer stays a `ssr:false` client island) so the "find my legislator" page has crawlable content and links.
+
+**Thin-content guardrails:** every new page is built from page-unique real data plus a unique hand-written sentence; vacant seats degrade to an honest roster-lag note; every page reachable via ≥2 internal link paths (indexes, member profiles, footer, home chips) — not sitemap-only.
+
+**Verified** against a local prod build: self-referencing canonical on every route type, H1/links present in raw HTML on the previously-empty pages, sitemap carries districts/topics/guides and no fabricated lastmod, invalid slugs 404, JSON-LD types present, `/profile` noindex. Bill/member data checks need env (not present in the build sandbox) — production build on Vercel will also pre-render the DB-backed static params.
+
+**Owner actions (no code):** GSC — export the Pages/Indexing baseline before this deploys, then "Validate fix" on the duplicate-canonical buckets (expect drain over 2–6 weeks) and watch three page filters (`^/districts/`, `^/bills/topics/`, `^/guides/`); register Bing Webmaster Tools; supply real social profile URLs if any exist for `Organization.sameAs` (left empty — never fabricate); earned local backlinks (Kentucky public libraries' civic pages, League of Women Voters of Kentucky, county clerk resource pages, civics teachers) — no directories or paid links.
+
+**Deferred (phase 4):** per-bill OG images; sharded 2010–2024 bill archive sitemaps via `generateSitemaps()`; RSC-first `/bills` list (server-rendered page 1 driven by the `searchParams` prop); audience-lens pages. **Revisit if:** GSC flags "Crawled — currently not indexed" persistently on districts/topics (enrich before adding page types), or build time balloons (drop the top-100 bill prerender first).

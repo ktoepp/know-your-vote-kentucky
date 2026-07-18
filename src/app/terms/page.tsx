@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { Container, Typography, Link as MuiLink, Stack } from '@mui/material';
 import Link from 'next/link';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Terms of service | Know Your Vote Kentucky',
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Terms of service',
   description: 'The basic rules for using Know Your Vote Kentucky.',
-};
+  path: '/terms',
+});
 
 const LAST_UPDATED = '2026-05-13';
 

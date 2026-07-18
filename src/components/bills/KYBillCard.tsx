@@ -10,6 +10,7 @@ import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import {
   avatarInitialsFromName,
   matchLegislatorBySponsorName,
+  memberProfilePath,
   memberSlug,
   normalizeLegislatorPhotoUrl,
   kySponsorPortraitAlt,
@@ -124,7 +125,10 @@ export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardPro
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      router.push(`/members/${memberSlug(s.name)}`);
+                      // Canonical profile path when the sponsor resolves in the roster —
+                      // name-derived slugs are aliases that 308 to it.
+                      const matched = matchLegislatorBySponsorName(legislators, s.name);
+                      router.push(matched ? memberProfilePath(matched) : `/members/${memberSlug(s.name)}`);
                     }}
                     title={s.name}
                     sx={{

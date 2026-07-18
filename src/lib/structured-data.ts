@@ -251,6 +251,92 @@ export function buildGlossaryFaqJsonLd(
   };
 }
 
+/**
+ * schema.org/AdministrativeArea for a legislative district page. schema.org has no
+ * legislative-district type; AdministrativeArea contained in the State is the honest
+ * fit. The member's Person node stays on the profile page — the HTML link carries
+ * the relationship.
+ */
+export function buildDistrictJsonLd(name: string, path: string): JsonLdNode {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'AdministrativeArea',
+    name,
+    url: absoluteUrl(path),
+    containedInPlace: { '@type': 'State', name: 'Kentucky' },
+  };
+}
+
+/** schema.org/CollectionPage for index pages (districts, topics). */
+export function buildCollectionPageJsonLd(opts: {
+  name: string;
+  description: string;
+  path: string;
+}): JsonLdNode {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: opts.name,
+    description: opts.description,
+    url: absoluteUrl(opts.path),
+    inLanguage: 'en-US',
+  };
+}
+
+/** schema.org/CollectionPage + ItemList for a topic page's visible bill list. */
+export function buildTopicCollectionJsonLd(opts: {
+  name: string;
+  description: string;
+  path: string;
+  bills: { bill_number: string; title: string; path: string }[];
+}): JsonLdNode {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: opts.name,
+    description: opts.description,
+    url: absoluteUrl(opts.path),
+    inLanguage: 'en-US',
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: opts.bills.map((b, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: `${b.bill_number} — ${b.title}`,
+        url: absoluteUrl(b.path),
+      })),
+    },
+  };
+}
+
+/**
+ * schema.org/Article for evergreen guide pages. Author/publisher reference the
+ * site Organization node emitted in the root layout. HowTo is deliberately not
+ * used (Google retired HowTo rich results in 2023); FAQPage stays reserved for
+ * the glossary.
+ */
+export function buildGuideArticleJsonLd(opts: {
+  headline: string;
+  description: string;
+  path: string;
+  /** ISO date of the last substantive content edit — maintained by hand in the page file. */
+  dateModified: string;
+}): JsonLdNode {
+  const origin = absoluteUrl('/');
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: opts.headline,
+    description: opts.description,
+    url: absoluteUrl(opts.path),
+    mainEntityOfPage: absoluteUrl(opts.path),
+    inLanguage: 'en-US',
+    dateModified: opts.dateModified,
+    author: { '@id': `${origin}#organization` },
+    publisher: { '@id': `${origin}#organization` },
+  };
+}
+
 /** schema.org/GovernmentOrganization for a Kentucky General Assembly committee. */
 export function buildCommitteeJsonLd(committee: KYCommittee, path: string): JsonLdNode {
   const name = normalizeKyGaDisplayName(committee.name);

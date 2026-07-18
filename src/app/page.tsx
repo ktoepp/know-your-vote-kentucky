@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { preload } from 'react-dom';
+import { buildPageMetadata } from '@/lib/seo';
 import { Box } from '@mui/material';
 import { HomeAuthHero } from '@/components/home/HomeAuthHero';
 import { HomePageContent } from '@/components/home/HomePageContent';
@@ -14,11 +15,13 @@ import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-se
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
-  title: 'Know Your Vote Kentucky — Track Kentucky legislation',
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Know Your Vote Kentucky — Track Kentucky bills and find your legislators',
+  absoluteTitle: true,
   description:
-    'Free tool for Kentucky residents to find their representatives, track bills, and get notified when legislation moves.',
-};
+    'Free, non-partisan tracking for the Kentucky General Assembly. Browse bills, look up your state representatives and senators, and receive email updates when legislation you follow moves.',
+  path: '/',
+});
 
 export default async function HomePage() {
   // Hero is a CSS background (invisible to the browser preload scanner), so

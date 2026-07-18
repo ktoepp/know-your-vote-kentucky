@@ -1,5 +1,6 @@
 import { Box, Chip, Typography } from '@mui/material';
 import { LANDING_TOPICS } from '@/components/home/landing-data';
+import { kyTopicPath } from '@/lib/ky-topic-pages';
 
 export function LandingTopics() {
   return (
@@ -33,12 +34,20 @@ export function LandingTopics() {
             key={label}
             label={label}
             component="a"
-            href={`/bills?topic=${encodeURIComponent(topic)}`}
+            href={kyTopicPath(topic)}
             clickable
             variant="outlined"
             sx={{ fontWeight: 500, borderRadius: '16px' }}
           />
         ))}
+        <Chip
+          label="All topics →"
+          component="a"
+          href="/bills/topics"
+          clickable
+          variant="outlined"
+          sx={{ fontWeight: 500, borderRadius: '16px' }}
+        />
         <Chip
           label="Browse bills →"
           component="a"

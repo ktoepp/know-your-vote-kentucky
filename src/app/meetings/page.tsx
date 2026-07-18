@@ -5,12 +5,14 @@ import { searchParamsToUrlSearchParams, type SearchParamsInput } from '@/lib/sea
 import { JsonLd } from '@/components/seo/JsonLd';
 import { buildMeetingEventJsonLd, buildBreadcrumbJsonLd } from '@/lib/structured-data';
 import { kyTodayIso } from '@/lib/ky-committee-display';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Committee meetings | Know Your Vote Kentucky',
+export const metadata = buildPageMetadata({
+  title: 'Kentucky legislative committee meetings',
   description:
     'Upcoming Kentucky General Assembly committee meetings from the LRC legislative calendar.',
-};
+  path: '/meetings',
+});
 
 export const revalidate = 300;
 

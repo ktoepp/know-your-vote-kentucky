@@ -14,8 +14,17 @@ import { buildCommitteeMemberDisplay } from '@/lib/ky-committee-members';
 import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { buildCommitteeJsonLd, buildBreadcrumbJsonLd } from '@/lib/structured-data';
+import { buildPageMetadata } from '@/lib/seo';
+import { fetchCommitteeSitemapEntries } from '@/lib/sitemap-data';
 
 export const revalidate = 300;
+
+// Pre-render committee pages at build so first crawls are warm; alias slugs
+// still resolve (and 308) on demand via `dynamicParams`.
+export async function generateStaticParams(): Promise<{ slug: string }[]> {
+  const entries = await fetchCommitteeSitemapEntries().catch(() => []);
+  return entries.map((e) => ({ slug: e.slug }));
+}
 
 type PageProps = { params: Promise<{ slug: string }> };
 
@@ -23,20 +32,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   const committee = await getKyCommitteeBySlug(slug);
   if (!committee) {
-    return { title: 'Committee not found | Know Your Vote Kentucky' };
+    return { title: 'Committee not found' };
   }
   const name = normalizeKyGaDisplayName(committee.name);
-  return {
-    title: `${name} | Know Your Vote Kentucky`,
+  return buildPageMetadata({
+    title: `${name} — Kentucky General Assembly committee`,
     description: `Scheduled meetings and agendas for ${name} from the Kentucky LRC legislative calendar.`,
-    alternates: { canonical: `/committees/${slug}` },
-    openGraph: {
-      title: name,
-      description: `Scheduled meetings and agendas for ${name} from the Kentucky LRC legislative calendar.`,
-      url: `/committees/${slug}`,
-      type: 'article',
-    },
-  };
+    path: `/committees/${slug}`,
+    ogType: 'article',
+  });
 }
 
 export default async function CommitteeDetailPage({ params }: PageProps) {

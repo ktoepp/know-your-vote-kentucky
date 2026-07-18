@@ -23,10 +23,17 @@ import { buildSiteJsonLd } from '@/lib/structured-data';
 
 const siteOrigin = publicSiteOrigin();
 
+// No layout-level `alternates` here: it would be inherited by every page that
+// doesn't set its own, making browse/static pages declare the homepage as their
+// canonical. Each indexable page sets a self-referencing canonical via
+// `buildPageMetadata` (src/lib/seo.ts); `metadataBase` absolutizes those paths.
 export const metadata: Metadata = {
-  title: 'Know Your Vote Kentucky',
-  description: 'Track Kentucky legislation, representatives, and civic engagement',
-  keywords: "Kentucky legislation, civic engagement, democracy, public affairs, bill tracking, Kentucky representatives",
+  title: {
+    default: 'Know Your Vote Kentucky — Kentucky bill tracking and legislator lookup',
+    template: '%s | Know Your Vote Kentucky',
+  },
+  description:
+    'Track Kentucky General Assembly bills, look up your state legislators, and receive email updates when legislation moves.',
   authors: [{ name: "Know Your Vote Kentucky Team" }],
   creator: "Know Your Vote Kentucky",
   publisher: "Know Your Vote Kentucky",
@@ -38,20 +45,12 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
   manifest: '/manifest.json',
   openGraph: {
-    title: "Know Your Vote Kentucky - Track Kentucky Legislation",
-    description: "Track Kentucky legislation, representatives, and civic engagement. Making government accessible through AI.",
-    url: siteOrigin,
     siteName: "Know Your Vote Kentucky",
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Know Your Vote Kentucky - Track Kentucky Legislation",
-    description: "Track Kentucky legislation, representatives, and civic engagement. Making government accessible through AI.",
-  },
-  alternates: {
-    canonical: siteOrigin,
   },
   verification: {
     google: "fQMQMUDeDWtfRZTik5SInNXWP6a9OWx99aRPY_V6iCM",

@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Find my legislators',
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Find my legislators — look up your Kentucky House and Senate districts',
   description:
-    'Explore Kentucky state House and Senate districts, search by ZIP code, and see your legislators on the roster.',
-};
+    'Enter your address or ZIP code to find your Kentucky House and Senate districts and see your state representatives for the current session.',
+  path: '/members/map',
+});
 
 export default function MembersMapLayout({ children }: { children: ReactNode }) {
   return children;

@@ -75,6 +75,48 @@ export function formatKyIsoDateShort(iso: string | null | undefined): string {
 }
 
 /**
+ * "HB208" → "HB 208" for meta titles/descriptions — the spaced form matches how the
+ * LRC and news phrase bill numbers in searchable text. On-page copy keeps the DB form.
+ */
+export function formatKyBillNumberSpaced(input: string | null | undefined): string {
+  const s = formatKyBillNumberDisplay(input);
+  const m = s.match(/^([A-Z]+)\s*(\d.*)$/);
+  return m ? `${m[1]} ${m[2]}` : s;
+}
+
+/** Session year for meta titles ("2026 Regular Session" → "2026"); null when unparseable. */
+export function kyBillSessionYear(session: string | null | undefined): string | null {
+  const m = /^(\d{4})\b/.exec((session || '').trim());
+  return m ? m[1] : null;
+}
+
+/**
+ * Official catchlines open with enacting boilerplate ("AN ACT relating to …",
+ * "A JOINT RESOLUTION directing …") that wastes the ~60 visible characters of a
+ * <title>. Strip the opener for meta titles/OG only — page copy and JSON-LD keep
+ * the official title as recorded.
+ */
+export function kyBillSeoCatchline(title: string | null | undefined, maxLen = 60): string {
+  const raw = String(title ?? '').trim();
+  if (!raw) return '';
+  let s = raw
+    .replace(/^AN?\s+ACT\s+(relating\s+to|to\s+amend|proposing\s+to\s+amend)\s+/i, '')
+    .replace(/^AN?\s+ACT\s+/i, '')
+    .replace(/^A\s+(JOINT|CONCURRENT)\s+RESOLUTION\s+/i, '')
+    .replace(/^A\s+RESOLUTION\s+/i, '')
+    .trim();
+  if (!s) s = raw;
+  s = s.replace(/\.\s*$/, '');
+  if (s) s = s.charAt(0).toUpperCase() + s.slice(1);
+  if (s.length > maxLen) {
+    const cut = s.slice(0, maxLen + 1);
+    const lastSpace = cut.lastIndexOf(' ');
+    s = `${(lastSpace > 20 ? cut.slice(0, lastSpace) : s.slice(0, maxLen)).replace(/[,;:\s]+$/, '')}…`;
+  }
+  return s;
+}
+
+/**
  * True when the status indicates a bill is still pending legislative action.
  * Used to decide whether to show "Adjourned Sine Die" once the session has ended.
  */

@@ -265,13 +265,11 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
     return [...bills].sort((a, b) => String(b.session ?? '').localeCompare(String(a.session ?? '')));
   }, [bills, showAllSessions]);
 
+  // The page H1 renders server-side in src/app/search/page.tsx: `useSearchParams`
+  // here bails this tree out of the static HTML, and crawlers must still see it.
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-          Search Kentucky bills
-        </Typography>
-
+      <Container maxWidth="lg" sx={{ pt: 0, pb: 4 }}>
         {/* Search Bar */}
         <Paper elevation={1} sx={{ p: 2, mb: 4, borderRadius: 2 }} component="form" onSubmit={handleSubmit}>
           <TextField
