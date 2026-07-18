@@ -50,6 +50,12 @@ export interface MemberCardProps {
   profileNameHeading?: 'h1' | 'h2' | 'h3';
   /** Show district minimap for House/Senate seats. @default true */
   showDistrictMinimap?: boolean;
+  /**
+   * Render the footer row of external-link buttons (KY Legislature, Ballotpedia, campaign site, governor office).
+   * Set false on the full profile page, where a dedicated "Profiles & links" section consolidates these instead.
+   * @default true
+   */
+  showFooterLinks?: boolean;
 }
 
 export function MemberCard({
@@ -60,6 +66,7 @@ export function MemberCard({
   legislatorRoster,
   profileNameHeading = 'h3',
   showDistrictMinimap = true,
+  showFooterLinks = true,
 }: MemberCardProps) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
@@ -121,23 +128,27 @@ export function MemberCard({
           {leg.email && (
             <Box
               sx={{
-                display: 'flex',
-                gap: 1.25,
-                alignItems: 'flex-start',
                 minWidth: 0,
                 pointerEvents: pointerPassthrough ? 'auto' : undefined,
               }}
               aria-label="Email"
             >
-              <Email sx={{ fontSize: ICON_REM.nav, color: 'text.secondary', flexShrink: 0, mt: 0.2 }} aria-hidden />
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <CopyableEmail email={leg.email} display="block" variant="body2" />
-                {isFormerMember && (
-                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                    From our last update — may be outdated if this person no longer holds this office.
-                  </Typography>
-                )}
+              <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center', minWidth: 0 }}>
+                <Email sx={{ fontSize: ICON_REM.nav, color: 'text.secondary', flexShrink: 0 }} aria-hidden />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <CopyableEmail email={leg.email} display="block" variant="body2" />
+                </Box>
               </Box>
+              {isFormerMember && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                  sx={{ mt: 0.5, pl: `calc(${ICON_REM.nav} + 10px)` }}
+                >
+                  From our last update — may be outdated if this person no longer holds this office.
+                </Typography>
+              )}
             </Box>
           )}
           {!leg.email && isFormerMember && (
@@ -243,7 +254,7 @@ export function MemberCard({
     </>
   );
 
-  const footer = hasFooterActions ? (
+  const footer = showFooterLinks && hasFooterActions ? (
     <Box
       sx={{
         display: 'flex',

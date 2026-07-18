@@ -69,6 +69,7 @@ import {
   type LegiScanPerson,
 } from './ky-legiscan-client';
 import { mapLegiScanBillStatus } from './map-legiscan-bill-status';
+import { dropDuplicateRollCallRows } from './ky-vote-dedupe';
 
 /** LegiScan getBill `committee` (object or occasional array) → `ky_bills` committee columns. */
 /**
@@ -1666,11 +1667,17 @@ export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult
     if (skippedNoRollCallId > 0) {
       log(source, `Skipped ${skippedNoRollCallId} vote(s) missing roll_call_id to avoid duplicate rows`);
     }
+    const { rows: dedupedRows, dropped: droppedTwins } = options.dryRun
+      ? { rows, dropped: 0 }
+      : await dropDuplicateRollCallRows(db, rows);
+    if (droppedTwins > 0) {
+      log(source, `Skipped ${droppedTwins} vote(s) duplicating an already-stored roll call under a different roll_call_id`);
+    }
     let synced = 0;
-    if (rows.length > 0 && !options.dryRun) {
+    if (dedupedRows.length > 0 && !options.dryRun) {
       const BATCH = 50;
-      for (let i = 0; i < rows.length; i += BATCH) {
-        const batch = rows.slice(i, i + BATCH);
+      for (let i = 0; i < dedupedRows.length; i += BATCH) {
+        const batch = dedupedRows.slice(i, i + BATCH);
         const { error } = await db
           .from('ky_votes')
           .upsert(batch, { onConflict: 'bill_id,roll_call_id', ignoreDuplicates: false });

@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Box,
   Button,
@@ -9,21 +10,31 @@ import {
   CardContent,
   Chip,
   Container,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
+  FormControl,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { ArrowBack, Description, Groups, HowToVote } from '@mui/icons-material';
+import { ArrowBack, Description, Groups, HowToVote, Search } from '@mui/icons-material';
 import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import type { KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { MemberSponsoredBills } from '@/components/members/MemberSponsoredBills';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
-import { kyLegislaturePublicUrl } from '@/lib/ky-member-utils';
+import {
+  isKentuckyGovernor,
+  kyLegislatorCampaignWebsite,
+  kyLegislaturePublicUrl,
+  normalizeBallotpediaHref,
+} from '@/lib/ky-member-utils';
+import { KENTUCKY_GOVERNOR_OFFICE_URL } from '@/components/civic/GovernorBeshearChip';
 import { legiscanMemberPersonUrl } from '@/lib/external-legislative-links';
 import { groupLegislatorExternalLinks, labelForLinkHost } from '@/lib/legislator-link-normalize';
 import { ICON_REM, INTERACTION, TYPE, SECTION_TITLE_DISPLAY_SX } from '@/lib/ui-tokens';
@@ -89,58 +100,95 @@ function CommitteeAssignmentTile({ assignment }: { assignment: MemberCommitteeAs
   );
 }
 
+interface RollVoteGroup {
+  key: string;
+  bill: MemberRecentRollVote['bill'];
+  rows: MemberRecentRollVote[];
+}
+
+/** Cluster consecutive roll calls on the same bill so the bill heading renders once per run. */
+function groupRollVotes(rows: MemberRecentRollVote[]): RollVoteGroup[] {
+  const groups: RollVoteGroup[] = [];
+  for (const r of rows) {
+    const prev = groups[groups.length - 1];
+    const billId = r.bill?.id ?? null;
+    if (prev && billId != null && prev.bill?.id === billId) {
+      prev.rows.push(r);
+    } else {
+      groups.push({ key: `${billId ?? 'none'}-${r.voteId}`, bill: r.bill, rows: [r] });
+    }
+  }
+  return groups;
+}
+
 function VoteRollCallList({ rows }: { rows: MemberRecentRollVote[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <List disablePadding>
-      {rows.map((r, j) => (
-        <React.Fragment key={r.voteId}>
-          {j > 0 && <Divider component="li" />}
-          <ListItem alignItems="flex-start" disablePadding sx={{ py: 1.25 }}>
-            <ListItemText
-              primary={
-                r.bill ? (
-                  <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.5 }}>
-                    <BillNumber billNumber={r.bill.bill_number} size="compact" href={kyBillPath(r.bill)} />
-                    {r.bill.title ? (
-                      <Typography component="span" color="text.secondary" variant="body2">
-                        — {r.bill.title}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    Bill
+    <Box>
+      {groupRollVotes(rows).map((g, i) => (
+        <Box
+          key={g.key}
+          sx={{ borderTop: i > 0 ? 1 : 0, borderColor: 'divider', pt: i > 0 ? 1.25 : 0, pb: 1.25, '&:last-of-type': { pb: 0 } }}
+        >
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.75, mb: 0.5 }}>
+            {g.bill ? (
+              <>
+                <BillNumber billNumber={g.bill.bill_number} size="compact" href={kyBillPath(g.bill)} />
+                {g.bill.title ? (
+                  <Typography
+                    component="span"
+                    color="text.secondary"
+                    variant="body2"
+                    sx={{
+                      overflow: 'hidden',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                  >
+                    {g.bill.title}
                   </Typography>
-                )
-              }
-              secondary={
-                <Box sx={{ pt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                  {r.date && (
-                    <Typography component="span" variant="caption" color="text.secondary">
-                      {formatKyIsoDateShort(r.date)}
-                    </Typography>
-                  )}
-                  <Chip
-                    size="small"
-                    label={memberVoteLabel(r.myBucket, r.myVote)}
-                    color={voteBucketChipColor(r.myBucket)}
-                    variant="outlined"
-                  />
-                  {r.description && (
-                    <Typography component="span" variant="caption" color="text.secondary">
-                      {r.description}
-                    </Typography>
-                  )}
-                </Box>
-              }
-              secondaryTypographyProps={{ component: 'div' }}
-            />
-          </ListItem>
-        </React.Fragment>
+                ) : null}
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Bill
+              </Typography>
+            )}
+          </Box>
+          {g.rows.map((r) => (
+            <Box
+              key={r.voteId}
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '76px 1fr auto', sm: '92px 1fr auto' },
+                gap: 1.25,
+                alignItems: 'center',
+                py: 0.5,
+                pl: 1.5,
+                ml: 0.25,
+                borderLeft: 2,
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                {r.date ? formatKyIsoDateShort(r.date) : ''}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {r.description || 'Roll call'}
+              </Typography>
+              <Chip
+                size="small"
+                label={memberVoteLabel(r.myBucket, r.myVote)}
+                color={voteBucketChipColor(r.myBucket)}
+                variant="outlined"
+              />
+            </Box>
+          ))}
+        </Box>
       ))}
-    </List>
+    </Box>
   );
 }
 
@@ -148,6 +196,7 @@ export function MemberProfileView({
   leg,
   legislatorRoster,
   sessionName,
+  sessionOptions = [],
   sponsoredBills = [],
   voteRecord,
   committeeAssignments = [],
@@ -155,11 +204,25 @@ export function MemberProfileView({
   leg: KYLegislator;
   legislatorRoster: KYLegislator[];
   sessionName: string;
+  sessionOptions?: string[];
   sponsoredBills?: MemberSponsoredBill[];
   voteRecord?: MemberVoteRecord;
   committeeAssignments?: MemberCommitteeAssignment[];
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [voteFilter, setVoteFilter] = useState<VoteFilter>('all');
+  const [voteSearch, setVoteSearch] = useState('');
+  const [voteSort, setVoteSort] = useState<'newest' | 'oldest'>('newest');
+  const normalizedVoteSearch = voteSearch.trim().toLowerCase();
+
+  const showSessionSelector = sessionOptions.length > 1;
+  const handleSessionChange = (next: string) => {
+    if (next === sessionName) return;
+    setVoteFilter('all');
+    setVoteSearch('');
+    router.push(`${pathname}?session=${encodeURIComponent(next)}`, { scroll: false });
+  };
 
   const hasLegiscan = legiscanMemberPersonUrl(leg.legiscan_id) != null;
   const isChamberMember = leg.chamber === 'house' || leg.chamber === 'senate';
@@ -167,7 +230,11 @@ export function MemberProfileView({
   const tally = voteRecord?.tally;
   const { social: socialLinks, other: otherLinks } = groupLegislatorExternalLinks(leg.external_links);
   const showDistrictMap = leg.chamber === 'house' || leg.chamber === 'senate';
+  const isFormerMember = leg.active === false;
   const officialProfileUrl = kyLegislaturePublicUrl(leg, legislatorRoster);
+  const ballotpediaUrl = normalizeBallotpediaHref(leg.ballotpedia);
+  const campaignUrl = isFormerMember ? null : kyLegislatorCampaignWebsite(leg);
+  const isGovernor = isKentuckyGovernor(leg);
   const profileSourceLinks = [
     ...(officialProfileUrl
       ? [
@@ -175,6 +242,33 @@ export function MemberProfileView({
             href: officialProfileUrl,
             label: 'Official profile (KY Legislature)',
             ariaLabel: `Official Kentucky Legislature profile for ${leg.name} (opens in a new tab)`,
+          },
+        ]
+      : []),
+    ...(ballotpediaUrl
+      ? [
+          {
+            href: ballotpediaUrl,
+            label: 'Ballotpedia',
+            ariaLabel: `Ballotpedia profile for ${leg.name} (opens in a new tab)`,
+          },
+        ]
+      : []),
+    ...(campaignUrl
+      ? [
+          {
+            href: campaignUrl,
+            label: 'Campaign website',
+            ariaLabel: `Campaign website for ${leg.name} (opens in a new tab)`,
+          },
+        ]
+      : []),
+    ...(isGovernor
+      ? [
+          {
+            href: KENTUCKY_GOVERNOR_OFFICE_URL,
+            label: "Governor's office",
+            ariaLabel: `Office of the Governor (opens in a new tab)`,
           },
         ]
       : []),
@@ -189,18 +283,38 @@ export function MemberProfileView({
     })),
   ].filter((link, i, arr) => arr.findIndex((l) => l.href === link.href) === i);
 
+  const matchedVotes = useMemo(() => {
+    if (!voteRecord?.votes.length) return [];
+    return voteRecord.votes.filter((v) => {
+      if (!matchesVoteFilter(v.myBucket, voteFilter)) return false;
+      if (!normalizedVoteSearch) return true;
+      const haystack = [v.bill?.bill_number, v.bill?.title, v.description]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedVoteSearch);
+    });
+  }, [voteFilter, voteRecord, normalizedVoteSearch]);
+
+  const isDefaultVoteView = voteFilter === 'all' && !normalizedVoteSearch;
+
   const filteredVotes = useMemo(() => {
     if (!voteRecord?.votes.length) return [];
-    if (voteFilter === 'all') return voteRecord.recent;
-    const matched = voteRecord.votes.filter((v) => matchesVoteFilter(v.myBucket, voteFilter));
-    return matched.slice(0, FILTERED_VOTE_DISPLAY_CAP);
-  }, [voteFilter, voteRecord]);
+    const base = isDefaultVoteView ? voteRecord.recent : matchedVotes.slice(0, FILTERED_VOTE_DISPLAY_CAP);
+    return [...base].sort((a, b) => {
+      // Null dates sort last in either direction.
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      const c = a.date.localeCompare(b.date);
+      return voteSort === 'newest' ? -c : c;
+    });
+  }, [isDefaultVoteView, matchedVotes, voteRecord, voteSort]);
 
   const filteredOverflow = useMemo(() => {
-    if (voteFilter === 'all' || !voteRecord?.votes.length) return 0;
-    const total = voteRecord.votes.filter((v) => matchesVoteFilter(v.myBucket, voteFilter)).length;
-    return Math.max(0, total - FILTERED_VOTE_DISPLAY_CAP);
-  }, [voteFilter, voteRecord]);
+    if (isDefaultVoteView) return 0;
+    return Math.max(0, matchedVotes.length - FILTERED_VOTE_DISPLAY_CAP);
+  }, [isDefaultVoteView, matchedVotes]);
 
   const toggleVoteFilter = (next: VoteFilter) => {
     setVoteFilter((prev) => (prev === next ? 'all' : next));
@@ -233,6 +347,7 @@ export function MemberProfileView({
               profileNameHeading="h1"
               legislatorRoster={legislatorRoster}
               showDistrictMinimap={false}
+              showFooterLinks={false}
             />
 
             {profileSourceLinks.length > 0 && (
@@ -260,6 +375,37 @@ export function MemberProfileView({
 
         {showLegislativeSections && (
           <>
+            {showSessionSelector && (
+              <Box
+                sx={{
+                  mt: 4,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 1.5,
+                }}
+              >
+                <FormControl size="small" sx={{ minWidth: 220 }}>
+                  <InputLabel id="member-session-label">Legislative session</InputLabel>
+                  <Select
+                    labelId="member-session-label"
+                    label="Legislative session"
+                    value={sessionName}
+                    onChange={(e) => handleSessionChange(e.target.value)}
+                  >
+                    {sessionOptions.map((s) => (
+                      <MenuItem key={s} value={s}>
+                        {s}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Typography variant="caption" color="text.secondary">
+                  Sponsored bills and voting record below reflect the selected session.
+                </Typography>
+              </Box>
+            )}
+
             {/* Sponsored bills */}
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
@@ -313,6 +459,39 @@ export function MemberProfileView({
                         </Typography>
                       ) : (
                         <>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1.5 }}>
+                            <TextField
+                              size="small"
+                              value={voteSearch}
+                              onChange={(e) => setVoteSearch(e.target.value)}
+                              placeholder="Search votes by bill number, title, or roll-call description"
+                              aria-label="Search voting record"
+                              sx={{ flex: '1 1 240px' }}
+                              InputProps={{
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <Search sx={{ fontSize: ICON_REM.nav, color: 'text.secondary' }} aria-hidden />
+                                  </InputAdornment>
+                                ),
+                              }}
+                            />
+                            <ToggleButtonGroup
+                              size="small"
+                              value={voteSort}
+                              exclusive
+                              onChange={(_, v: 'newest' | 'oldest' | null) => {
+                                if (v != null) setVoteSort(v);
+                              }}
+                              aria-label="Sort votes by date"
+                            >
+                              <ToggleButton value="newest" sx={{ textTransform: 'none', px: 1.5 }}>
+                                Newest first
+                              </ToggleButton>
+                              <ToggleButton value="oldest" sx={{ textTransform: 'none', px: 1.5 }}>
+                                Oldest first
+                              </ToggleButton>
+                            </ToggleButtonGroup>
+                          </Box>
                           <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 1 }} role="group" aria-label="Filter votes by outcome">
                             {voteFilter !== 'all' && (
                               <Chip
@@ -381,7 +560,7 @@ export function MemberProfileView({
                           {filteredVotes.length > 0 ? (
                             <>
                               <Typography component="h3" variant="subtitle2" color="text.primary" sx={{ mb: 0.5 }}>
-                                {voteFilter === 'all' ? 'Recent' : 'Matching votes'}
+                                {isDefaultVoteView ? 'Recent' : 'Matching votes'}
                               </Typography>
                               <VoteRollCallList rows={filteredVotes} />
                               {filteredOverflow > 0 && (

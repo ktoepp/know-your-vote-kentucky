@@ -288,6 +288,22 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
 
 ## Backlog
 
+### `ky_votes` duplicate rows — sync-side dedupe + one-time cleanup
+
+Found 2026-07-17 while merging roll calls into the bill timeline: **152 duplicate groups** in `ky_votes` (same bill + date + yea/nay/absent), two flavors — (a) 51 rows with NULL `roll_call_id` that a later sync re-inserted with the id populated (two sync paths, no shared upsert key), and (b) LegiScan shipping one physical roll call twice under the same RCS#/RSN# with variant descriptions ("Third Reading" vs "Third Reading W/SCS 1"; a mislabeled "Veto Override" copy with identical tally/date). The bill page now dedupes at read time (`fetchDbVotes`), but the member-profile RPC (`get_votes_for_legislator`) and any other consumer still see raw rows.
+
+- [x] **One-time cleanup — ✅ ran against primary 2026-07-17.** 135 rows deleted (51 NULL-`roll_call_id` twins + 84 same-RCS# copies), all preserved in `ky_votes_dupe_backup_20260717`. 6,944 votes remain; the 27 groups sharing a date+tally under **different** RCS numbers were confirmed as genuinely distinct roll calls and kept. Drop the backup table once a few weeks pass without complaints.
+- [x] **Sync-side guard — ✅ done same day.** New `src/lib/ky-vote-dedupe.ts` (`dropDuplicateRollCallRows`): a roll call's physical identity is (bill, date, yea, nay, absent, RCS/RSN number parsed from desc); incoming rows duplicating that identity under a different `roll_call_id` are skipped, in-batch and against existing DB rows. Wired into both write paths — `syncKyVotes` and the dataset importer's `upsertVoteRows`. Rows without a parseable number are never cross-collapsed.
+- [x] Read-time dedupe in `fetchDbVotes` kept as a guard, and made RCS#-aware so it can't collapse the 27 legitimate same-tally pairs.
+
+### Backfill pre-2018 roll-call votes (`ky_votes`) — enables member Voting-record history
+
+The member profile now has a **shared legislative-session selector** (2026-07-17) covering both Sponsored bills and the Voting record. Sponsor data exists for every session (2010–2026), but roll-call `ky_votes` only exist from **2018 Regular Session onward** — for any earlier session the member's Voting record renders empty ("No recorded votes found for this session yet.") even though sponsored bills show. Coverage as of 2026-07-17 (votes per session): 2018 RS 799, 2019 RS 675 / Special 11, 2020 RS 605, 2021 RS 816 / Special 33, 2022 RS 946 / Special 4, 2023 RS 678, 2024 RS 844, 2025 RS 701, 2026 RS 967; **2010–2017 RS + specials = 0 votes**.
+
+- [ ] Backfill `ky_votes` for **2010–2017** regular + special sessions (and the empty 2018 Special) so the pre-2018 Voting record isn't blank. Prefer the **LegiScan Dataset Pull API** path already built for the weekly reconcile (`npm run sync:ky:dataset` / `src/lib/ky-legiscan-dataset-import.ts`) — historic datasets are hash-stable, so this is a one-time bounded pull per session, not ongoing quota. Verify the dataset importer parses/persists roll-call rows (`roll_call` JSON, `nv_count`) for these older sessions, or extend it if it currently only imports bills.
+- [ ] After backfill, the session selector needs no code change — it already lists any session the member sponsored in; confirm the Voting record populates for a long-serving member across the newly-seeded sessions.
+- [ ] Consider whether the selector should also surface sessions where a member has **votes but no sponsorships** (currently sponsor-based via `fetchMemberSessionsForLegislator`); revisit only if backfill surfaces such gaps.
+
 ### Accuracy-audit follow-ups (delegated — LLM / heavy verification out of scope for the deterministic agent)
 
 The weekly `audit:accuracy` agent intentionally stays deterministic and cheap (see decisions.md § 2026-06-03). The following need semantic judgment or heavy fetches and should be handled by a human or a dedicated LLM/data agent, then cross-checked against primary sources before any content edit:

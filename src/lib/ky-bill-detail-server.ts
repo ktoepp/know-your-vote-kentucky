@@ -63,7 +63,7 @@ async function fetchDbVotes(
     .order('date', { ascending: true, nullsFirst: true })
     .order('roll_call_id', { ascending: true });
   if (error || !data) return [];
-  return data.map((v) => ({
+  const mapped = data.map((v) => ({
     roll_call_id: v.roll_call_id ?? undefined,
     date: v.date ?? null,
     desc: v.description ?? null,
@@ -72,7 +72,44 @@ async function fetchDbVotes(
     nv: v.nv_count ?? 0,
     absent: v.absent_count ?? 0,
     passed: v.passed ?? null,
-  })) as KyBillDetailEnrichment['votes'];
+  }));
+  // Dedupe rows describing the same physical roll call (guard: primary dedupe ran as
+  // a one-time DB cleanup 2026-07-17, see TASKS.md). Two duplicate shapes exist:
+  // (a) rows without roll_call_id that a later sync re-added with one — dropped when
+  //     any keyed row shares their (date, yea, nay, absent) tally;
+  // (b) LegiScan shipping one RCS#/RSN# twice with variant descriptions ("Third
+  //     Reading" vs "Third Reading W/SCS 1", or a mislabeled "Veto Override" copy) —
+  //     collapsed only when the parsed roll-call number ALSO matches, because
+  //     genuinely distinct roll calls can share a date and tally (27 such pairs in
+  //     production). Prefer the row with NV populated; ties keep the earliest
+  //     roll_call_id (query order).
+  const tallyKey = (v: (typeof mapped)[number]) => `${v.date}|${v.yea}|${v.nay}|${v.absent}`;
+  const rcNumOf = (v: (typeof mapped)[number]) =>
+    /(?:RCS|RSN)#\s*(\d+)/i.exec(v.desc ?? '')?.[1] ?? null;
+
+  const keyedTallies = new Set(mapped.filter((v) => v.roll_call_id != null).map(tallyKey));
+  const winners: typeof mapped = [];
+  const winnerIndexByKey = new Map<string, number>();
+  for (const v of mapped) {
+    if (v.roll_call_id == null) {
+      if (!keyedTallies.has(tallyKey(v))) winners.push(v);
+      continue;
+    }
+    const num = rcNumOf(v);
+    if (num == null) {
+      winners.push(v);
+      continue;
+    }
+    const key = `${tallyKey(v)}|${num}`;
+    const at = winnerIndexByKey.get(key);
+    if (at == null) {
+      winnerIndexByKey.set(key, winners.length);
+      winners.push(v);
+    } else if (v.nv > 0 && winners[at]!.nv <= 0) {
+      winners[at] = v;
+    }
+  }
+  return winners as KyBillDetailEnrichment['votes'];
 }
 
 /**
