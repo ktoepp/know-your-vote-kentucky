@@ -5,6 +5,7 @@ import {
   fetchCommitteeSitemapEntries,
   fetchMemberSitemapEntries,
 } from '@/lib/sitemap-data';
+import { allKyDistrictRefs, kyDistrictPath } from '@/lib/ky-district-pages';
 
 type ChangeFreq = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
 
@@ -24,6 +25,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/committees', changeFrequency: 'weekly', priority: 0.8 },
     { path: '/members', changeFrequency: 'weekly', priority: 0.8 },
     { path: '/members/map', changeFrequency: 'monthly', priority: 0.75 },
+    { path: '/districts', changeFrequency: 'weekly', priority: 0.7 },
     { path: '/search', changeFrequency: 'weekly', priority: 0.75 },
     { path: '/about', changeFrequency: 'monthly', priority: 0.5 },
     { path: '/glossary', changeFrequency: 'monthly', priority: 0.5 },
@@ -67,5 +69,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority,
   }));
 
-  return [...staticEntries, ...billEntries, ...memberEntries, ...committeeEntries];
+  // All 138 district pages — fixed set, no DB dependency.
+  const districtEntries: MetadataRoute.Sitemap = allKyDistrictRefs().map((ref) => ({
+    url: `${origin}${kyDistrictPath(ref)}`,
+    changeFrequency: 'monthly',
+    priority: 0.6,
+  }));
+
+  return [...staticEntries, ...billEntries, ...memberEntries, ...committeeEntries, ...districtEntries];
 }

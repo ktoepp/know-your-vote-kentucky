@@ -251,6 +251,38 @@ export function buildGlossaryFaqJsonLd(
   };
 }
 
+/**
+ * schema.org/AdministrativeArea for a legislative district page. schema.org has no
+ * legislative-district type; AdministrativeArea contained in the State is the honest
+ * fit. The member's Person node stays on the profile page — the HTML link carries
+ * the relationship.
+ */
+export function buildDistrictJsonLd(name: string, path: string): JsonLdNode {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'AdministrativeArea',
+    name,
+    url: absoluteUrl(path),
+    containedInPlace: { '@type': 'State', name: 'Kentucky' },
+  };
+}
+
+/** schema.org/CollectionPage for index pages (districts, topics). */
+export function buildCollectionPageJsonLd(opts: {
+  name: string;
+  description: string;
+  path: string;
+}): JsonLdNode {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: opts.name,
+    description: opts.description,
+    url: absoluteUrl(opts.path),
+    inLanguage: 'en-US',
+  };
+}
+
 /** schema.org/GovernmentOrganization for a Kentucky General Assembly committee. */
 export function buildCommitteeJsonLd(committee: KYCommittee, path: string): JsonLdNode {
   const name = normalizeKyGaDisplayName(committee.name);

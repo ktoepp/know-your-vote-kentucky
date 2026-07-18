@@ -13,6 +13,7 @@ const footerNavLinks = [
   { href: '/committees', label: 'Committees' },
   { href: '/meetings', label: 'Meetings' },
   { href: '/members', label: 'Members' },
+  { href: '/districts', label: 'Districts' },
   { href: '/search', label: 'Search' },
   { href: '/legislature/resources', label: 'Frankfort resources' },
   { href: '/glossary', label: 'Glossary' },
