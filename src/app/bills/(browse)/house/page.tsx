@@ -22,7 +22,7 @@ type PageProps = {
 export default function HouseBillsPage({ searchParams }: PageProps) {
   return (
     <BillsBrowsePage
-      title="House Bills"
+      title="House bills"
       subtitle="House bills and resolutions (HB, HR, HJR, HCR, etc.) from the Kentucky General Assembly."
       chamberMode="house"
       searchParams={searchParams}

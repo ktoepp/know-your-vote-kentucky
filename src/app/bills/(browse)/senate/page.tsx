@@ -22,7 +22,7 @@ type PageProps = {
 export default function SenateBillsPage({ searchParams }: PageProps) {
   return (
     <BillsBrowsePage
-      title="Senate Bills"
+      title="Senate bills"
       subtitle="Senate bills and resolutions (SB, SR, SJR, SCR, etc.) from the Kentucky General Assembly."
       chamberMode="senate"
       searchParams={searchParams}
