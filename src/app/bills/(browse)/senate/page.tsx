@@ -1,11 +1,17 @@
 import type { Metadata } from 'next';
 import { BillsBrowsePage } from '@/components/bills/BillsBrowsePage';
 import type { SearchParamsInput } from '@/lib/search-params';
+import { getCivicDataSessionName } from '@/lib/ky-sessions';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Senate Bills | Know Your Vote Kentucky',
-  description: 'Senate bills and resolutions from the Kentucky General Assembly.',
-};
+export function generateMetadata(): Metadata {
+  const session = getCivicDataSessionName();
+  return buildPageMetadata({
+    title: `Kentucky Senate bills — ${session}`,
+    description: `Bills introduced in the Kentucky Senate during the ${session}, with status, sponsors, and votes.`,
+    path: '/bills/senate',
+  });
+}
 
 export const revalidate = 60;
 

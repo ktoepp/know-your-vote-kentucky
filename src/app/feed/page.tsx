@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import { FeedView } from '@/components/feed/FeedView';
 import { fetchKyFeedRecentHouseBills, fetchKyFeedRecentSenateBills } from '@/lib/ky-feed-server';
 import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-server';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Your feed | Know Your Vote Kentucky',
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Your feed',
   description: 'Bills you follow and recent Kentucky General Assembly activity.',
-};
+  path: '/feed',
+});
 
 export const revalidate = 120;
 

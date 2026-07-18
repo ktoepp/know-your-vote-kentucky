@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { getCivicDataSessionName } from '@/lib/ky-sessions';
+import { getCivicDataSessionName, KY_BILL_SESSION_OPTIONS } from '@/lib/ky-sessions';
 import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-server';
 import { memberCanonicalSlug } from '@/lib/ky-member-utils';
 import { kyBillSlug } from '@/lib/ky-bill-slug';
@@ -22,26 +22,61 @@ function toDate(value: string | null | undefined): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-/** Bills in the active session, capped to keep sitemap under search-engine limits. */
+/** PostgREST caps a single response at ~1000 rows, so bill fetches must paginate with .range(). */
+const SITEMAP_FETCH_PAGE_SIZE = 1000;
+
+/**
+ * Bills in the current + most recent prior session, capped to keep the sitemap under
+ * search-engine limits. The prior session stays included so its bills don't vanish
+ * from the sitemap the day a new session starts (people search old bill numbers).
+ */
 export async function fetchBillSitemapEntries(limit = 5000): Promise<SitemapEntry[]> {
+  const supabase = createAnonClient();
+  if (!supabase) return [];
+  const current = getCivicDataSessionName();
+  const currentIdx = KY_BILL_SESSION_OPTIONS.indexOf(current);
+  const sessions =
+    currentIdx >= 0 ? [...KY_BILL_SESSION_OPTIONS.slice(currentIdx, currentIdx + 2)] : [current];
+
+  const entries: SitemapEntry[] = [];
+  for (let offset = 0; entries.length < limit; offset += SITEMAP_FETCH_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('ky_bills')
+      .select('id, bill_number, session, updated_at')
+      .in('session', sessions)
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + SITEMAP_FETCH_PAGE_SIZE - 1);
+    if (error || !data || data.length === 0) break;
+    // Advertise the canonical slug URL (F4) — UUID entries were what Google was ranking.
+    // UUID fallback only for rows whose slug can't be derived (those pages self-serve).
+    for (const row of data as { id: string; bill_number: string; session: string | null; updated_at: string | null }[]) {
+      entries.push({ slug: kyBillSlug(row) ?? row.id, lastModified: toDate(row.updated_at) });
+      if (entries.length >= limit) break;
+    }
+    if (data.length < SITEMAP_FETCH_PAGE_SIZE) break;
+  }
+  return entries;
+}
+
+/**
+ * Top current-session bills by view count — pre-rendered at build (`generateStaticParams`)
+ * so first crawler hits land on warm pages instead of cold on-demand renders.
+ */
+export async function fetchTopBillSlugsForPrerender(limit = 100): Promise<string[]> {
   const supabase = createAnonClient();
   if (!supabase) return [];
   const session = getCivicDataSessionName();
   const { data, error } = await supabase
     .from('ky_bills')
-    .select('id, bill_number, session, updated_at')
+    .select('id, bill_number, session, view_count')
     .eq('session', session)
-    .order('updated_at', { ascending: false })
+    .order('view_count', { ascending: false, nullsFirst: false })
     .limit(limit);
   if (error || !data) return [];
-  // Advertise the canonical slug URL (F4) — UUID entries were what Google was ranking.
-  // UUID fallback only for rows whose slug can't be derived (those pages self-serve).
-  return (data as { id: string; bill_number: string; session: string | null; updated_at: string | null }[]).map(
-    (row) => ({
-      slug: kyBillSlug(row) ?? row.id,
-      lastModified: toDate(row.updated_at),
-    }),
-  );
+  return (data as { id: string; bill_number: string; session: string | null }[])
+    .map((row) => kyBillSlug(row))
+    .filter((s): s is string => !!s);
 }
 
 export async function fetchCommitteeSitemapEntries(): Promise<SitemapEntry[]> {

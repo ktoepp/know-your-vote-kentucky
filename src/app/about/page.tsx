@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Box, Container, Paper, Typography, List, ListItem, ListItemText } from '@mui/material';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'About | Know Your Vote Kentucky',
+export const metadata: Metadata = buildPageMetadata({
+  title: 'About',
   description:
     'Know Your Vote Kentucky helps residents follow the General Assembly — bills, legislators, committees, and district lookup.',
-};
+  path: '/about',
+});
 
 export default function AboutPage() {
   return (

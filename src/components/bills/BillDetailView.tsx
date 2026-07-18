@@ -398,7 +398,14 @@ function SponsorCard({
 }) {
   const theme = useTheme();
   const photo = normalizeLegislatorPhotoUrl(rosterPhoto || sponsor.bio?.social?.image);
-  const memberHref = memberProfilePath({ name: sponsor.name, id: sponsor.name });
+  // Canonical profile path when the sponsor resolves in the roster; the name-derived
+  // slug is an alias that 308s, so it stays only as the unresolved fallback.
+  const matchedLegislator =
+    matchLegislatorByLegiscanId(legislators, sponsor.people_id) ??
+    matchLegislatorBySponsorName(legislators, sponsor.name);
+  const memberHref = matchedLegislator
+    ? memberProfilePath(matchedLegislator)
+    : memberProfilePath({ name: sponsor.name, id: sponsor.name });
   const ballotpediaUrl = normalizeBallotpediaHref(sponsor.bio?.social?.ballotpedia ?? sponsor.ballotpedia);
   const officialProfileHref = httpUrlForUiLink(sponsor.bio?.social?.biography);
   const isPrimary = sponsor.sponsor_type_id === 1;

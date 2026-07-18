@@ -66,8 +66,6 @@ export type BillsBrowseInitial = {
 };
 
 export interface BillsBrowseProps {
-  title: string;
-  subtitle: string;
   chamberMode: BillsBrowseChamberMode;
   /** Pre-select a topic filter on mount (e.g. from ?topic= URL param). */
   initialTopic?: string;
@@ -75,9 +73,10 @@ export interface BillsBrowseProps {
   initialBrowse?: BillsBrowseInitial;
 }
 
+// The page H1 + subtitle render server-side in BillsBrowsePage: `useSearchParams`
+// below bails this whole tree out of the static HTML (up to the Suspense boundary),
+// and crawlers must still see the heading.
 export function BillsBrowse({
-  title,
-  subtitle,
   chamberMode,
   initialTopic,
   legislatorRoster,
@@ -376,17 +375,7 @@ export function BillsBrowse({
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Heading */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-            {title}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {subtitle}
-          </Typography>
-        </Box>
-
+      <Container maxWidth="lg" sx={{ pt: 0, pb: 4 }}>
         <Box
           sx={{
             display: 'flex',

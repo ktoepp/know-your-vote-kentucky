@@ -10,12 +10,14 @@ import {
 import { GlossaryBrowser, type GlossaryEntry } from '@/components/glossary/GlossaryBrowser';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { buildBreadcrumbJsonLd, buildGlossaryFaqJsonLd } from '@/lib/structured-data';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Glossary | Know Your Vote Kentucky',
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Kentucky legislative glossary',
   description:
     'Plain-English definitions of the legislative terms used across Know Your Vote Kentucky — bill types, status stages, committee terminology, voting procedures, and more.',
-};
+  path: '/glossary',
+});
 
 function buildEntriesByCategory(): Record<TooltipCategory, GlossaryEntry[]> {
   const empty = Object.fromEntries(
