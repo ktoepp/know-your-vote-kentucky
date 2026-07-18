@@ -97,10 +97,35 @@ function iterateZipEntries(buf: Buffer): ZipEntry[] {
   return entries;
 }
 
+export interface DatasetZipFileCounts {
+  /** All non-directory entries in the archive. */
+  total: number;
+  /** JSON entries under a `bill/` folder. */
+  billFiles: number;
+  /** JSON entries under a `people/` folder. */
+  peopleFiles: number;
+  /** JSON entries under a `vote/` folder — 0 means the dataset ships no roll calls at all. */
+  voteFiles: number;
+}
+
 export interface DatasetPayloads {
   bills: any[];
   people: any[];
   rollCalls: any[];
+  /**
+   * Raw archive shape, independent of JSON parsing. Lets callers distinguish
+   * "this dataset contains no vote JSON" (voteFiles === 0 — LegiScan's KY
+   * archives before the 2018 Regular Session ship none) from "vote files exist
+   * but none parsed" (voteFiles > 0 && rollCalls.length === 0 — a parser bug).
+   */
+  fileCounts: DatasetZipFileCounts;
+}
+
+function folderOf(name: string): 'bill' | 'people' | 'vote' | null {
+  if (/(^|\/)bill\//i.test(name)) return 'bill';
+  if (/(^|\/)people\//i.test(name)) return 'people';
+  if (/(^|\/)vote\//i.test(name)) return 'vote';
+  return null;
 }
 
 export function parseDatasetZip(b64: string): DatasetPayloads {
@@ -118,9 +143,19 @@ export function parseDatasetZip(b64: string): DatasetPayloads {
       throw err;
     }
   }
-  const out: DatasetPayloads = { bills: [], people: [], rollCalls: [] };
+  const out: DatasetPayloads = {
+    bills: [],
+    people: [],
+    rollCalls: [],
+    fileCounts: { total: 0, billFiles: 0, peopleFiles: 0, voteFiles: 0 },
+  };
   for (const e of entries) {
+    out.fileCounts.total += 1;
     if (!e.name.endsWith('.json')) continue;
+    const folder = folderOf(e.name);
+    if (folder === 'bill') out.fileCounts.billFiles += 1;
+    else if (folder === 'people') out.fileCounts.peopleFiles += 1;
+    else if (folder === 'vote') out.fileCounts.voteFiles += 1;
     let parsed: any;
     try { parsed = JSON.parse(e.data.toString('utf8')); } catch { continue; }
     if (parsed?.bill) out.bills.push(parsed.bill);
@@ -204,6 +239,7 @@ export function buildVoteRow(rc: any, billUuidByLegiscanId: Map<number, string>)
     description: rc?.desc || null,
     yea_count: Number(rc?.yea) || 0,
     nay_count: Number(rc?.nay) || 0,
+    nv_count: Number(rc?.nv) || 0,
     absent_count: Number(rc?.absent) || 0,
     passed: rc?.passed === 1 || rc?.passed === true,
     roll_call: detail,
@@ -258,6 +294,32 @@ export async function upsertBillRows(db: SupabaseClient, rows: Record<string, un
     for (const row of data || []) {
       if (row.legiscan_id != null && row.id) map.set(Number(row.legiscan_id), String(row.id));
     }
+  }
+  return map;
+}
+
+/**
+ * legiscan_id → ky_bills.id for every bill already stored for a LegiScan
+ * session. Votes-only re-imports (see `scripts/backfill-ky-votes-from-datasets.ts`)
+ * use this instead of `upsertBillRows` so a historic vote backfill never
+ * rewrites bill rows (status/topics re-derivation, history churn).
+ */
+export async function fetchBillUuidMapForSession(db: SupabaseClient, sessionId: number): Promise<Map<number, string>> {
+  const map = new Map<number, string>();
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from('ky_bills')
+      .select('id, legiscan_id')
+      .eq('legiscan_session_id', sessionId)
+      .not('legiscan_id', 'is', null)
+      .order('id')
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`ky_bills lookup for session ${sessionId}: ${error.message}`);
+    for (const row of data || []) {
+      if (row.legiscan_id != null && row.id) map.set(Number(row.legiscan_id), String(row.id));
+    }
+    if (!data || data.length < PAGE) break;
   }
   return map;
 }

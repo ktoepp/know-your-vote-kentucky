@@ -1,0 +1,101 @@
+# One-time historic ky_votes backfill — forced LegiScan dataset re-import,
+# votes only (never rewrites ky_bills / ky_legislators).
+#
+# WHY: the 2026-04-24 bulk seed recorded every session's dataset_hash in
+# ky_legiscan_datasets but landed 0 votes for sessions before the 2018 Regular
+# Session, so the hash-gated weekly reconcile can never fill them. This
+# workflow deliberately bypasses the hash-gate for the target sessions.
+#
+# QUOTA ETIQUETTE: forced re-pull of an unchanged dataset is the exact pattern
+# LegiScan penalises (hash-gating memo, 2026-07-07). A ONE-TIME forced pull of
+# the ~13 zero-vote historic sessions (~2 quota points each, ~26 total) is
+# acceptable. Do NOT schedule this workflow and do NOT redispatch it
+# repeatedly — if a run reports "dataset has no vote JSON", re-running cannot
+# change the outcome (fallback is a getBill+getRollCall API backfill; see
+# TASKS.md § Backfill pre-2018 roll-call votes).
+#
+# workflow_dispatch only. Default inputs target exactly the sessions that have
+# bills but 0 votes (auto-detected against the production DB at run time).
+#
+# Secrets (same set as legiscan-dataset-weekly.yml):
+#   LEGISCAN_API_KEY, NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY
+# Optional Slack: SLACK_WEBHOOK_ERRORS (failure ping only).
+name: LegiScan votes backfill (historic sessions)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sessions:
+        description: 'Comma-separated LegiScan session_ids (blank = auto: every session with bills but 0 votes).'
+        type: string
+        default: ''
+      limit:
+        description: 'Cap sessions processed this run (blank = all targets). Re-dispatch to continue.'
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry-run: list target sessions only — no dataset downloads, no DB writes.'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# Shares the weekly reconcile's group so a forced backfill can never race the
+# Sunday cron on the same tables / hash records.
+concurrency:
+  group: legiscan-dataset-weekly
+  cancel-in-progress: false
+
+jobs:
+  votes-backfill:
+    name: Historic ky_votes backfill (forced dataset re-import)
+    runs-on: ubuntu-latest
+    # ~13 datasets, each decodes + upserts in seconds; 30 minutes is generous
+    # headroom for the full historic list in one dispatch.
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Backfill historic votes from LegiScan datasets
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            EXTRA="--dry-run"
+          fi
+          if [ -n "${{ inputs.sessions }}" ]; then
+            EXTRA="$EXTRA --sessions=${{ inputs.sessions }}"
+          fi
+          if [ -n "${{ inputs.limit }}" ]; then
+            EXTRA="$EXTRA --limit=${{ inputs.limit }}"
+          fi
+          npm run backfill:ky:votes -- ${EXTRA}
+
+      - name: Slack notify on failure
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+        run: |
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set."
+            exit 0
+          fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"*KY Vote — historic votes backfill failed*\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$WEBHOOK"
