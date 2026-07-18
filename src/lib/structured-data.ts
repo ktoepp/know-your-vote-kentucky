@@ -283,6 +283,32 @@ export function buildCollectionPageJsonLd(opts: {
   };
 }
 
+/** schema.org/CollectionPage + ItemList for a topic page's visible bill list. */
+export function buildTopicCollectionJsonLd(opts: {
+  name: string;
+  description: string;
+  path: string;
+  bills: { bill_number: string; title: string; path: string }[];
+}): JsonLdNode {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: opts.name,
+    description: opts.description,
+    url: absoluteUrl(opts.path),
+    inLanguage: 'en-US',
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: opts.bills.map((b, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: `${b.bill_number} — ${b.title}`,
+        url: absoluteUrl(b.path),
+      })),
+    },
+  };
+}
+
 /** schema.org/GovernmentOrganization for a Kentucky General Assembly committee. */
 export function buildCommitteeJsonLd(committee: KYCommittee, path: string): JsonLdNode {
   const name = normalizeKyGaDisplayName(committee.name);

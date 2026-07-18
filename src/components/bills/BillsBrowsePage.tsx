@@ -15,19 +15,22 @@ export type BillsBrowsePageProps = {
   initialTopic?: string;
 };
 
-/** Chamber cross-links per view — server-rendered so crawlers can reach every bills section. */
+/** Section cross-links per view — server-rendered so crawlers can reach every bills section. */
 const CHAMBER_LINKS: Record<BillsBrowseChamberMode, { label: string; href: string }[]> = {
   all: [
     { label: 'House bills', href: '/bills/house' },
     { label: 'Senate bills', href: '/bills/senate' },
+    { label: 'Bills by topic', href: '/bills/topics' },
   ],
   house: [
     { label: 'All bills', href: '/bills' },
     { label: 'Senate bills', href: '/bills/senate' },
+    { label: 'Bills by topic', href: '/bills/topics' },
   ],
   senate: [
     { label: 'All bills', href: '/bills' },
     { label: 'House bills', href: '/bills/house' },
+    { label: 'Bills by topic', href: '/bills/topics' },
   ],
 };
 

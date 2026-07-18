@@ -6,6 +6,8 @@ import {
   fetchMemberSitemapEntries,
 } from '@/lib/sitemap-data';
 import { allKyDistrictRefs, kyDistrictPath } from '@/lib/ky-district-pages';
+import { KY_TOPICS } from '@/lib/ky-topic-classifier';
+import { kyTopicPath } from '@/lib/ky-topic-pages';
 
 type ChangeFreq = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
 
@@ -21,6 +23,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/bills', changeFrequency: 'daily', priority: 0.9 },
     { path: '/bills/house', changeFrequency: 'daily', priority: 0.85 },
     { path: '/bills/senate', changeFrequency: 'daily', priority: 0.85 },
+    { path: '/bills/topics', changeFrequency: 'weekly', priority: 0.75 },
     { path: '/meetings', changeFrequency: 'daily', priority: 0.85 },
     { path: '/committees', changeFrequency: 'weekly', priority: 0.8 },
     { path: '/members', changeFrequency: 'weekly', priority: 0.8 },
@@ -76,5 +79,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticEntries, ...billEntries, ...memberEntries, ...committeeEntries, ...districtEntries];
+  // The 22 topic landing pages — fixed taxonomy, no DB dependency.
+  const topicEntries: MetadataRoute.Sitemap = KY_TOPICS.map((tag) => ({
+    url: `${origin}${kyTopicPath(tag)}`,
+    changeFrequency: 'daily',
+    priority: 0.7,
+  }));
+
+  return [
+    ...staticEntries,
+    ...billEntries,
+    ...memberEntries,
+    ...committeeEntries,
+    ...districtEntries,
+    ...topicEntries,
+  ];
 }
