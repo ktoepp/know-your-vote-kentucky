@@ -14,6 +14,20 @@ export interface KYLegislator {
   id: string;
   legiscan_id: number | null;
   openstates_id: string | null;
+  /**
+   * Canonical URL slug for /members/[slug] (migration 042). Name-derived; collides-with-
+   * another-seat names carry a district suffix (e.g. `jane-smith-hd-5`). Nullable until the
+   * migration is applied and the legislator sync backfills it — all readers must fall back
+   * to `memberSlug(name)`.
+   */
+  profile_slug?: string | null;
+  /**
+   * Derived, NOT a DB column: server-annotated verdict that this member's seat has rows for
+   * a different person (turnover), so LRC `?DistrictNumber=` profile links must be skipped.
+   * Set by `annotateKyLrcSeatConflicts` during roster cache build; when absent, link
+   * builders fall back to scanning a caller-provided roster.
+   */
+  lrc_district_link_unsafe?: boolean;
   name: string;
   first_name: string | null;
   last_name: string | null;
@@ -56,7 +70,18 @@ export interface KYLegislator {
 /** Subset returned by lightweight `select(...)` for roster matching (photos, names). */
 export type KYLegislatorRoster = Pick<
   KYLegislator,
-  'id' | 'legiscan_id' | 'name' | 'first_name' | 'last_name' | 'party' | 'chamber' | 'district' | 'photo_url' | 'ballotpedia' | 'legiscan_image_url'
+  | 'id'
+  | 'legiscan_id'
+  | 'name'
+  | 'first_name'
+  | 'last_name'
+  | 'party'
+  | 'chamber'
+  | 'district'
+  | 'photo_url'
+  | 'ballotpedia'
+  | 'legiscan_image_url'
+  | 'profile_slug'
 >;
 
 export interface KYBill {

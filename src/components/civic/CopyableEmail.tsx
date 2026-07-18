@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Box, IconButton, Typography, Tooltip } from '@mui/material';
+import { Box, IconButton, Typography } from '@mui/material';
 import { ContentCopy } from '@mui/icons-material';
 
 const COPIED_MS = 2000;
@@ -50,18 +50,19 @@ export function CopyableEmail({ email, variant = 'caption', display = 'block' }:
       <Typography variant={variant} color="text.secondary" component="span" sx={{ wordBreak: 'break-all' }}>
         {email}
       </Typography>
-      <Tooltip title={copied ? 'Copied' : 'Copy email'}>
-        <IconButton
-          type="button"
-          aria-label={copied ? 'Copied to clipboard' : 'Copy email to clipboard'}
-          onClick={copy}
-          // Inherits the theme-level 44×44 touch-target floor (theme.ts MuiIconButton).
-          // Icon stays visually small via fontSize; the click region is full-size.
-          sx={{ color: copied ? 'success.main' : 'text.secondary' }}
-        >
-          <ContentCopy sx={{ fontSize: variant === 'body2' ? 18 : 16 }} />
-        </IconButton>
-      </Tooltip>
+      {/* Native title, not MuiTooltip: this renders once per card on roster-scale lists,
+          and the visible "Copied" caption already announces success. */}
+      <IconButton
+        type="button"
+        title={copied ? 'Copied' : 'Copy email'}
+        aria-label={copied ? 'Copied to clipboard' : 'Copy email to clipboard'}
+        onClick={copy}
+        // Inherits the theme-level 44×44 touch-target floor (theme.ts MuiIconButton).
+        // Icon stays visually small via fontSize; the click region is full-size.
+        sx={{ color: copied ? 'success.main' : 'text.secondary' }}
+      >
+        <ContentCopy sx={{ fontSize: variant === 'body2' ? 18 : 16 }} />
+      </IconButton>
       {copied && (
         <Typography variant="caption" color="success.main" component="span" sx={{ fontWeight: 600 }}>
           Copied

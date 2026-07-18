@@ -26,7 +26,7 @@ function loadMembersBrowseRoster(): Promise<KYLegislator[]> {
   return sharedInflight;
 }
 
-/** Cached members/map roster (slim columns, includes inactive rows for dedupe). */
+/** Cached members/map roster: active members only, with server-annotated LRC link safety. */
 export function useKyMembersBrowseRoster(): { roster: KYLegislator[]; loading: boolean; error: string | null } {
   const [roster, setRoster] = useState<KYLegislator[]>(sharedRoster ?? []);
   const [loading, setLoading] = useState(!sharedRoster);
