@@ -33,6 +33,7 @@ meeting schedules come from the Kentucky Legislative Research Commission (LRC).
 - [Meetings](${origin}/meetings): Upcoming and recent committee meetings, with agenda items.
 - [Search](${origin}/search): Full-site search across bills, members, and committees.
 - [Glossary](${origin}/glossary): Plain-language explanations of legislative terms.
+- [Guides](${origin}/guides): Factual guides — finding your Kentucky state legislators, tracking a bill, how a bill becomes a law in Kentucky, and General Assembly session dates.
 - [About](${origin}/about): Project background, data sources, and methodology.
 
 ## Data sources

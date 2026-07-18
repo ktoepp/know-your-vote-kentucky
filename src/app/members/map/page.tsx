@@ -25,7 +25,15 @@ export default function MembersDistrictMapPage() {
             <MuiLink component={NextLink} href="/members" underline="hover">
               member roster
             </MuiLink>
-            .
+            . The{' '}
+            <MuiLink
+              component={NextLink}
+              href="/guides/find-your-kentucky-legislator"
+              underline="hover"
+            >
+              guide to finding your legislators
+            </MuiLink>{' '}
+            explains what the results show.
           </Typography>
         </Box>
         <DistrictMapExplorerIsland />

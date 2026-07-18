@@ -17,6 +17,7 @@ const footerNavLinks = [
   { href: '/search', label: 'Search' },
   { href: '/legislature/resources', label: 'Frankfort resources' },
   { href: '/glossary', label: 'Glossary' },
+  { href: '/guides', label: 'Guides' },
 ];
 
 const footerAuthLinks = [

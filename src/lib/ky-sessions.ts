@@ -215,7 +215,7 @@ export function getCivicDataSessionName(asOf: Date = new Date()): string {
   return (getActiveSession(asOf) ?? KY_SESSIONS[0]!).name;
 }
 
-const SESSION_TYPE_DESCRIPTIONS: Record<KYSessionType, string> = {
+export const SESSION_TYPE_DESCRIPTIONS: Record<KYSessionType, string> = {
   regular:
     'A regular session convenes each January under the Kentucky Constitution. ' +
     'In even-numbered years the General Assembly meets for up to 60 legislative days and must adjourn by April 15 — ' +

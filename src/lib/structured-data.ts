@@ -309,6 +309,34 @@ export function buildTopicCollectionJsonLd(opts: {
   };
 }
 
+/**
+ * schema.org/Article for evergreen guide pages. Author/publisher reference the
+ * site Organization node emitted in the root layout. HowTo is deliberately not
+ * used (Google retired HowTo rich results in 2023); FAQPage stays reserved for
+ * the glossary.
+ */
+export function buildGuideArticleJsonLd(opts: {
+  headline: string;
+  description: string;
+  path: string;
+  /** ISO date of the last substantive content edit — maintained by hand in the page file. */
+  dateModified: string;
+}): JsonLdNode {
+  const origin = absoluteUrl('/');
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: opts.headline,
+    description: opts.description,
+    url: absoluteUrl(opts.path),
+    mainEntityOfPage: absoluteUrl(opts.path),
+    inLanguage: 'en-US',
+    dateModified: opts.dateModified,
+    author: { '@id': `${origin}#organization` },
+    publisher: { '@id': `${origin}#organization` },
+  };
+}
+
 /** schema.org/GovernmentOrganization for a Kentucky General Assembly committee. */
 export function buildCommitteeJsonLd(committee: KYCommittee, path: string): JsonLdNode {
   const name = normalizeKyGaDisplayName(committee.name);
