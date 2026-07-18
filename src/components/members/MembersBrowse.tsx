@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
 import Link from 'next/link';
 import {
   Container,
@@ -89,6 +89,9 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
   const legislators = useMemo(() => legislatorRoster.filter((l) => l.active), [legislatorRoster]);
   const [searchQuery, setSearchQuery] = useState('');
   const [chamberFilter, setChamberFilter] = useState<'all' | 'governor' | 'house' | 'senate'>('all');
+  // Deferred: the TextField updates immediately; re-filtering the card grid happens
+  // in an interruptible background render, so typing stays responsive.
+  const deferredQuery = useDeferredValue(searchQuery);
 
   const legislatorsScoped = useMemo(() => {
     if (chamberFilter === 'governor') return legislators.filter(isKentuckyGovernor);
@@ -97,28 +100,42 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
     return legislators;
   }, [legislators, chamberFilter]);
 
-  const filtered = legislatorsScoped
-    .filter((leg) => {
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
-      return leg.name?.toLowerCase().includes(q) || leg.district?.toLowerCase().includes(q);
-    })
-    .sort(sortLegislatorsByName);
+  const filtered = useMemo(() => {
+    const q = deferredQuery.toLowerCase();
+    const matched = q
+      ? legislatorsScoped.filter(
+          (leg) => leg.name?.toLowerCase().includes(q) || leg.district?.toLowerCase().includes(q),
+        )
+      : [...legislatorsScoped];
+    return matched.sort(sortLegislatorsByName);
+  }, [legislatorsScoped, deferredQuery]);
 
-  const executiveLegislators = filtered
-    .filter((l) => isKentuckyGovernor(l) || (l.chamber == null && !isKentuckyGovernor(l)))
-    .sort(sortLegislatorsByName);
-  const houseLegislators = filtered.filter((l) => l.chamber === 'house');
-  const senateLegislators = filtered.filter((l) => l.chamber === 'senate');
+  const { executiveLegislators, houseLegislators, senateLegislators } = useMemo(
+    () => ({
+      executiveLegislators: filtered.filter((l) => isKentuckyGovernor(l) || l.chamber == null),
+      houseLegislators: filtered.filter((l) => l.chamber === 'house'),
+      senateLegislators: filtered.filter((l) => l.chamber === 'senate'),
+    }),
+    [filtered],
+  );
 
+  // Deep links (/members#slug): scroll once when the target card first renders —
+  // never again on later filter/search re-renders, which would hijack the scroll.
+  const hashScrolledRef = useRef(false);
   useEffect(() => {
-    if (filtered.length === 0) return;
-    const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
-    if (!hash) return;
+    if (hashScrolledRef.current || filtered.length === 0) return;
+    const hash = window.location.hash.replace(/^#/, '');
+    if (!hash) {
+      hashScrolledRef.current = true;
+      return;
+    }
+    const target = document.getElementById(hash);
+    if (!target) return;
+    hashScrolledRef.current = true;
     requestAnimationFrame(() => {
-      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-  }, [filtered, searchQuery, chamberFilter]);
+  }, [filtered]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -271,7 +288,7 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
           <PaginatedSection
             items={filtered}
             pageSize={MEMBERS_PAGE_SIZE}
-            resetKey={`${chamberFilter}|${searchQuery}`}
+            resetKey={`${chamberFilter}|${deferredQuery}`}
             variant="loadmore"
           >
             {(visible) => (

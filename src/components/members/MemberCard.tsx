@@ -58,7 +58,12 @@ export interface MemberCardProps {
   showFooterLinks?: boolean;
 }
 
-export function MemberCard({
+/**
+ * Memoized: `/members` renders dozens of these per section, and every search
+ * keystroke re-renders the parent — with stable `leg` / `legislatorRoster`
+ * identities the unchanged cards bail out of re-rendering entirely.
+ */
+export const MemberCard = React.memo(function MemberCard({
   leg,
   featured = false,
   showDistrictInSubtitle = true,
@@ -350,4 +355,4 @@ export function MemberCard({
       />
     </Box>
   );
-}
+});

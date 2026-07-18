@@ -296,6 +296,32 @@ function kyLegislatorIdentityNorm(leg: Pick<KYLegislator, 'name' | 'first_name' 
 }
 
 /**
+ * Seat key → distinct person identities present in the roster, memoized per roster
+ * array identity. The conflict check runs twice per member card on roster-scale
+ * surfaces (`/members`, `/members/map`); without the index each call rescans the
+ * roster with regex normalization — O(cards × roster) per render.
+ */
+const seatIdentityIndexCache = new WeakMap<KYLegislator[], Map<string, Set<string>>>();
+
+function seatIdentityIndex(roster: KYLegislator[]): Map<string, Set<string>> {
+  const cached = seatIdentityIndexCache.get(roster);
+  if (cached) return cached;
+  const index = new Map<string, Set<string>>();
+  for (const p of roster) {
+    const seat = kyDistrictSeatKey(p);
+    if (!seat) continue;
+    let idents = index.get(seat);
+    if (!idents) {
+      idents = new Set();
+      index.set(seat, idents);
+    }
+    idents.add(kyLegislatorIdentityNorm(p));
+  }
+  seatIdentityIndexCache.set(roster, index);
+  return index;
+}
+
+/**
  * Another roster member represents a **different person** for the same chamber + district.
  * LRC `Legislator-Profile.aspx?DistrictNumber=` always tracks the **current** listing for the seat, so those URLs are
  * unsafe whenever the seat has turned over and we still retain the prior legislator row (often `active = false`).
@@ -306,12 +332,10 @@ function hasKyDistrictSeatDifferentPersonConflict(
 ): boolean {
   const seat = kyDistrictSeatKey(leg);
   if (!seat) return false;
-  const selfId = kyLegislatorIdentityNorm(leg as KYLegislator);
-  return roster.some((p) => {
-    if (p.id === leg.id) return false;
-    if (kyDistrictSeatKey(p) !== seat) return false;
-    return kyLegislatorIdentityNorm(p) !== selfId;
-  });
+  const idents = seatIdentityIndex(roster).get(seat);
+  if (!idents || idents.size === 0) return false;
+  if (idents.size > 1) return true;
+  return !idents.has(kyLegislatorIdentityNorm(leg as KYLegislator));
 }
 
 /** True when URL is the LRC district-based profile (current officeholder for that seat, not a person-stable id). */

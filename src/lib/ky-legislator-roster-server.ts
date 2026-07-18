@@ -13,15 +13,22 @@ const SLIM_ROSTER_COLUMNS =
 /** Active legislators — sponsor chips, browse, search (client via `/api/roster/active`). */
 export const KY_ACTIVE_SLIM_ROSTER_SELECT = SLIM_ROSTER_COLUMNS;
 
+/** Contact + LRC URL fields MemberCard renders on roster-scale surfaces. */
+const MEMBER_CARD_ROSTER_COLUMNS =
+  `${SLIM_ROSTER_COLUMNS},openstates_id,role_title,email,phone,website,lrc_profile_url,active`;
+
 /**
  * Active legislators with fields needed for committee member matching + MemberCard.
  * Historical rows stay in DB; only current GA seats load here.
  */
-const COMMITTEE_ROSTER_COLUMNS =
-  `${SLIM_ROSTER_COLUMNS},openstates_id,role_title,email,phone,website,lrc_profile_url,committee_memberships,active`;
+const COMMITTEE_ROSTER_COLUMNS = `${MEMBER_CARD_ROSTER_COLUMNS},committee_memberships`;
 
-/** Members browse + map: active and inactive rows for dedupe / LRC URL rules (no `select *`). */
-export const KY_MEMBERS_BROWSE_ROSTER_SELECT = COMMITTEE_ROSTER_COLUMNS;
+/**
+ * Members browse + map: active and inactive rows for dedupe / LRC URL rules (no `select *`).
+ * Excludes `committee_memberships` — no browse/map surface reads it, and it bloats the
+ * SSR payload + `/api/roster/members` response for every row.
+ */
+export const KY_MEMBERS_BROWSE_ROSTER_SELECT = MEMBER_CARD_ROSTER_COLUMNS;
 
 function createAnonClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
