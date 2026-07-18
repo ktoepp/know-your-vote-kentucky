@@ -24,7 +24,7 @@ import {
   kyLegislaturePublicUrl,
   legislatorAvatarDescriptor,
   legislatorDisplayPhone,
-  memberSlug,
+  memberCanonicalSlug,
   normalizeBallotpediaHref,
 } from '@/lib/ky-member-utils';
 
@@ -75,7 +75,7 @@ export const MemberCard = React.memo(function MemberCard({
 }: MemberCardProps) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
-  const anchorId = memberSlug(leg.name || leg.id);
+  const anchorId = memberCanonicalSlug(leg);
   const governor = isKentuckyGovernor(leg);
   /** Open States marks former members inactive after sync; links to LRC/LegiScan often describe the seat or current session, not this row. */
   const isFormerMember = leg.active === false;

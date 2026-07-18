@@ -54,6 +54,7 @@ import {
 import { normalizeKyLegislatorDistrictForDb } from './ky-district-geo';
 import {
   kyLegislatureHeadshotUrlFromLegiscanDistrict,
+  memberSlug,
   normalizeLegislatorPhotoUrl,
   normalizeSponsorNameForMatch,
 } from './ky-member-utils';
@@ -286,6 +287,10 @@ function isMissingCommitteeMembershipsColumn(err: { message?: string } | null): 
 
 function isMissingExternalLinksColumn(err: { message?: string } | null): boolean {
   return (err?.message || '').toLowerCase().includes('external_links');
+}
+
+function isMissingProfileSlugColumn(err: { message?: string } | null): boolean {
+  return (err?.message || '').toLowerCase().includes('profile_slug');
 }
 
 function getSupabase() {
@@ -1310,7 +1315,55 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         external_links,
       };
     });
-    let { error } = await db.from('ky_legislators').upsert(rows, { onConflict: 'openstates_id' });
+    // Canonical profile slugs (migration 042): base name slug, district-suffixed when the
+    // base collides with another seat in this batch or in an existing DB row. Rows carry the
+    // field only when the column exists — pre-042 databases upsert exactly as before.
+    let rowsToUpsert: Array<(typeof rows)[number] & { profile_slug?: string | null }> = rows;
+    const seatKeyOf = (chamber: 'house' | 'senate' | null, district: string | null) =>
+      `${chamber ?? 'none'}:${(district ?? '').toLowerCase()}`;
+    const seatsBySlugBase = new Map<string, Set<string>>();
+    for (const r of rows) {
+      const base = memberSlug(r.name || r.openstates_id || '');
+      if (!base) continue;
+      let seats = seatsBySlugBase.get(base);
+      if (!seats) seatsBySlugBase.set(base, (seats = new Set()));
+      seats.add(seatKeyOf(r.chamber, r.district));
+    }
+    if (seatsBySlugBase.size > 0) {
+      const { data: existingSlugRows, error: slugProbeError } = await db
+        .from('ky_legislators')
+        .select('profile_slug,chamber,district')
+        .in('profile_slug', [...seatsBySlugBase.keys()]);
+      if (slugProbeError) {
+        if (isMissingProfileSlugColumn(slugProbeError)) {
+          log(
+            source,
+            'Skipping profile_slug maintenance (run supabase/migrations/042_ky_legislators_profile_slug.sql)',
+          );
+        }
+      } else {
+        for (const row of existingSlugRows ?? []) {
+          if (!row.profile_slug) continue;
+          seatsBySlugBase
+            .get(row.profile_slug)
+            ?.add(seatKeyOf((row.chamber as 'house' | 'senate' | null) ?? null, row.district));
+        }
+        rowsToUpsert = rows.map((r) => {
+          const base = memberSlug(r.name || r.openstates_id || '');
+          if (!base) return { ...r, profile_slug: null };
+          const conflicted = (seatsBySlugBase.get(base)?.size ?? 0) > 1;
+          const districtSlug = memberSlug(r.district || '');
+          return {
+            ...r,
+            profile_slug: conflicted && districtSlug ? `${base}-${districtSlug}` : base,
+          };
+        });
+      }
+    }
+
+    let { error } = await db
+      .from('ky_legislators')
+      .upsert(rowsToUpsert, { onConflict: 'openstates_id' });
     if (error && isMissingExternalLinksColumn(error)) {
       log(
         source,

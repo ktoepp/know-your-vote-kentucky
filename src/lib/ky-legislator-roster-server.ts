@@ -2,13 +2,46 @@ import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { createClient } from '@supabase/supabase-js';
 import type { KYLegislator, KYLegislatorRoster } from '@/types/kentucky';
-import { dedupeKyLegislators, findLegislatorByProfileSlug } from '@/lib/ky-member-utils';
+import {
+  annotateKyLrcSeatConflicts,
+  dedupeKyLegislators,
+  findLegislatorByProfileSlug,
+} from '@/lib/ky-member-utils';
 
 /** Shared revalidate window for civic roster data (seconds). */
 export const KY_ROSTER_REVALIDATE_SECONDS = 3600;
 
 const SLIM_ROSTER_COLUMNS =
-  'id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url,ballotpedia,legiscan_image_url';
+  'id,legiscan_id,name,first_name,last_name,party,chamber,district,photo_url,ballotpedia,legiscan_image_url,profile_slug';
+
+/**
+ * `profile_slug` ships in every explicit select but exists only after migration 042 —
+ * PostgREST rejects the whole query (42703) when the column is missing, so selects retry
+ * without it until the operator applies the migration. Same pattern as the sync pipeline's
+ * missing-column retries.
+ */
+function isMissingProfileSlugColumn(err: { message?: string } | null): boolean {
+  return (err?.message || '').toLowerCase().includes('profile_slug');
+}
+
+async function selectKyLegislatorsWithFallback(
+  runSelect: (columns: string) => PromiseLike<{
+    data: unknown[] | null;
+    error: { message?: string } | null;
+  }>,
+  columns: string,
+): Promise<unknown[] | null> {
+  let { data, error } = await runSelect(columns);
+  if (error && isMissingProfileSlugColumn(error) && columns.includes('profile_slug')) {
+    const legacyColumns = columns
+      .split(',')
+      .filter((c) => c.trim() !== 'profile_slug')
+      .join(',');
+    ({ data, error } = await runSelect(legacyColumns));
+  }
+  if (error || !data) return null;
+  return data;
+}
 
 /** Active legislators — sponsor chips, browse, search (client via `/api/roster/active`). */
 export const KY_ACTIVE_SLIM_ROSTER_SELECT = SLIM_ROSTER_COLUMNS;
@@ -24,9 +57,10 @@ const MEMBER_CARD_ROSTER_COLUMNS =
 const COMMITTEE_ROSTER_COLUMNS = `${MEMBER_CARD_ROSTER_COLUMNS},committee_memberships`;
 
 /**
- * Members browse + map: active and inactive rows for dedupe / LRC URL rules (no `select *`).
- * Excludes `committee_memberships` — no browse/map surface reads it, and it bloats the
- * SSR payload + `/api/roster/members` response for every row.
+ * Members browse + map: fetches the full table (historical rows feed dedupe + LRC URL
+ * rules server-side) but the cached result ships ACTIVE rows only, each annotated with
+ * `lrc_district_link_unsafe`. Excludes `committee_memberships` — no browse/map surface
+ * reads it, and it bloats the SSR payload + `/api/roster/members` response for every row.
  */
 export const KY_MEMBERS_BROWSE_ROSTER_SELECT = MEMBER_CARD_ROSTER_COLUMNS;
 
@@ -41,12 +75,16 @@ const getCachedActiveSlimRoster = unstable_cache(
   async (): Promise<KYLegislatorRoster[]> => {
     const supabase = createAnonClient();
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('ky_legislators')
-      .select(KY_ACTIVE_SLIM_ROSTER_SELECT)
-      .eq('active', true)
-      .order('last_name', { ascending: true });
-    if (error || !data) return [];
+    const data = await selectKyLegislatorsWithFallback(
+      (columns) =>
+        supabase
+          .from('ky_legislators')
+          .select(columns)
+          .eq('active', true)
+          .order('last_name', { ascending: true }),
+      KY_ACTIVE_SLIM_ROSTER_SELECT,
+    );
+    if (!data) return [];
     return data as KYLegislatorRoster[];
   },
   ['ky-roster-active-slim'],
@@ -57,12 +95,16 @@ const getCachedCommitteeLegislatorRoster = unstable_cache(
   async (): Promise<KYLegislator[]> => {
     const supabase = createAnonClient();
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('ky_legislators')
-      .select(COMMITTEE_ROSTER_COLUMNS)
-      .eq('active', true)
-      .order('last_name', { ascending: true });
-    if (error || !data?.length) return [];
+    const data = await selectKyLegislatorsWithFallback(
+      (columns) =>
+        supabase
+          .from('ky_legislators')
+          .select(columns)
+          .eq('active', true)
+          .order('last_name', { ascending: true }),
+      COMMITTEE_ROSTER_COLUMNS,
+    );
+    if (!data?.length) return [];
     return dedupeKyLegislators(data as unknown as KYLegislator[]);
   },
   ['ky-roster-committee-active'],
@@ -94,17 +136,22 @@ const getCachedMembersBrowseRoster = unstable_cache(
   async (): Promise<KYLegislator[]> => {
     const supabase = createAnonClient();
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('ky_legislators')
-      .select(KY_MEMBERS_BROWSE_ROSTER_SELECT)
-      .order('last_name', { ascending: true });
-    if (error || !data?.length) return [];
-    return dedupeKyLegislators(data as unknown as KYLegislator[]);
+    const data = await selectKyLegislatorsWithFallback(
+      (columns) =>
+        supabase.from('ky_legislators').select(columns).order('last_name', { ascending: true }),
+      KY_MEMBERS_BROWSE_ROSTER_SELECT,
+    );
+    if (!data?.length) return [];
+    // Dedupe and compute LRC link safety over the FULL table (historical rows drive seat
+    // conflicts), then ship active rows only — the payload the browse page and map render.
+    const deduped = dedupeKyLegislators(data as unknown as KYLegislator[]);
+    return annotateKyLrcSeatConflicts(deduped).filter((l) => l.active);
   },
   ['ky-roster-members-browse'],
   { revalidate: KY_ROSTER_REVALIDATE_SECONDS },
 );
 
+/** Active members only; seat-turnover rows carry `lrc_district_link_unsafe: true`. */
 export async function fetchKyMembersBrowseRoster(): Promise<KYLegislator[]> {
   return getCachedMembersBrowseRoster();
 }

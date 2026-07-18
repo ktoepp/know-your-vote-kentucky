@@ -35,6 +35,11 @@ export interface PaginatedSectionProps<T> {
    * responsive — gallery on xs/sm, pagination from md up.
    */
   variant?: PaginatedSectionVariant;
+  /**
+   * loadmore only: index into `items` that must be mounted (e.g. a #hash deep-link target
+   * past the first page). Raises the visible count to that item's full page; never lowers it.
+   */
+  expandToItem?: number;
   children: (pageItems: T[]) => React.ReactNode;
 }
 
@@ -45,6 +50,7 @@ export function PaginatedSection<T>({
   pageSizeOptions,
   onPageSizeChange,
   variant = 'pagination',
+  expandToItem,
   children,
 }: PaginatedSectionProps<T>) {
   const theme = useTheme();
@@ -58,6 +64,12 @@ export function PaginatedSection<T>({
     setPage(1);
     setVisibleCount(pageSize);
   }, [resetKey, pageSize]);
+
+  useEffect(() => {
+    if (expandToItem == null || expandToItem < 0) return;
+    const needed = Math.min(items.length, Math.ceil((expandToItem + 1) / pageSize) * pageSize);
+    setVisibleCount((current) => Math.max(current, needed));
+  }, [expandToItem, items.length, pageSize]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);

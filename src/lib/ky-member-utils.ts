@@ -105,9 +105,23 @@ export function memberSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-/** App Router path: `/members/{slug}` (same value as `memberSlug(leg.name || leg.id)`). */
-export function memberProfilePath(leg: Pick<KYLegislator, 'name' | 'id'>): string {
-  return `/members/${memberSlug(leg.name || leg.id)}`;
+/**
+ * Canonical slug for a member: DB `profile_slug` (migration 042, collision-safe) when
+ * populated, else the legacy name-derived slug. Anchors on /members and profile hrefs
+ * must agree, so both go through this helper.
+ */
+export function memberCanonicalSlug(
+  leg: Pick<KYLegislator, 'name' | 'id'> & { profile_slug?: string | null },
+): string {
+  const stored = (leg.profile_slug || '').trim();
+  return stored || memberSlug(leg.name || leg.id);
+}
+
+/** App Router path: `/members/{slug}` (see {@link memberCanonicalSlug}). */
+export function memberProfilePath(
+  leg: Pick<KYLegislator, 'name' | 'id'> & { profile_slug?: string | null },
+): string {
+  return `/members/${memberCanonicalSlug(leg)}`;
 }
 
 /** Turn a URL slug back into a guess for sponsor-style name matching. */
@@ -234,6 +248,9 @@ export function findLegislatorByProfileSlug(
   const key = (profileSlug || '').trim().toLowerCase();
   if (!key) return null;
 
+  const byStoredSlug = legislators.find((l) => (l.profile_slug || '').trim() === key);
+  if (byStoredSlug) return byStoredSlug;
+
   for (const leg of legislators) {
     for (const v of memberProfileSlugVariants(leg)) {
       if (v === key) return leg;
@@ -338,6 +355,28 @@ function hasKyDistrictSeatDifferentPersonConflict(
   return !idents.has(kyLegislatorIdentityNorm(leg as KYLegislator));
 }
 
+/**
+ * Attach the LRC district-link safety verdict (`lrc_district_link_unsafe: true`) to
+ * conflicted rows. Run during roster cache builds over the FULL deduped roster — historical
+ * rows included, since predecessors are exactly what makes a seat conflicted — and BEFORE
+ * any active-only filter. Lets browse/map payloads ship active rows only while cards keep
+ * the verdict.
+ *
+ * Safe rows carry NO flag (payload weight): an absent flag falls back to scanning the
+ * caller-provided roster, and a scan can only find conflicts this annotation also found —
+ * so absent-flag consumers resolve to the same `false`.
+ */
+export function annotateKyLrcSeatConflicts(roster: KYLegislator[]): KYLegislator[] {
+  const index = seatIdentityIndex(roster);
+  return roster.map((leg) => {
+    const seat = kyDistrictSeatKey(leg);
+    const idents = seat ? index.get(seat) : undefined;
+    const unsafe =
+      !!idents && idents.size > 0 && (idents.size > 1 || !idents.has(kyLegislatorIdentityNorm(leg)));
+    return unsafe ? { ...leg, lrc_district_link_unsafe: true } : leg;
+  });
+}
+
 /** True when URL is the LRC district-based profile (current officeholder for that seat, not a person-stable id). */
 export function isKyLrcDistrictNumberProfileUrl(url: string | null | undefined): boolean {
   const raw = (url ?? '').trim();
@@ -396,6 +435,7 @@ export function kyLegislatureProfileUrl(
     first_name?: string | null;
     last_name?: string | null;
     openstates_id?: string | null;
+    lrc_district_link_unsafe?: boolean;
     lrc_profile_url?: string | null;
     website?: string | null;
     chamber?: 'house' | 'senate' | null;
@@ -403,10 +443,16 @@ export function kyLegislatureProfileUrl(
   },
   roster?: KYLegislator[],
 ): string | null {
+  // Server-annotated verdict wins (browse/map payloads); roster scan is the fallback for
+  // surfaces still passing an unannotated roster (member profile).
   const seatConflict =
-    roster?.length &&
-    typeof leg.id === 'string' &&
-    hasKyDistrictSeatDifferentPersonConflict(leg as KYLegislator, roster);
+    typeof leg.lrc_district_link_unsafe === 'boolean'
+      ? leg.lrc_district_link_unsafe
+      : Boolean(
+          roster?.length &&
+            typeof leg.id === 'string' &&
+            hasKyDistrictSeatDifferentPersonConflict(leg as KYLegislator, roster),
+        );
 
   const fromLrc = sanitizeStoredKyLegislatureUrl(leg.lrc_profile_url);
   if (fromLrc) {
@@ -463,6 +509,7 @@ export function kyLegislaturePublicUrl(
     first_name?: string | null;
     last_name?: string | null;
     openstates_id?: string | null;
+    lrc_district_link_unsafe?: boolean;
     chamber?: 'house' | 'senate' | null;
     lrc_profile_url?: string | null;
     website?: string | null;

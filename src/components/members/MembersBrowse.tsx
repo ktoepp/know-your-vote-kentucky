@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import Link from 'next/link';
 import {
   Container,
@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import { AccountBalance, Cancel, Groups, House, Search } from '@mui/icons-material';
 import type { KYLegislator } from '@/types/kentucky';
-import { isKentuckyGovernor, memberProfilePath } from '@/lib/ky-member-utils';
+import { isKentuckyGovernor, memberCanonicalSlug, memberProfilePath, memberSlug } from '@/lib/ky-member-utils';
 import { MemberCard } from '@/components/members/MemberCard';
 import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
@@ -31,18 +31,28 @@ function sortLegislatorsByName(a: KYLegislator, b: KYLegislator) {
 
 const MEMBERS_PAGE_SIZE = 24;
 
+/**
+ * Skip layout/paint for offscreen cards (long sections). The intrinsic-size estimate keeps
+ * scrollbar geometry stable until a card first renders; `auto` then remembers its real size.
+ */
+const CARD_ITEM_CONTENT_VISIBILITY_SX = {
+  contentVisibility: 'auto',
+  containIntrinsicSize: 'auto 460px',
+} as const;
+
 function ChamberSection({
   title,
   caption,
   icon,
   legislators,
-  legislatorRoster,
+  expandToItem,
 }: {
   title: string;
   caption?: string;
   icon: React.ReactNode;
   legislators: KYLegislator[];
-  legislatorRoster: KYLegislator[];
+  /** Index (within `legislators`) that must be mounted — used for #hash deep links. */
+  expandToItem?: number;
 }) {
   if (legislators.length === 0) return null;
   return (
@@ -61,16 +71,17 @@ function ChamberSection({
         </Box>
         <Chip label={legislators.length} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
       </Box>
-      <PaginatedSection items={legislators} pageSize={MEMBERS_PAGE_SIZE} variant="loadmore">
+      <PaginatedSection
+        items={legislators}
+        pageSize={MEMBERS_PAGE_SIZE}
+        variant="loadmore"
+        expandToItem={expandToItem}
+      >
         {(visible) => (
           <CardGrid>
             {visible.map((leg) => (
-              <CardGridItem key={leg.id}>
-                <MemberCard
-                  leg={leg}
-                  profileHref={memberProfilePath(leg)}
-                  legislatorRoster={legislatorRoster}
-                />
+              <CardGridItem key={leg.id} sx={CARD_ITEM_CONTENT_VISIBILITY_SX}>
+                <MemberCard leg={leg} profileHref={memberProfilePath(leg)} />
               </CardGridItem>
             ))}
           </CardGrid>
@@ -119,23 +130,54 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
     [filtered],
   );
 
-  // Deep links (/members#slug): scroll once when the target card first renders —
-  // never again on later filter/search re-renders, which would hijack the scroll.
-  const hashScrolledRef = useRef(false);
+  // Deep links (/members#slug): read the hash once after mount (client-only, so SSR markup
+  // stays hydration-safe), expand whichever section holds the target so the card actually
+  // mounts (it may sit past the first load-more page), then scroll to it once.
+  const [hashTarget, setHashTarget] = useState('');
   useEffect(() => {
-    if (hashScrolledRef.current || filtered.length === 0) return;
     const hash = window.location.hash.replace(/^#/, '');
-    if (!hash) {
-      hashScrolledRef.current = true;
-      return;
-    }
-    const target = document.getElementById(hash);
-    if (!target) return;
-    hashScrolledRef.current = true;
-    requestAnimationFrame(() => {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }, [filtered]);
+    if (hash) setHashTarget(hash);
+  }, []);
+
+  const hashMatch = useMemo(() => {
+    if (!hashTarget) return null;
+    // Match stored slug or the legacy name slug, so pre-042 links keep working.
+    const matches = (l: KYLegislator) =>
+      memberCanonicalSlug(l) === hashTarget || memberSlug(l.name || l.id) === hashTarget;
+    const executive = executiveLegislators.findIndex(matches);
+    const house = houseLegislators.findIndex(matches);
+    const senate = senateLegislators.findIndex(matches);
+    const found =
+      (executive >= 0 && executiveLegislators[executive]) ||
+      (house >= 0 && houseLegislators[house]) ||
+      (senate >= 0 && senateLegislators[senate]) ||
+      null;
+    // Card DOM ids use the canonical slug; a legacy-alias hash must scroll to that id.
+    return { executive, house, senate, elementId: found ? memberCanonicalSlug(found) : hashTarget };
+  }, [hashTarget, executiveLegislators, houseLegislators, senateLegislators]);
+
+  const hashElementId = hashMatch?.elementId ?? '';
+  const hashScrolledRef = React.useRef(false);
+  useEffect(() => {
+    if (!hashElementId || hashScrolledRef.current) return;
+    let cancelled = false;
+    let attempts = 0;
+    // Poll a few frames: the expanded section commits on a later render than this effect.
+    const tryScroll = () => {
+      if (cancelled) return;
+      const target = document.getElementById(hashElementId);
+      if (target) {
+        hashScrolledRef.current = true;
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      if (++attempts < 90) requestAnimationFrame(tryScroll);
+    };
+    requestAnimationFrame(tryScroll);
+    return () => {
+      cancelled = true;
+    };
+  }, [hashElementId]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -268,20 +310,20 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
                 caption="Governor, Lieutenant Governor, and other statewide executive officials"
                 icon={<AccountBalance sx={{ fontSize: 28 }} />}
                 legislators={executiveLegislators}
-                legislatorRoster={legislatorRoster}
+                expandToItem={hashMatch && hashMatch.executive >= 0 ? hashMatch.executive : undefined}
               />
             )}
             <ChamberSection
               title="House of Representatives"
               icon={<House sx={{ fontSize: 28 }} />}
               legislators={houseLegislators}
-              legislatorRoster={legislatorRoster}
+              expandToItem={hashMatch && hashMatch.house >= 0 ? hashMatch.house : undefined}
             />
             <ChamberSection
               title="Senate"
               icon={<Groups sx={{ fontSize: 28 }} />}
               legislators={senateLegislators}
-              legislatorRoster={legislatorRoster}
+              expandToItem={hashMatch && hashMatch.senate >= 0 ? hashMatch.senate : undefined}
             />
           </Box>
         ) : (
@@ -294,12 +336,8 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
             {(visible) => (
               <CardGrid>
                 {visible.map((leg) => (
-                  <CardGridItem key={leg.id}>
-                    <MemberCard
-                      leg={leg}
-                      profileHref={memberProfilePath(leg)}
-                      legislatorRoster={legislatorRoster}
-                    />
+                  <CardGridItem key={leg.id} sx={CARD_ITEM_CONTENT_VISIBILITY_SX}>
+                    <MemberCard leg={leg} profileHref={memberProfilePath(leg)} />
                   </CardGridItem>
                 ))}
               </CardGrid>

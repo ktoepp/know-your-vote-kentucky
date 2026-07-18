@@ -1,6 +1,8 @@
 # Members roster views — fix, optimize, then search / filtered / historical views
 
-**Status:** Proposed (2026-07-18). Phase 0 shipped on `claude/members-page-lag-pv5qef`.
+**Status:** Active (2026-07-18). Phases 0 **and 1 shipped** on `claude/members-page-lag-pv5qef`;
+next up is Phase 2. Operator prerequisite for 1d's slugs: apply migration **042**, then run
+`sync:ky:legislators` (code is fallback-safe either way).
 **Owner surfaces:** `/members`, `/members/map`, `/members/[slug]`, `/search` (members leg), roster APIs.
 
 ## Context
@@ -147,12 +149,11 @@ Rough sizing: 1a/1b/1c/1d ≈ one small PR each; 2 ≈ two PRs (URL state; filte
 PR; 4a ≈ the big one (migration + backfill + audit checker); 4b ≈ two PRs. No step blocks the
 site; each lands behind the existing pages.
 
-## Open questions (answer before the marked phases)
+## Open questions
 
-1. **"Backfill views" meaning** — historical member views (assumed) vs. operator
-   backfill-monitoring dashboard? Gates Phase 4.
+1. ~~**"Backfill views" meaning**~~ — **Resolved 2026-07-18:** end-user historical member views,
+   as planned. Phase 4 interpretation stands.
 2. **Committee filter data path** — lazy index fetch (proposed) vs. re-adding slugs to the browse
    payload? Gates 2b.
-3. **County/region filtering** — districts→counties needs a new mapping (derivable from the
-   district GeoJSON + a county layer, or LRC data). In or out of scope for Phase 2?
+3. ~~**County/region filtering**~~ — **Resolved 2026-07-18: out of scope.**
 4. **Former-member SEO** — index or noindex `/members?view=former` and former profiles? Gates 4b.
