@@ -224,6 +224,29 @@ export function MemberProfileView({
     router.push(`${pathname}?session=${encodeURIComponent(next)}`, { scroll: false });
   };
 
+  /**
+   * Shared session control for Sponsored bills + Voting record. Rendered inside the
+   * Sponsored bills filter bar (beside the co-sponsored toggle) rather than floating
+   * above the section heading; the Voting record subtitle names the selected session.
+   */
+  const sessionSelector = showSessionSelector ? (
+    <FormControl size="small" sx={{ minWidth: 190 }}>
+      <InputLabel id="member-session-label">Session</InputLabel>
+      <Select
+        labelId="member-session-label"
+        label="Session"
+        value={sessionName}
+        onChange={(e) => handleSessionChange(e.target.value)}
+      >
+        {sessionOptions.map((s) => (
+          <MenuItem key={s} value={s}>
+            {s}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  ) : null;
+
   const hasLegiscan = legiscanMemberPersonUrl(leg.legiscan_id) != null;
   const isChamberMember = leg.chamber === 'house' || leg.chamber === 'senate';
   const showLegislativeSections = isChamberMember || hasLegiscan;
@@ -375,37 +398,6 @@ export function MemberProfileView({
 
         {showLegislativeSections && (
           <>
-            {showSessionSelector && (
-              <Box
-                sx={{
-                  mt: 4,
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  gap: 1.5,
-                }}
-              >
-                <FormControl size="small" sx={{ minWidth: 220 }}>
-                  <InputLabel id="member-session-label">Legislative session</InputLabel>
-                  <Select
-                    labelId="member-session-label"
-                    label="Legislative session"
-                    value={sessionName}
-                    onChange={(e) => handleSessionChange(e.target.value)}
-                  >
-                    {sessionOptions.map((s) => (
-                      <MenuItem key={s} value={s}>
-                        {s}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Typography variant="caption" color="text.secondary">
-                  Sponsored bills and voting record below reflect the selected session.
-                </Typography>
-              </Box>
-            )}
-
             {/* Sponsored bills */}
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
@@ -424,11 +416,19 @@ export function MemberProfileView({
             </Typography>
 
             {sponsoredBills.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                No sponsored bills found for this session yet. Sponsor data may lag the official record.
-              </Typography>
+              <>
+                {/* Keep the session control reachable when the selected session has no sponsored bills. */}
+                {sessionSelector && <Box sx={{ mb: 2 }}>{sessionSelector}</Box>}
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  No sponsored bills found for this session yet. Sponsor data may lag the official record.
+                </Typography>
+              </>
             ) : (
-              <MemberSponsoredBills entries={sponsoredBills} legislatorRoster={legislatorRoster} />
+              <MemberSponsoredBills
+                entries={sponsoredBills}
+                legislatorRoster={legislatorRoster}
+                sessionSelector={sessionSelector}
+              />
             )}
 
             {/* Voting record */}
