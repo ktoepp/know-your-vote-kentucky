@@ -35,7 +35,16 @@ cp .env.local /tmp/kyvky-baseline/
 npm run perf:members:measure -- 3101 baseline
 ```
 
-## What the driver asserts / records
+## Member profile driver
+
+`npm run perf:members:profile -- <port> <label>` measures `/members/[slug]`: **stub query
+counts cold vs warm** (the honest server metric — each count is one Supabase round trip in
+production; the cached data layer should show `{}` for warm views), response times, HTML
+payload bytes, and client long tasks at 4× throttle. The stub serves fixture bills,
+roll-call votes (RPC `get_votes_for_legislator`), committees, and calendar meeting rows so
+the full profile renders. `GET :54321/__stats` (`?reset=1`) exposes the counters.
+
+## What the browse driver asserts / records
 
 - **API payload** (`/api/roster/members`): bytes, row count, inactive rows (should be 0),
   `lrc_district_link_unsafe` + `profile_slug` presence.

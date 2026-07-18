@@ -40,7 +40,7 @@ const AGENDA_WITH_MEETING_SELECT = `
 
 const COMMITTEE_DETAIL_REVALIDATE_SECONDS = 300;
 
-export async function fetchKyCommittees(): Promise<KYCommittee[]> {
+async function fetchKyCommitteesUncached(): Promise<KYCommittee[]> {
   const supabase = createAnonClient();
   if (!supabase) return [];
   const { data, error } = await supabase
@@ -50,6 +50,13 @@ export async function fetchKyCommittees(): Promise<KYCommittee[]> {
   if (error || !data) return [];
   return data as KYCommittee[];
 }
+
+/** Full committee list (~56 rows), cached — member profiles and browse surfaces share it. */
+export const fetchKyCommittees = unstable_cache(
+  fetchKyCommitteesUncached,
+  ['ky-committees-all'],
+  { revalidate: COMMITTEE_DETAIL_REVALIDATE_SECONDS },
+);
 
 async function fetchKyCommitteeBySlugUncached(slug: string): Promise<KYCommittee | null> {
   const supabase = createAnonClient();

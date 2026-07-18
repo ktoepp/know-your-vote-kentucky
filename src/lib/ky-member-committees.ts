@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@supabase/supabase-js';
 import type { KYCommittee, KYLegislator } from '@/types/kentucky';
 import { committeeMembershipSlugMatchesFilter } from '@/lib/ky-committee-utils';
@@ -126,13 +127,24 @@ function assignmentsFromLrcCalendar(
  * (provides role labels — Chair, Vice Chair, etc.), Open States slugs as fallback when the
  * legislator hasn't appeared in any calendar meeting yet (e.g. newly assigned before first meeting).
  */
+/**
+ * Member-independent 500-row calendar query, cached: every profile view was refetching
+ * `ky_committee_meetings.member_refs` from scratch — one of the dynamic route's biggest
+ * per-request costs. Scripts keep calling `fetchCalendarCommitteeMeetingRows` directly.
+ */
+const getCachedCalendarCommitteeMeetingRows = unstable_cache(
+  fetchCalendarCommitteeMeetingRows,
+  ['ky-member-committee-calendar-rows'],
+  { revalidate: 600 },
+);
+
 export async function fetchCommitteeAssignmentsForLegislator(
   leg: KYLegislator,
   committees: KYCommittee[],
 ): Promise<MemberCommitteeAssignment[]> {
   if (leg.chamber !== 'house' && leg.chamber !== 'senate') return [];
 
-  const meetings = await fetchCalendarCommitteeMeetingRows();
+  const meetings = await getCachedCalendarCommitteeMeetingRows();
   const fromLrc = assignmentsFromLrcCalendar(leg, meetings);
   if (fromLrc.length > 0) return fromLrc;
 

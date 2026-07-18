@@ -1,5 +1,6 @@
+import { unstable_cache } from 'next/cache';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { KYBill, KYLegislator, KYVote } from '@/types/kentucky';
+import type { KYBill, KYLegislator, KYLegislatorRoster, KYVote } from '@/types/kentucky';
 import { getCivicDataSessionName, KY_BILL_SESSION_OPTIONS } from '@/lib/ky-sessions';
 import { bucketLegiscanVoteText, type VoteBucket } from '@/lib/legiscan-vote-tally';
 import { matchLegislatorBySponsorName } from '@/lib/ky-member-utils';
@@ -10,6 +11,35 @@ import {
 } from '@/lib/ky-bill-sponsors';
 
 export type MemberSponsorRole = 'primary' | 'cosponsor';
+
+/**
+ * The fields the profile fetchers actually match on (LegiScan id + name variants). The
+ * cached wrappers key `unstable_cache` entries off this — small and deterministic — so the
+ * full `KYLegislator` row (external_links etc.) never ends up serialized into cache keys.
+ */
+type MemberMatchIdentity = KYLegislatorRoster;
+
+function memberMatchIdentity(leg: KYLegislator): MemberMatchIdentity {
+  return {
+    id: leg.id,
+    legiscan_id: leg.legiscan_id,
+    name: leg.name,
+    first_name: leg.first_name,
+    last_name: leg.last_name,
+    party: leg.party,
+    chamber: leg.chamber,
+    district: leg.district,
+    photo_url: null,
+    ballotpedia: null,
+    legiscan_image_url: null,
+    profile_slug: null,
+  };
+}
+
+/** `/members/[slug]` renders dynamically (session switcher reads searchParams); these windows
+ * bound how often a profile view actually hits Supabase. */
+const MEMBER_SESSIONS_REVALIDATE_SECONDS = 3600;
+const MEMBER_ACTIVITY_REVALIDATE_SECONDS = 300;
 
 /** A bill this member sponsored, tagged with whether they were a primary sponsor or a co-sponsor. */
 export interface MemberSponsoredBill {
@@ -33,7 +63,7 @@ const SPONSORED_BILL_SELECT = `${BILL_SUMMARY}, sponsors, topics`;
 type SponsorRow = { name?: string; people_id?: number };
 
 /** Find this member's own sponsor record on a bill, then classify it as primary vs co-sponsor. */
-function memberSponsorRole(sponsors: unknown, leg: KYLegislator): MemberSponsorRole {
+function memberSponsorRole(sponsors: unknown, leg: MemberMatchIdentity): MemberSponsorRole {
   const records = parseLegiscanSponsorRecords(sponsors);
   for (const r of records) {
     const pid = r.people_id != null ? Number(r.people_id) : NaN;
@@ -49,7 +79,7 @@ function memberSponsorRole(sponsors: unknown, leg: KYLegislator): MemberSponsorR
 }
 
 /** Strip the raw `sponsors` blob and tag each row with this member's sponsor role. */
-function toSponsoredBills(rows: Array<KYBill & { sponsors?: unknown }>, leg: KYLegislator): MemberSponsoredBill[] {
+function toSponsoredBills(rows: Array<KYBill & { sponsors?: unknown }>, leg: MemberMatchIdentity): MemberSponsoredBill[] {
   return rows.map((row) => {
     const role = memberSponsorRole(row.sponsors, leg);
     const { sponsors: _sponsors, ...bill } = row;
@@ -57,7 +87,7 @@ function toSponsoredBills(rows: Array<KYBill & { sponsors?: unknown }>, leg: KYL
   });
 }
 
-function billListsLegislatorAsSponsor(sponsors: unknown, leg: KYLegislator): boolean {
+function billListsLegislatorAsSponsor(sponsors: unknown, leg: MemberMatchIdentity): boolean {
   if (!Array.isArray(sponsors)) return false;
   for (const row of sponsors) {
     if (!row || typeof row !== 'object') continue;
@@ -73,7 +103,7 @@ function billListsLegislatorAsSponsor(sponsors: unknown, leg: KYLegislator): boo
 /** When `legiscan_id` is missing, infer LegiScan `people_id` from sponsor JSON on recent bills. */
 async function resolveLegiscanPeopleIdFromBillSponsors(
   supabase: SupabaseClient,
-  leg: KYLegislator,
+  leg: MemberMatchIdentity,
   sessionName: string,
 ): Promise<number | null> {
   const { data, error } = await supabase
@@ -214,6 +244,16 @@ function sortSessionsNewestFirst(sessions: string[]): string[] {
  * resolvable LegiScan `people_id`.
  */
 export async function fetchMemberSessionsForLegislator(leg: KYLegislator): Promise<string[]> {
+  return getCachedMemberSessions(memberMatchIdentity(leg));
+}
+
+const getCachedMemberSessions = unstable_cache(
+  fetchMemberSessionsInner,
+  ['member-profile-sessions'],
+  { revalidate: MEMBER_SESSIONS_REVALIDATE_SECONDS },
+);
+
+async function fetchMemberSessionsInner(leg: MemberMatchIdentity): Promise<string[]> {
   const currentSession = getCivicDataSessionName();
   const supabase = createAnonClient();
   if (!supabase) return [currentSession];
@@ -243,11 +283,24 @@ export async function fetchSponsoredBillsForLegislator(
   leg: KYLegislator,
   options?: { limit?: number; sessionName?: string },
 ): Promise<MemberSponsoredBill[]> {
-  const supabase = createAnonClient();
-  if (!supabase) return [];
-
   const sessionName = options?.sessionName ?? getCivicDataSessionName();
   const limit = options?.limit ?? 25;
+  return getCachedSponsoredBills(memberMatchIdentity(leg), sessionName, limit);
+}
+
+const getCachedSponsoredBills = unstable_cache(
+  fetchSponsoredBillsInner,
+  ['member-profile-sponsored-bills'],
+  { revalidate: MEMBER_ACTIVITY_REVALIDATE_SECONDS },
+);
+
+async function fetchSponsoredBillsInner(
+  leg: MemberMatchIdentity,
+  sessionName: string,
+  limit: number,
+): Promise<MemberSponsoredBill[]> {
+  const supabase = createAnonClient();
+  if (!supabase) return [];
 
   let peopleId = leg.legiscan_id != null ? Number(leg.legiscan_id) : null;
   if (peopleId == null || !Number.isFinite(peopleId)) {
@@ -287,22 +340,36 @@ export async function fetchMemberVoteRecord(
   leg: KYLegislator,
   options?: { maxRows?: number; recentLimit?: number; sessionName?: string },
 ): Promise<MemberVoteRecord> {
-  const supabase = createAnonClient();
-  const sessionNameEarly = options?.sessionName ?? getCivicDataSessionName();
-  if (!supabase) return emptyMemberVoteRecord(sessionNameEarly);
-
   const sessionName = options?.sessionName ?? getCivicDataSessionName();
+  const maxRows = options?.maxRows ?? 200;
+  const recentLimit = options?.recentLimit ?? 8;
+  return getCachedMemberVoteRecord(memberMatchIdentity(leg), sessionName, maxRows, recentLimit);
+}
+
+const getCachedMemberVoteRecord = unstable_cache(
+  fetchMemberVoteRecordInner,
+  ['member-profile-vote-record'],
+  { revalidate: MEMBER_ACTIVITY_REVALIDATE_SECONDS },
+);
+
+async function fetchMemberVoteRecordInner(
+  leg: MemberMatchIdentity,
+  sessionName: string,
+  maxRows: number,
+  recentLimit: number,
+): Promise<MemberVoteRecord> {
+  const supabase = createAnonClient();
+  if (!supabase) return emptyMemberVoteRecord(sessionName);
+
   let peopleId = leg.legiscan_id != null ? Number(leg.legiscan_id) : null;
   if (peopleId == null || !Number.isFinite(peopleId)) {
     peopleId = await resolveLegiscanPeopleIdFromBillSponsors(supabase, leg, sessionName);
   }
   if (peopleId == null || !Number.isFinite(peopleId)) {
-    return emptyMemberVoteRecord(sessionNameEarly);
+    return emptyMemberVoteRecord(sessionName);
   }
 
   const peopleKey = String(peopleId);
-  const maxRows = options?.maxRows ?? 200;
-  const recentLimit = options?.recentLimit ?? 8;
 
   const { data: rows, error } = await supabase.rpc('get_votes_for_legislator', {
     legislator_people_id: peopleKey,

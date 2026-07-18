@@ -123,9 +123,114 @@ const KY_SOURCES = [
 ];
 const SOURCE_COLUMNS = new Set(['source_name', 'last_sync_at']);
 
+// ---------- bills + votes + committees (member profile surfaces) ----------
+const activeMembers = rows.filter((r) => r.active && r.chamber);
+const BILLS = [];
+for (let i = 0; i < 800; i++) {
+  const session = i % 3 === 0 ? '2025 Regular Session' : '2026 Regular Session';
+  const primary = activeMembers[(i * 7) % activeMembers.length];
+  const co1 = activeMembers[(i * 11 + 3) % activeMembers.length];
+  const co2 = activeMembers[(i * 13 + 9) % activeMembers.length];
+  const chamber = primary.chamber;
+  const n = 100 + i;
+  BILLS.push({
+    id: uuid(90000 + i),
+    bill_number: `${chamber === 'house' ? 'HB' : 'SB'}${n}`,
+    title: `An act relating to fixture topic ${i % 40} (${session})`,
+    status: ['Introduced', 'In Committee', 'Passed House', 'Chaptered'][i % 4],
+    last_action_date: `2026-0${1 + (i % 6)}-1${i % 3}`,
+    last_action: 'received in Senate',
+    session,
+    chamber,
+    legiscan_id: 700000 + i,
+    topics: [`topic-${i % 40}`],
+    sponsors: [
+      { people_id: primary.legiscan_id, name: primary.name, sponsor_type_id: 1 },
+      { people_id: co1.legiscan_id, name: co1.name, sponsor_type_id: 2 },
+      { people_id: co2.legiscan_id, name: co2.name, sponsor_type_id: 2 },
+    ],
+  });
+}
+const BILL_COLUMNS = new Set(Object.keys(BILLS[0]));
+
+const COMMITTEES = ['Appropriations and Revenue', 'Judiciary', 'Health Services', 'Education', 'Agriculture', 'Transportation', 'State Government', 'Banking and Insurance'].map((name, i) => ({
+  id: uuid(80000 + i),
+  lrc_rsn: 9000 + i,
+  committee_type: 'S',
+  name,
+  chamber: i % 2 === 0 ? 'house' : 'senate',
+  slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+  profile_url: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-07-01T00:00:00Z',
+}));
+const COMMITTEE_COLUMNS = new Set(Object.keys(COMMITTEES[0]));
+
+// Meeting rows for the member_refs → committee-assignment path (embedded committee select).
+const MEETINGS = [];
+for (let i = 0; i < 120; i++) {
+  const committee = COMMITTEES[i % COMMITTEES.length];
+  const memberRefs = [];
+  for (let m = 0; m < 12; m++) {
+    const leg = activeMembers[(i * 5 + m * 17) % activeMembers.length];
+    const dn = leg.chamber === 'senate' ? 100 + Number(leg.district.split('-')[1]) : Number(leg.district.split('-')[1]);
+    memberRefs.push({ displayName: m === 0 ? `${leg.name} (Chair)` : leg.name, districtNumber: dn });
+  }
+  MEETINGS.push({ member_refs: memberRefs, ky_committees: { name: committee.name, slug: committee.slug, chamber: committee.chamber } });
+}
+
+// Roll-call votes served by the get_votes_for_legislator RPC.
+const VOTES = BILLS.filter((_, i) => i % 4 !== 3).map((bill, i) => ({
+  id: uuid(70000 + i),
+  bill_id: bill.id,
+  date: bill.last_action_date,
+  chamber: bill.chamber,
+  description: `Third reading, ${bill.bill_number}`,
+  yea_count: 80,
+  nay_count: 15,
+  absent_count: 5,
+  passed: true,
+  roll_call: activeMembers
+    .filter((m) => m.chamber === bill.chamber)
+    .map((m, j) => ({ legislator_id: String(m.legiscan_id), vote: j % 7 === 0 ? 'Nay' : 'Yea' })),
+  created_at: '2026-07-01T00:00:00Z',
+}));
+
+// ---------- request stats (per-table query counts — proves caching) ----------
+const stats = new Map();
+function bumpStat(key) {
+  stats.set(key, (stats.get(key) ?? 0) + 1);
+}
+
 // ---------- PostgREST-ish query handling ----------
+const TABLES = {
+  ky_legislators: { rows: () => rows, columns: () => LEGISLATOR_COLUMNS },
+  ky_sources: { rows: () => KY_SOURCES, columns: () => SOURCE_COLUMNS },
+  ky_bills: { rows: () => BILLS, columns: () => BILL_COLUMNS },
+  ky_committees: { rows: () => COMMITTEES, columns: () => COMMITTEE_COLUMNS },
+};
+
+/** JSONB containment (`sponsors=cs.[{"people_id":123}]`) — subset match on array elements. */
+function jsonbContains(value, needle) {
+  if (!Array.isArray(value) || !Array.isArray(needle)) return false;
+  return needle.every((want) =>
+    value.some(
+      (el) =>
+        el && typeof el === 'object' && Object.entries(want).every(([k, v]) => el[k] === v),
+    ),
+  );
+}
+
 function applyQuery(table, params) {
-  const known = table === 'ky_legislators' ? LEGISLATOR_COLUMNS : SOURCE_COLUMNS;
+  // ky_committee_meetings uses an embedded committee select — return pre-shaped rows.
+  if (table === 'ky_committee_meetings') {
+    const limit = params.get('limit');
+    const data = limit ? MEETINGS.slice(0, parseInt(limit, 10)) : [...MEETINGS];
+    return { status: 200, body: data };
+  }
+  const def = TABLES[table];
+  if (!def) return { status: 200, body: [] };
+  const known = def.columns();
   const select = params.get('select');
   if (select && select !== '*') {
     for (const col of select.split(',').map((s) => s.trim())) {
@@ -137,13 +242,34 @@ function applyQuery(table, params) {
       }
     }
   }
-  let data = table === 'ky_legislators' ? [...rows] : [...KY_SOURCES];
+  let data = [...def.rows()];
   for (const [key, value] of params.entries()) {
     if (key === 'select' || key === 'order' || key === 'limit' || key === 'offset' || key === 'apikey') continue;
-    const m = /^eq\.(.*)$/.exec(value);
+    let m = /^eq\.(.*)$/.exec(value);
     if (m) {
       const want = m[1] === 'true' ? true : m[1] === 'false' ? false : m[1];
       data = data.filter((r) => r[key] === want);
+      continue;
+    }
+    m = /^cs\.(.*)$/.exec(value);
+    if (m) {
+      let needle = null;
+      try {
+        needle = JSON.parse(m[1]);
+      } catch {
+        /* unsupported containment literal */
+      }
+      data = data.filter((r) => jsonbContains(r[key], needle));
+      continue;
+    }
+    m = /^in\.\((.*)\)$/.exec(value);
+    if (m) {
+      const wants = new Set(m[1].split(',').map((s) => s.trim().replace(/^"|"$/g, '')));
+      data = data.filter((r) => wants.has(String(r[key])));
+      continue;
+    }
+    if (value === 'not.is.null') {
+      data = data.filter((r) => r[key] != null);
     }
   }
   const order = params.get('order');
@@ -172,17 +298,47 @@ const server = http.createServer((req, res) => {
     res.end();
     return;
   }
+  // Per-table query counters — the honest cache metric (each count = one Supabase round
+  // trip in production). GET /__stats returns them; /__stats?reset=1 zeroes first.
+  if (url.pathname === '/__stats') {
+    if (url.searchParams.get('reset') === '1') stats.clear();
+    res.writeHead(200, { ...cors, 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(Object.fromEntries(stats)));
+    return;
+  }
+  const rpcMatch = /^\/rest\/v1\/rpc\/(\w+)$/.exec(url.pathname);
+  if (rpcMatch && req.method === 'POST') {
+    bumpStat(`rpc:${rpcMatch[1]}`);
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      let body = [];
+      if (rpcMatch[1] === 'get_votes_for_legislator') {
+        try {
+          const args = JSON.parse(raw || '{}');
+          const pid = String(args.legislator_people_id ?? '');
+          const max = Number(args.max_rows ?? 200);
+          body = VOTES.filter(
+            (v) =>
+              (!args.p_session || BILLS.find((b) => b.id === v.bill_id)?.session === args.p_session) &&
+              v.roll_call.some((r) => r.legislator_id === pid),
+          ).slice(0, max);
+        } catch {
+          body = [];
+        }
+      }
+      res.writeHead(200, { ...cors, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(body));
+    });
+    return;
+  }
   const restMatch = /^\/rest\/v1\/(\w+)$/.exec(url.pathname);
   if (restMatch && (req.method === 'GET' || req.method === 'HEAD')) {
     const table = restMatch[1];
-    if (table === 'ky_legislators' || table === 'ky_sources') {
-      const { status, body } = applyQuery(table, url.searchParams);
-      res.writeHead(status, { ...cors, 'Content-Type': 'application/json' });
-      res.end(req.method === 'HEAD' ? undefined : JSON.stringify(body));
-      return;
-    }
-    res.writeHead(200, { ...cors, 'Content-Type': 'application/json' });
-    res.end('[]');
+    bumpStat(table);
+    const { status, body } = applyQuery(table, url.searchParams);
+    res.writeHead(status, { ...cors, 'Content-Type': 'application/json' });
+    res.end(req.method === 'HEAD' ? undefined : JSON.stringify(body));
     return;
   }
   if (url.pathname.startsWith('/auth/v1/')) {

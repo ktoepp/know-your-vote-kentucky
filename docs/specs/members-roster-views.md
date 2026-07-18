@@ -80,6 +80,17 @@ append district, e.g. `jane-smith-hd-5`), written by the legislator sync, indexe
 becomes an indexed `eq` (replacing today's `select('*')` full-roster scan + fuzzy matching, which
 stays only as a redirect fallback for legacy URLs).
 
+## Phase 1.5 — `/members/[slug]` profile lag (added 2026-07-19 from field report — shipped)
+
+Unplanned insert after a day-later report that profiles still lagged. The dynamic route ran
+six uncached Supabase round trips per view and shipped the full `select('*')` roster to the
+client, with no `loading.tsx`. Shipped: `unstable_cache` on all per-member fetchers + the
+member-independent calendar query + `fetchKyCommittees`; slim `sponsorRoster` payload (the
+member's own LRC rule rides the Phase-1 flag); profile loading skeleton; indexed
+`matchLegislatorBySponsorName`; `content-visibility` on sponsored-bill cards. Warm-view
+queries 28-per-4-views → 0; profile HTML −12%. Follow-up lever if field INP still objects:
+nested Suspense sections to split the streamed commit. Details: TASKS.md § 2026-07-19.
+
 ## Phase 2 — Filtered views (URL-driven)
 
 - **2a.** Move chamber + query to searchParams (`/members?chamber=house&q=smith`) with

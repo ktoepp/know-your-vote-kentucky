@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getMemberProfilePageContext } from '@/lib/member-profile';
+import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-server';
 import { getCivicDataSessionName } from '@/lib/ky-sessions';
 import {
   fetchSponsoredBillsForLegislator,
@@ -52,14 +53,19 @@ export default async function MemberProfilePage({ params, searchParams }: PagePr
   const { session: requestedSession } = await searchParams;
   const ctx = await getMemberProfilePageContext(slug);
   if (!ctx) notFound();
-  const { leg, roster } = ctx;
-  const sessionOptions = await fetchMemberSessionsForLegislator(leg);
+  const { leg } = ctx;
+  // Sponsor chips only need the slim roster; the full select('*') roster (external_links,
+  // committee_memberships, historical rows) stays server-side for slug resolution.
+  const [sessionOptions, committees, sponsorRoster] = await Promise.all([
+    fetchMemberSessionsForLegislator(leg),
+    fetchKyCommittees(),
+    fetchKyActiveLegislatorRosterSlim(),
+  ]);
   // Honour ?session= only when it's one the member actually has activity in; otherwise default to the newest.
   const sessionName =
     requestedSession && sessionOptions.includes(requestedSession)
       ? requestedSession
       : sessionOptions[0] ?? getCivicDataSessionName();
-  const committees = await fetchKyCommittees();
   const [sponsoredBills, voteRecord, committeeAssignments] = await Promise.all([
     fetchSponsoredBillsForLegislator(leg, { sessionName, limit: 30 }),
     fetchMemberVoteRecord(leg, { sessionName, maxRows: 200, recentLimit: 8 }),
@@ -80,7 +86,7 @@ export default async function MemberProfilePage({ params, searchParams }: PagePr
       />
       <MemberProfileView
         leg={leg}
-        legislatorRoster={roster}
+        sponsorRoster={sponsorRoster}
         sessionName={sessionName}
         sessionOptions={sessionOptions}
         sponsoredBills={sponsoredBills}

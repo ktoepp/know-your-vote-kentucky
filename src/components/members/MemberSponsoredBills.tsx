@@ -14,7 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import { ArrowDownward, ArrowUpward } from '@mui/icons-material';
-import type { KYLegislator } from '@/types/kentucky';
+import type { KYLegislatorRoster } from '@/types/kentucky';
 import type { MemberSponsoredBill } from '@/lib/member-profile-data';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
@@ -41,7 +41,7 @@ export function MemberSponsoredBills({
   legislatorRoster,
 }: {
   entries: MemberSponsoredBill[];
-  legislatorRoster: KYLegislator[];
+  legislatorRoster: KYLegislatorRoster[];
 }) {
   const [includeCosponsored, setIncludeCosponsored] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -185,7 +185,12 @@ export function MemberSponsoredBills({
       ) : (
         <CardGrid>
           {visible.map((e) => (
-            <CardGridItem key={e.bill.id}>
+            // content-visibility: the whole profile streams in as one commit (loading.tsx
+            // boundary); skipping offscreen card layout/paint keeps that commit small.
+            <CardGridItem
+              key={e.bill.id}
+              sx={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
+            >
               <KYBillCard bill={e.bill} legislators={legislatorRoster} />
             </CardGridItem>
           ))}

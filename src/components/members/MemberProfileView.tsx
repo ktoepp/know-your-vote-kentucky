@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { ArrowBack, Description, Groups, HowToVote, Search } from '@mui/icons-material';
 import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
-import type { KYLegislator } from '@/types/kentucky';
+import type { KYLegislator, KYLegislatorRoster } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { MemberSponsoredBills } from '@/components/members/MemberSponsoredBills';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
@@ -194,7 +194,7 @@ function VoteRollCallList({ rows }: { rows: MemberRecentRollVote[] }) {
 
 export function MemberProfileView({
   leg,
-  legislatorRoster,
+  sponsorRoster,
   sessionName,
   sessionOptions = [],
   sponsoredBills = [],
@@ -202,7 +202,9 @@ export function MemberProfileView({
   committeeAssignments = [],
 }: {
   leg: KYLegislator;
-  legislatorRoster: KYLegislator[];
+  /** Slim active roster for sponsor-chip portrait matching. `leg` itself carries the
+   * server-annotated LRC link-safety flag, so no full roster is needed here. */
+  sponsorRoster: KYLegislatorRoster[];
   sessionName: string;
   sessionOptions?: string[];
   sponsoredBills?: MemberSponsoredBill[];
@@ -231,7 +233,7 @@ export function MemberProfileView({
   const { social: socialLinks, other: otherLinks } = groupLegislatorExternalLinks(leg.external_links);
   const showDistrictMap = leg.chamber === 'house' || leg.chamber === 'senate';
   const isFormerMember = leg.active === false;
-  const officialProfileUrl = kyLegislaturePublicUrl(leg, legislatorRoster);
+  const officialProfileUrl = kyLegislaturePublicUrl(leg);
   const ballotpediaUrl = normalizeBallotpediaHref(leg.ballotpedia);
   const campaignUrl = isFormerMember ? null : kyLegislatorCampaignWebsite(leg);
   const isGovernor = isKentuckyGovernor(leg);
@@ -345,7 +347,6 @@ export function MemberProfileView({
               leg={leg}
               featured={false}
               profileNameHeading="h1"
-              legislatorRoster={legislatorRoster}
               showDistrictMinimap={false}
               showFooterLinks={false}
             />
@@ -428,7 +429,7 @@ export function MemberProfileView({
                 No sponsored bills found for this session yet. Sponsor data may lag the official record.
               </Typography>
             ) : (
-              <MemberSponsoredBills entries={sponsoredBills} legislatorRoster={legislatorRoster} />
+              <MemberSponsoredBills entries={sponsoredBills} legislatorRoster={sponsorRoster} />
             )}
 
             {/* Voting record */}

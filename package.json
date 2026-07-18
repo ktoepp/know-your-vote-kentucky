@@ -61,6 +61,7 @@
     "verify:recent-ship": "tsx scripts/verify-recent-ship.ts",
     "perf:members:stub": "node scripts/perf/members-postgrest-stub.mjs",
     "perf:members:measure": "node scripts/perf/members-measure.mjs",
+    "perf:members:profile": "node scripts/perf/member-profile-measure.mjs",
     "sync:ky:lrc-calendar": "tsx scripts/manual-sync.ts lrc-calendar",
     "sync:ky:lrc-calendar:dry": "tsx scripts/manual-sync.ts lrc-calendar --dry-run",
     "sync:ky:lrc-committee-materials": "tsx scripts/sync-lrc-committee-materials.ts",

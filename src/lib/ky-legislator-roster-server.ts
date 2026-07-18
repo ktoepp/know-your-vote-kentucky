@@ -158,12 +158,14 @@ export async function fetchKyMembersBrowseRoster(): Promise<KYLegislator[]> {
 
 /**
  * Per-request deduped profile lookup (metadata + page share one roster fetch).
- * Historical legislators remain resolvable by slug.
+ * Historical legislators remain resolvable by slug. The roster is annotated, so the
+ * returned `leg` carries `lrc_district_link_unsafe` — profile surfaces need no roster
+ * for LRC link rules (and should not ship the full roster to the client).
  */
 export const getMemberProfilePageContext = cache(
   async (slug: string): Promise<{ leg: KYLegislator; roster: KYLegislator[] } | null> => {
     const decoded = decodeURIComponent(slug).trim();
-    const roster = await getCachedFullLegislatorRoster();
+    const roster = annotateKyLrcSeatConflicts(await getCachedFullLegislatorRoster());
     const leg = findLegislatorByProfileSlug(roster, decoded);
     if (!leg) return null;
     return { leg, roster };

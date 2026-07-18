@@ -711,6 +711,63 @@ export function formatMemberDisplay(
   return cluster ? `${prefix}${name} (${cluster})` : `${prefix}${name}`;
 }
 
+interface SponsorNameEntry {
+  leg: KYLegislatorRoster;
+  lastLower: string;
+  nameNorm: string;
+}
+
+interface SponsorNameIndex {
+  /** Normalized full-name AND first+last keys, first row wins — matches the scan order. */
+  byExact: Map<string, KYLegislatorRoster>;
+  entries: SponsorNameEntry[];
+}
+
+/**
+ * Memoized per roster array identity: sponsor chips call the matcher once per sponsor per
+ * bill card, and each un-indexed call regex-normalizes the whole roster.
+ */
+const sponsorNameIndexCache = new WeakMap<KYLegislatorRoster[], SponsorNameIndex>();
+
+function sponsorNameEntry(leg: KYLegislatorRoster): SponsorNameEntry {
+  return {
+    leg,
+    lastLower: (leg.last_name || '').toLowerCase(),
+    nameNorm: normalizeSponsorNameForMatch(leg.name || ''),
+  };
+}
+
+function sponsorNameIndex(legislators: KYLegislatorRoster[]): SponsorNameIndex {
+  const cached = sponsorNameIndexCache.get(legislators);
+  if (cached) return cached;
+  const byExact = new Map<string, KYLegislatorRoster>();
+  const entries: SponsorNameEntry[] = [];
+  for (const leg of legislators) {
+    const entry = sponsorNameEntry(leg);
+    if (entry.nameNorm && !byExact.has(entry.nameNorm)) byExact.set(entry.nameNorm, leg);
+    const flNorm = normalizeSponsorNameForMatch(`${leg.first_name || ''} ${leg.last_name || ''}`);
+    if (flNorm && !byExact.has(flNorm)) byExact.set(flNorm, leg);
+    entries.push(entry);
+  }
+  const index = { byExact, entries };
+  sponsorNameIndexCache.set(legislators, index);
+  return index;
+}
+
+/** Unique last-name (or name-suffix) match — the fuzzy tail of the sponsor matcher. */
+function matchSponsorByLastName(
+  entries: SponsorNameEntry[],
+  target: string,
+): KYLegislatorRoster | null {
+  const targetTokens = target.split(' ').filter((t) => t.length > 1);
+  const last = targetTokens[targetTokens.length - 1];
+  if (!last || last.length <= 2) return null;
+  const hits = entries.filter(
+    ({ lastLower, nameNorm }) => (lastLower && last === lastLower) || nameNorm.endsWith(last),
+  );
+  return hits.length === 1 ? hits[0].leg : null;
+}
+
 /** Match a bill sponsor string to a KY legislator (for official portrait). */
 export function matchLegislatorBySponsorName(
   legislators: KYLegislatorRoster[],
@@ -719,24 +776,20 @@ export function matchLegislatorBySponsorName(
   const target = normalizeSponsorNameForMatch(sponsorName);
   if (!target) return null;
 
-  for (const leg of legislators) {
-    const full = normalizeSponsorNameForMatch(leg.name || '');
-    if (full && full === target) return leg;
-    const fl = `${leg.first_name || ''} ${leg.last_name || ''}`;
-    const flNorm = normalizeSponsorNameForMatch(fl);
-    if (flNorm && flNorm === target) return leg;
+  // Tiny arrays (single-member role checks) scan directly — an index would cost more to
+  // build per call than it saves. Roster-scale arrays share the memoized index.
+  if (legislators.length <= 4) {
+    for (const leg of legislators) {
+      const full = normalizeSponsorNameForMatch(leg.name || '');
+      if (full && full === target) return leg;
+      const flNorm = normalizeSponsorNameForMatch(`${leg.first_name || ''} ${leg.last_name || ''}`);
+      if (flNorm && flNorm === target) return leg;
+    }
+    return matchSponsorByLastName(legislators.map(sponsorNameEntry), target);
   }
 
-  const targetTokens = target.split(' ').filter((t) => t.length > 1);
-  const last = targetTokens[targetTokens.length - 1];
-  if (last && last.length > 2) {
-    const hits = legislators.filter((leg) => {
-      const ln = (leg.last_name || '').toLowerCase();
-      if (ln && last === ln) return true;
-      const nm = normalizeSponsorNameForMatch(leg.name || '');
-      return nm.endsWith(last);
-    });
-    if (hits.length === 1) return hits[0];
-  }
-  return null;
+  const { byExact, entries } = sponsorNameIndex(legislators);
+  const exact = byExact.get(target);
+  if (exact) return exact;
+  return matchSponsorByLastName(entries, target);
 }
