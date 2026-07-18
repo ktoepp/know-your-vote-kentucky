@@ -17,7 +17,6 @@ export type HomeTrendingResult = {
   /**
    * 'visitors' — ranked by unique visitors over the past day (PostHog);
    * 'views' — fallback ranking by cumulative page views (`ky_bills.view_count`).
-   * The section caption must describe whichever metric actually ranked the list.
    */
   metric: 'visitors' | 'views';
 };
@@ -168,15 +167,17 @@ export async function fetchHomeTrendingBills(): Promise<HomeTrendingResult> {
 
 type HistoryEntry = { date?: unknown; action?: unknown; importance?: unknown };
 
-/** Most recent substantive (LegiScan importance=1, i.e. non-clerical) action date, or null. */
-function latestSubstantiveActionDate(bill: KYBill): string | null {
+/** Most recent substantive (LegiScan importance=1, i.e. non-clerical) action, or null. */
+function latestSubstantiveAction(bill: KYBill): { date: string; action: string | null } | null {
   const history = Array.isArray(bill.legiscan_history) ? (bill.legiscan_history as HistoryEntry[]) : [];
-  let latest: string | null = null;
+  let latest: { date: string; action: string | null } | null = null;
   for (const entry of history) {
     if (Number(entry?.importance) !== 1) continue;
     const date = typeof entry?.date === 'string' ? entry.date : null;
     if (!date) continue;
-    if (latest == null || date > latest) latest = date;
+    if (latest == null || date > latest.date) {
+      latest = { date, action: typeof entry?.action === 'string' ? entry.action : null };
+    }
   }
   return latest;
 }
@@ -201,11 +202,20 @@ export async function fetchHomeLatestActionBills(): Promise<KYBill[]> {
         .toISOString()
         .slice(0, 10);
       return bills
-        .map(bill => ({ bill, actionDate: latestSubstantiveActionDate(bill) }))
-        .filter((x): x is { bill: KYBill; actionDate: string } => x.actionDate != null && x.actionDate >= cutoff)
-        .sort((a, b) => (a.actionDate < b.actionDate ? 1 : a.actionDate > b.actionDate ? -1 : 0))
+        .map(bill => ({ bill, latest: latestSubstantiveAction(bill) }))
+        .filter(
+          (x): x is { bill: KYBill; latest: { date: string; action: string | null } } =>
+            x.latest != null && x.latest.date >= cutoff,
+        )
+        .sort((a, b) => (a.latest.date < b.latest.date ? 1 : a.latest.date > b.latest.date ? -1 : 0))
         .slice(0, HIGHLIGHT_LIMIT)
-        .map(({ bill, actionDate }) => ({ ...bill, last_action_date: actionDate }));
+        // Card "Latest action" must show the substantive step itself, not a later
+        // clerical entry — override both the date and the action text together.
+        .map(({ bill, latest }) => ({
+          ...bill,
+          last_action_date: latest.date,
+          last_action: latest.action ?? bill.last_action,
+        }));
     },
     ['ky-home-latest-action-bills'],
     { revalidate: LATEST_ACTION_REVALIDATE_SECONDS },

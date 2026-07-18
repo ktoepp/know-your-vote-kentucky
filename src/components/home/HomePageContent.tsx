@@ -1,5 +1,5 @@
 import { Container } from '@mui/material';
-import type { KYBill } from '@/types/kentucky';
+import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import { HomeBillCarousel } from '@/components/home/HomeBillCarousel';
 import { LandingFeatures } from '@/components/home/LandingFeatures';
 import { LandingMapSection } from '@/components/home/LandingMapSection';
@@ -15,14 +15,14 @@ export function HomePageContent({
   currentSessionBillCount,
   authHero,
   trendingBills,
-  trendingCaption,
   latestActionBills,
+  legislators,
 }: {
   currentSessionBillCount?: number;
   authHero: React.ReactNode;
   trendingBills?: KYBill[];
-  trendingCaption?: string;
   latestActionBills?: KYBill[];
+  legislators?: KYLegislatorRoster[];
 }) {
   return (
     <>
@@ -33,16 +33,16 @@ export function HomePageContent({
         {trendingBills && trendingBills.length > 0 ? (
           <HomeBillCarousel
             title="Most viewed bills"
-            caption={trendingCaption ?? ''}
             bills={trendingBills}
+            legislators={legislators ?? []}
             kind="trending"
           />
         ) : null}
         {latestActionBills && latestActionBills.length > 0 ? (
           <HomeBillCarousel
             title="Recent legislative action"
-            caption="Bills with a recent step in the legislative process. Routine procedural entries are not shown."
             bills={latestActionBills}
+            legislators={legislators ?? []}
             kind="action"
           />
         ) : null}
