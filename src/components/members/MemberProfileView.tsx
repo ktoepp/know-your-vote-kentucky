@@ -425,10 +425,6 @@ export function MemberProfileView({
                 Sponsored bills
               </Typography>
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Bills sponsored by this member in <strong>{sessionName}</strong>.
-            </Typography>
-
             {sponsoredBills.length === 0 ? (
               <>
                 {/* Keep the session control reachable when the selected session has no sponsored bills. */}
