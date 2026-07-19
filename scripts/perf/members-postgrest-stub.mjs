@@ -123,11 +123,64 @@ const KY_SOURCES = [
 ];
 const SOURCE_COLUMNS = new Set(['source_name', 'last_sync_at']);
 
+// ---------- ky_bills fixture ----------
+// Enough bill rows for the member-profile session selector + Sponsored bills filter bar
+// (needs >1 session with activity). people_id 20003 = the first house member in this
+// fixture ("Mary Hale", HD-1, slug mary-hale-hd-1 in post-042 mode): primary + co-sponsored
+// bills in 2025 RS and 2024 RS, nothing in the current session — so her selector shows an
+// empty current session plus two historical ones. The perf driver ignores ky_bills.
+const HER_PEOPLE_ID = 20003;
+const OTHER_PEOPLE_ID = 20004;
+let billSeq = 1;
+function makeBill(session, num, title, sponsorTypeForHer, extra = {}) {
+  const n = billSeq++;
+  const year = session.slice(0, 4);
+  const sponsors = [];
+  if (sponsorTypeForHer != null) sponsors.push({ people_id: HER_PEOPLE_ID, name: 'Mary Hale', sponsor_type_id: sponsorTypeForHer, sponsor_order: sponsorTypeForHer === 1 ? 1 : 2 });
+  sponsors.push({ people_id: OTHER_PEOPLE_ID, name: 'Patricia Dixon', sponsor_type_id: sponsorTypeForHer === 1 ? 2 : 1, sponsor_order: sponsorTypeForHer === 1 ? 2 : 1 });
+  return {
+    id: uuid(9000 + n),
+    bill_number: num,
+    title,
+    status: extra.status ?? 'Introduced',
+    last_action: extra.last_action ?? 'to Committee on Committees (H)',
+    last_action_date: `${year}-02-${String(10 + n).padStart(2, '0')}`,
+    session,
+    chamber: 'house',
+    legiscan_id: 700000 + n,
+    sponsors,
+    topics: extra.topics ?? ['Education'],
+    description: title,
+    url: null,
+    state_link: null,
+  };
+}
+
+const KY_BILLS = [
+  makeBill('2025 Regular Session', 'HB 101', 'AN ACT relating to public school libraries.', 1),
+  makeBill('2025 Regular Session', 'HB 214', 'AN ACT relating to teacher certification.', 1, { status: 'Chaptered', last_action: 'signed by Governor' }),
+  makeBill('2025 Regular Session', 'SB 60', 'AN ACT relating to school transportation funding.', 2),
+  makeBill('2024 Regular Session', 'HB 333', 'AN ACT relating to student data privacy.', 1),
+  makeBill('2024 Regular Session', 'HB 77', 'AN ACT relating to career and technical education.', 2),
+  makeBill('2026 Regular Session', 'HB 500', 'AN ACT relating to broadband deployment.', null, { topics: ['Technology'] }),
+];
+
 // ---------- PostgREST-ish query handling ----------
+/** PostgREST `cs.` (JSON containment) — array column contains every needle object. */
+function matchesContains(rowVal, needles) {
+  if (!Array.isArray(rowVal) || !Array.isArray(needles)) return false;
+  return needles.every((needle) =>
+    rowVal.some((el) => el && typeof el === 'object' && Object.entries(needle).every(([k, v]) => el[k] === v)),
+  );
+}
+
 function applyQuery(table, params) {
+  const isBills = table === 'ky_bills';
   const known = table === 'ky_legislators' ? LEGISLATOR_COLUMNS : SOURCE_COLUMNS;
   const select = params.get('select');
-  if (select && select !== '*') {
+  // ky_bills projects unknown columns as absent instead of 42703 — the missing-column
+  // fallback machinery under test is the legislators' profile_slug retry, not bills.
+  if (!isBills && select && select !== '*') {
     for (const col of select.split(',').map((s) => s.trim())) {
       if (!known.has(col)) {
         return {
@@ -137,13 +190,20 @@ function applyQuery(table, params) {
       }
     }
   }
-  let data = table === 'ky_legislators' ? [...rows] : [...KY_SOURCES];
+  let data = table === 'ky_legislators' ? [...rows] : isBills ? [...KY_BILLS] : [...KY_SOURCES];
   for (const [key, value] of params.entries()) {
     if (key === 'select' || key === 'order' || key === 'limit' || key === 'offset' || key === 'apikey') continue;
     const m = /^eq\.(.*)$/.exec(value);
     if (m) {
       const want = m[1] === 'true' ? true : m[1] === 'false' ? false : m[1];
       data = data.filter((r) => r[key] === want);
+      continue;
+    }
+    const cs = /^cs\.(.*)$/.exec(value);
+    if (cs) {
+      let needles = null;
+      try { needles = JSON.parse(cs[1]); } catch { needles = null; }
+      if (needles) data = data.filter((r) => matchesContains(r[key], needles));
     }
   }
   const order = params.get('order');
@@ -172,10 +232,16 @@ const server = http.createServer((req, res) => {
     res.end();
     return;
   }
+  // RPCs (member vote record, search, ...): empty result set, success.
+  if (url.pathname.startsWith('/rest/v1/rpc/')) {
+    res.writeHead(200, { ...cors, 'Content-Type': 'application/json' });
+    res.end('[]');
+    return;
+  }
   const restMatch = /^\/rest\/v1\/(\w+)$/.exec(url.pathname);
   if (restMatch && (req.method === 'GET' || req.method === 'HEAD')) {
     const table = restMatch[1];
-    if (table === 'ky_legislators' || table === 'ky_sources') {
+    if (table === 'ky_legislators' || table === 'ky_sources' || table === 'ky_bills') {
       const { status, body } = applyQuery(table, url.searchParams);
       res.writeHead(status, { ...cors, 'Content-Type': 'application/json' });
       res.end(req.method === 'HEAD' ? undefined : JSON.stringify(body));
@@ -197,6 +263,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
   const active = rows.filter((r) => r.active).length;
   console.log(
-    `postgrest-stub on :${PORT} — ${rows.length} legislator rows (${active} active), profile_slug ${WITH_PROFILE_SLUG ? 'ON (post-042)' : 'OFF (pre-042)'}`,
+    `postgrest-stub on :${PORT} — ${rows.length} legislator rows (${active} active), ${KY_BILLS.length} bills, profile_slug ${WITH_PROFILE_SLUG ? 'ON (post-042)' : 'OFF (pre-042)'}`,
   );
 });
