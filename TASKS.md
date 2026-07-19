@@ -329,6 +329,7 @@ Update 2026-07-19: step one shipped — the Governor's office section is removed
 - [ ] Design + build House/Senate search tiles for the space where the governor's-office section sat.
 - [ ] Wire tiles as anchor links to the corresponding member list sections below.
 - [ ] Add search filters (chamber, party, district/name) once the tiles are in place.
+- [ ] Expand member search to match cities/towns/counties (owner request 2026-07-19): map a place name to the district(s) covering it so "Bardstown" finds its representative and senator, not just name/district text matches. Needs a place→district dataset (county subdivisions vs. district boundaries — districts split counties, so a place can map to several districts).
 - [ ] Backfill any missing members so filtering has full coverage.
 
 ### `ky_votes` duplicate rows — sync-side dedupe + one-time cleanup
