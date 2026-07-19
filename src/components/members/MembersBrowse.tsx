@@ -276,13 +276,6 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
           </Box>
         )}
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Groups sx={{ fontSize: '1.2rem', color: 'primary.main' }} />
-          <Typography variant="body2" fontWeight={600}>
-            {filtered.length} {filtered.length === 1 ? 'member' : 'members'}
-          </Typography>
-        </Box>
-
         {legislatorRoster.length === 0 ? (
           <Alert severity="error" sx={{ mb: 2 }}>
             Member data is currently unavailable. Try again shortly.

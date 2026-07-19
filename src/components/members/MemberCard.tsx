@@ -308,7 +308,25 @@ export const MemberCard = React.memo(function MemberCard({
   ) : undefined;
 
   return (
-    <Box sx={{ position: 'relative', height: '100%' }}>
+    // Hover/focus styles live HERE, not on the Card: the Card has `pointer-events: none`
+    // (clicks fall through to the stretch link), so its own `:hover` only fired over the
+    // re-enabled email/phone/link children instead of the whole card surface.
+    <Box
+      sx={{
+        position: 'relative',
+        height: '100%',
+        ...(profileHref && {
+          cursor: 'pointer',
+          '&:hover .member-card-surface': {
+            boxShadow:
+              theme.palette.mode === 'dark' ? CARD.hoverBoxShadowDark : CARD.hoverBoxShadow,
+            transform: CARD.hoverTransform,
+            borderColor: governor ? theme.palette.success.dark : theme.palette.primary.main,
+          },
+          '&:has(.member-card-stretch-link:focus-visible) .member-card-surface': FOCUS_RING,
+        }),
+      }}
+    >
       {profileHref && (
         <Link
           href={profileHref}
@@ -329,6 +347,7 @@ export const MemberCard = React.memo(function MemberCard({
         variant="member"
         featured={governor}
         id={anchorId}
+        className="member-card-surface"
         sx={{
           position: 'relative',
           zIndex: 2,
@@ -338,16 +357,6 @@ export const MemberCard = React.memo(function MemberCard({
               theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.08)' : 'rgba(46, 125, 50, 0.04)',
           }),
           ...(pointerPassthrough && { pointerEvents: 'none' as const }),
-          ...(profileHref && {
-            cursor: 'pointer',
-            '&:hover': {
-              boxShadow:
-                theme.palette.mode === 'dark' ? CARD.hoverBoxShadowDark : CARD.hoverBoxShadow,
-              transform: CARD.hoverTransform,
-              borderColor: governor ? theme.palette.success.dark : theme.palette.primary.main,
-            },
-            '&:has(.member-card-stretch-link:focus-visible)': FOCUS_RING,
-          }),
         }}
         header={header}
         body={body}
