@@ -58,6 +58,12 @@ export interface OpenStatesLegislator {
   offices?: OpenStatesOffice[] | null;
   /** Popolo-style roles (committee memberships). Included when API returns them on `/people`. */
   roles?: unknown[] | null;
+  /** v1-style social ids (twitter, facebook, …) — mirrors openstates/people YAML `ids:`. */
+  ids?: Record<string, unknown> | null;
+  /** v3 catch-all extras; some jurisdictions carry social handles here. */
+  extras?: Record<string, unknown> | null;
+  /** v3 `include=other_identifiers` — scheme/identifier pairs (may include social schemes). */
+  other_identifiers?: Array<{ identifier?: string; scheme?: string }> | null;
 }
 
 /**
@@ -279,13 +285,13 @@ export class KyOpenStatesClient {
   }
 
   async fetchLegislators(): Promise<OpenStatesLegislator[]> {
-    console.log('[KyOpenStates] Fetching KY legislators (include=links,offices)');
+    console.log('[KyOpenStates] Fetching KY legislators (include=links,offices,other_identifiers)');
     try {
-      return await this.fetchLegislatorPages(['links', 'offices']);
+      return await this.fetchLegislatorPages(['links', 'offices', 'other_identifiers']);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!/422/.test(msg)) throw e;
-      console.warn('[KyOpenStates] links+offices in one request returned 422; using two paged passes');
+      console.warn('[KyOpenStates] combined include returned 422; using two paged passes (links, offices)');
       const withLinks = await this.fetchLegislatorPages(['links']);
       try {
         const withOffices = await this.fetchLegislatorPages(['offices']);

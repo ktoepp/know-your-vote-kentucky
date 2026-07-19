@@ -15,7 +15,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
-import { AccountBalance, Cancel, Groups, House, Search } from '@mui/icons-material';
+import { Cancel, Groups, House, Search } from '@mui/icons-material';
 import type { KYLegislator } from '@/types/kentucky';
 import { isKentuckyGovernor, memberCanonicalSlug, memberProfilePath, memberSlug } from '@/lib/ky-member-utils';
 import { MemberCard } from '@/components/members/MemberCard';
@@ -97,15 +97,22 @@ export interface MembersBrowseProps {
 
 export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
   const legislatorRoster = initialRoster;
-  const legislators = useMemo(() => legislatorRoster.filter((l) => l.active), [legislatorRoster]);
+  // /members browses the General Assembly only — executive officials (Governor's office)
+  // ride along in the shared roster but are not listed here.
+  const legislators = useMemo(
+    () =>
+      legislatorRoster.filter(
+        (l) => l.active && !isKentuckyGovernor(l) && (l.chamber === 'house' || l.chamber === 'senate'),
+      ),
+    [legislatorRoster],
+  );
   const [searchQuery, setSearchQuery] = useState('');
-  const [chamberFilter, setChamberFilter] = useState<'all' | 'governor' | 'house' | 'senate'>('all');
+  const [chamberFilter, setChamberFilter] = useState<'all' | 'house' | 'senate'>('all');
   // Deferred: the TextField updates immediately; re-filtering the card grid happens
   // in an interruptible background render, so typing stays responsive.
   const deferredQuery = useDeferredValue(searchQuery);
 
   const legislatorsScoped = useMemo(() => {
-    if (chamberFilter === 'governor') return legislators.filter(isKentuckyGovernor);
     if (chamberFilter === 'house') return legislators.filter((l) => l.chamber === 'house');
     if (chamberFilter === 'senate') return legislators.filter((l) => l.chamber === 'senate');
     return legislators;
@@ -121,9 +128,8 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
     return matched.sort(sortLegislatorsByName);
   }, [legislatorsScoped, deferredQuery]);
 
-  const { executiveLegislators, houseLegislators, senateLegislators } = useMemo(
+  const { houseLegislators, senateLegislators } = useMemo(
     () => ({
-      executiveLegislators: filtered.filter((l) => isKentuckyGovernor(l) || l.chamber == null),
       houseLegislators: filtered.filter((l) => l.chamber === 'house'),
       senateLegislators: filtered.filter((l) => l.chamber === 'senate'),
     }),
@@ -144,17 +150,15 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
     // Match stored slug or the legacy name slug, so pre-042 links keep working.
     const matches = (l: KYLegislator) =>
       memberCanonicalSlug(l) === hashTarget || memberSlug(l.name || l.id) === hashTarget;
-    const executive = executiveLegislators.findIndex(matches);
     const house = houseLegislators.findIndex(matches);
     const senate = senateLegislators.findIndex(matches);
     const found =
-      (executive >= 0 && executiveLegislators[executive]) ||
       (house >= 0 && houseLegislators[house]) ||
       (senate >= 0 && senateLegislators[senate]) ||
       null;
     // Card DOM ids use the canonical slug; a legacy-alias hash must scroll to that id.
-    return { executive, house, senate, elementId: found ? memberCanonicalSlug(found) : hashTarget };
-  }, [hashTarget, executiveLegislators, houseLegislators, senateLegislators]);
+    return { house, senate, elementId: found ? memberCanonicalSlug(found) : hashTarget };
+  }, [hashTarget, houseLegislators, senateLegislators]);
 
   const hashElementId = hashMatch?.elementId ?? '';
   const hashScrolledRef = React.useRef(false);
@@ -272,13 +276,6 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
           </Box>
         )}
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Groups sx={{ fontSize: '1.2rem', color: 'primary.main' }} />
-          <Typography variant="body2" fontWeight={600}>
-            {filtered.length} {filtered.length === 1 ? 'member' : 'members'}
-          </Typography>
-        </Box>
-
         {legislatorRoster.length === 0 ? (
           <Alert severity="error" sx={{ mb: 2 }}>
             Member data is currently unavailable. Try again shortly.
@@ -304,15 +301,6 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
           </Box>
         ) : chamberFilter === 'all' ? (
           <Box>
-            {executiveLegislators.length > 0 && (
-              <ChamberSection
-                title="Governor's office"
-                caption="Governor, Lieutenant Governor, and other statewide executive officials"
-                icon={<AccountBalance sx={{ fontSize: 28 }} />}
-                legislators={executiveLegislators}
-                expandToItem={hashMatch && hashMatch.executive >= 0 ? hashMatch.executive : undefined}
-              />
-            )}
             <ChamberSection
               title="House of Representatives"
               icon={<House sx={{ fontSize: 28 }} />}

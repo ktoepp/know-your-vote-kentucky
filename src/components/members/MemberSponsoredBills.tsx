@@ -39,9 +39,12 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 export function MemberSponsoredBills({
   entries,
   legislatorRoster,
+  sessionSelector,
 }: {
   entries: MemberSponsoredBill[];
   legislatorRoster: KYLegislator[];
+  /** Shared legislative-session dropdown (owned by the profile view); rendered beside the co-sponsored toggle. */
+  sessionSelector?: React.ReactNode;
 }) {
   const [includeCosponsored, setIncludeCosponsored] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -89,21 +92,22 @@ export function MemberSponsoredBills({
           flexWrap: 'wrap',
         }}
       >
-        {cosponsoredCount > 0 ? (
-          <FormControlLabel
-            control={
-              <Switch
-                checked={includeCosponsored}
-                onChange={(e) => setIncludeCosponsored(e.target.checked)}
-                size="small"
-              />
-            }
-            label={`Show co-sponsored (${cosponsoredCount})`}
-            sx={{ m: 0 }}
-          />
-        ) : (
-          <span />
-        )}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          {cosponsoredCount > 0 && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={includeCosponsored}
+                  onChange={(e) => setIncludeCosponsored(e.target.checked)}
+                  size="small"
+                />
+              }
+              label={`Show co-sponsored (${cosponsoredCount})`}
+              sx={{ m: 0 }}
+            />
+          )}
+          {sessionSelector}
+        </Box>
 
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', ml: { sm: 'auto' } }}>
           {topicOptions.length > 0 && (

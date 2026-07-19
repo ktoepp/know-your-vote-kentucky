@@ -13,7 +13,6 @@ import {
   FormControl,
   InputAdornment,
   InputLabel,
-  Link as MuiLink,
   MenuItem,
   Paper,
   Select,
@@ -23,12 +22,13 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { ArrowBack, Description, Groups, HowToVote, Search } from '@mui/icons-material';
+import { ArrowBack, Groups, HowToVote, Search } from '@mui/icons-material';
 import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import type { KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { MemberSponsoredBills } from '@/components/members/MemberSponsoredBills';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
+import { KentuckyDistrictLocatorMap } from '@/components/members/KentuckyDistrictLocatorMap';
 import {
   isKentuckyGovernor,
   kyLegislatorCampaignWebsite,
@@ -226,6 +226,29 @@ export function MemberProfileView({
     router.push(`${pathname}?session=${encodeURIComponent(next)}`, { scroll: false });
   };
 
+  /**
+   * Shared session control for Sponsored bills + Voting record. Rendered inside the
+   * Sponsored bills filter bar (beside the co-sponsored toggle) rather than floating
+   * above the section heading; the Voting record subtitle names the selected session.
+   */
+  const sessionSelector = showSessionSelector ? (
+    <FormControl size="small" sx={{ minWidth: 190 }}>
+      <InputLabel id="member-session-label">Session</InputLabel>
+      <Select
+        labelId="member-session-label"
+        label="Session"
+        value={sessionName}
+        onChange={(e) => handleSessionChange(e.target.value)}
+      >
+        {sessionOptions.map((s) => (
+          <MenuItem key={s} value={s}>
+            {s}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  ) : null;
+
   const hasLegiscan = legiscanMemberPersonUrl(leg.legiscan_id) != null;
   const isChamberMember = leg.chamber === 'house' || leg.chamber === 'senate';
   const showLegislativeSections = isChamberMember || hasLegiscan;
@@ -265,6 +288,15 @@ export function MemberProfileView({
             href: campaignUrl,
             label: 'Campaign website',
             ariaLabel: `Campaign website for ${leg.name} (opens in a new tab)`,
+          },
+        ]
+      : []),
+    ...(districtRef
+      ? [
+          {
+            href: kyDistrictPath(districtRef),
+            label: 'District page',
+            ariaLabel: `${kyDistrictShortName(districtRef)} district page`,
           },
         ]
       : []),
@@ -353,35 +385,35 @@ export function MemberProfileView({
               legislatorRoster={legislatorRoster}
               showDistrictMinimap={false}
               showFooterLinks={false}
+              footerContent={
+                profileSourceLinks.length > 0 ? (
+                  <>
+                    <Typography
+                      component="h2"
+                      variant="subtitle2"
+                      fontWeight={700}
+                      color="text.secondary"
+                      sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.75rem', mb: 1 }}
+                    >
+                      Profiles &amp; links
+                    </Typography>
+                    <OfficialSourceLinks layout="stack" links={profileSourceLinks} />
+                  </>
+                ) : undefined
+              }
             />
-
-            {profileSourceLinks.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Typography
-                  component="h2"
-                  variant="subtitle2"
-                  fontWeight={700}
-                  color="text.secondary"
-                  sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.75rem', mb: 1 }}
-                >
-                  Profiles &amp; links
-                </Typography>
-                <OfficialSourceLinks layout="stack" links={profileSourceLinks} />
-              </Box>
-            )}
           </Box>
 
           {showDistrictMap && (
             <Box>
-              <Box sx={{ pointerEvents: 'none' }}>
-                <LegislatorDistrictThumbnail leg={leg} size="profile" />
-              </Box>
-              {districtRef && (
-                <Typography variant="body2" sx={{ mt: 1 }}>
-                  <MuiLink component={Link} href={kyDistrictPath(districtRef)} underline="hover">
-                    {kyDistrictShortName(districtRef)} →
-                  </MuiLink>
-                </Typography>
+              {isFormerMember ? (
+                // Former members keep the static district-zoom image — the interactive
+                // map would spotlight the seat's CURRENT holder, not this person.
+                <Box sx={{ pointerEvents: 'none' }}>
+                  <LegislatorDistrictThumbnail leg={leg} size="profile" />
+                </Box>
+              ) : (
+                <KentuckyDistrictLocatorMap leg={leg} />
               )}
             </Box>
           )}
@@ -389,40 +421,8 @@ export function MemberProfileView({
 
         {showLegislativeSections && (
           <>
-            {showSessionSelector && (
-              <Box
-                sx={{
-                  mt: 4,
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  gap: 1.5,
-                }}
-              >
-                <FormControl size="small" sx={{ minWidth: 220 }}>
-                  <InputLabel id="member-session-label">Legislative session</InputLabel>
-                  <Select
-                    labelId="member-session-label"
-                    label="Legislative session"
-                    value={sessionName}
-                    onChange={(e) => handleSessionChange(e.target.value)}
-                  >
-                    {sessionOptions.map((s) => (
-                      <MenuItem key={s} value={s}>
-                        {s}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Typography variant="caption" color="text.secondary">
-                  Sponsored bills and voting record below reflect the selected session.
-                </Typography>
-              </Box>
-            )}
-
             {/* Sponsored bills */}
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
               <Typography
                 component="h2"
                 variant={TYPE.sectionTitle.variant}
@@ -433,16 +433,20 @@ export function MemberProfileView({
                 Sponsored bills
               </Typography>
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Bills sponsored by this member in <strong>{sessionName}</strong>.
-            </Typography>
-
             {sponsoredBills.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                No sponsored bills found for this session yet. Sponsor data may lag the official record.
-              </Typography>
+              <>
+                {/* Keep the session control reachable when the selected session has no sponsored bills. */}
+                {sessionSelector && <Box sx={{ mb: 2 }}>{sessionSelector}</Box>}
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  No sponsored bills found for this session yet. Sponsor data may lag the official record.
+                </Typography>
+              </>
             ) : (
-              <MemberSponsoredBills entries={sponsoredBills} legislatorRoster={legislatorRoster} />
+              <MemberSponsoredBills
+                entries={sponsoredBills}
+                legislatorRoster={legislatorRoster}
+                sessionSelector={sessionSelector}
+              />
             )}
 
             {/* Voting record */}

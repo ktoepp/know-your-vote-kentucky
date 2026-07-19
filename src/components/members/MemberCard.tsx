@@ -56,6 +56,11 @@ export interface MemberCardProps {
    * @default true
    */
   showFooterLinks?: boolean;
+  /**
+   * Custom footer slot rendered inside the card below the divider (e.g. the profile page's
+   * consolidated "Profiles & links" list). Takes precedence over the default link buttons.
+   */
+  footerContent?: React.ReactNode;
 }
 
 /**
@@ -72,6 +77,7 @@ export const MemberCard = React.memo(function MemberCard({
   profileNameHeading = 'h3',
   showDistrictMinimap = true,
   showFooterLinks = true,
+  footerContent,
 }: MemberCardProps) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
@@ -259,7 +265,19 @@ export const MemberCard = React.memo(function MemberCard({
     </>
   );
 
-  const footer = showFooterLinks && hasFooterActions ? (
+  const footer = footerContent != null ? (
+    <Box
+      sx={{
+        borderTop: 1,
+        borderColor: 'divider',
+        pt: 2,
+        mt: -0.5,
+        pointerEvents: pointerPassthrough ? 'auto' : undefined,
+      }}
+    >
+      {footerContent}
+    </Box>
+  ) : showFooterLinks && hasFooterActions ? (
     <Box
       sx={{
         display: 'flex',
@@ -308,7 +326,25 @@ export const MemberCard = React.memo(function MemberCard({
   ) : undefined;
 
   return (
-    <Box sx={{ position: 'relative', height: '100%' }}>
+    // Hover/focus styles live HERE, not on the Card: the Card has `pointer-events: none`
+    // (clicks fall through to the stretch link), so its own `:hover` only fired over the
+    // re-enabled email/phone/link children instead of the whole card surface.
+    <Box
+      sx={{
+        position: 'relative',
+        height: '100%',
+        ...(profileHref && {
+          cursor: 'pointer',
+          '&:hover .member-card-surface': {
+            boxShadow:
+              theme.palette.mode === 'dark' ? CARD.hoverBoxShadowDark : CARD.hoverBoxShadow,
+            transform: CARD.hoverTransform,
+            borderColor: governor ? theme.palette.success.dark : theme.palette.primary.main,
+          },
+          '&:has(.member-card-stretch-link:focus-visible) .member-card-surface': FOCUS_RING,
+        }),
+      }}
+    >
       {profileHref && (
         <Link
           href={profileHref}
@@ -329,6 +365,7 @@ export const MemberCard = React.memo(function MemberCard({
         variant="member"
         featured={governor}
         id={anchorId}
+        className="member-card-surface"
         sx={{
           position: 'relative',
           zIndex: 2,
@@ -338,16 +375,6 @@ export const MemberCard = React.memo(function MemberCard({
               theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.08)' : 'rgba(46, 125, 50, 0.04)',
           }),
           ...(pointerPassthrough && { pointerEvents: 'none' as const }),
-          ...(profileHref && {
-            cursor: 'pointer',
-            '&:hover': {
-              boxShadow:
-                theme.palette.mode === 'dark' ? CARD.hoverBoxShadowDark : CARD.hoverBoxShadow,
-              transform: CARD.hoverTransform,
-              borderColor: governor ? theme.palette.success.dark : theme.palette.primary.main,
-            },
-            '&:has(.member-card-stretch-link:focus-visible)': FOCUS_RING,
-          }),
         }}
         header={header}
         body={body}

@@ -1669,3 +1669,34 @@ Real lever surfaced by the PR #164 investigation. `Sentry.init()` was already on
 **Owner actions (no code):** GSC — export the Pages/Indexing baseline before this deploys, then "Validate fix" on the duplicate-canonical buckets (expect drain over 2–6 weeks) and watch three page filters (`^/districts/`, `^/bills/topics/`, `^/guides/`); register Bing Webmaster Tools; supply real social profile URLs if any exist for `Organization.sameAs` (left empty — never fabricate); earned local backlinks (Kentucky public libraries' civic pages, League of Women Voters of Kentucky, county clerk resource pages, civics teachers) — no directories or paid links.
 
 **Deferred (phase 4):** per-bill OG images; sharded 2010–2024 bill archive sitemaps via `generateSitemaps()`; RSC-first `/bills` list (server-rendered page 1 driven by the `searchParams` prop); audience-lens pages. **Revisit if:** GSC flags "Crawled — currently not indexed" persistently on districts/topics (enrich before adding page types), or build time balloons (drop the top-100 bill prerender first).
+
+---
+
+## 2026-07-19 — /members drops the Governor's office section; session selector anchored in the Sponsored bills filter bar
+
+Re-landing of two changes from an unpushed 2026-07-18 working session (the session-selector commits survived on `claude/member-session-selector-fix`; the governor-section removal was reconstructed).
+
+- **`/members` lists the General Assembly only.** The Governor's office section (Governor, Lt. Governor, other statewide executives) is gone from the browse page, and executive rows are excluded from the page's counts, search, and `#hash` matching so no invisible members are counted. **Why:** the page's promise is "members of the Kentucky General Assembly", and the three executive photo cards pushed both chambers below the fold; per the TASKS.md backlog note (2026-07-18), House/Senate search tiles will take that spot in a later pass. Executive officials keep their profile pages and remain in the shared roster feeding `/members/map`, districts, and the API.
+- **Member profile: the legislative-session dropdown lives in the Sponsored bills filter bar** (beside the co-sponsored toggle) instead of floating above the section heading, and keeps working when the selected session has no sponsored bills. **Why:** the selector reads as one of the filters it actually drives; the Voting record subtitle already names the selected session.
+
+---
+
+## 2026-07-19 — /members polish + profile district locator map (owner feedback)
+
+Same-day owner notes on the members surfaces, landed on `claude/members-page-layout-p4s4vc`:
+
+- **Member cards: hover feedback now fires from the whole card surface.** Root cause: the card element carries `pointer-events: none` so clicks fall through to the stretch link, which also meant the card's own `:hover` styles only triggered while the pointer was over the re-enabled email/phone/footer children. The hover styles (and the keyboard focus ring) moved to the wrapper that actually receives the pointer. Bonus fix: the old focus ring used `&:has(.member-card-stretch-link:focus-visible)` **on the card**, but the stretch link is the card's *sibling* — the selector could never match, so keyboard focus showed no ring at all. On the wrapper the `:has()` matches and the ring renders.
+- **`/members` drops the "N members" count row** (icon + count above the sections). Redundant: each section header already carries a count chip. **Trade-off:** in single-chamber or searched views there's no aggregate count; revisit if the tiles/search pass (backlog) wants a results count in the filter bar.
+- **Member profile: statewide district locator replaces the district-zoom thumbnail** for current members. New `KentuckyDistrictLocatorMap` renders all of Kentucky from the committed district GeoJSON (`/geo/ky-sldl|sldu.geojson` — same files the explorer loads, so no Mapbox request and no new payload class) with the member's district highlighted; clicking opens `/members/map?chamber=…&district=…`, and the explorer now honours those params (selects the district + chamber immediately from boundary data; camera fit waits for Mapbox readiness so the panel works even if tiles fail). Owner offered either this or a plain static image — chose interactive since the boundary data was already committed; the static thumbnail remains as the runtime fallback when boundaries fail to load, and former-member profiles keep it outright (the interactive map would spotlight the seat's current holder, not them).
+- **Backlog:** member search by city/town/county recorded in TASKS.md under the `/members` redesign section.
+
+---
+
+## 2026-07-19 — member profile: links fold into the name card; district line + heading icon dropped; social sourcing
+
+Second round of same-day owner notes, landed on `claude/members-page-layout-p4s4vc`:
+
+- **"Profiles & links" moved inside the member card** (new `footerContent` slot on `MemberCard`, rendered as the card footer under the divider), so the name, contact rows, and outbound profiles read as one container. The card's default footer buttons stay for roster surfaces; the profile passes its richer consolidated list.
+- **District link line under the map removed** ("House District N →") — redundant with the card subtitle and the locator-map caption. The `/districts/[slug]` landing page keeps a member-profile inbound path via a new **District page** entry in Profiles & links (preserves the SEO rule that every district page is reachable from ≥2 in-app paths).
+- **Sponsored bills heading icon removed** (owner note; Voting record and Committee assignments keep theirs until told otherwise).
+- **Social links (X/Twitter etc.) sourced at sync.** Production audit 2026-07-19: 141/141 active rows have `external_links`, **0** social entries — KY's Open States `links[]` carries no socials, so the UI's existing social rendering had nothing to show. The legislator sync now also harvests handles from Open States `ids` / `extras` / `other_identifiers` (`collectOpenStatesSocialLinks`, merged + deduped with the links[] pass; handles validated to a conservative charset before URL-building, `include=other_identifiers` added to the fetch). **Needs an operator resync to take effect** — TASKS.md carries the action; if coverage stays 0 after resync, Open States has no KY social data and an alternative source is an owner decision. We render only sourced URLs — no hand-guessed handles (misattributing a legislator's account is worse than showing none).

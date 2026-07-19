@@ -235,6 +235,93 @@ export function buildLegislatorExternalLinks(
   return out;
 }
 
+/* ------------------------------------------------------------------ */
+/* Social handles from Open States person payloads                     */
+/* ------------------------------------------------------------------ */
+
+const SOCIAL_SCHEME_URL: Record<string, (handle: string) => string> = {
+  twitter: (h) => `https://x.com/${h}`,
+  x: (h) => `https://x.com/${h}`,
+  facebook: (h) => `https://www.facebook.com/${h}`,
+  instagram: (h) => `https://www.instagram.com/${h}`,
+  youtube: (h) =>
+    /^UC[A-Za-z0-9_-]{10,}$/.test(h) ? `https://www.youtube.com/channel/${h}` : `https://www.youtube.com/@${h}`,
+  tiktok: (h) => `https://www.tiktok.com/@${h}`,
+  linkedin: (h) => `https://www.linkedin.com/in/${h}`,
+  threads: (h) => `https://www.threads.net/@${h}`,
+};
+
+/**
+ * Social profile URL from a scheme + raw handle (or full URL). Handles are validated to a
+ * conservative charset so a malformed upstream value can't smuggle a path into the URL.
+ */
+export function socialUrlFromHandle(scheme: string, raw: string | null | undefined): string | null {
+  const build = SOCIAL_SCHEME_URL[scheme.trim().toLowerCase()];
+  if (!build) return null;
+  let h = String(raw ?? '').trim();
+  if (!h) return null;
+  if (/^https?:\/\//i.test(h) || h.startsWith('//')) {
+    const url = normalizeHttpsUrl(h);
+    return url && isSocialMediaHost(hostnameOf(url)) ? url : null;
+  }
+  h = h.replace(/^@/, '');
+  if (!/^[A-Za-z0-9_.-]{1,80}$/.test(h)) return null;
+  return build(h);
+}
+
+export type OpenStatesSocialFields = {
+  /** v1-style social ids (mirrors the openstates/people YAML `ids:` block). */
+  ids?: Record<string, unknown> | null;
+  /** v3 catch-all — some jurisdictions carry twitter/facebook/… keys here. */
+  extras?: Record<string, unknown> | null;
+  /** v3 `include=other_identifiers` — scheme + identifier pairs. */
+  other_identifiers?: Array<{ identifier?: unknown; scheme?: unknown }> | null;
+};
+
+/**
+ * Social profile URLs from every field Open States has historically carried handles in.
+ * KY's `links[]` has no social entries (verified 2026-07-19: 141/141 rows, 0 social), so
+ * this is the only path that can surface X/Twitter etc. on member profiles.
+ */
+export function collectOpenStatesSocialLinks(person: OpenStatesSocialFields): LegislatorExternalLink[] {
+  const out: LegislatorExternalLink[] = [];
+  const push = (scheme: string, raw: unknown) => {
+    if (typeof raw !== 'string') return;
+    const url = socialUrlFromHandle(scheme, raw);
+    if (!url) return;
+    const host = hostnameOf(url);
+    if (!host) return;
+    out.push({ url, category: 'social', host });
+  };
+  for (const bag of [person.ids, person.extras]) {
+    if (!bag || typeof bag !== 'object') continue;
+    for (const scheme of Object.keys(SOCIAL_SCHEME_URL)) {
+      push(scheme, (bag as Record<string, unknown>)[scheme]);
+    }
+  }
+  for (const oid of person.other_identifiers ?? []) {
+    if (oid && typeof oid.scheme === 'string') push(oid.scheme, oid.identifier);
+  }
+  return out;
+}
+
+/** Merge external-link lists, first occurrence winning, deduped by canonical URL. */
+export function mergeLegislatorExternalLinks(
+  ...lists: Array<LegislatorExternalLink[]>
+): LegislatorExternalLink[] {
+  const seen = new Set<string>();
+  const out: LegislatorExternalLink[] = [];
+  for (const list of lists) {
+    for (const link of list) {
+      const key = link.url.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(link);
+    }
+  }
+  return out;
+}
+
 const SOCIAL_HOST_LABELS: Record<string, string> = {
   'twitter.com': 'X (Twitter)',
   'x.com': 'X (Twitter)',

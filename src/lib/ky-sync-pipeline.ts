@@ -48,6 +48,8 @@ import {
 import { normalizeBallotpediaForStorage } from './external-legislative-links';
 import {
   buildLegislatorExternalLinks,
+  collectOpenStatesSocialLinks,
+  mergeLegislatorExternalLinks,
   normalizeHttpsUrl,
   sanitizeLegislatorCampaignWebsiteUrl,
 } from './legislator-link-normalize';
@@ -1295,7 +1297,12 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
         canonicalCommitteeMap.size > 0
           ? extractCanonicalCommitteeSlugsFromOpenStatesPerson(leg, canonicalCommitteeMap)
           : extractCommitteeMembershipSlugsFromOpenStatesPerson(leg); // fallback when ky_committees not yet seeded
-      const external_links = buildLegislatorExternalLinks(leg.links);
+      // links[] first (richer notes), then social handles from ids/extras/other_identifiers —
+      // KY's links[] carries no socials, so this second pass is what surfaces X/Twitter.
+      const external_links = mergeLegislatorExternalLinks(
+        buildLegislatorExternalLinks(leg.links),
+        collectOpenStatesSocialLinks(leg),
+      );
       return {
         openstates_id: leg.id,
         name: leg.name,
