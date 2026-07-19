@@ -29,6 +29,7 @@ import type { KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { MemberSponsoredBills } from '@/components/members/MemberSponsoredBills';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
+import { KentuckyDistrictLocatorMap } from '@/components/members/KentuckyDistrictLocatorMap';
 import {
   isKentuckyGovernor,
   kyLegislatorCampaignWebsite,
@@ -396,9 +397,15 @@ export function MemberProfileView({
 
           {showDistrictMap && (
             <Box>
-              <Box sx={{ pointerEvents: 'none' }}>
-                <LegislatorDistrictThumbnail leg={leg} size="profile" />
-              </Box>
+              {isFormerMember ? (
+                // Former members keep the static district-zoom image — the interactive
+                // map would spotlight the seat's CURRENT holder, not this person.
+                <Box sx={{ pointerEvents: 'none' }}>
+                  <LegislatorDistrictThumbnail leg={leg} size="profile" />
+                </Box>
+              ) : (
+                <KentuckyDistrictLocatorMap leg={leg} />
+              )}
               {districtRef && (
                 <Typography variant="body2" sx={{ mt: 1 }}>
                   <MuiLink component={Link} href={kyDistrictPath(districtRef)} underline="hover">
