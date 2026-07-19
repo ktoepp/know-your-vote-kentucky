@@ -56,6 +56,11 @@ export interface MemberCardProps {
    * @default true
    */
   showFooterLinks?: boolean;
+  /**
+   * Custom footer slot rendered inside the card below the divider (e.g. the profile page's
+   * consolidated "Profiles & links" list). Takes precedence over the default link buttons.
+   */
+  footerContent?: React.ReactNode;
 }
 
 /**
@@ -72,6 +77,7 @@ export const MemberCard = React.memo(function MemberCard({
   profileNameHeading = 'h3',
   showDistrictMinimap = true,
   showFooterLinks = true,
+  footerContent,
 }: MemberCardProps) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
@@ -259,7 +265,19 @@ export const MemberCard = React.memo(function MemberCard({
     </>
   );
 
-  const footer = showFooterLinks && hasFooterActions ? (
+  const footer = footerContent != null ? (
+    <Box
+      sx={{
+        borderTop: 1,
+        borderColor: 'divider',
+        pt: 2,
+        mt: -0.5,
+        pointerEvents: pointerPassthrough ? 'auto' : undefined,
+      }}
+    >
+      {footerContent}
+    </Box>
+  ) : showFooterLinks && hasFooterActions ? (
     <Box
       sx={{
         display: 'flex',

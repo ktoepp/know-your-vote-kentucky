@@ -13,7 +13,6 @@ import {
   FormControl,
   InputAdornment,
   InputLabel,
-  Link as MuiLink,
   MenuItem,
   Paper,
   Select,
@@ -23,7 +22,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { ArrowBack, Description, Groups, HowToVote, Search } from '@mui/icons-material';
+import { ArrowBack, Groups, HowToVote, Search } from '@mui/icons-material';
 import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import type { KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
@@ -292,6 +291,15 @@ export function MemberProfileView({
           },
         ]
       : []),
+    ...(districtRef
+      ? [
+          {
+            href: kyDistrictPath(districtRef),
+            label: 'District page',
+            ariaLabel: `${kyDistrictShortName(districtRef)} district page`,
+          },
+        ]
+      : []),
     ...(isGovernor
       ? [
           {
@@ -377,22 +385,23 @@ export function MemberProfileView({
               legislatorRoster={legislatorRoster}
               showDistrictMinimap={false}
               showFooterLinks={false}
+              footerContent={
+                profileSourceLinks.length > 0 ? (
+                  <>
+                    <Typography
+                      component="h2"
+                      variant="subtitle2"
+                      fontWeight={700}
+                      color="text.secondary"
+                      sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.75rem', mb: 1 }}
+                    >
+                      Profiles &amp; links
+                    </Typography>
+                    <OfficialSourceLinks layout="stack" links={profileSourceLinks} />
+                  </>
+                ) : undefined
+              }
             />
-
-            {profileSourceLinks.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Typography
-                  component="h2"
-                  variant="subtitle2"
-                  fontWeight={700}
-                  color="text.secondary"
-                  sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.75rem', mb: 1 }}
-                >
-                  Profiles &amp; links
-                </Typography>
-                <OfficialSourceLinks layout="stack" links={profileSourceLinks} />
-              </Box>
-            )}
           </Box>
 
           {showDistrictMap && (
@@ -406,13 +415,6 @@ export function MemberProfileView({
               ) : (
                 <KentuckyDistrictLocatorMap leg={leg} />
               )}
-              {districtRef && (
-                <Typography variant="body2" sx={{ mt: 1 }}>
-                  <MuiLink component={Link} href={kyDistrictPath(districtRef)} underline="hover">
-                    {kyDistrictShortName(districtRef)} →
-                  </MuiLink>
-                </Typography>
-              )}
             </Box>
           )}
         </Box>
@@ -421,7 +423,6 @@ export function MemberProfileView({
           <>
             {/* Sponsored bills */}
             <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Description sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
               <Typography
                 component="h2"
                 variant={TYPE.sectionTitle.variant}
