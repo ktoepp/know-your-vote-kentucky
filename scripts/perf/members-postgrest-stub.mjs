@@ -96,6 +96,10 @@ for (let d = 10; d <= 21; d++) {
   rows.push({ ...active, id: uuid(seq + 5000), openstates_id: null, legiscan_id: 30000 + seq++, email: null, phone: null, lrc_profile_url: null, active: false });
 }
 
+// Social link fixture: HD-1's profile must surface an "X (Twitter)" entry in Profiles & links.
+const hd1 = rows.find((r) => r.district === 'HD-1' && r.active);
+hd1.external_links = [{ url: 'https://x.com/repmaryhale', category: 'social', host: 'x.com' }];
+
 // Post-042 mode: backfill profile_slug with the migration's collision policy — a base slug
 // shared across more than one distinct seat gets the district suffix on districted rows.
 if (WITH_PROFILE_SLUG) {
