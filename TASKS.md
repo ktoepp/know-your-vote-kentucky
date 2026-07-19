@@ -330,6 +330,7 @@ Update 2026-07-19: step one shipped — the Governor's office section is removed
 - [ ] Wire tiles as anchor links to the corresponding member list sections below.
 - [ ] Add search filters (chamber, party, district/name) once the tiles are in place.
 - [ ] Expand member search to match cities/towns/counties (owner request 2026-07-19): map a place name to the district(s) covering it so "Bardstown" finds its representative and senator, not just name/district text matches. Needs a place→district dataset (county subdivisions vs. district boundaries — districts split counties, so a place can map to several districts).
+- [ ] **⚠️ Operator — social links backfill:** run `npm run sync:ky:legislators` after the 2026-07-19 members branch deploys. The sync now harvests social handles (X/Twitter, Facebook, …) from Open States `ids`/`extras`/`other_identifiers` in addition to `links[]` (KY's `links[]` has zero social entries — verified against production data 2026-07-19). If X/Twitter coverage is still 0 after the resync, Open States simply has no KY social data and we need an alternative source (Ballotpedia scrape or manual curation) — owner decision.
 - [ ] Backfill any missing members so filtering has full coverage.
 
 ### `ky_votes` duplicate rows — sync-side dedupe + one-time cleanup
