@@ -324,7 +324,9 @@ From [docs/specs/committee-calendar.md](./docs/specs/committee-calendar.md) § P
 
 Note-to-self, 2026-07-18: the three photos of the governor's office on `/members` should be replaced with tiles that let a visitor search the House and Senate sides. Those tiles become anchor links down to the senators/representatives listed below on the same page. Later pass: fill in real search filters (chamber, party, district, name), and backfill as many members as possible so search/filter coverage is complete.
 
-- [ ] Design + build House/Senate search tiles to replace the three governor's-office photos on `/members`.
+Update 2026-07-19: step one shipped — the Governor's office section is removed and `/members` lists House and Senate only (executive officials keep their profile pages and stay in the shared roster for other surfaces). The tiles/search build below is still open.
+
+- [ ] Design + build House/Senate search tiles for the space where the governor's-office section sat.
 - [ ] Wire tiles as anchor links to the corresponding member list sections below.
 - [ ] Add search filters (chamber, party, district/name) once the tiles are in place.
 - [ ] Backfill any missing members so filtering has full coverage.

@@ -1669,3 +1669,12 @@ Real lever surfaced by the PR #164 investigation. `Sentry.init()` was already on
 **Owner actions (no code):** GSC — export the Pages/Indexing baseline before this deploys, then "Validate fix" on the duplicate-canonical buckets (expect drain over 2–6 weeks) and watch three page filters (`^/districts/`, `^/bills/topics/`, `^/guides/`); register Bing Webmaster Tools; supply real social profile URLs if any exist for `Organization.sameAs` (left empty — never fabricate); earned local backlinks (Kentucky public libraries' civic pages, League of Women Voters of Kentucky, county clerk resource pages, civics teachers) — no directories or paid links.
 
 **Deferred (phase 4):** per-bill OG images; sharded 2010–2024 bill archive sitemaps via `generateSitemaps()`; RSC-first `/bills` list (server-rendered page 1 driven by the `searchParams` prop); audience-lens pages. **Revisit if:** GSC flags "Crawled — currently not indexed" persistently on districts/topics (enrich before adding page types), or build time balloons (drop the top-100 bill prerender first).
+
+---
+
+## 2026-07-19 — /members drops the Governor's office section; session selector anchored in the Sponsored bills filter bar
+
+Re-landing of two changes from an unpushed 2026-07-18 working session (the session-selector commits survived on `claude/member-session-selector-fix`; the governor-section removal was reconstructed).
+
+- **`/members` lists the General Assembly only.** The Governor's office section (Governor, Lt. Governor, other statewide executives) is gone from the browse page, and executive rows are excluded from the page's counts, search, and `#hash` matching so no invisible members are counted. **Why:** the page's promise is "members of the Kentucky General Assembly", and the three executive photo cards pushed both chambers below the fold; per the TASKS.md backlog note (2026-07-18), House/Senate search tiles will take that spot in a later pass. Executive officials keep their profile pages and remain in the shared roster feeding `/members/map`, districts, and the API.
+- **Member profile: the legislative-session dropdown lives in the Sponsored bills filter bar** (beside the co-sponsored toggle) instead of floating above the section heading, and keeps working when the selected session has no sponsored bills. **Why:** the selector reads as one of the filters it actually drives; the Voting record subtitle already names the selected session.
