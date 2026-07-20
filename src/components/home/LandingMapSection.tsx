@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import dynamic from 'next/dynamic';
+import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 
 const LandingDistrictMapPreview = dynamic(
@@ -76,6 +77,27 @@ export function LandingMapSection() {
         ) : (
           <Box sx={{ width: '100%', height: '100%', bgcolor: 'action.hover' }} aria-hidden />
         )}
+        {/* The preview is non-interactive; a full-bleed link makes the map image
+            itself open the district finder (mirrors the search CTA beside it). */}
+        <Box
+          component={NextLink}
+          href="/members/map"
+          aria-label="Open the district map to find your representatives"
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 1,
+            display: 'block',
+            cursor: 'pointer',
+            transition: 'background-color 0.15s ease',
+            '&:hover': { backgroundColor: 'rgba(15, 23, 42, 0.06)' },
+            '&:focus-visible': {
+              outline: '2px solid',
+              outlineColor: 'primary.main',
+              outlineOffset: '-2px',
+            },
+          }}
+        />
       </Box>
       <Box sx={{ flex: 1, p: { xs: 3, md: 5 }, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <Typography variant="h4" component="h2" fontWeight={700} gutterBottom sx={{ lineHeight: 1.2 }}>
