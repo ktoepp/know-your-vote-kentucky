@@ -823,10 +823,15 @@ export default function DistrictMapExplorer() {
                     'line-width': [
                       'case',
                       ['==', ['to-string', ['get', 'NAME']], selectedHouseName ?? ''],
-                      4,
                       2.5,
+                      1,
                     ],
-                    'line-opacity': 1,
+                    'line-opacity': [
+                      'case',
+                      ['==', ['to-string', ['get', 'NAME']], selectedHouseName ?? ''],
+                      1,
+                      0.55,
+                    ],
                   }}
                   layout={{ visibility: showHouseLayer ? 'visible' : 'none' }}
                 />
@@ -889,10 +894,15 @@ export default function DistrictMapExplorer() {
                     'line-width': [
                       'case',
                       ['==', ['to-string', ['get', 'NAME']], selectedSenateName ?? ''],
-                      4,
                       2.5,
+                      1,
                     ],
-                    'line-opacity': 1,
+                    'line-opacity': [
+                      'case',
+                      ['==', ['to-string', ['get', 'NAME']], selectedSenateName ?? ''],
+                      1,
+                      0.55,
+                    ],
                   }}
                   layout={{ visibility: showSenateLayer ? 'visible' : 'none' }}
                 />
