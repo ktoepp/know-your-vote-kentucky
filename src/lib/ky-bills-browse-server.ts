@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import * as Sentry from '@sentry/nextjs';
 import type { KYBill } from '@/types/kentucky';
 import {
   billMatchesBrowseStatusFilter,
@@ -132,6 +133,54 @@ function sortBrowseRows(bills: KYBill[], query: KyBillsBrowseQuery): KYBill[] {
   return next;
 }
 
+type PostgrestErrorLike = {
+  message?: string | null;
+  code?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+/**
+ * Supabase returns a plain PostgrestError object (`{message, code, details, hint}`), not an
+ * `Error` instance. Throwing it raw surfaced in Sentry/Vercel as `Error: {"message":""}` with
+ * no stack whenever the message was blank — e.g. a statement timeout (code 57014) or an aborted
+ * request (TASKS.md ops finding #1). Converting it to a real `Error` here — the origin — gives
+ * every failure a descriptive message, a stack, and the query context, and capturing it also
+ * makes background ISR revalidation failures on the `ky-bills-browse` cache key diagnosable
+ * rather than blending into Next's routine "revalidating cache with key…" log noise (finding #2).
+ * The wrapped error is still thrown, so the page fails exactly as before — only now legibly.
+ */
+function throwBrowseQueryError(
+  error: PostgrestErrorLike,
+  query: KyBillsBrowseQuery,
+  stage: 'chamber-scoped' | 'count' | 'rows',
+): never {
+  const context = [
+    error?.message?.trim() || '(empty PostgREST message)',
+    error?.code ? `code=${error.code}` : null,
+    error?.details ? `details=${error.details}` : null,
+    error?.hint ? `hint=${error.hint}` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const wrapped = new Error(`ky_bills browse query failed [${stage}]: ${context}`, { cause: error });
+  Sentry.captureException(wrapped, {
+    tags: { route: 'bills/browse', stage, postgrest_code: error?.code ?? 'none' },
+    extra: {
+      chamberMode: query.chamberMode,
+      chamberFilter: query.chamberFilter,
+      statusFilter: query.statusFilter,
+      topicFilter: query.topicFilter,
+      sessionFilter: query.sessionFilter,
+      sortBy: query.sortBy,
+      sortDir: query.sortDir,
+      page: query.page,
+      pageSize: query.pageSize,
+    },
+  });
+  throw wrapped;
+}
+
 async function fetchChamberScopedRows(
   supabase: SupabaseClient,
   query: KyBillsBrowseQuery,
@@ -151,7 +200,7 @@ async function fetchChamberScopedRows(
     q = eqBillSession(q, query.sessionFilter);
   }
   const { data, error } = await q.limit(limit);
-  if (error) throw error;
+  if (error) throwBrowseQueryError(error, query, 'chamber-scoped');
   const rows = (data ?? []) as KYBill[];
   return { rows, capped: rows.length >= limit };
 }
@@ -202,8 +251,8 @@ async function fetchKyBillsBrowsePageUncached(query: KyBillsBrowseQuery): Promis
   const to = from + pageSize - 1;
 
   const [countRes, rowRes] = await Promise.all([countQ, rowQ.range(from, to)]);
-  if (countRes.error) throw countRes.error;
-  if (rowRes.error) throw rowRes.error;
+  if (countRes.error) throwBrowseQueryError(countRes.error, query, 'count');
+  if (rowRes.error) throwBrowseQueryError(rowRes.error, query, 'rows');
 
   const bills = sortBrowseRows((rowRes.data ?? []) as KYBill[], query);
   return {

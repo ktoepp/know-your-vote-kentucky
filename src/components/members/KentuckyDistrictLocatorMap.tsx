@@ -104,6 +104,14 @@ function buildLocatorGeometry(fc: GeoJSON.FeatureCollection, districtNumber: str
 
 export interface KentuckyDistrictLocatorMapProps {
   leg: Pick<KYLegislator, 'chamber' | 'district' | 'name'>;
+  /**
+   * When false, renders as a static, non-interactive graphic (a plain Box — no link, no
+   * hover) so it can be embedded inside a larger clickable surface, e.g. a member card whose
+   * whole body already links to the profile. Default true (its own link to the district map).
+   */
+  interactive?: boolean;
+  /** Render the "District X — select to explore" caption below the map. Default true. */
+  showCaption?: boolean;
 }
 
 /**
@@ -112,7 +120,11 @@ export interface KentuckyDistrictLocatorMapProps {
  * same committed district GeoJSON the explorer uses — no Mapbox request. Falls back
  * to the static district-zoom thumbnail if the boundaries fail to load.
  */
-export function KentuckyDistrictLocatorMap({ leg }: KentuckyDistrictLocatorMapProps) {
+export function KentuckyDistrictLocatorMap({
+  leg,
+  interactive = true,
+  showCaption = true,
+}: KentuckyDistrictLocatorMapProps) {
   const chamber = leg.chamber === 'house' || leg.chamber === 'senate' ? leg.chamber : null;
   const districtNumber = chamber ? parseKyDistrictNumber(leg.district) : null;
   const [geometry, setGeometry] = React.useState<LocatorGeometry | null>(null);
@@ -138,42 +150,26 @@ export function KentuckyDistrictLocatorMap({ leg }: KentuckyDistrictLocatorMapPr
 
   if (!chamber || !districtNumber) return null;
   if (failed) {
-    // Same degraded experience the profile had before: static district-zoom image.
+    // Same degraded experience the profile had before: static district-zoom image
+    // (sized down to the card slot when embedded non-interactively).
     return (
       <Box sx={{ pointerEvents: 'none' }}>
-        <LegislatorDistrictThumbnail leg={leg} size="profile" />
+        <LegislatorDistrictThumbnail leg={leg} size={interactive ? 'profile' : 'card'} />
       </Box>
     );
   }
 
   const districtLabel = formatKyLegislatorDistrict(leg) || `District ${districtNumber}`;
 
-  return (
-    <Box
-      component={Link}
-      href={`/members/map?chamber=${chamber}&district=${districtNumber}`}
-      aria-label={`Map of Kentucky highlighting ${districtLabel} — open the interactive district map`}
-      sx={{
-        display: 'block',
-        borderRadius: 2,
-        border: '1px solid',
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-        overflow: 'hidden',
-        textDecoration: 'none',
-        color: 'inherit',
-        transition: 'border-color 0.15s ease, background-color 0.15s ease',
-        '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
-        '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
-      }}
-    >
+  const mapInner = (
+    <>
       {geometry ? (
         <Box
           component="svg"
           viewBox={geometry.viewBox}
           role="img"
           aria-hidden
-          sx={{ display: 'block', width: '100%', height: 'auto', p: 1 }}
+          sx={{ display: 'block', width: '100%', height: 'auto', p: interactive ? 1 : 0.5 }}
         >
           <Box
             component="path"
@@ -192,9 +188,47 @@ export function KentuckyDistrictLocatorMap({ leg }: KentuckyDistrictLocatorMapPr
       ) : (
         <Skeleton variant="rectangular" sx={{ width: '100%', aspectRatio: '1000 / 460', height: 'auto' }} />
       )}
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 1.5, pb: 1 }}>
-        {districtLabel} — select to explore the district map
-      </Typography>
+      {showCaption && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 1.5, pb: 1 }}>
+          {districtLabel} — select to explore the district map
+        </Typography>
+      )}
+    </>
+  );
+
+  const frameSx = {
+    display: 'block',
+    borderRadius: 2,
+    border: '1px solid',
+    borderColor: 'divider',
+    bgcolor: 'background.paper',
+    overflow: 'hidden',
+  } as const;
+
+  // Static, non-interactive graphic — for embedding inside a larger clickable surface.
+  if (!interactive) {
+    return (
+      <Box role="img" aria-label={`Map of Kentucky highlighting ${districtLabel}`} sx={{ ...frameSx, pointerEvents: 'none' }}>
+        {mapInner}
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      component={Link}
+      href={`/members/map?chamber=${chamber}&district=${districtNumber}`}
+      aria-label={`Map of Kentucky highlighting ${districtLabel} — open the interactive district map`}
+      sx={{
+        ...frameSx,
+        textDecoration: 'none',
+        color: 'inherit',
+        transition: 'border-color 0.15s ease, background-color 0.15s ease',
+        '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+        '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
+      }}
+    >
+      {mapInner}
     </Box>
   );
 }
