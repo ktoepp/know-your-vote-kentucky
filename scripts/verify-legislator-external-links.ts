@@ -5,6 +5,13 @@
  * Checks (when present): lrc_profile_url, website, Ballotpedia (resolved), LegiScan person page.
  * Non-LegiScan: HEAD first; on 405/501 or HEAD failure, retries with GET (Range: bytes=0-0, then full GET).
  *
+ * Transient signals (any 5xx — e.g. legislature.ky.gov 503 under load — or status 0 / connection drop)
+ * are retried with exponential backoff + jitter, and any that still don't resolve are recorded as
+ * **skip** (server unavailable / transient), NOT a failure. This mirrors `classifyLinkStatus`
+ * (src/lib/ky-committee-material-link-probe.ts): only a definitive 4xx (404/410) means a link is broken;
+ * a host throttle or blip must never flip a good link to "failed" and page #errors. The skip count is
+ * still surfaced in the summary so a genuine host-wide outage stays visible.
+ *
  * LegiScan: the public `legiscan.com/people/id/...` HTML is often **403** for scripts (Cloudflare). That shows as
  * `skip` in human output — the URL was still probed; the site blocked automation, not "missing link."
  * When **LEGISCAN_API_KEY** is set (same as bill sync), LegiScan rows are validated with **getPerson** instead,
@@ -37,6 +44,12 @@ import {
 
 const TIMEOUT_MS = 18_000;
 const CONCURRENCY = 6;
+/** Max probe attempts (initial + retries) for a URL that comes back transient (5xx/status-0). */
+const MAX_PROBE_ATTEMPTS = 3;
+/** Exponential-backoff base between transient retries; jitter added on top. */
+const RETRY_BASE_MS = 800;
+/** Small pre-probe jitter (ms) to spread the concurrency burst across the host. */
+const PROBE_JITTER_MS = 250;
 
 type FieldKey =
   | 'lrc_profile_url'
@@ -228,7 +241,17 @@ function fetchOpts(method: 'HEAD' | 'GET', extraHeaders?: Record<string, string>
   };
 }
 
-async function probeUrl(url: string): Promise<ProbeResult> {
+/**
+ * Server-side / network signals that mean "inconclusive," not "broken link":
+ * status 0 (connection dropped / timeout) or any 5xx (e.g. legislature.ky.gov 503
+ * under the probe's concurrent load). Mirrors `classifyLinkStatus` — a transient
+ * blip or host throttle must never be recorded as a dead link.
+ */
+function isTransientStatus(status: number): boolean {
+  return status === 0 || (status >= 500 && status <= 599);
+}
+
+async function probeOnce(url: string): Promise<ProbeResult> {
   try {
     let res = await fetch(url, fetchOpts('HEAD'));
     if (res.status === 405 || res.status === 501) {
@@ -256,6 +279,28 @@ async function probeUrl(url: string): Promise<ProbeResult> {
       }
     }
   }
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Probe a URL, retrying transient (5xx/status-0) results with exponential backoff
+ * + jitter before giving up. A small pre-probe jitter spreads the concurrency
+ * burst so we don't provoke the host's rate limiter in the first place. Definitive
+ * results (2xx/3xx, 404, …) return immediately — only transient signals retry.
+ */
+async function probeUrl(url: string): Promise<ProbeResult> {
+  await sleep(Math.floor(Math.random() * PROBE_JITTER_MS));
+  let result = await probeOnce(url);
+  for (
+    let attempt = 1;
+    attempt < MAX_PROBE_ATTEMPTS && !result.ok && isTransientStatus(result.status);
+    attempt++
+  ) {
+    await sleep(RETRY_BASE_MS * 2 ** (attempt - 1) + Math.floor(Math.random() * 400));
+    result = await probeOnce(url);
+  }
+  return result;
 }
 
 async function mapLimit<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -316,6 +361,7 @@ async function main() {
       exemptLegiscan403: boolean;
       exemptSocialBlock: boolean;
       exemptLegiscanQuota: boolean;
+      exemptTransient: boolean;
       legiscanVia?: 'api' | 'http';
     };
   const table: RowOut[] = [];
@@ -332,6 +378,7 @@ async function main() {
         exemptLegiscan403: false,
         exemptSocialBlock: false,
         exemptLegiscanQuota: r.quotaHold === true,
+        exemptTransient: r.quotaHold !== true && !r.ok && isTransientStatus(r.status),
         legiscanVia: 'api',
       });
       continue;
@@ -345,12 +392,15 @@ async function main() {
       // ignore
     }
     const exemptSocialBlock = !exemptLegiscan403 && isBotBlockedExempt(p.field, host, r.status);
+    const exemptTransient =
+      !r.ok && !exemptLegiscan403 && !exemptSocialBlock && isTransientStatus(r.status);
     table.push({
       ...p,
       ...r,
       exemptLegiscan403,
       exemptSocialBlock,
       exemptLegiscanQuota: false,
+      exemptTransient,
       legiscanVia: p.field === 'legiscan' ? 'http' : undefined,
     });
   }
@@ -359,10 +409,12 @@ async function main() {
   let skippedLegiscan403 = 0;
   let skippedSocialBlock = 0;
   let skippedLegiscanQuota = 0;
+  let skippedTransient = 0;
   for (const row of table) {
     if (row.exemptLegiscan403) skippedLegiscan403++;
     else if (row.exemptLegiscanQuota) skippedLegiscanQuota++;
     else if (row.exemptSocialBlock) skippedSocialBlock++;
+    else if (row.exemptTransient) skippedTransient++;
     else if (!row.ok) failed++;
   }
 
@@ -374,15 +426,19 @@ async function main() {
       skippedLegiscan403,
       skippedLegiscanQuota,
       skippedSocialBlock,
+      skippedTransient,
       strictLegiscan,
       probeSocial,
       legiscanVerification: useLegiscanApi ? 'legiscan_api_getperson' : 'public_http',
-      rows: table.map(({ exemptLegiscan403, exemptSocialBlock, exemptLegiscanQuota, ...rest }) => ({
-        ...rest,
-        ...(exemptLegiscan403 ? { verifierNote: 'legiscan_html_403_exempt' } : {}),
-        ...(exemptLegiscanQuota ? { verifierNote: 'legiscan_quota_hold_exempt' } : {}),
-        ...(exemptSocialBlock ? { verifierNote: 'social_host_bot_block_exempt' } : {}),
-      })),
+      rows: table.map(
+        ({ exemptLegiscan403, exemptSocialBlock, exemptLegiscanQuota, exemptTransient, ...rest }) => ({
+          ...rest,
+          ...(exemptLegiscan403 ? { verifierNote: 'legiscan_html_403_exempt' } : {}),
+          ...(exemptLegiscanQuota ? { verifierNote: 'legiscan_quota_hold_exempt' } : {}),
+          ...(exemptSocialBlock ? { verifierNote: 'social_host_bot_block_exempt' } : {}),
+          ...(exemptTransient ? { verifierNote: 'transient_server_unavailable_exempt' } : {}),
+        }),
+      ),
     };
     const json2 = JSON.stringify(payload, null, 2);
     if (output) {
@@ -402,6 +458,10 @@ async function main() {
         ? ` | LegiScan API skipped (monthly quota on sync hold): ${skippedLegiscanQuota}`
         : '';
     const socialNote = skippedSocialBlock > 0 ? ` | Social hosts skipped (401/403/429 bot block): ${skippedSocialBlock}` : '';
+    const transientNote =
+      skippedTransient > 0
+        ? ` | Transient skipped (5xx/timeout after ${MAX_PROBE_ATTEMPTS} tries — server unavailable, not a dead link): ${skippedTransient}`
+        : '';
     const apiNote =
       useLegiscanApi && legApiN > 0
         ? ` | LegiScan checked via API (getPerson): ${legApiN}`
@@ -409,7 +469,7 @@ async function main() {
           ? ' | LegiScan: set LEGISCAN_API_KEY to validate people_id via API (public HTML often 403).'
           : '';
     console.log(
-      `Legislators: ${rows.length} | Link checks: ${table.length} (${uniqueUrls.length} unique HTTP URLs) | Failed: ${failed}${skipNote}${quotaNote}${socialNote}${apiNote}\n`,
+      `Legislators: ${rows.length} | Link checks: ${table.length} (${uniqueUrls.length} unique HTTP URLs) | Failed: ${failed}${skipNote}${quotaNote}${socialNote}${transientNote}${apiNote}\n`,
     );
     if (strictLegiscan && !useLegiscanApi) {
       console.log(
@@ -420,6 +480,7 @@ async function main() {
     console.log(
       'Legend: STAT = HTTP status (or 200 for LegiScan API OK). OK = yes if 2xx–3xx. ' +
         'LegiScan **skip** = public legiscan.com returned 403 to automated HTTP (Cloudflare); the store link may still work in a browser. ' +
+        '**skip** on a 5xx/status-0 = server was unavailable/throttled after retries (transient), not a dead link. ' +
         'With LEGISCAN_API_KEY, LegiScan rows use the API instead of public HTML. ' +
         'Use --http-legiscan-only to force HTTP probes only.\n',
     );
@@ -430,17 +491,34 @@ async function main() {
     for (const t of table) {
       let okStr = 'yes';
       if (!t.ok) {
-        okStr = t.exemptLegiscan403 || t.exemptSocialBlock || t.exemptLegiscanQuota ? 'skip' : 'no ';
+        okStr =
+          t.exemptLegiscan403 || t.exemptSocialBlock || t.exemptLegiscanQuota || t.exemptTransient
+            ? 'skip'
+            : 'no ';
       }
       const line = `${t.name.slice(0, wName).padEnd(wName)} ${t.field.padEnd(18)} ${String(t.status).padEnd(4)} ${okStr}   ${t.finalUrl}`;
       console.log(line);
-      if (!t.ok && !t.exemptLegiscan403 && !t.exemptSocialBlock && !t.exemptLegiscanQuota && t.error)
+      if (
+        !t.ok &&
+        !t.exemptLegiscan403 &&
+        !t.exemptSocialBlock &&
+        !t.exemptLegiscanQuota &&
+        !t.exemptTransient &&
+        t.error
+      )
         console.log(`${''.padEnd(wName)} ${''.padEnd(18)}      note: ${t.error}`);
     }
   }
 
   const failures = table
-    .filter((row) => !row.ok && !row.exemptLegiscan403 && !row.exemptSocialBlock && !row.exemptLegiscanQuota)
+    .filter(
+      (row) =>
+        !row.ok &&
+        !row.exemptLegiscan403 &&
+        !row.exemptSocialBlock &&
+        !row.exemptLegiscanQuota &&
+        !row.exemptTransient,
+    )
     .map((row) => ({
       name: row.name,
       field: row.field,
@@ -455,6 +533,7 @@ async function main() {
     skippedLegiscan403,
     skippedLegiscanQuota,
     skippedSocialBlock,
+    skippedTransient,
     failures,
     fromCli: true,
   }).catch((e) => console.error('[Slack] verify notify failed:', e));
