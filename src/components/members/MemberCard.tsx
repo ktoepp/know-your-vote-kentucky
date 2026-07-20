@@ -14,7 +14,7 @@ import { LegislatorExternalLinkButton } from '@/components/civic/LegislatorExter
 import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBlock';
 import { MemberName } from '@/components/civic/MemberName';
 import { MetaChip } from '@/components/ui/Chip';
-import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
+import { KentuckyDistrictLocatorMap } from '@/components/members/KentuckyDistrictLocatorMap';
 import { legislatorDistrictLine, legislatorRoleTitle } from '@/lib/legislator-display';
 import { CARD, FOCUS_RING, ICON_REM } from '@/lib/ui-tokens';
 import {
@@ -101,40 +101,50 @@ export const MemberCard = React.memo(function MemberCard({
     governor ||
     Boolean((showKyLegislatureButton && lrcPublicUrl) || campaignUrl || ballotpediaHref);
 
-  const header = (
-    <>
-      <LegislatorIdentityBlock
-          name={<MemberName member={leg} variant="primary" />}
-          nameComponent={profileNameHeading}
-          roleTitle={legislatorRoleTitle(leg)}
-          districtLine={
-            showDistrictInSubtitle ? legislatorDistrictLine(leg) : null
-          }
-          density={avatarDensity}
-          avatar={legislatorAvatarDescriptor(leg)}
-          avatarSx={governor ? { border: `2px solid ${theme.palette.success.main}` } : undefined}
-          chips={
-            isFormerMember || governor ? (
-              <>
-                {isFormerMember && (
-                  <MetaChip label="Not a current member" size="small" tone="warning" variant="outlined" />
-                )}
-                {governor && <MetaChip label="Governor" size="small" tone="success" variant="outlined" />}
-              </>
-            ) : undefined
-          }
-        />
-      {showDistrictMinimap && (leg.chamber === 'house' || leg.chamber === 'senate') && showDistrictInSubtitle && (
-        <Box sx={{ mt: 1.25, maxWidth: 200 }}>
-          <LegislatorDistrictThumbnail leg={leg} size={featured || governor ? 'profile' : 'card'} />
-        </Box>
-      )}
-    </>
+  const showDistrictMap =
+    showDistrictMinimap &&
+    showDistrictInSubtitle &&
+    (leg.chamber === 'house' || leg.chamber === 'senate');
+
+  const identityBlock = (
+    <LegislatorIdentityBlock
+      name={<MemberName member={leg} variant="primary" />}
+      nameComponent={profileNameHeading}
+      roleTitle={legislatorRoleTitle(leg)}
+      districtLine={showDistrictInSubtitle ? legislatorDistrictLine(leg) : null}
+      density={avatarDensity}
+      avatar={legislatorAvatarDescriptor(leg)}
+      avatarSx={governor ? { border: `2px solid ${theme.palette.success.main}` } : undefined}
+      chips={
+        isFormerMember || governor ? (
+          <>
+            {isFormerMember && (
+              <MetaChip label="Not a current member" size="small" tone="warning" variant="outlined" />
+            )}
+            {governor && <MetaChip label="Governor" size="small" tone="success" variant="outlined" />}
+          </>
+        ) : undefined
+      }
+    />
+  );
+
+  // District map (statewide KY locator, mirroring the profile page) sits beside the
+  // portrait + name + title rather than stacked below it. It is decorative here — the whole
+  // card already links to the profile — so it renders non-interactively (no nested link).
+  const header = showDistrictMap ? (
+    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>{identityBlock}</Box>
+      <Box sx={{ width: { xs: 124, sm: 100 }, flexShrink: 0, mt: 0.5, pointerEvents: 'none' }}>
+        <KentuckyDistrictLocatorMap leg={leg} interactive={false} showCaption={false} />
+      </Box>
+    </Box>
+  ) : (
+    identityBlock
   );
 
   const body = (
     <>
-      <Divider sx={{ mt: -0.5, mb: 2 }} />
+      <Divider sx={{ mt: -0.5, mb: 1.75 }} />
       <Stack spacing={1.75}>
           {leg.email && (
             <Box
@@ -262,68 +272,70 @@ export const MemberCard = React.memo(function MemberCard({
             </Box>
           )}
       </Stack>
+      {footerContent == null && showFooterLinks && hasFooterActions && (
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 0.25,
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            mt: 1.25,
+            pointerEvents: pointerPassthrough ? 'auto' : undefined,
+          }}
+        >
+          {showKyLegislatureButton && lrcPublicUrl && (
+            <LegislatorExternalLinkButton href={lrcPublicUrl}>KY Legislature</LegislatorExternalLinkButton>
+          )}
+          {campaignUrl && (
+            <LegislatorExternalLinkButton href={campaignUrl}>Website</LegislatorExternalLinkButton>
+          )}
+          {ballotpediaHref && (
+            <Tooltip
+              title={
+                tooltipsEnabled
+                  ? isFormerMember
+                    ? 'Ballotpedia often covers former officeholders; verify dates and current roles on official sources when needed.'
+                    : 'Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record.'
+                  : ''
+              }
+              placement="top"
+              arrow
+              enterDelay={400}
+            >
+              <LegislatorExternalLinkButton href={ballotpediaHref}>Ballotpedia</LegislatorExternalLinkButton>
+            </Tooltip>
+          )}
+          {governor && (
+            <LegislatorExternalLinkButton
+              href={KENTUCKY_GOVERNOR_OFFICE_URL}
+              startIcon={<Public sx={{ fontSize: '0.95rem', opacity: 0.75 }} aria-hidden />}
+              sx={{ color: 'success.main' }}
+            >
+              Governor office
+            </LegislatorExternalLinkButton>
+          )}
+        </Box>
+      )}
     </>
   );
 
-  const footer = footerContent != null ? (
-    <Box
-      sx={{
-        borderTop: 1,
-        borderColor: 'divider',
-        pt: 2,
-        mt: -0.5,
-        pointerEvents: pointerPassthrough ? 'auto' : undefined,
-      }}
-    >
-      {footerContent}
-    </Box>
-  ) : showFooterLinks && hasFooterActions ? (
-    <Box
-      sx={{
-        display: 'flex',
-        gap: 0.25,
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        borderTop: 1,
-        borderColor: 'divider',
-        pt: 2,
-        mt: -0.5,
-        pointerEvents: pointerPassthrough ? 'auto' : undefined,
-      }}
-    >
-      {showKyLegislatureButton && lrcPublicUrl && (
-        <LegislatorExternalLinkButton href={lrcPublicUrl}>KY Legislature</LegislatorExternalLinkButton>
-      )}
-      {campaignUrl && (
-        <LegislatorExternalLinkButton href={campaignUrl}>Website</LegislatorExternalLinkButton>
-      )}
-      {ballotpediaHref && (
-        <Tooltip
-          title={
-            tooltipsEnabled
-              ? isFormerMember
-                ? 'Ballotpedia often covers former officeholders; verify dates and current roles on official sources when needed.'
-                : 'Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record.'
-              : ''
-          }
-          placement="top"
-          arrow
-          enterDelay={400}
-        >
-          <LegislatorExternalLinkButton href={ballotpediaHref}>Ballotpedia</LegislatorExternalLinkButton>
-        </Tooltip>
-      )}
-      {governor && (
-        <LegislatorExternalLinkButton
-          href={KENTUCKY_GOVERNOR_OFFICE_URL}
-          startIcon={<Public sx={{ fontSize: '0.95rem', opacity: 0.75 }} aria-hidden />}
-          sx={{ color: 'success.main' }}
-        >
-          Governor office
-        </LegislatorExternalLinkButton>
-      )}
-    </Box>
-  ) : undefined;
+  // Footer slot is used only for the profile page's consolidated "Profiles & links" block
+  // (passed via footerContent). The default per-card link row now lives in the body, tight
+  // under the email — so a member card has a single divider (header → contact), not two.
+  const footer =
+    footerContent != null ? (
+      <Box
+        sx={{
+          borderTop: 1,
+          borderColor: 'divider',
+          pt: 2,
+          mt: -0.5,
+          pointerEvents: pointerPassthrough ? 'auto' : undefined,
+        }}
+      >
+        {footerContent}
+      </Box>
+    ) : undefined;
 
   return (
     // Hover/focus styles live HERE, not on the Card: the Card has `pointer-events: none`
