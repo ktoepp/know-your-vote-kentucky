@@ -32,9 +32,29 @@ export interface KYSessionRecord {
   start: string;
   end: string;
   type: KYSessionType;
+  /**
+   * Why a special (extraordinary) session was called — the Governor's or
+   * petition's stated subject. Regular sessions leave this undefined.
+   */
+  subject?: string;
   milestones?: KYSessionMilestones;
 }
 
+/**
+ * Newest first — `KY_SESSIONS[0]` must stay the current/most-recent session
+ * (used by `getCivicDataSessionName`, `guideDescription`, etc.).
+ *
+ * Historical dates (2010–2024) were researched from official Kentucky sources —
+ * LRC Informational Bulletins ("General Assembly Action" per session), LRC
+ * legislative-record filenames, and the LRC session calendars — cross-checked
+ * against secondary references (Ballotpedia, Wikipedia) and Kentucky's
+ * constitutional convening rule (regular sessions convene the first Tuesday
+ * after the first Monday of January). Only dates confirmable to a day are
+ * included. Deliberately omitted because their exact dates could not be
+ * confirmed from a reliable source (better absent than wrong): the 2011 Regular
+ * Session's sine die, and the 2011 and 2012 Special Sessions — these session
+ * labels still exist for bill filtering in `KY_BILL_SESSION_OPTIONS`.
+ */
 export const KY_SESSIONS: KYSessionRecord[] = [
   {
     name: '2026 Regular Session',
@@ -52,6 +72,62 @@ export const KY_SESSIONS: KYSessionRecord[] = [
     },
   },
   { name: '2025 Regular Session', start: '2025-01-07', end: '2025-04-15', type: 'regular' },
+  { name: '2024 Regular Session', start: '2024-01-02', end: '2024-04-15', type: 'regular' },
+  { name: '2023 Regular Session', start: '2023-01-03', end: '2023-03-30', type: 'regular' },
+  {
+    name: '2022 Special Session',
+    start: '2022-08-24',
+    end: '2022-08-26',
+    type: 'special',
+    subject: 'Eastern Kentucky flood relief after the July 2022 floods.',
+  },
+  { name: '2022 Regular Session', start: '2022-01-04', end: '2022-04-14', type: 'regular' },
+  {
+    name: '2021 Special Session',
+    start: '2021-09-07',
+    end: '2021-09-09',
+    type: 'special',
+    subject: 'COVID-19 response — state of emergency, school flexibility, and federal relief funds.',
+  },
+  { name: '2021 Regular Session', start: '2021-01-05', end: '2021-03-30', type: 'regular' },
+  { name: '2020 Regular Session', start: '2020-01-07', end: '2020-04-15', type: 'regular' },
+  {
+    name: '2019 Special Session',
+    start: '2019-07-19',
+    end: '2019-07-24',
+    type: 'special',
+    subject: 'Pension relief for quasi-governmental agencies (regional universities, health departments).',
+  },
+  { name: '2019 Regular Session', start: '2019-01-08', end: '2019-03-28', type: 'regular' },
+  {
+    name: '2018 Special Session',
+    start: '2018-12-17',
+    end: '2018-12-18',
+    type: 'special',
+    subject: 'Public-pension reform (adjourned without passing a pension bill).',
+  },
+  { name: '2018 Regular Session', start: '2018-01-02', end: '2018-04-14', type: 'regular' },
+  { name: '2017 Regular Session', start: '2017-01-03', end: '2017-03-30', type: 'regular' },
+  { name: '2016 Regular Session', start: '2016-01-05', end: '2016-04-15', type: 'regular' },
+  { name: '2015 Regular Session', start: '2015-01-06', end: '2015-03-25', type: 'regular' },
+  { name: '2014 Regular Session', start: '2014-01-07', end: '2014-04-15', type: 'regular' },
+  {
+    name: '2013 Special Session',
+    start: '2013-08-19',
+    end: '2013-08-23',
+    type: 'special',
+    subject: 'Legislative redistricting of the House and Senate districts.',
+  },
+  { name: '2013 Regular Session', start: '2013-01-08', end: '2013-03-26', type: 'regular' },
+  { name: '2012 Regular Session', start: '2012-01-03', end: '2012-04-12', type: 'regular' },
+  {
+    name: '2010 Special Session',
+    start: '2010-05-24',
+    end: '2010-05-29',
+    type: 'special',
+    subject: 'State budget — enacted the FY2010–2012 budget after the regular session adjourned without one.',
+  },
+  { name: '2010 Regular Session', start: '2010-01-05', end: '2010-04-15', type: 'regular' },
 ];
 
 export type KYSession = KYSessionRecord;

@@ -126,6 +126,14 @@ export default function SessionsGuidePage() {
                   </>
                 )}
               </Box>
+              {s.subject && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+                  <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    Called for:
+                  </Box>{' '}
+                  {s.subject}
+                </Typography>
+              )}
             </Box>
           ))}
         </Box>
