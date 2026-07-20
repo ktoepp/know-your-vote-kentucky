@@ -135,7 +135,7 @@ export const MemberCard = React.memo(function MemberCard({
     <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>{identityBlock}</Box>
       <Box sx={{ width: { xs: 124, sm: 100 }, flexShrink: 0, mt: 0.5, pointerEvents: 'none' }}>
-        <KentuckyDistrictLocatorMap leg={leg} interactive={false} showCaption={false} />
+        <KentuckyDistrictLocatorMap leg={leg} interactive={false} showCaption={false} bordered={false} />
       </Box>
     </Box>
   ) : (

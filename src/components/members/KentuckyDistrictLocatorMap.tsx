@@ -112,6 +112,9 @@ export interface KentuckyDistrictLocatorMapProps {
   interactive?: boolean;
   /** Render the "District X — select to explore" caption below the map. Default true. */
   showCaption?: boolean;
+  /** Draw the divider frame (border) around the map. Default true; set false to blend
+   *  into a surface that already has its own border (e.g. a member card). */
+  bordered?: boolean;
 }
 
 /**
@@ -124,6 +127,7 @@ export function KentuckyDistrictLocatorMap({
   leg,
   interactive = true,
   showCaption = true,
+  bordered = true,
 }: KentuckyDistrictLocatorMapProps) {
   const chamber = leg.chamber === 'house' || leg.chamber === 'senate' ? leg.chamber : null;
   const districtNumber = chamber ? parseKyDistrictNumber(leg.district) : null;
@@ -199,8 +203,7 @@ export function KentuckyDistrictLocatorMap({
   const frameSx = {
     display: 'block',
     borderRadius: 2,
-    border: '1px solid',
-    borderColor: 'divider',
+    ...(bordered && { border: '1px solid', borderColor: 'divider' }),
     bgcolor: 'background.paper',
     overflow: 'hidden',
   } as const;
