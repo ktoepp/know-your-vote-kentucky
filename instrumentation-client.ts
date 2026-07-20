@@ -17,6 +17,28 @@ const posthogInDev =
 // project. NEXT_PUBLIC_VERCEL_ENV is baked in via next.config.ts.
 const isPreviewDeploy = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview";
 
+/**
+ * Benign "view transition skipped" browser noise.
+ *
+ * When react-dom / the browser starts a View Transition during a navigation and
+ * the tab is hidden (backgrounded) or being unloaded before the transition can
+ * run, the browser aborts it with a DOMException (InvalidStateError). This is
+ * expected behavior — the user isn't looking at the page and nothing is actually
+ * broken — but the resulting unhandled rejection is picked up by PostHog Error
+ * Tracking (capture_exceptions) and by Sentry, creating a non-actionable "new
+ * issue" that pages us in Slack.
+ *
+ * Chromium surfaces two different messages for the same condition:
+ *   - spec-compliant: "Skipping view transition because document visibility state has become hidden."
+ *   - generic:        "Transition was aborted because of invalid state."
+ * (see https://github.com/facebook/react/issues/34098)
+ *
+ * We drop both from our telemetry. This message only ever fires while the tab is
+ * hidden, so suppressing it cannot mask a bug a user could actually observe.
+ */
+const BENIGN_VIEW_TRANSITION_ERROR =
+  /Skipping view transition because document visibility|view transition was skipped because document visibility|Transition was aborted because of invalid state/i;
+
 if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || posthogInDev)) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
@@ -31,6 +53,24 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
     // Duplicates Sentry on purpose: Sentry stays authoritative; PostHog just needs the signal
     // to tie crashes to sessions/users. Must also be enabled in PostHog UI → Error Tracking.
     capture_exceptions: true,
+    // Drop benign view-transition-skipped noise (see BENIGN_VIEW_TRANSITION_ERROR).
+    before_send: (event) => {
+      if (event?.event === "$exception") {
+        const exceptions = (event.properties?.["$exception_list"] as
+          | Array<{ type?: string; value?: string }>
+          | undefined) ?? [];
+        const topLevelMessage = String(event.properties?.["$exception_message"] ?? "");
+        const isBenign =
+          BENIGN_VIEW_TRANSITION_ERROR.test(topLevelMessage) ||
+          exceptions.some(
+            (ex) =>
+              BENIGN_VIEW_TRANSITION_ERROR.test(ex?.value ?? "") ||
+              BENIGN_VIEW_TRANSITION_ERROR.test(ex?.type ?? ""),
+          );
+        if (isBenign) return null;
+      }
+      return event;
+    },
   });
 }
 
@@ -55,6 +95,11 @@ async function loadAndInitSentry() {
 
       enabled:
         !!dsn && (process.env.NODE_ENV === "production" || reportInDev),
+
+      // Benign view-transition-skipped noise (see BENIGN_VIEW_TRANSITION_ERROR).
+      // Same rationale as PostHog's before_send above: it only fires on hidden
+      // tabs, so it's non-actionable and shouldn't open a Sentry issue.
+      ignoreErrors: [BENIGN_VIEW_TRANSITION_ERROR],
 
       sendDefaultPii: true,
 

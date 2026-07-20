@@ -7,16 +7,17 @@ import {
   Typography,
   Box,
   Chip,
-  CircularProgress,
   Alert,
   TextField,
   InputAdornment,
+  MenuItem,
   Link as MuiLink,
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
-import { AccountBalance, Cancel, Groups, House, Search } from '@mui/icons-material';
+import { ArrowForward, Cancel, Groups, Search } from '@mui/icons-material';
 import type { KYLegislator } from '@/types/kentucky';
+import { formatPartyLabel, formatPartyLetterAbbrev } from '@/lib/bill-display';
 import { isKentuckyGovernor, memberCanonicalSlug, memberProfilePath, memberSlug } from '@/lib/ky-member-utils';
 import { MemberCard } from '@/components/members/MemberCard';
 import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
@@ -31,6 +32,10 @@ function sortLegislatorsByName(a: KYLegislator, b: KYLegislator) {
 
 const MEMBERS_PAGE_SIZE = 24;
 
+/** Stable ids so the chamber jump tiles can anchor-scroll to each list. */
+const HOUSE_SECTION_ID = 'members-house';
+const SENATE_SECTION_ID = 'members-senate';
+
 /**
  * Skip layout/paint for offscreen cards (long sections). The intrinsic-size estimate keeps
  * scrollbar geometry stable until a card first renders; `auto` then remembers its real size.
@@ -40,25 +45,108 @@ const CARD_ITEM_CONTENT_VISIBILITY_SX = {
   containIntrinsicSize: 'auto 460px',
 } as const;
 
+/**
+ * Jump-nav tile for a chamber — fills the space the Governor's-office section used to occupy.
+ * Renders as an in-page anchor link (native `#id` scroll, keyboard-focusable, works without JS)
+ * down to that chamber's list below. When the current filters leave a chamber with no matches,
+ * the tile is a dimmed, non-interactive card instead of a dead link.
+ */
+function ChamberJumpTile({ chamber, count }: { chamber: 'house' | 'senate'; count: number }) {
+  const isHouse = chamber === 'house';
+  const label = isHouse ? 'House of Representatives' : 'Senate';
+  const noun = isHouse ? 'representatives' : 'senators';
+  const targetId = isHouse ? HOUSE_SECTION_ID : SENATE_SECTION_ID;
+  const disabled = count === 0;
+  const countLabel = disabled
+    ? 'No matching members'
+    : `${count} ${count === 1 ? noun.slice(0, -1) : noun}`;
+
+  const inner = (
+    <>
+      <Box>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+          {label}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {countLabel}
+        </Typography>
+      </Box>
+      {!disabled && (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+            color: 'primary.main',
+            fontWeight: 600,
+            fontSize: '0.875rem',
+            flexShrink: 0,
+          }}
+        >
+          View list
+          <ArrowForward sx={{ fontSize: 18 }} aria-hidden />
+        </Box>
+      )}
+    </>
+  );
+
+  const baseSx = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 2,
+    p: { xs: 2, sm: 2.5 },
+    borderRadius: 2,
+    border: '1px solid',
+    borderColor: 'divider',
+    bgcolor: 'background.paper',
+    height: '100%',
+  } as const;
+
+  if (disabled) {
+    return <Box sx={{ ...baseSx, opacity: 0.6 }}>{inner}</Box>;
+  }
+
+  return (
+    <Box
+      component="a"
+      href={`#${targetId}`}
+      aria-label={`Jump to the ${label} list — ${countLabel}`}
+      sx={{
+        ...baseSx,
+        color: 'inherit',
+        textDecoration: 'none',
+        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+        '&:hover': {
+          borderColor: 'primary.light',
+          boxShadow: '0 4px 20px rgba(37, 99, 235, 0.08)',
+        },
+      }}
+    >
+      {inner}
+    </Box>
+  );
+}
+
 function ChamberSection({
   title,
   caption,
-  icon,
   legislators,
+  sectionId,
   expandToItem,
 }: {
   title: string;
   caption?: string;
-  icon: React.ReactNode;
   legislators: KYLegislator[];
+  /** DOM id used as the anchor target for the chamber jump tiles. */
+  sectionId?: string;
   /** Index (within `legislators`) that must be mounted — used for #hash deep links. */
   expandToItem?: number;
 }) {
   if (legislators.length === 0) return null;
   return (
-    <Box component="section" sx={{ mb: 4 }}>
+    <Box component="section" id={sectionId} sx={{ mb: 4, scrollMarginTop: 96 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
-        <Box sx={{ color: 'primary.main', display: 'flex', alignItems: 'center' }}>{icon}</Box>
         <Box>
           <Typography variant="h6" component="h2" fontWeight={700}>
             {title}
@@ -95,21 +183,49 @@ export interface MembersBrowseProps {
   initialRoster: KYLegislator[];
 }
 
+/** Party abbrevs kept in a familiar order (majority-first for KY), unknowns trailing alpha. */
+const PARTY_DISPLAY_ORDER = ['R', 'D', 'I', 'L', 'G'];
+
 export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
   const legislatorRoster = initialRoster;
-  const legislators = useMemo(() => legislatorRoster.filter((l) => l.active), [legislatorRoster]);
+  // /members browses the General Assembly only — executive officials (Governor's office)
+  // ride along in the shared roster but are not listed here.
+  const legislators = useMemo(
+    () =>
+      legislatorRoster.filter(
+        (l) => l.active && !isKentuckyGovernor(l) && (l.chamber === 'house' || l.chamber === 'senate'),
+      ),
+    [legislatorRoster],
+  );
   const [searchQuery, setSearchQuery] = useState('');
-  const [chamberFilter, setChamberFilter] = useState<'all' | 'governor' | 'house' | 'senate'>('all');
+  const [chamberFilter, setChamberFilter] = useState<'all' | 'house' | 'senate'>('all');
+  const [partyFilter, setPartyFilter] = useState('');
   // Deferred: the TextField updates immediately; re-filtering the card grid happens
   // in an interruptible background render, so typing stays responsive.
   const deferredQuery = useDeferredValue(searchQuery);
 
+  // Distinct parties actually present, in a familiar order — the party filter only appears
+  // when there is more than one party to choose between.
+  const partyOptions = useMemo(() => {
+    const present = new Set<string>();
+    for (const l of legislators) {
+      const abbrev = formatPartyLetterAbbrev(l.party);
+      if (abbrev) present.add(abbrev);
+    }
+    return Array.from(present).sort((a, b) => {
+      const ia = PARTY_DISPLAY_ORDER.indexOf(a);
+      const ib = PARTY_DISPLAY_ORDER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+    });
+  }, [legislators]);
+
   const legislatorsScoped = useMemo(() => {
-    if (chamberFilter === 'governor') return legislators.filter(isKentuckyGovernor);
-    if (chamberFilter === 'house') return legislators.filter((l) => l.chamber === 'house');
-    if (chamberFilter === 'senate') return legislators.filter((l) => l.chamber === 'senate');
-    return legislators;
-  }, [legislators, chamberFilter]);
+    let list = legislators;
+    if (chamberFilter === 'house') list = list.filter((l) => l.chamber === 'house');
+    else if (chamberFilter === 'senate') list = list.filter((l) => l.chamber === 'senate');
+    if (partyFilter) list = list.filter((l) => formatPartyLetterAbbrev(l.party) === partyFilter);
+    return list;
+  }, [legislators, chamberFilter, partyFilter]);
 
   const filtered = useMemo(() => {
     const q = deferredQuery.toLowerCase();
@@ -121,14 +237,15 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
     return matched.sort(sortLegislatorsByName);
   }, [legislatorsScoped, deferredQuery]);
 
-  const { executiveLegislators, houseLegislators, senateLegislators } = useMemo(
+  const { houseLegislators, senateLegislators } = useMemo(
     () => ({
-      executiveLegislators: filtered.filter((l) => isKentuckyGovernor(l) || l.chamber == null),
       houseLegislators: filtered.filter((l) => l.chamber === 'house'),
       senateLegislators: filtered.filter((l) => l.chamber === 'senate'),
     }),
     [filtered],
   );
+
+  const hasActiveFilters = chamberFilter !== 'all' || Boolean(partyFilter) || Boolean(searchQuery);
 
   // Deep links (/members#slug): read the hash once after mount (client-only, so SSR markup
   // stays hydration-safe), expand whichever section holds the target so the card actually
@@ -136,7 +253,8 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
   const [hashTarget, setHashTarget] = useState('');
   useEffect(() => {
     const hash = window.location.hash.replace(/^#/, '');
-    if (hash) setHashTarget(hash);
+    // The chamber jump tiles use these ids; they scroll natively and need no JS assist.
+    if (hash && hash !== HOUSE_SECTION_ID && hash !== SENATE_SECTION_ID) setHashTarget(hash);
   }, []);
 
   const hashMatch = useMemo(() => {
@@ -144,17 +262,15 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
     // Match stored slug or the legacy name slug, so pre-042 links keep working.
     const matches = (l: KYLegislator) =>
       memberCanonicalSlug(l) === hashTarget || memberSlug(l.name || l.id) === hashTarget;
-    const executive = executiveLegislators.findIndex(matches);
     const house = houseLegislators.findIndex(matches);
     const senate = senateLegislators.findIndex(matches);
     const found =
-      (executive >= 0 && executiveLegislators[executive]) ||
       (house >= 0 && houseLegislators[house]) ||
       (senate >= 0 && senateLegislators[senate]) ||
       null;
     // Card DOM ids use the canonical slug; a legacy-alias hash must scroll to that id.
-    return { executive, house, senate, elementId: found ? memberCanonicalSlug(found) : hashTarget };
-  }, [hashTarget, executiveLegislators, houseLegislators, senateLegislators]);
+    return { house, senate, elementId: found ? memberCanonicalSlug(found) : hashTarget };
+  }, [hashTarget, houseLegislators, senateLegislators]);
 
   const hashElementId = hashMatch?.elementId ?? '';
   const hashScrolledRef = React.useRef(false);
@@ -195,6 +311,21 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
           </Typography>
         </Box>
 
+        {/* Chamber jump tiles — only in the default two-section view, where both anchors exist. */}
+        {legislatorRoster.length > 0 && chamberFilter === 'all' && filtered.length > 0 && (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              gap: 2,
+              mb: 4,
+            }}
+          >
+            <ChamberJumpTile chamber="house" count={houseLegislators.length} />
+            <ChamberJumpTile chamber="senate" count={senateLegislators.length} />
+          </Box>
+        )}
+
         <Box
           sx={{
             display: 'flex',
@@ -218,6 +349,23 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
             <ToggleButton value="house">House</ToggleButton>
             <ToggleButton value="senate">Senate</ToggleButton>
           </ToggleButtonGroup>
+          {partyOptions.length > 1 && (
+            <TextField
+              select
+              label="Party"
+              value={partyFilter}
+              onChange={(e) => setPartyFilter(e.target.value)}
+              size="small"
+              sx={{ minWidth: 150 }}
+            >
+              <MenuItem value="">All parties</MenuItem>
+              {partyOptions.map((p) => (
+                <MenuItem key={p} value={p}>
+                  {formatPartyLabel(p)}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             placeholder="Search by name or district…"
             value={searchQuery}
@@ -234,7 +382,7 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
           />
         </Box>
 
-        {(chamberFilter !== 'all' || searchQuery) && (
+        {hasActiveFilters && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2, alignItems: 'center' }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 0.5 }}>
               Active filters:
@@ -244,6 +392,16 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
                 label={chamberFilter === 'house' ? 'House' : 'Senate'}
                 size="small"
                 onDelete={() => setChamberFilter('all')}
+                deleteIcon={<Cancel />}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {partyFilter && (
+              <Chip
+                label={formatPartyLabel(partyFilter)}
+                size="small"
+                onDelete={() => setPartyFilter('')}
                 deleteIcon={<Cancel />}
                 color="primary"
                 variant="outlined"
@@ -264,6 +422,7 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
               size="small"
               onClick={() => {
                 setChamberFilter('all');
+                setPartyFilter('');
                 setSearchQuery('');
               }}
               variant="outlined"
@@ -271,13 +430,6 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
             />
           </Box>
         )}
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Groups sx={{ fontSize: '1.2rem', color: 'primary.main' }} />
-          <Typography variant="body2" fontWeight={600}>
-            {filtered.length} {filtered.length === 1 ? 'member' : 'members'}
-          </Typography>
-        </Box>
 
         {legislatorRoster.length === 0 ? (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -304,25 +456,16 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
           </Box>
         ) : chamberFilter === 'all' ? (
           <Box>
-            {executiveLegislators.length > 0 && (
-              <ChamberSection
-                title="Governor's office"
-                caption="Governor, Lieutenant Governor, and other statewide executive officials"
-                icon={<AccountBalance sx={{ fontSize: 28 }} />}
-                legislators={executiveLegislators}
-                expandToItem={hashMatch && hashMatch.executive >= 0 ? hashMatch.executive : undefined}
-              />
-            )}
             <ChamberSection
               title="House of Representatives"
-              icon={<House sx={{ fontSize: 28 }} />}
               legislators={houseLegislators}
+              sectionId={HOUSE_SECTION_ID}
               expandToItem={hashMatch && hashMatch.house >= 0 ? hashMatch.house : undefined}
             />
             <ChamberSection
               title="Senate"
-              icon={<Groups sx={{ fontSize: 28 }} />}
               legislators={senateLegislators}
+              sectionId={SENATE_SECTION_ID}
               expandToItem={hashMatch && hashMatch.senate >= 0 ? hashMatch.senate : undefined}
             />
           </Box>
@@ -330,7 +473,7 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
           <PaginatedSection
             items={filtered}
             pageSize={MEMBERS_PAGE_SIZE}
-            resetKey={`${chamberFilter}|${deferredQuery}`}
+            resetKey={`${chamberFilter}|${partyFilter}|${deferredQuery}`}
             variant="loadmore"
           >
             {(visible) => (

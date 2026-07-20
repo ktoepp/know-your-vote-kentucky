@@ -49,3 +49,47 @@ npm run perf:members:measure -- 3101 baseline
   district-suffixed card in post-042 mode.
 
 Numbers are for A/B deltas on the same machine, not absolute budgets.
+
+## Member-profile fixtures (beyond perf)
+
+The stub also serves a small `ky_bills` fixture and answers every `/rest/v1/rpc/*` with
+`[]`, so `/members/[slug]` renders end-to-end: **Mary Hale** (`mary-hale-hd-1` post-042,
+LegiScan `people_id` 20003) has primary + co-sponsored bills in **2025 RS** and **2024 RS**
+and none in the current session — her session selector shows an empty current session plus
+two historical ones, exercising both selector render paths and the Sponsored bills filter
+bar. `sponsors=cs.[…]` containment filtering is honoured.
+
+## UI verification recipe (no credentials, sandbox-safe)
+
+Used to runtime-verify members/bills UI changes by driving real pages (2026-07-19 pass:
+governor-section removal, session-selector placement, card hover, district locator map).
+
+```bash
+PROFILE_SLUG=1 npm run perf:members:stub &
+printf 'NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321\nNEXT_PUBLIC_SUPABASE_ANON_KEY=stub-key\n' > .env.local
+npm run build -- --experimental-build-mode compile   # skip prerender: full builds die on
+                                                     # pages whose browse-query shapes the
+                                                     # stub doesn't emulate (topic pages)
+npx next start -p 3100 &
+# then drive pages with Playwright (npm i --no-save playwright; in Claude sandboxes launch
+# with executablePath /opt/pw-browsers/chromium)
+```
+
+Pitfalls, each learned the slow way:
+
+- **`.env.local` must point at the stub.** Sandboxes usually block egress to
+  `*.supabase.co`; a leftover real URL fails **silently** — empty rosters, zero stub
+  traffic, no errors anywhere.
+- **Poisoned data cache.** A build/run against a broken env caches empty `unstable_cache`
+  results (1h revalidate) and the cache survives rebuilds:
+  `rm -rf .next/cache/fetch-cache` after fixing env, then restart `next start`.
+- **`NEXT_PUBLIC_*` is baked into client bundles at build time.** Fixing env + restart
+  heals server fetches; the browser bundle keeps the old URL until rebuilt (symptom:
+  console `ERR_TUNNEL_CONNECTION_FAILED` from auth calls — harmless on anonymous reads).
+- **`/members#slug` deep links only act on a fresh page load** (hash is read once on
+  mount, by design) — in a driver, `page.goto('about:blank')` first.
+- **MemberCard is pointer-events:none over a stretch link** — `locator.hover()` fails its
+  actionability check on card text; use raw `page.mouse.move(x, y)` to test card hover.
+- **No Mapbox token** → `/members/map` shows the token banner and no tiles, but
+  `?chamber=&district=` preselection and the legislator panel still work (they only need
+  the committed GeoJSON + `/api/roster/members`).

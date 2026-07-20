@@ -6,18 +6,21 @@ import {
   FormControl,
   FormControlLabel,
   IconButton,
+  InputAdornment,
   InputLabel,
   MenuItem,
   Select,
   Switch,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
-import { ArrowDownward, ArrowUpward } from '@mui/icons-material';
+import { ArrowDownward, ArrowUpward, Search } from '@mui/icons-material';
 import type { KYLegislator } from '@/types/kentucky';
 import type { MemberSponsoredBill } from '@/lib/member-profile-data';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
+import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { billMatchesBrowseStatusFilter, compareKyBills, type KyBillSortKey } from '@/lib/bill-display';
 import { KY_BILL_SORT_OPTIONS, defaultDirForKyBillSort } from '@/lib/ky-bills-browse-url';
 
@@ -39,15 +42,20 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 export function MemberSponsoredBills({
   entries,
   legislatorRoster,
+  sessionSelector,
 }: {
   entries: MemberSponsoredBill[];
   legislatorRoster: KYLegislator[];
+  /** Shared legislative-session dropdown (owned by the profile view); rendered beside the co-sponsored toggle. */
+  sessionSelector?: React.ReactNode;
 }) {
+  const [search, setSearch] = useState('');
   const [includeCosponsored, setIncludeCosponsored] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [topicFilter, setTopicFilter] = useState('');
   const [sortBy, setSortBy] = useState<KyBillSortKey>('last_action_date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const normalizedSearch = search.trim().toLowerCase();
 
   const cosponsoredCount = useMemo(
     () => entries.filter((e) => e.role === 'cosponsor').length,
@@ -65,31 +73,53 @@ export function MemberSponsoredBills({
     if (!includeCosponsored) list = list.filter((e) => e.role === 'primary');
     if (statusFilter !== 'all') list = list.filter((e) => billMatchesBrowseStatusFilter(e.bill, statusFilter));
     if (topicFilter) list = list.filter((e) => e.bill.topics?.includes(topicFilter));
+    if (normalizedSearch) {
+      list = list.filter((e) =>
+        [e.bill.bill_number, e.bill.title]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedSearch),
+      );
+    }
     return [...list].sort((a, b) => {
       const c = compareKyBills(a.bill, b.bill, sortBy);
       return sortDir === 'asc' ? c : -c;
     });
-  }, [entries, includeCosponsored, statusFilter, topicFilter, sortBy, sortDir]);
+  }, [entries, includeCosponsored, statusFilter, topicFilter, normalizedSearch, sortBy, sortDir]);
 
   const billsWord = visible.length === 1 ? 'bill' : 'bills';
 
   return (
     <Box>
-      {/* Filter bar — mirrors /bills (toggle left, dropdowns right) */}
+      {/* Filter bar — search, co-sponsored toggle, session, and topic/status/sort all flow in one wrapping row */}
       <Box
         role="region"
         aria-label="Sponsored bill filters"
         sx={{
           display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          alignItems: { xs: 'flex-start', sm: 'center' },
-          justifyContent: 'space-between',
-          gap: 2,
+          alignItems: 'center',
+          gap: 1.5,
           mb: 2,
           flexWrap: 'wrap',
         }}
       >
-        {cosponsoredCount > 0 ? (
+        <TextField
+          size="small"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search bills by number or title"
+          aria-label="Search sponsored bills"
+          sx={{ width: { xs: '100%', sm: 208 } }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search sx={{ fontSize: 18, color: 'text.secondary' }} aria-hidden />
+              </InputAdornment>
+            ),
+          }}
+        />
+        {cosponsoredCount > 0 && (
           <FormControlLabel
             control={
               <Switch
@@ -101,75 +131,71 @@ export function MemberSponsoredBills({
             label={`Show co-sponsored (${cosponsoredCount})`}
             sx={{ m: 0 }}
           />
-        ) : (
-          <span />
         )}
-
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', ml: { sm: 'auto' } }}>
-          {topicOptions.length > 0 && (
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="member-bills-topic-label">Topic</InputLabel>
-              <Select
-                labelId="member-bills-topic-label"
-                label="Topic"
-                value={topicFilter}
-                onChange={(e) => setTopicFilter(e.target.value)}
-              >
-                <MenuItem value="">All topics</MenuItem>
-                {topicOptions.map((t) => (
-                  <MenuItem key={t} value={t}>
-                    {t}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
-          <FormControl size="small" sx={{ minWidth: 145 }}>
-            <InputLabel id="member-bills-status-label">Status</InputLabel>
+        {sessionSelector}
+        {topicOptions.length > 0 && (
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel id="member-bills-topic-label">Topic</InputLabel>
             <Select
-              labelId="member-bills-status-label"
-              label="Status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              labelId="member-bills-topic-label"
+              label="Topic"
+              value={topicFilter}
+              onChange={(e) => setTopicFilter(e.target.value)}
             >
-              {STATUS_OPTIONS.map((opt) => (
+              <MenuItem value="">All topics</MenuItem>
+              {topicOptions.map((t) => (
+                <MenuItem key={t} value={t}>
+                  {t}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        <FormControl size="small" sx={{ minWidth: 145 }}>
+          <InputLabel id="member-bills-status-label">Status</InputLabel>
+          <Select
+            labelId="member-bills-status-label"
+            label="Status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel id="member-bills-sort-label">Sort by</InputLabel>
+            <Select
+              labelId="member-bills-sort-label"
+              label="Sort by"
+              value={sortBy}
+              onChange={(e) => {
+                const key = e.target.value as KyBillSortKey;
+                setSortBy(key);
+                setSortDir(defaultDirForKyBillSort(key));
+              }}
+            >
+              {KY_BILL_SORT_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="member-bills-sort-label">Sort by</InputLabel>
-              <Select
-                labelId="member-bills-sort-label"
-                label="Sort by"
-                value={sortBy}
-                onChange={(e) => {
-                  const key = e.target.value as KyBillSortKey;
-                  setSortBy(key);
-                  setSortDir(defaultDirForKyBillSort(key));
-                }}
-              >
-                {KY_BILL_SORT_OPTIONS.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Tooltip title={sortDir === 'desc' ? 'Descending — switch to ascending' : 'Ascending — switch to descending'}>
-              <IconButton
-                size="small"
-                aria-label={sortDir === 'desc' ? 'Sort descending' : 'Sort ascending'}
-                onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
-                sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
-              >
-                {sortDir === 'desc' ? <ArrowDownward fontSize="small" /> : <ArrowUpward fontSize="small" />}
-              </IconButton>
-            </Tooltip>
-          </Box>
+          <Tooltip title={sortDir === 'desc' ? 'Descending — switch to ascending' : 'Ascending — switch to descending'}>
+            <IconButton
+              size="small"
+              aria-label={sortDir === 'desc' ? 'Sort descending' : 'Sort ascending'}
+              onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+            >
+              {sortDir === 'desc' ? <ArrowDownward fontSize="small" /> : <ArrowUpward fontSize="small" />}
+            </IconButton>
+          </Tooltip>
         </Box>
       </Box>
 
@@ -183,13 +209,22 @@ export function MemberSponsoredBills({
           No sponsored bills match these filters.
         </Typography>
       ) : (
-        <CardGrid>
-          {visible.map((e) => (
-            <CardGridItem key={e.bill.id}>
-              <KYBillCard bill={e.bill} legislators={legislatorRoster} />
-            </CardGridItem>
-          ))}
-        </CardGrid>
+        <PaginatedSection
+          items={visible}
+          pageSize={12}
+          variant="loadmore"
+          resetKey={`${includeCosponsored}|${statusFilter}|${topicFilter}|${sortBy}|${sortDir}|${normalizedSearch}`}
+        >
+          {(page) => (
+            <CardGrid>
+              {page.map((e) => (
+                <CardGridItem key={e.bill.id}>
+                  <KYBillCard bill={e.bill} legislators={legislatorRoster} />
+                </CardGridItem>
+              ))}
+            </CardGrid>
+          )}
+        </PaginatedSection>
       )}
     </Box>
   );

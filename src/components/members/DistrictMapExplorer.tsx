@@ -551,6 +551,46 @@ export default function DistrictMapExplorer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady]);
 
+  // Preselect from ?chamber=&district= (member-profile locator map click-through).
+  // Selection only needs the boundary data — it must work even when map tiles can't
+  // load — so the camera move runs separately below, gated on mapReady.
+  const preselectAppliedRef = useRef(false);
+  useEffect(() => {
+    if (preselectAppliedRef.current || !houseFc || !senateFc) return;
+    const chamberParam = searchParams.get('chamber');
+    const districtNum = parseKyDistrictNumber(searchParams.get('district'));
+    if ((chamberParam !== 'house' && chamberParam !== 'senate') || !districtNum) return;
+    preselectAppliedRef.current = true;
+    setVisibleChamber(chamberParam);
+    if (chamberParam === 'house') setSelectedHouseName(String(districtNum));
+    else setSelectedSenateName(String(districtNum));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [houseFc, senateFc]);
+
+  useEffect(() => {
+    if (!mapReady || !houseFc || !senateFc) return;
+    const chamberParam = searchParams.get('chamber');
+    const districtNum = parseKyDistrictNumber(searchParams.get('district'));
+    if ((chamberParam !== 'house' && chamberParam !== 'senate') || !districtNum) return;
+    const fc = chamberParam === 'house' ? houseFc : senateFc;
+    const feat = fc.features.find((f) => districtNameFromCensusFeature(f) === String(districtNum));
+    const map = mapRef.current?.getMap();
+    if (!feat || !map) return;
+    try {
+      const b = bbox(feat);
+      map.fitBounds(
+        [
+          [b[0], b[1]],
+          [b[2], b[3]],
+        ],
+        { padding: 72, duration: 600, maxZoom: 9 },
+      );
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, houseFc, senateFc]);
+
   return (
     <Stack spacing={2}>
       {/* Search + layer toggle */}
