@@ -25,9 +25,16 @@ function hexToRgba(hex: string, alpha: number): string {
 export const HOUSE_HOVER_OVERLAY = hexToRgba(HOUSE_OUTLINE, HOVER_OVERLAY_ALPHA);
 export const SENATE_HOVER_OVERLAY = hexToRgba(SENATE_OUTLINE, HOVER_OVERLAY_ALPHA);
 
-/** Fill tint for a selected (clicked) district — stronger alpha than hover overlay. */
-export const HOUSE_SELECTED_FILL = hexToRgba(HOUSE_OUTLINE, 0.22);
-export const SENATE_SELECTED_FILL = hexToRgba(SENATE_OUTLINE, 0.22);
+/**
+ * Fill for a selected (clicked) district. Uses the darker outline hue at a high
+ * alpha so the selected district reads clearly *darker in value* than its pastel
+ * neighbors — matching the selected-district emphasis on the per-member minimap
+ * (`LegislatorDistrictMinimap`). Must stay above `HOVER_OVERLAY_ALPHA` (0.4) so a
+ * selected district is always more prominent than a merely hovered one; the white
+ * halo on `DISTRICT_LABEL` keeps the district number legible over the darker fill.
+ */
+export const HOUSE_SELECTED_FILL = hexToRgba(HOUSE_OUTLINE, 0.62);
+export const SENATE_SELECTED_FILL = hexToRgba(SENATE_OUTLINE, 0.62);
 
 /** Lucide MapPin: stroke, fill (RGBA), pixel size, stroke width */
 export const MAP_MARKER_PIN = {
