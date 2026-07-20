@@ -463,11 +463,14 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           status: bill.status,
           last_action: bill.last_action,
           chamber: bill.chamber,
+          session: bill.session,
         } as KYBill);
         progress = {
           stageLabels: p.stages.map((s) => s.label),
           reachedIndex: p.reachedIndex,
-          terminal: p.terminal,
+          // The email meter only distinguishes vetoed vs stopped; an adjourned-sine-die
+          // bill renders like any other stopped bill.
+          terminal: p.terminal === 'adjourned' ? 'failed' : p.terminal,
         };
       }
       const group: BillDigestGroup = {
