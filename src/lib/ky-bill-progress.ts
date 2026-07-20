@@ -122,41 +122,61 @@ export function getBillProgress(bill: KYBill): BillProgress {
   const bucket = classifyKyBillBrowseBucket(bill);
   const statusLabel = (bill.status || '').trim() || 'Introduced';
 
-  // Map the coarse status bucket onto this bill type's stage list. Indices are
-  // clamped to the bill type's own stage count (resolutions have fewer stages).
+  // Map the coarse status onto this bill type's stage list. Indices are clamped
+  // to the bill type's own stage count (resolutions have fewer stages).
   let reachedIndex = 0;
   let terminal: BillTerminalState = null;
 
-  switch (bucket) {
-    case 'signed':
-      // Became law (signed / chaptered / veto override / line-item veto).
+  if (kind === 'bill') {
+    // HB/SB/HJR/SJR — the full path through both chambers to the governor.
+    switch (bucket) {
+      case 'signed':
+        // Became law (signed / chaptered / veto override / line-item veto).
+        reachedIndex = lastIndex;
+        break;
+      case 'vetoed':
+        // Vetoed and not overridden: cleared both chambers, then stopped before
+        // enactment. Fill through "passed both chambers" and mark the veto.
+        reachedIndex = Math.max(0, lastIndex - 1);
+        terminal = 'vetoed';
+        break;
+      case 'passed':
+        // Passed both chambers, awaiting the governor.
+        reachedIndex = Math.max(0, lastIndex - 1);
+        break;
+      case 'passed_one_chamber':
+        reachedIndex = Math.min(1, lastIndex);
+        break;
+      case 'in_committee':
+      case 'introduced':
+        reachedIndex = 0;
+        break;
+      case 'other':
+      default:
+        reachedIndex = 0;
+        if (isFailedBill(bill)) terminal = 'failed';
+        break;
+    }
+  } else {
+    // Resolutions use "adopted" vocabulary and never go to the governor, so the
+    // bill-centric bucket classifier can land an adopted resolution in "other"
+    // (status text like "Adopted") — handle the adoption signals directly.
+    const statusText = `${bill.status ?? ''} ${bill.last_action ?? ''}`.toLowerCase();
+    const isAdopted =
+      bucket === 'signed' ||
+      bucket === 'passed' ||
+      /\b(adopted|enrolled|passed|chaptered)\b/.test(statusText);
+    if (isFailedBill(bill)) {
+      reachedIndex = 0;
+      terminal = 'failed';
+    } else if (isAdopted) {
+      // Final stage: "Adopted by both chambers" (CR) or "Adopted by {chamber}" (SR).
       reachedIndex = lastIndex;
-      break;
-    case 'vetoed':
-      // Vetoed and not overridden: the bill cleared both chambers, then stopped
-      // before enactment. Fill through "passed both chambers" (the stage before
-      // the final one) and mark the terminal veto.
-      reachedIndex = Math.max(0, lastIndex - 1);
-      terminal = 'vetoed';
-      break;
-    case 'passed':
-      // Passed both chambers, awaiting the governor (or adopted, for a CR).
-      reachedIndex = kind === 'bill' ? Math.max(0, lastIndex - 1) : lastIndex;
-      break;
-    case 'passed_one_chamber':
+    } else if (bucket === 'passed_one_chamber') {
       reachedIndex = Math.min(1, lastIndex);
-      break;
-    case 'in_committee':
-    case 'introduced':
+    } else {
       reachedIndex = 0;
-      break;
-    case 'other':
-    default:
-      // "other" is either a dead bill or an unrecognized status. Distinguish the
-      // two: a clear failure is terminal; anything else sits at "Introduced".
-      reachedIndex = 0;
-      if (isFailedBill(bill)) terminal = 'failed';
-      break;
+    }
   }
 
   return { kind, stages, reachedIndex, terminal, statusLabel };

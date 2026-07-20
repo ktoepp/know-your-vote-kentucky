@@ -908,6 +908,13 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
         {/* Header */}
         <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
           <MuiCardContent sx={{ p: { xs: 2, md: 3 } }}>
+            {/* Progress meter at the top — generalized 4-stage view of where the
+                bill stands. Fed the history-derived effectiveStatus so it agrees
+                with the status chip below. */}
+            <Box sx={{ mb: 2.5 }}>
+              <BillProgressMeter bill={{ ...bill, status: effectiveStatus }} variant="detail" />
+            </Box>
+
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
               {bill.chamber && (() => {
                 const chamberKey = bill.chamber === 'house' ? 'house' : 'senate';
@@ -1053,19 +1060,6 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                 </Typography>
               </Box>
             )}
-
-            {/* Progress meter — generalized 4-stage view of where the bill stands.
-                Fed the history-derived effectiveStatus so it agrees with the status chip. */}
-            <Box sx={{ mt: 2.5, pt: 2, borderTop: 1, borderColor: 'divider' }}>
-              <Typography
-                variant="overline"
-                color="text.secondary"
-                sx={{ display: 'block', mb: 1.25, fontWeight: 700, letterSpacing: '0.06em' }}
-              >
-                Progress
-              </Typography>
-              <BillProgressMeter bill={{ ...bill, status: effectiveStatus }} variant="detail" />
-            </Box>
 
             {/* Full text + official source links */}
             {(officialTextForAi || legiscanBillDocHref || showOfficialKyBillLink) && (
