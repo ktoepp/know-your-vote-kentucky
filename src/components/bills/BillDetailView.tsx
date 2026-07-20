@@ -34,6 +34,7 @@ import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBl
 import { MemberName } from '@/components/civic/MemberName';
 import { BillNumber } from '@/components/bills/BillNumber';
 import { BillStatusMetaChip } from '@/components/bills/BillStatusMetaChip';
+import { BillProgressMeter } from '@/components/bills/BillProgressMeter';
 import { ChamberChip, MetaChip } from '@/components/ui/Chip';
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { legislatorRoleDistrictLineFromSponsor } from '@/lib/legislator-display';
@@ -1052,6 +1053,19 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                 </Typography>
               </Box>
             )}
+
+            {/* Progress meter — generalized 4-stage view of where the bill stands.
+                Fed the history-derived effectiveStatus so it agrees with the status chip. */}
+            <Box sx={{ mt: 2.5, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+              <Typography
+                variant="overline"
+                color="text.secondary"
+                sx={{ display: 'block', mb: 1.25, fontWeight: 700, letterSpacing: '0.06em' }}
+              >
+                Progress
+              </Typography>
+              <BillProgressMeter bill={{ ...bill, status: effectiveStatus }} variant="detail" />
+            </Box>
 
             {/* Full text + official source links */}
             {(officialTextForAi || legiscanBillDocHref || showOfficialKyBillLink) && (

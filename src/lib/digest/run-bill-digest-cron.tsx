@@ -8,7 +8,10 @@ import {
   type BillDigestGroup,
   type BillDigestLine,
   type BillDigestSection,
+  type DigestBillProgress,
 } from '@/lib/email/bill-digest-email';
+import { getBillProgress } from '@/lib/ky-bill-progress';
+import type { KYBill } from '@/types/kentucky';
 import {
   KY_DIGEST_MAJOR_MILESTONE_SET,
   type KyDigestEventType,
@@ -75,6 +78,9 @@ type BillRow = {
   bill_number: string | null;
   title: string | null;
   session: string | null;
+  status: string | null;
+  last_action: string | null;
+  chamber: 'house' | 'senate' | null;
   topics: string[] | null;
   legiscan_subjects: Array<{ subject_id?: number; subject_name?: string }> | null;
 };
@@ -212,7 +218,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const chunk = billIds.slice(i, i + CHUNK);
     const { data: bills } = await supabaseAdmin
       .from('ky_bills')
-      .select('id, bill_number, title, session, topics, legiscan_subjects')
+      .select('id, bill_number, title, session, status, last_action, chamber, topics, legiscan_subjects')
       .in('id', chunk);
     for (const b of bills ?? []) {
       billById.set(String(b.id), b as BillRow);
@@ -448,10 +454,27 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
         detail: h.detail,
         observedAt: formatObserved(h.observed_at),
       }));
+      // Generalized 4-stage progress meter, same derivation as the site (bills
+      // with a usable status only).
+      let progress: DigestBillProgress | undefined;
+      if (bill.bill_number && bill.status) {
+        const p = getBillProgress({
+          bill_number: bill.bill_number,
+          status: bill.status,
+          last_action: bill.last_action,
+          chamber: bill.chamber,
+        } as KYBill);
+        progress = {
+          stageLabels: p.stages.map((s) => s.label),
+          reachedIndex: p.reachedIndex,
+          terminal: p.terminal,
+        };
+      }
       const group: BillDigestGroup = {
         billNumber: bill.bill_number || '',
         billTitle: bill.title || '',
         billHref: `${origin}/bills/${(bill.bill_number && kyBillSlug({ bill_number: bill.bill_number, session: bill.session })) || billId}`,
+        progress,
         lines,
       };
       if (followedSet.has(billId)) {

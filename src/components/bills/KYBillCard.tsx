@@ -18,6 +18,7 @@ import {
 import { legislatorAvatarSx, legislatorRoleDistrictLine } from '@/lib/legislator-display';
 import { LEGISLATOR_FIELD_LABEL_SX, LEGISLATOR_NAME_SX, LEGISLATOR_ROLE_LINE_SX } from '@/lib/ui-tokens';
 import { BillStatusMetaChip } from '@/components/bills/BillStatusMetaChip';
+import { BillProgressMeter } from '@/components/bills/BillProgressMeter';
 import { kyBillPath } from '@/lib/ky-bill-slug';
 import { CivicCard } from '@/components/ui/CivicCard';
 import { ChamberChip } from '@/components/ui/Chip';
@@ -103,6 +104,7 @@ export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardPro
       >
         {bill.title}
       </Typography>
+      {bill.status && <BillProgressMeter bill={bill} variant="card" />}
     </>
   );
 

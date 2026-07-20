@@ -18,6 +18,21 @@ export type BillDigestLine = {
   observedAt: string;
 };
 
+/**
+ * Compact, serializable form of a bill's generalized progress (see
+ * `getBillProgress` in `ky-bill-progress.ts`) — carried into the email so the
+ * digest can show the same 4-stage meter as the site. Undefined for committee
+ * groups and bills without a usable status.
+ */
+export type DigestBillProgress = {
+  /** Ordered stage labels for this bill type (e.g. Introduced / Passed House / …). */
+  stageLabels: string[];
+  /** 0-based furthest stage reached. */
+  reachedIndex: number;
+  /** vetoed / failed when the bill has stopped advancing, else null. */
+  terminal: 'vetoed' | 'failed' | null;
+};
+
 export type BillDigestGroup = {
   /** Bill number ("HB 208") or committee name; empty when the bill has no number. */
   billNumber: string;
@@ -26,8 +41,74 @@ export type BillDigestGroup = {
   billHref: string;
   /** Topics (from the user's filters) this bill matched — shown in the topic section. */
   matchedTopics?: string[];
+  /** Generalized 4-stage progress meter data (bills only). */
+  progress?: DigestBillProgress;
   lines: BillDigestLine[];
 };
+
+/**
+ * Email-safe (table-based) rendering of the generalized progress meter. Mirrors
+ * the on-site `BillProgressMeter`: completed stages fill blue, a vetoed bill's
+ * final stage shows a red bar, and a caption names the current stage / terminal.
+ */
+function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
+  const { stageLabels, reachedIndex, terminal } = progress;
+  const n = stageLabels.length;
+  const last = n - 1;
+  const caption =
+    terminal === 'vetoed'
+      ? 'Vetoed'
+      : terminal === 'failed'
+        ? 'Did not advance'
+        : stageLabels[Math.max(0, reachedIndex)] ?? '';
+  return (
+    <>
+      <table
+        role="presentation"
+        width="100%"
+        cellPadding={0}
+        cellSpacing={0}
+        style={{ borderCollapse: 'separate', margin: '10px 0 0' }}
+      >
+        <tbody>
+          <tr>
+            {stageLabels.map((label, i) => {
+              const blocked = terminal === 'vetoed' && i === last;
+              const complete = i <= reachedIndex;
+              const bg = blocked ? '#dc2626' : complete ? '#1e40af' : '#e2e8f0';
+              const cls = blocked ? 'dg-seg-veto' : complete ? 'dg-seg' : 'dg-track';
+              return (
+                <td
+                  key={i}
+                  width={`${Math.round(100 / n)}%`}
+                  style={{ padding: i === 0 ? '0 3px 0 0' : i === last ? '0 0 0 3px' : '0 3px' }}
+                >
+                  <div
+                    className={cls}
+                    style={{ height: 6, backgroundColor: bg, borderRadius: 3, fontSize: 1, lineHeight: '6px' }}
+                  >
+                    &nbsp;
+                  </div>
+                </td>
+              );
+            })}
+          </tr>
+        </tbody>
+      </table>
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          margin: '4px 0 0',
+          color: terminal === 'vetoed' ? '#dc2626' : '#475569',
+        }}
+        className={terminal === 'vetoed' ? undefined : 'dg-muted'}
+      >
+        {caption}
+      </Text>
+    </>
+  );
+}
 
 export type BillDigestSection = {
   heading: string;
@@ -55,12 +136,18 @@ const darkModeStyles = `
     .dg-muted { color: #94a3b8 !important; }
     .dg-link { color: #93c5fd !important; }
     .dg-border { border-color: #334155 !important; }
+    .dg-seg { background-color: #60a5fa !important; }
+    .dg-track { background-color: #334155 !important; }
+    .dg-seg-veto { background-color: #f87171 !important; }
   }
   [data-ogsb] .dg-bg { background-color: #0f172a !important; }
   [data-ogsc] .dg-ink { color: #e2e8f0 !important; }
   [data-ogsc] .dg-muted { color: #94a3b8 !important; }
   [data-ogsc] .dg-link { color: #93c5fd !important; }
   [data-ogsc] .dg-border { border-color: #334155 !important; }
+  [data-ogsb] .dg-seg { background-color: #60a5fa !important; }
+  [data-ogsb] .dg-track { background-color: #334155 !important; }
+  [data-ogsb] .dg-seg-veto { background-color: #f87171 !important; }
 `;
 
 export function BillDigestEmail(props: {
@@ -152,6 +239,7 @@ export function BillDigestEmail(props: {
                       <span style={titleText} className="dg-ink">{g.billTitle}</span>
                     )}
                   </Link>
+                  {g.progress && <DigestProgressMeter progress={g.progress} />}
                   {g.matchedTopics && g.matchedTopics.length > 0 && (
                     <Text style={topicNote} className="dg-muted">
                       Matches your{' '}
