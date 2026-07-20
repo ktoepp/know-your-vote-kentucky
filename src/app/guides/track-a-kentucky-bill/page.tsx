@@ -144,20 +144,22 @@ export default function TrackABillGuidePage() {
         </Typography>
       </Box>
 
-      <Box component="nav" aria-label="Related pages">
-        <Typography variant="body2">
-          <MuiLink component={NextLink} href="/guides" underline="hover">
-            All guides →
-          </MuiLink>
-          {' · '}
-          <MuiLink
-            component={NextLink}
-            href="/guides/how-a-kentucky-bill-becomes-a-law"
-            underline="hover"
-          >
-            How a bill becomes a law in Kentucky →
-          </MuiLink>
-        </Typography>
+      <Box
+        component="nav"
+        aria-label="Related pages"
+        sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2.5, rowGap: 1 }}
+      >
+        <MuiLink component={NextLink} href="/guides" underline="hover" variant="body2">
+          All guides →
+        </MuiLink>
+        <MuiLink
+          component={NextLink}
+          href="/guides/how-a-kentucky-bill-becomes-a-law"
+          underline="hover"
+          variant="body2"
+        >
+          How a bill becomes a law in Kentucky →
+        </MuiLink>
       </Box>
     </Container>
   );

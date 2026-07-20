@@ -70,26 +70,70 @@ export default function SessionsGuidePage() {
         <Typography variant="h6" component="h2" fontWeight={700} gutterBottom>
           Recent and scheduled sessions
         </Typography>
-        <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', rowGap: 2 }}>
+        <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', rowGap: 2.5 }}>
           {KY_SESSIONS.map((s) => (
             <Box component="li" key={s.name}>
-              <Typography variant="body1" fontWeight={600}>
+              <Typography variant="body1" fontWeight={600} gutterBottom>
                 {s.name}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {fmt(s.start)} – {fmt(s.end)}
+              {/* One milestone per line — the inline "·"-joined form wrapped mid-date and
+                  was hard to scan. Rendered as a compact label/value grid. */}
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'minmax(120px, max-content) 1fr' },
+                  columnGap: 2,
+                  rowGap: 0.5,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary" component="span">
+                  Session dates
+                </Typography>
+                <Typography variant="body2" color="text.primary" component="span">
+                  {fmt(s.start)} – {fmt(s.end)}
+                </Typography>
+
                 {s.milestones?.vetoRecessStart && s.milestones?.vetoRecessEnd && (
                   <>
-                    {' '}
-                    · Veto recess {fmt(s.milestones.vetoRecessStart)} –{' '}
-                    {fmt(s.milestones.vetoRecessEnd)}
+                    <Typography variant="body2" color="text.secondary" component="span">
+                      Veto recess
+                    </Typography>
+                    <Typography variant="body2" color="text.primary" component="span">
+                      {fmt(s.milestones.vetoRecessStart)} – {fmt(s.milestones.vetoRecessEnd)}
+                    </Typography>
                   </>
                 )}
-                {s.milestones?.sineDie && <> · Sine die {fmt(s.milestones.sineDie)}</>}
-                {s.milestones?.actsEffectiveDate && (
-                  <> · Acts effective {fmt(s.milestones.actsEffectiveDate)}</>
+
+                {s.milestones?.sineDie && (
+                  <>
+                    <Typography variant="body2" color="text.secondary" component="span">
+                      Sine die
+                    </Typography>
+                    <Typography variant="body2" color="text.primary" component="span">
+                      {fmt(s.milestones.sineDie)}
+                    </Typography>
+                  </>
                 )}
-              </Typography>
+
+                {s.milestones?.actsEffectiveDate && (
+                  <>
+                    <Typography variant="body2" color="text.secondary" component="span">
+                      Acts effective
+                    </Typography>
+                    <Typography variant="body2" color="text.primary" component="span">
+                      {fmt(s.milestones.actsEffectiveDate)}
+                    </Typography>
+                  </>
+                )}
+              </Box>
+              {s.subject && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+                  <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    Called for:
+                  </Box>{' '}
+                  {s.subject}
+                </Typography>
+              )}
             </Box>
           ))}
         </Box>
@@ -141,20 +185,20 @@ export default function SessionsGuidePage() {
         </Typography>
       </Box>
 
-      <Box component="nav" aria-label="Related pages">
-        <Typography variant="body2">
-          <MuiLink component={NextLink} href="/guides" underline="hover">
-            All guides →
-          </MuiLink>
-          {' · '}
-          <MuiLink component={NextLink} href="/bills" underline="hover">
-            Bills →
-          </MuiLink>
-          {' · '}
-          <MuiLink component={NextLink} href="/meetings" underline="hover">
-            Committee meetings →
-          </MuiLink>
-        </Typography>
+      <Box
+        component="nav"
+        aria-label="Related pages"
+        sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2.5, rowGap: 1 }}
+      >
+        <MuiLink component={NextLink} href="/guides" underline="hover" variant="body2">
+          All guides →
+        </MuiLink>
+        <MuiLink component={NextLink} href="/bills" underline="hover" variant="body2">
+          Bills →
+        </MuiLink>
+        <MuiLink component={NextLink} href="/meetings" underline="hover" variant="body2">
+          Committee meetings →
+        </MuiLink>
       </Box>
     </Container>
   );

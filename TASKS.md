@@ -8,6 +8,23 @@
 
 ## In Progress
 
+### Front-end polish pass (2026-07-20, branch `claude/front-end-polish-bo645y`)
+
+Dictated UI refinements. All shipped items verified in-browser (dev server; Mapbox/Supabase env absent, so map + live-data views were checked via swatches/harnesses).
+
+- [x] **Members map (`/members/map`)** — selected district now reads clearly darker in value than its neighbors (`HOUSE/SENATE_SELECTED_FILL` 0.22→0.62 in `district-map-tokens.ts`), matching the per-member minimap; district boundary strokes lightened (base outline 2.5px→1px @ 0.55 opacity, selected kept crisp) in `DistrictMapExplorer.tsx`.
+- [x] **Landing map preview → finder link** — the homepage "Find your representatives" map image is now a full-bleed link to `/members/map` (`LandingMapSection.tsx`).
+- [x] **Primary nav reorg** (`src/app/components/Navigation.tsx`) — order Bills → Members → Committees → Find my legislators, with **Meetings nested in a Committees dropdown** (link + caret, hover/click, keyboard-accessible); right cluster reordered to Log in / Sign up → tooltip → search; mobile menu nests Meetings under Committees. No routes/sitemap changed.
+- [x] **Bill sponsor cards** (`BillDetailView.tsx`) — mirror the member-card pattern: whole-card hover surface + stretch link to the member profile (was name-only link); broken out of the elevated white surface (flat bordered cards; Co-sponsors section made borderless like Primary Sponsors).
+- [x] **Guides cleanup** — removed the middot (`·`) separators in each guide's "Related pages" row (gap-separated flex); sessions-guide milestone details render one-per-line as a label/value grid instead of an inline `·`-joined string.
+- [x] **Bill progress meter (generalized 4-stage)** — `Introduced → Passed {chamber} → Passed {chamber} → Became law`, on **bill cards, bill detail, and the digest email**. Pure derivation in `src/lib/ky-bill-progress.ts` (from mapped `status` + designation; adapts per bill type — bills/JRs = 4 stages, concurrent res = "Adopted by both chambers", simple res = single chamber; terminal vetoed/failed). Component `src/components/bills/BillProgressMeter.tsx`; email (table-based) in `bill-digest-email.tsx` populated by `run-bill-digest-cron.tsx`. Stage 4 = "Became law" (covers unsigned/override/line-item enactment), per product call.
+- [x] **Session dates backfill** — `KY_SESSIONS` extended to 2010–2024 (researched from LRC bulletins/records/calendars + secondary corroboration + the constitutional convening rule); special sessions annotated with `subject` ("Called for: …") on the sessions guide.
+
+**Deferred follow-ups (flagged 2026-07-20):**
+
+- [ ] **Digest email progress meter — placement review.** The 4-stage meter currently renders on **every** bill block in the digest (`bill-digest-email.tsx` / `run-bill-digest-cron.tsx`). Decide whether that's the right density or whether to gate it (e.g. only on major-milestone events). No functional issue; a product/voice call. Risk accepted for now — shipped as-is.
+- [ ] **Session-date verification — medium-confidence + gaps (risk accepted).** Two backfilled sine-die dates rest on secondary sources only — **2021 RS end (2021-03-30)** and **2016 RS end (2016-04-15)** — kept as-is (risk assumed). Three sessions were **omitted** because their exact dates couldn't be confirmed: **2011 Regular Session** sine die, **2011 Special Session**, and **2012 Special Session** (labels still exist in `KY_BILL_SESSION_OPTIONS` for filtering). Authoritative fill/verify source is the LRC **"Extraordinary Sessions since 1940"** (`legislature.ky.gov/.../KrsExtraOrdList.aspx`) + **"Normal Effective Dates"** (`.../KrsEffDates.aspx`) pages — blocked by this environment's egress policy (403); verify from an unrestricted network and add the three missing sessions to `KY_SESSIONS` in `src/lib/ky-sessions.ts`.
+
 ### Logged-out home page — topics copy + bill highlight carousels (2026-07-18, branch `claude/home-page-logged-out-updates-1evwf5`)
 
 - [x] "Explore by topic" → **"Bills by topic"** with human-first labels that keep click-scent with the browse filter values ("Schools & education" → `Education`, "Budget & taxes" → `Budget`, …), an honest-sourcing subheading ("Topic tags are automated and can miss or mislabel some bills."), and "more →" → "Browse bills →". Labels are shared with the `/bills` quick topic chips via `LANDING_TOPICS`, so the words survive the click.
