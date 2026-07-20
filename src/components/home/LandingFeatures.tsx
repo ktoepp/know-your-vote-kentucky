@@ -41,9 +41,15 @@ function LandingFeatureCard({
         color: 'inherit',
         textDecoration: 'none',
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+        // Tint the (black) Lottie line-icon strokes to match the surface's hover
+        // border (primary.light) when the card is hovered.
+        '& svg path': { transition: 'stroke 0.2s ease' },
         '&:hover': {
           borderColor: 'primary.light',
           boxShadow: '0 4px 20px rgba(37, 99, 235, 0.08)',
+        },
+        '&:hover svg path': {
+          stroke: (theme) => `${theme.palette.primary.light} !important`,
         },
       }}
     >
