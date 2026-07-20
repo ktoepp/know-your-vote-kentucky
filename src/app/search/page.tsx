@@ -22,11 +22,8 @@ export default async function SearchPage() {
   return (
     <Box sx={{ bgcolor: 'background.default' }}>
       <Container maxWidth="lg" sx={{ pt: 4 }}>
-        <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+        <Typography variant="h4" component="h1" fontWeight={700} sx={{ mb: 3 }}>
           Search Kentucky bills
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Search Kentucky General Assembly bills by number, title, or topic.
         </Typography>
       </Container>
       <Suspense

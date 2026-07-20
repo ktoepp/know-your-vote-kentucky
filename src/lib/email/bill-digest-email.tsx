@@ -55,12 +55,18 @@ function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
   const { stageLabels, reachedIndex, terminal } = progress;
   const n = stageLabels.length;
   const last = n - 1;
+  // Fully passed (enacted / adopted) reads green; still in progress reads blue.
+  const fullyPassed = terminal === null && reachedIndex === last;
+  const completeBg = fullyPassed ? '#16a34a' : '#1e40af';
+  const completeCls = fullyPassed ? 'dg-seg-done' : 'dg-seg';
   const caption =
     terminal === 'vetoed'
       ? 'Vetoed'
       : terminal === 'failed'
         ? 'Did not advance'
         : stageLabels[Math.max(0, reachedIndex)] ?? '';
+  const captionColor = terminal === 'vetoed' ? '#dc2626' : fullyPassed ? '#15803d' : '#475569';
+  const captionClass = terminal === 'vetoed' ? undefined : fullyPassed ? 'dg-done-text' : 'dg-muted';
   return (
     <>
       <table
@@ -68,15 +74,15 @@ function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
         width="100%"
         cellPadding={0}
         cellSpacing={0}
-        style={{ borderCollapse: 'separate', margin: '10px 0 0' }}
+        style={{ borderCollapse: 'separate', margin: '0' }}
       >
         <tbody>
           <tr>
             {stageLabels.map((label, i) => {
               const blocked = terminal === 'vetoed' && i === last;
               const complete = i <= reachedIndex;
-              const bg = blocked ? '#dc2626' : complete ? '#1e40af' : '#e2e8f0';
-              const cls = blocked ? 'dg-seg-veto' : complete ? 'dg-seg' : 'dg-track';
+              const bg = blocked ? '#dc2626' : complete ? completeBg : '#e2e8f0';
+              const cls = blocked ? 'dg-seg-veto' : complete ? completeCls : 'dg-track';
               return (
                 <td
                   key={i}
@@ -96,13 +102,8 @@ function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
         </tbody>
       </table>
       <Text
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          margin: '4px 0 0',
-          color: terminal === 'vetoed' ? '#dc2626' : '#475569',
-        }}
-        className={terminal === 'vetoed' ? undefined : 'dg-muted'}
+        style={{ fontSize: 12, fontWeight: 600, margin: '4px 0 0', color: captionColor }}
+        className={captionClass}
       >
         {caption}
       </Text>
@@ -137,6 +138,8 @@ const darkModeStyles = `
     .dg-link { color: #93c5fd !important; }
     .dg-border { border-color: #334155 !important; }
     .dg-seg { background-color: #60a5fa !important; }
+    .dg-seg-done { background-color: #4ade80 !important; }
+    .dg-done-text { color: #4ade80 !important; }
     .dg-track { background-color: #334155 !important; }
     .dg-seg-veto { background-color: #f87171 !important; }
   }
@@ -146,6 +149,8 @@ const darkModeStyles = `
   [data-ogsc] .dg-link { color: #93c5fd !important; }
   [data-ogsc] .dg-border { border-color: #334155 !important; }
   [data-ogsb] .dg-seg { background-color: #60a5fa !important; }
+  [data-ogsb] .dg-seg-done { background-color: #4ade80 !important; }
+  [data-ogsc] .dg-done-text { color: #4ade80 !important; }
   [data-ogsb] .dg-track { background-color: #334155 !important; }
   [data-ogsb] .dg-seg-veto { background-color: #f87171 !important; }
 `;
@@ -227,6 +232,8 @@ export function BillDigestEmail(props: {
               <Text style={sectionHeading} className="dg-muted">{section.heading}</Text>
               {section.groups.map((g) => (
                 <Section key={g.billHref} style={billBlock} className="dg-border">
+                  {/* Progress meter at the top of the block. */}
+                  {g.progress && <DigestProgressMeter progress={g.progress} />}
                   {/* One anchor per group: the blue number signals the link, the
                       title rides along for a full-width target, and the plain-text
                       part prints the URL once instead of twice. */}
@@ -239,7 +246,6 @@ export function BillDigestEmail(props: {
                       <span style={titleText} className="dg-ink">{g.billTitle}</span>
                     )}
                   </Link>
-                  {g.progress && <DigestProgressMeter progress={g.progress} />}
                   {g.matchedTopics && g.matchedTopics.length > 0 && (
                     <Text style={topicNote} className="dg-muted">
                       Matches your{' '}

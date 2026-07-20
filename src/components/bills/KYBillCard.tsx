@@ -61,19 +61,25 @@ export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardPro
       : null;
 
   const cardHeader = (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 1,
-      }}
-    >
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-        {chamber && <ChamberChip chamber={chamber} />}
-        {bill.status && <BillStatusMetaChip bill={bill} variant="card" />}
-      </Box>
+    <>
+      {bill.status && (
+        <Box sx={{ mb: 1.75 }}>
+          <BillProgressMeter bill={bill} variant="card" />
+        </Box>
+      )}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 1,
+        }}
+      >
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          {chamber && <ChamberChip chamber={chamber} />}
+          {bill.status && <BillStatusMetaChip bill={bill} variant="card" />}
+        </Box>
       {followedBillIds?.has(bill.id) ? (
         <Box
           component="span"
@@ -84,7 +90,8 @@ export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardPro
           <Bookmark sx={{ fontSize: '1.25rem' }} aria-hidden />
         </Box>
       ) : null}
-    </Box>
+      </Box>
+    </>
   );
 
   const cardBody = (
@@ -104,7 +111,6 @@ export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardPro
       >
         {bill.title}
       </Typography>
-      {bill.status && <BillProgressMeter bill={bill} variant="card" />}
     </>
   );
 

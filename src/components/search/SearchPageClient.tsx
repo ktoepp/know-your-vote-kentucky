@@ -23,7 +23,7 @@ import {
 } from '@mui/material';
 import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import { gaChamberFilterLabel } from '@/lib/ky-committee-display';
-import { Cancel, Search, Gavel, ArrowForward, InfoOutlined } from '@mui/icons-material';
+import { Cancel, Search, ArrowForward, InfoOutlined } from '@mui/icons-material';
 import ListSubheader from '@mui/material/ListSubheader';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
@@ -270,8 +270,8 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="lg" sx={{ pt: 0, pb: 4 }}>
-        {/* Search Bar */}
-        <Paper elevation={1} sx={{ p: 2, mb: 4, borderRadius: 2 }} component="form" onSubmit={handleSubmit}>
+        {/* Search bar + filters — no surface chrome (flat on the page background). */}
+        <Box component="form" onSubmit={handleSubmit} sx={{ mb: 4 }}>
           <TextField
             fullWidth
             placeholder="Example: HB 23, SB 6, Medicaid, budgets…"
@@ -393,6 +393,21 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 })()}
               </Select>
             </FormControl>
+            {displayBills && displayBills.length > 0 && (
+              <FormControl size="small" sx={{ minWidth: 110 }}>
+                <InputLabel id="search-per-page-label">Per page</InputLabel>
+                <Select
+                  labelId="search-per-page-label"
+                  label="Per page"
+                  value={searchPageSize}
+                  onChange={(e) => setSearchPageSize(toPageSizeChoice(parseInt(String(e.target.value), 10)))}
+                >
+                  {PAGE_SIZE_CHOICES.map((n) => (
+                    <MenuItem key={n} value={n}>{n}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
           </Box>
 
           {/* Active filter chips */}
@@ -519,7 +534,36 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               </Box>
             </Box>
           )}
-        </Paper>
+
+          {/* Condensed result summary — hugs the bottom center of the search area. */}
+          {searched && !loading && bills && (
+            <Box sx={{ mt: 2.5, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary" role="status">
+                {totalResults >= SEARCH_FETCH_LIMIT ? `${SEARCH_FETCH_LIMIT}+` : totalResults} result
+                {totalResults !== 1 ? 's' : ''} for &quot;{query}&quot;
+                {showAllSessions ? ' across all sessions' : ` in the ${effectiveSession}`}
+                {!showAllSessions && (
+                  <>
+                    {' · '}
+                    <MuiLink
+                      component="button"
+                      type="button"
+                      onClick={() => setFilterParam('session', 'all')}
+                      sx={{ verticalAlign: 'baseline', fontWeight: 600 }}
+                    >
+                      Search all sessions
+                    </MuiLink>
+                  </>
+                )}
+                {' · '}
+                Also search{' '}
+                <MuiLink component={Link} href={`/meetings?q=${encodeURIComponent(query.trim())}`} fontWeight={600}>
+                  committee agendas
+                </MuiLink>
+              </Typography>
+            </Box>
+          )}
+        </Box>
 
         {nonBillType && (
           <Alert
@@ -580,31 +624,6 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 No matches in the {defaultSession}, so these results include earlier sessions.
               </Alert>
             )}
-            <Typography variant="body2" color="text.secondary" role="status" sx={{ mb: 1 }}>
-              {totalResults >= SEARCH_FETCH_LIMIT ? `${SEARCH_FETCH_LIMIT}+` : totalResults} result
-              {totalResults !== 1 ? 's' : ''} for &quot;{query}&quot;
-              {showAllSessions ? ' across all sessions' : ` in the ${effectiveSession}`}
-              {!showAllSessions && (
-                <>
-                  {' · '}
-                  <MuiLink
-                    component="button"
-                    type="button"
-                    onClick={() => setFilterParam('session', 'all')}
-                    sx={{ verticalAlign: 'baseline', fontWeight: 600 }}
-                  >
-                    Search all sessions
-                  </MuiLink>
-                </>
-              )}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Also search{' '}
-              <MuiLink component={Link} href={`/meetings?q=${encodeURIComponent(query.trim())}`} fontWeight={600}>
-                committee agendas
-              </MuiLink>
-              .
-            </Typography>
 
             {totalResults === 0 && (
               <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
@@ -652,15 +671,9 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
 
             {displayBills && displayBills.length > 0 && (
               <Box sx={{ mb: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Gavel color="primary" />
-                  <Typography variant="h6" component="h2" fontWeight={600}>Bills ({displayBills.length})</Typography>
-                </Box>
                 <PaginatedSection
                   items={displayBills}
                   pageSize={searchPageSize}
-                  pageSizeOptions={[...PAGE_SIZE_CHOICES]}
-                  onPageSizeChange={(n) => setSearchPageSize(toPageSizeChoice(n))}
                   resetKey={`bill-${query}-${displayBills.length}-${displayBills[0]?.id ?? ''}-${searchPageSize}`}
                   variant="responsive"
                 >

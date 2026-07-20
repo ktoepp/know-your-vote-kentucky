@@ -31,6 +31,11 @@ export function BillProgressMeter({ bill, variant = 'card' }: BillProgressMeterP
   const trackColor = theme.palette.mode === 'dark' ? theme.palette.action.selected : theme.palette.action.hover;
   const blockedColor = theme.palette.error.main;
 
+  // Fully passed (enacted / adopted, not stopped) reads green; a bill still
+  // moving through the process reads blue ("interim"). Failure keeps its own style.
+  const fullyPassed = !terminal && reachedIndex === lastIndex;
+  const completeColor = fullyPassed ? theme.palette.success.main : theme.palette.primary.main;
+
   const segmentState = (i: number): SegmentState => {
     if (terminal === 'vetoed' && i === lastIndex) return 'blocked';
     if (i <= reachedIndex) return 'complete';
@@ -38,7 +43,7 @@ export function BillProgressMeter({ bill, variant = 'card' }: BillProgressMeterP
   };
 
   const segmentColor = (state: SegmentState): string => {
-    if (state === 'complete') return theme.palette.primary.main;
+    if (state === 'complete') return completeColor;
     if (state === 'blocked') return blockedColor;
     return trackColor;
   };
@@ -103,7 +108,7 @@ export function BillProgressMeter({ bill, variant = 'card' }: BillProgressMeterP
                   {complete && (
                     <CheckIcon
                       aria-hidden
-                      sx={{ fontSize: '0.95rem', color: 'primary.main', flexShrink: 0, mt: '1px' }}
+                      sx={{ fontSize: '0.95rem', color: completeColor, flexShrink: 0, mt: '1px' }}
                     />
                   )}
                   {state === 'blocked' && (
