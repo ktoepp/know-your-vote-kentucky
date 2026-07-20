@@ -15,7 +15,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
-import { ArrowForward, Cancel, Groups, House, Search } from '@mui/icons-material';
+import { ArrowForward, Cancel, Groups, Search } from '@mui/icons-material';
 import type { KYLegislator } from '@/types/kentucky';
 import { formatPartyLabel, formatPartyLetterAbbrev } from '@/lib/bill-display';
 import { isKentuckyGovernor, memberCanonicalSlug, memberProfilePath, memberSlug } from '@/lib/ky-member-utils';
@@ -63,18 +63,13 @@ function ChamberJumpTile({ chamber, count }: { chamber: 'house' | 'senate'; coun
 
   const inner = (
     <>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Box sx={{ color: disabled ? 'text.disabled' : 'primary.main', display: 'flex' }}>
-          {isHouse ? <House sx={{ fontSize: 32 }} /> : <Groups sx={{ fontSize: 32 }} />}
-        </Box>
-        <Box>
-          <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>
-            {label}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {countLabel}
-          </Typography>
-        </Box>
+      <Box>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+          {label}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {countLabel}
+        </Typography>
       </Box>
       {!disabled && (
         <Box
@@ -136,14 +131,12 @@ function ChamberJumpTile({ chamber, count }: { chamber: 'house' | 'senate'; coun
 function ChamberSection({
   title,
   caption,
-  icon,
   legislators,
   sectionId,
   expandToItem,
 }: {
   title: string;
   caption?: string;
-  icon: React.ReactNode;
   legislators: KYLegislator[];
   /** DOM id used as the anchor target for the chamber jump tiles. */
   sectionId?: string;
@@ -154,7 +147,6 @@ function ChamberSection({
   return (
     <Box component="section" id={sectionId} sx={{ mb: 4, scrollMarginTop: 96 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
-        <Box sx={{ color: 'primary.main', display: 'flex', alignItems: 'center' }}>{icon}</Box>
         <Box>
           <Typography variant="h6" component="h2" fontWeight={700}>
             {title}
@@ -466,14 +458,12 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
           <Box>
             <ChamberSection
               title="House of Representatives"
-              icon={<House sx={{ fontSize: 28 }} />}
               legislators={houseLegislators}
               sectionId={HOUSE_SECTION_ID}
               expandToItem={hashMatch && hashMatch.house >= 0 ? hashMatch.house : undefined}
             />
             <ChamberSection
               title="Senate"
-              icon={<Groups sx={{ fontSize: 28 }} />}
               legislators={senateLegislators}
               sectionId={SENATE_SECTION_ID}
               expandToItem={hashMatch && hashMatch.senate >= 0 ? hashMatch.senate : undefined}

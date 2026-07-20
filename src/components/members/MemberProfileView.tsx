@@ -22,7 +22,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { ArrowBack, Groups, HowToVote, Search } from '@mui/icons-material';
+import { ArrowBack, Search } from '@mui/icons-material';
 import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import type { KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
@@ -453,7 +453,6 @@ export function MemberProfileView({
             {isChamberMember ? (
               <>
                 <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <HowToVote sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
                   <Typography
                     component="h2"
                     variant={TYPE.sectionTitle.variant}
@@ -604,7 +603,6 @@ export function MemberProfileView({
             {isChamberMember && (
               <>
                 <Box sx={{ mt: 4, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Groups sx={{ color: 'primary.main', fontSize: ICON_REM.section }} aria-hidden />
                   <Typography
                     component="h2"
                     variant={TYPE.sectionTitle.variant}
