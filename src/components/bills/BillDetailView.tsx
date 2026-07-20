@@ -59,7 +59,7 @@ import {
   httpUrlForUiLink,
   kyLrcBillDetailsUrl,
 } from '@/lib/external-legislative-links';
-import { CHIP, EXTERNAL_LINK_ICON_SX, ICON_REM, TYPE } from '@/lib/ui-tokens';
+import { CARD, CHIP, EXTERNAL_LINK_ICON_SX, FOCUS_RING, ICON_REM, TYPE } from '@/lib/ui-tokens';
 import { useTooltips } from '@/lib/TooltipContext';
 import { BillHistoryActionText } from '@/components/bills/BillHistoryActionText';
 import { FollowBillButton } from '@/components/bills/FollowBillButton';
@@ -410,48 +410,103 @@ function SponsorCard({
   const officialProfileHref = httpUrlForUiLink(sponsor.bio?.social?.biography);
   const isPrimary = sponsor.sponsor_type_id === 1;
   const roleLine = legislatorRoleDistrictLineFromSponsor(sponsor, legislators);
+  const sponsorName = sponsor.name?.trim() || 'legislator';
 
+  // Whole-card link + hover surface, mirroring MemberCard: the card surface has
+  // `pointer-events: none` so clicks fall through to the stretch link, while the
+  // email + external-link actions re-enable pointer events to stay independently
+  // clickable. Hover/focus styles live on the wrapper (not the card) so the lift
+  // fires over the whole surface, not just the re-enabled children.
   return (
-    <MuiCard sx={{ borderRadius: 2, border: `1px solid ${theme.palette.divider}`, height: '100%' }}>
-      <MuiCardContent>
-        <LegislatorIdentityBlock
-          name={<MemberName member={sponsor} variant="primary" />}
-          nameHref={memberHref}
-          roleLine={roleLine}
-          density="detail"
-          avatar={{
-            src: photo || undefined,
-            alt: kySponsorPortraitAlt(sponsor.name),
-            party: sponsor.party,
-            initials: kyLegislatorAvatarInitials(sponsor),
-            imgProps: { referrerPolicy: 'no-referrer' },
-          }}
-          chips={
-            <MetaChip
-              label={isPrimary ? 'Primary sponsor' : 'Co-sponsor'}
-              size="small"
-              tone="primary"
-              variant="filled"
-            />
-          }
-        />
+    <Box
+      sx={{
+        position: 'relative',
+        height: '100%',
+        cursor: 'pointer',
+        '&:hover .member-card-surface': {
+          boxShadow: theme.palette.mode === 'dark' ? CARD.hoverBoxShadowDark : CARD.hoverBoxShadow,
+          transform: CARD.hoverTransform,
+          borderColor: theme.palette.primary.main,
+        },
+        '&:has(.member-card-stretch-link:focus-visible) .member-card-surface': FOCUS_RING,
+      }}
+    >
+      <NextLink
+        href={memberHref}
+        className="member-card-stretch-link"
+        aria-label={`View profile for ${sponsorName}`}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 1,
+          borderRadius: 8,
+          textDecoration: 'none',
+        }}
+      >
+        <span className="sr-only">View profile</span>
+      </NextLink>
+      <MuiCard
+        elevation={0}
+        className="member-card-surface"
+        sx={{
+          position: 'relative',
+          zIndex: 2,
+          pointerEvents: 'none',
+          borderRadius: 2,
+          border: `1px solid ${theme.palette.divider}`,
+          height: '100%',
+          transition: CARD.hoverTransition,
+        }}
+      >
+        <MuiCardContent>
+          <LegislatorIdentityBlock
+            name={<MemberName member={sponsor} variant="primary" />}
+            nameComponent="h3"
+            roleLine={roleLine}
+            density="detail"
+            avatar={{
+              src: photo || undefined,
+              alt: kySponsorPortraitAlt(sponsor.name),
+              party: sponsor.party,
+              initials: kyLegislatorAvatarInitials(sponsor),
+              imgProps: { referrerPolicy: 'no-referrer' },
+            }}
+            chips={
+              <MetaChip
+                label={isPrimary ? 'Primary sponsor' : 'Co-sponsor'}
+                size="small"
+                tone="primary"
+                variant="filled"
+              />
+            }
+          />
 
-        {sponsor.bio?.social?.email && (
-          <Box sx={{ mt: 1.5, mb: 0.5 }}>
-            <CopyableEmail email={sponsor.bio.social.email} />
-          </Box>
-        )}
+          {sponsor.bio?.social?.email && (
+            <Box sx={{ mt: 1.5, mb: 0.5, pointerEvents: 'auto' }}>
+              <CopyableEmail email={sponsor.bio.social.email} />
+            </Box>
+          )}
 
-        {(ballotpediaUrl || officialProfileHref) && (
-          <Box sx={{ display: 'flex', gap: 0.25, mt: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-            {ballotpediaUrl && <LegislatorExternalLinkButton href={ballotpediaUrl}>Ballotpedia</LegislatorExternalLinkButton>}
-            {officialProfileHref && (
-              <LegislatorExternalLinkButton href={officialProfileHref}>Official profile</LegislatorExternalLinkButton>
-            )}
-          </Box>
-        )}
-      </MuiCardContent>
-    </MuiCard>
+          {(ballotpediaUrl || officialProfileHref) && (
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 0.25,
+                mt: 1.5,
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                pointerEvents: 'auto',
+              }}
+            >
+              {ballotpediaUrl && <LegislatorExternalLinkButton href={ballotpediaUrl}>Ballotpedia</LegislatorExternalLinkButton>}
+              {officialProfileHref && (
+                <LegislatorExternalLinkButton href={officialProfileHref}>Official profile</LegislatorExternalLinkButton>
+              )}
+            </Box>
+          )}
+        </MuiCardContent>
+      </MuiCard>
+    </Box>
   );
 }
 
@@ -1102,9 +1157,10 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               </MuiCard>
             )}
 
-            {/* Co-sponsors */}
+            {/* Co-sponsors — borderless wrapper so the interactive member cards sit
+                directly on the page (no card-in-card surface), matching Primary Sponsors. */}
             {coSponsors.length > 0 && (
-              <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+              <MuiCard elevation={0} sx={{ mb: 3, borderRadius: 3, boxShadow: 'none', border: 'none' }}>
                 <MuiCardContent>
                   <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
                     Co-sponsors ({coSponsors.length})
