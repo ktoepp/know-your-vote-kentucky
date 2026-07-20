@@ -92,117 +92,110 @@ export function MemberSponsoredBills({
 
   return (
     <Box>
-      {/* Filter bar — mirrors /bills (toggle left, dropdowns right) */}
+      {/* Filter bar — search, co-sponsored toggle, session, and topic/status/sort all flow in one wrapping row */}
       <Box
         role="region"
         aria-label="Sponsored bill filters"
         sx={{
           display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          alignItems: { xs: 'flex-start', sm: 'center' },
-          justifyContent: 'space-between',
-          gap: 2,
+          alignItems: 'center',
+          gap: 1.5,
           mb: 2,
           flexWrap: 'wrap',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-          <TextField
-            size="small"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search bills by number or title"
-            aria-label="Search sponsored bills"
-            sx={{ flex: '1 1 220px', minWidth: 200 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search sx={{ fontSize: 18, color: 'text.secondary' }} aria-hidden />
-                </InputAdornment>
-              ),
-            }}
+        <TextField
+          size="small"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search bills by number or title"
+          aria-label="Search sponsored bills"
+          sx={{ width: { xs: '100%', sm: 208 } }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search sx={{ fontSize: 18, color: 'text.secondary' }} aria-hidden />
+              </InputAdornment>
+            ),
+          }}
+        />
+        {cosponsoredCount > 0 && (
+          <FormControlLabel
+            control={
+              <Switch
+                checked={includeCosponsored}
+                onChange={(e) => setIncludeCosponsored(e.target.checked)}
+                size="small"
+              />
+            }
+            label={`Show co-sponsored (${cosponsoredCount})`}
+            sx={{ m: 0 }}
           />
-          {cosponsoredCount > 0 && (
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={includeCosponsored}
-                  onChange={(e) => setIncludeCosponsored(e.target.checked)}
-                  size="small"
-                />
-              }
-              label={`Show co-sponsored (${cosponsoredCount})`}
-              sx={{ m: 0 }}
-            />
-          )}
-          {sessionSelector}
-        </Box>
-
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', ml: { sm: 'auto' } }}>
-          {topicOptions.length > 0 && (
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="member-bills-topic-label">Topic</InputLabel>
-              <Select
-                labelId="member-bills-topic-label"
-                label="Topic"
-                value={topicFilter}
-                onChange={(e) => setTopicFilter(e.target.value)}
-              >
-                <MenuItem value="">All topics</MenuItem>
-                {topicOptions.map((t) => (
-                  <MenuItem key={t} value={t}>
-                    {t}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
-          <FormControl size="small" sx={{ minWidth: 145 }}>
-            <InputLabel id="member-bills-status-label">Status</InputLabel>
+        )}
+        {sessionSelector}
+        {topicOptions.length > 0 && (
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel id="member-bills-topic-label">Topic</InputLabel>
             <Select
-              labelId="member-bills-status-label"
-              label="Status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              labelId="member-bills-topic-label"
+              label="Topic"
+              value={topicFilter}
+              onChange={(e) => setTopicFilter(e.target.value)}
             >
-              {STATUS_OPTIONS.map((opt) => (
+              <MenuItem value="">All topics</MenuItem>
+              {topicOptions.map((t) => (
+                <MenuItem key={t} value={t}>
+                  {t}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        <FormControl size="small" sx={{ minWidth: 145 }}>
+          <InputLabel id="member-bills-status-label">Status</InputLabel>
+          <Select
+            labelId="member-bills-status-label"
+            label="Status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel id="member-bills-sort-label">Sort by</InputLabel>
+            <Select
+              labelId="member-bills-sort-label"
+              label="Sort by"
+              value={sortBy}
+              onChange={(e) => {
+                const key = e.target.value as KyBillSortKey;
+                setSortBy(key);
+                setSortDir(defaultDirForKyBillSort(key));
+              }}
+            >
+              {KY_BILL_SORT_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="member-bills-sort-label">Sort by</InputLabel>
-              <Select
-                labelId="member-bills-sort-label"
-                label="Sort by"
-                value={sortBy}
-                onChange={(e) => {
-                  const key = e.target.value as KyBillSortKey;
-                  setSortBy(key);
-                  setSortDir(defaultDirForKyBillSort(key));
-                }}
-              >
-                {KY_BILL_SORT_OPTIONS.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Tooltip title={sortDir === 'desc' ? 'Descending — switch to ascending' : 'Ascending — switch to descending'}>
-              <IconButton
-                size="small"
-                aria-label={sortDir === 'desc' ? 'Sort descending' : 'Sort ascending'}
-                onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
-                sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
-              >
-                {sortDir === 'desc' ? <ArrowDownward fontSize="small" /> : <ArrowUpward fontSize="small" />}
-              </IconButton>
-            </Tooltip>
-          </Box>
+          <Tooltip title={sortDir === 'desc' ? 'Descending — switch to ascending' : 'Ascending — switch to descending'}>
+            <IconButton
+              size="small"
+              aria-label={sortDir === 'desc' ? 'Sort descending' : 'Sort ascending'}
+              onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+            >
+              {sortDir === 'desc' ? <ArrowDownward fontSize="small" /> : <ArrowUpward fontSize="small" />}
+            </IconButton>
+          </Tooltip>
         </Box>
       </Box>
 

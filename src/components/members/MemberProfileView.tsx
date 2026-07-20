@@ -232,7 +232,7 @@ export function MemberProfileView({
    * above the section heading; the Voting record subtitle names the selected session.
    */
   const sessionSelector = showSessionSelector ? (
-    <FormControl size="small" sx={{ minWidth: 190 }}>
+    <FormControl size="small" sx={{ minWidth: 168 }}>
       <InputLabel id="member-session-label">Session</InputLabel>
       <Select
         labelId="member-session-label"
