@@ -37,6 +37,7 @@ import {
   parseKyDistrictNumber,
 } from '@/lib/ky-district-geo';
 import { MemberCard } from '@/components/members/MemberCard';
+import { CHAMBER_TOGGLE_GROUP_SX } from '@/components/civic/GaChamberFilterBar';
 import { memberProfilePath } from '@/lib/ky-member-utils';
 import type { DistrictMapTooltipModel } from '@/components/members/DistrictMapMemberTooltip';
 import {
@@ -663,7 +664,7 @@ export default function DistrictMapExplorer() {
           size="small"
           disabled={!mapReady}
           aria-label="District layer"
-          sx={{ flexShrink: 0 }}
+          sx={{ flexShrink: 0, ...CHAMBER_TOGGLE_GROUP_SX }}
         >
           <ToggleButton value="house">House</ToggleButton>
           <ToggleButton value="senate">Senate</ToggleButton>
