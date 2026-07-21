@@ -36,6 +36,7 @@ export function LandingTopics() {
             component="a"
             href={kyTopicPath(topic)}
             clickable
+            size="small"
             variant="outlined"
             sx={{ fontWeight: 500, borderRadius: '16px' }}
           />
@@ -45,6 +46,7 @@ export function LandingTopics() {
           component="a"
           href="/bills/topics"
           clickable
+          size="small"
           variant="outlined"
           sx={{ fontWeight: 500, borderRadius: '16px' }}
         />
@@ -53,6 +55,7 @@ export function LandingTopics() {
           component="a"
           href="/bills"
           clickable
+          size="small"
           variant="outlined"
           sx={{ fontWeight: 500, borderRadius: '16px' }}
         />

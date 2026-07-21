@@ -358,6 +358,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 label="Session"
                 value={sessionParamIsAll ? 'all' : sessionSelect || defaultSession}
                 onChange={(e) => setFilterParam('session', e.target.value as string)}
+                MenuProps={{ PaperProps: { sx: { maxHeight: 420 } } }}
               >
                 <MenuItem value="all">All sessions</MenuItem>
                 {KY_BILL_SESSION_OPTIONS.map((s) => (

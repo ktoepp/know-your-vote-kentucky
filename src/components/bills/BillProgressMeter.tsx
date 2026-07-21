@@ -1,11 +1,25 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Tooltip, Typography } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { Block as BlockIcon, Check as CheckIcon } from '@mui/icons-material';
 import type { KYBill } from '@/types/kentucky';
 import { getBillProgress } from '@/lib/ky-bill-progress';
+import { billStatusToTooltipKey } from '@/lib/bill-display';
+import { governmentTooltips } from '@/lib/tooltipContent';
+import { useTooltips } from '@/lib/TooltipContext';
+
+/** Matches the status-chip tooltip surface so the meter and the tag read identically. */
+const STATUS_TOOLTIP_POPPER_SX = {
+  maxWidth: 340,
+  bgcolor: 'background.paper',
+  color: 'text.primary',
+  border: '1px solid',
+  borderColor: 'divider',
+  boxShadow: 4,
+  '& .MuiTooltip-arrow': { color: 'background.paper' },
+} as const;
 
 export interface BillProgressMeterProps {
   bill: KYBill;
@@ -23,7 +37,8 @@ type SegmentState = 'complete' | 'upcoming' | 'blocked';
  */
 export function BillProgressMeter({ bill, variant = 'card' }: BillProgressMeterProps) {
   const theme = useTheme();
-  const { stages, reachedIndex, terminal } = getBillProgress(bill);
+  const { tooltipsEnabled } = useTooltips();
+  const { stages, reachedIndex, terminal, statusLabel } = getBillProgress(bill);
   const n = stages.length;
   const lastIndex = n - 1;
   const isDetail = variant === 'detail';
@@ -54,13 +69,20 @@ export function BillProgressMeter({ bill, variant = 'card' }: BillProgressMeterP
   const ariaLabel =
     terminal === 'vetoed'
       ? `Progress: passed both chambers, then vetoed`
-      : terminal === 'failed'
-        ? `Progress: did not advance past ${currentStageLabel.toLowerCase()}`
-        : `Progress: step ${reachedIndex + 1} of ${n}, ${currentStageLabel.toLowerCase()}`;
+      : terminal === 'adjourned'
+        ? `Progress: pending when the session adjourned sine die`
+        : terminal === 'failed'
+          ? `Progress: did not advance past ${currentStageLabel.toLowerCase()}`
+          : `Progress: step ${reachedIndex + 1} of ${n}, ${currentStageLabel.toLowerCase()}`;
 
   const barHeight = isDetail ? 8 : 6;
 
-  return (
+  // Same educational tooltip the status chip shows for the current status — so the
+  // meter and the tag are consistent on hover.
+  const tipKey = billStatusToTooltipKey(statusLabel);
+  const tip = tipKey ? governmentTooltips[tipKey] : null;
+
+  const meter = (
     <Box role="group" aria-label={ariaLabel} sx={{ width: '100%' }}>
       {/* Segment track */}
       <Box
@@ -136,6 +158,11 @@ export function BillProgressMeter({ bill, variant = 'card' }: BillProgressMeterP
               );
             })}
           </Box>
+          {terminal === 'adjourned' && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              Adjourned sine die — pending when the session ended, so it did not pass.
+            </Typography>
+          )}
           {terminal === 'failed' && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
               This bill did not advance and is no longer active.
@@ -145,4 +172,27 @@ export function BillProgressMeter({ bill, variant = 'card' }: BillProgressMeterP
       ) : null}
     </Box>
   );
+
+  if (tooltipsEnabled && tip) {
+    return (
+      <Tooltip
+        title={
+          <Box sx={{ p: 0.25 }}>
+            <Typography variant="caption" display="block" sx={{ fontWeight: 700, mb: 0.5 }}>
+              {tip.title}
+            </Typography>
+            <Typography variant="body2">{tip.content}</Typography>
+          </Box>
+        }
+        arrow
+        enterDelay={300}
+        disableInteractive
+        componentsProps={{ tooltip: { sx: STATUS_TOOLTIP_POPPER_SX } }}
+      >
+        <Box sx={{ width: '100%', cursor: 'help' }}>{meter}</Box>
+      </Tooltip>
+    );
+  }
+
+  return meter;
 }

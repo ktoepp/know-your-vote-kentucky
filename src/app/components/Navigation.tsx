@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { alpha, useTheme, type Theme, type SxProps } from '@mui/material/styles';
 import {
   AppBar,
@@ -23,6 +23,8 @@ import {
   Avatar,
   Menu,
   MenuItem,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -358,6 +360,48 @@ function UserMenu() {
   );
 }
 
+/**
+ * Inline nav search: typing + Enter (or clicking the search icon) navigates to the
+ * bill search page with the query prefilled. Replaces the old search-icon link.
+ */
+function NavSearch() {
+  const router = useRouter();
+  const [q, setQ] = useState('');
+  const submit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const query = q.trim();
+    router.push(query ? `/search?q=${encodeURIComponent(query)}` : '/search');
+  };
+  return (
+    <Box
+      component="form"
+      onSubmit={submit}
+      sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', mx: 0.5 }}
+    >
+      <TextField
+        size="small"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search bills…"
+        inputProps={{ 'aria-label': 'Search bills' }}
+        sx={{
+          width: { md: 170, lg: 210 },
+          '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: 'background.paper' },
+        }}
+        InputProps={{
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton type="submit" size="small" edge="end" aria-label="Search" title="Search bills">
+                <SearchIcon sx={{ fontSize: '1.15rem' }} />
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
+      />
+    </Box>
+  );
+}
+
 export default function Navigation() {
   const theme = useTheme();
   const pathname = usePathname();
@@ -505,25 +549,9 @@ export default function Navigation() {
               </IconButton>
             </Box>
 
-            {/* Desktop search icon. Native `title` replaces MuiTooltip so Popper
-                stays out of the shell chunk; the icon-button's aria-label already
-                covers assistive tech. */}
-            <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center' }}>
-              <IconButton
-                component={Link}
-                href="/search"
-                aria-label="Search"
-                title="Search bills and members"
-                sx={{
-                  color: theme.palette.text.primary,
-                  p: 1.25,
-                  borderRadius: 2,
-                  '&:hover': { backgroundColor: 'rgba(0,0,0,0.05)' },
-                }}
-              >
-                <SearchIcon sx={{ fontSize: ICON_REM.nav }} />
-              </IconButton>
-            </Box>
+            {/* Desktop inline search — type + Enter or click the icon to open the
+                bill search page with the query. */}
+            <NavSearch />
 
             {/* Mobile menu button */}
             <Box sx={{ display: { xs: 'block', lg: 'none' } }}>

@@ -22,6 +22,7 @@ import { isKentuckyGovernor, memberCanonicalSlug, memberProfilePath, memberSlug 
 import { MemberCard } from '@/components/members/MemberCard';
 import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
+import { CHAMBER_TOGGLE_GROUP_SX } from '@/components/civic/GaChamberFilterBar';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 
 function sortLegislatorsByName(a: KYLegislator, b: KYLegislator) {
@@ -344,6 +345,7 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
               if (v !== null) setChamberFilter(v);
             }}
             aria-label="Filter by chamber"
+            sx={CHAMBER_TOGGLE_GROUP_SX}
           >
             <ToggleButton value="all">All</ToggleButton>
             <ToggleButton value="house">House</ToggleButton>
@@ -373,7 +375,7 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ fontSize: 18 }} />
+                  <Search sx={{ fontSize: 18, color: 'text.secondary' }} />
                 </InputAdornment>
               ),
             }}
