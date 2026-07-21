@@ -399,6 +399,7 @@ export function BillsBrowse({
               color={topicFilter === topic ? 'primary' : 'default'}
               variant={topicFilter === topic ? 'filled' : 'outlined'}
               onClick={() => setTopicInUrl(topicFilter === topic ? '' : topic)}
+              sx={{ fontWeight: 500, borderRadius: '16px' }}
             />
           ))}
           {topicFilter && !LANDING_TOPICS.some((t) => t.topic === topicFilter) && (
@@ -409,12 +410,13 @@ export function BillsBrowse({
               color="primary"
               variant="filled"
               onClick={() => setTopicInUrl('')}
+              sx={{ fontWeight: 500, borderRadius: '16px' }}
             />
           )}
           {topicFilter ? (
-            <Chip label="All topics" size="small" clickable variant="outlined" onClick={() => setTopicInUrl('')} />
+            <Chip label="All topics" size="small" clickable variant="outlined" onClick={() => setTopicInUrl('')} sx={{ fontWeight: 500, borderRadius: '16px' }} />
           ) : (
-            <Chip label="more →" size="small" clickable variant="outlined" component={Link} href={browseBaseHref} />
+            <Chip label="more →" size="small" clickable variant="outlined" component={Link} href={browseBaseHref} sx={{ fontWeight: 500, borderRadius: '16px' }} />
           )}
         </Box>
 
@@ -485,6 +487,7 @@ export function BillsBrowse({
                 label="Session"
                 value={sessionFilter}
                 onChange={(e) => setSessionInUrl(e.target.value)}
+                MenuProps={{ PaperProps: { sx: { maxHeight: 420 } } }}
               >
                 <MenuItem value="">All sessions</MenuItem>
                 {KY_BILL_SESSION_OPTIONS.map((s) => (

@@ -375,7 +375,7 @@ export function MembersBrowse({ initialRoster }: MembersBrowseProps) {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ fontSize: 18 }} />
+                  <Search sx={{ fontSize: 18, color: 'text.secondary' }} />
                 </InputAdornment>
               ),
             }}

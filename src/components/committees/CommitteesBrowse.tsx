@@ -12,6 +12,7 @@ import {
   Chip,
   Container,
   FormControl,
+  InputLabel,
   MenuItem,
   Select,
   Link as MuiLink,
@@ -101,15 +102,16 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2.5, flexWrap: 'wrap' }}>
           <GaChamberFilterBar value={chamberFilter} onChange={setChamberFilter} />
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', ml: { sm: 'auto' } }}>
-            <FormControl size="small">
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel id="committees-topic-label">Topic</InputLabel>
               <Select
+                labelId="committees-topic-label"
+                label="Topic"
                 value={topicFilter}
-                displayEmpty
                 onChange={(event: SelectChangeEvent) => setTopicFilter(event.target.value)}
-                sx={{ borderRadius: 999, minWidth: 112, bgcolor: 'background.paper' }}
-                inputProps={{ 'aria-label': 'Filter by topic' }}
+                MenuProps={{ PaperProps: { sx: { maxHeight: 420 } } }}
               >
-                <MenuItem value="">Topic</MenuItem>
+                <MenuItem value="">All topics</MenuItem>
                 {topics.map((topic) => (
                   <MenuItem key={topic} value={topic}>
                     {topic}
@@ -117,12 +119,13 @@ export function CommitteesBrowse({ initialCommittees }: CommitteesBrowseProps) {
                 ))}
               </Select>
             </FormControl>
-            <FormControl size="small">
+            <FormControl size="small" sx={{ minWidth: 110 }}>
+              <InputLabel id="committees-perpage-label">Per page</InputLabel>
               <Select
+                labelId="committees-perpage-label"
+                label="Per page"
                 value={String(pageSize)}
                 onChange={(event: SelectChangeEvent) => setPageSize(Number(event.target.value))}
-                sx={{ borderRadius: 999, minWidth: 76, bgcolor: 'background.paper' }}
-                inputProps={{ 'aria-label': 'Committees per page' }}
               >
                 {[12, 24, 36].map((value) => (
                   <MenuItem key={value} value={String(value)}>
