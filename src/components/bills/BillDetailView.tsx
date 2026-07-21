@@ -910,9 +910,38 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
           <MuiCardContent sx={{ p: { xs: 2, md: 3 } }}>
             {/* Progress meter at the top — generalized 4-stage view of where the
                 bill stands. Fed the history-derived effectiveStatus so it agrees
-                with the status chip below. */}
+                with the status chip below. The dates + latest action are consolidated
+                directly beneath it (they used to sit in a separate meta row + a
+                highlighted box lower down). */}
             <Box sx={{ mb: 2.5 }}>
               <BillProgressMeter bill={{ ...bill, status: effectiveStatus }} variant="detail" />
+              {(bill.last_action || bill.introduced_date) && (
+                <Box sx={{ mt: 2 }}>
+                  {bill.last_action && (
+                    <>
+                      <Typography
+                        component="span"
+                        variant="caption"
+                        sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'text.secondary' }}
+                      >
+                        Last action{bill.last_action_date ? ` · ${fmtDate(bill.last_action_date)}` : ''}
+                      </Typography>
+                      <Typography component="div" variant="body1" fontWeight={500} sx={{ fontSize: '1.02rem', mt: 0.25 }}>
+                        <BillHistoryActionText text={bill.last_action} component="div" />
+                      </Typography>
+                    </>
+                  )}
+                  {bill.introduced_date && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: bill.last_action ? 0.75 : 0, fontSize: '0.95rem' }}
+                    >
+                      Introduced {fmtDate(bill.introduced_date)}
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </Box>
 
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
@@ -1028,27 +1057,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               </Box>
             )}
 
-            {/* Meta row */}
-            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              {bill.introduced_date && (
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.95rem' }}>
-                  Introduced: {fmtDate(bill.introduced_date)}
-                </Typography>
-              )}
-              {bill.last_action_date && (
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.95rem' }}>
-                  Last action: {fmtDate(bill.last_action_date)}
-                </Typography>
-              )}
-            </Box>
-
-            {bill.last_action && (
-              <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
-                <Typography component="div" variant="body1" fontWeight={500} sx={{ fontSize: '1.02rem' }}>
-                  <BillHistoryActionText text={bill.last_action} component="div" />
-                </Typography>
-              </Box>
-            )}
+            {/* Introduced date + latest action are consolidated under the progress bar above. */}
 
             {effectiveDateNotice && (
               <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.success.main, 0.08) }}>
@@ -1061,16 +1070,17 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               </Box>
             )}
 
-            {/* Full text + official source links */}
+            {/* Full text + official source links — uniform padding so the group aligns. */}
             {(officialTextForAi || legiscanBillDocHref || showOfficialKyBillLink) && (
-              <Box sx={{ mt: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                 {officialTextForAi && (
                   <MuiButton
+                    size="small"
                     href={officialTextForAi}
                     target="_blank"
                     rel="noopener noreferrer"
                     endIcon={<OpenInNew sx={{ fontSize: '0.9rem !important' }} />}
-                    sx={{ fontWeight: 600, pl: 0, pr: 0.5, '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' } }}
+                    sx={{ fontWeight: 600, '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' } }}
                   >
                     Read the full text
                   </MuiButton>
@@ -1139,55 +1149,50 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
 
           {/* Right column — Sponsors + Text versions */}
           <MuiGrid item xs={12} md={5}>
-            {/* Sponsors */}
+            {/* Sponsors — no card container/padding; the heading + interactive member
+                cards sit directly in the column (each card carries its own surface). */}
             {primarySponsors.length > 0 && (
-              <MuiCard elevation={0} sx={{ mb: 3, borderRadius: 3, boxShadow: 'none', border: 'none' }}>
-                <MuiCardContent>
-                  <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
-                    {primarySponsors.length === 1 ? 'Primary Sponsor' : 'Primary Sponsors'}
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {primarySponsors.map((s) => (
-                      <SponsorCard
-                        key={s.people_id}
-                        sponsor={s}
-                        legislators={legislators}
-                        rosterPhoto={
-                          normalizeLegislatorPhotoUrl(
-                            matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
-                              matchLegislatorBySponsorName(legislators, s.name)?.photo_url,
-                          )
-                        }
-                      />
-                    ))}
-                  </Box>
-                </MuiCardContent>
-              </MuiCard>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
+                  {primarySponsors.length === 1 ? 'Primary Sponsor' : 'Primary Sponsors'}
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {primarySponsors.map((s) => (
+                    <SponsorCard
+                      key={s.people_id}
+                      sponsor={s}
+                      legislators={legislators}
+                      rosterPhoto={
+                        normalizeLegislatorPhotoUrl(
+                          matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
+                            matchLegislatorBySponsorName(legislators, s.name)?.photo_url,
+                        )
+                      }
+                    />
+                  ))}
+                </Box>
+              </Box>
             )}
 
-            {/* Co-sponsors — borderless wrapper so the interactive member cards sit
-                directly on the page (no card-in-card surface), matching Primary Sponsors. */}
             {coSponsors.length > 0 && (
-              <MuiCard elevation={0} sx={{ mb: 3, borderRadius: 3, boxShadow: 'none', border: 'none' }}>
-                <MuiCardContent>
-                  <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
-                    Co-sponsors ({coSponsors.length})
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {coSponsors.map((s) => (
-                      <SponsorCard
-                        key={s.people_id}
-                        sponsor={s}
-                        legislators={legislators}
-                        rosterPhoto={
-                          matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
-                          matchLegislatorBySponsorName(legislators, s.name)?.photo_url
-                        }
-                      />
-                    ))}
-                  </Box>
-                </MuiCardContent>
-              </MuiCard>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant={TYPE.cardTitle.variant} component="h2" fontWeight={TYPE.cardTitle.fontWeight} gutterBottom>
+                  Co-sponsors ({coSponsors.length})
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {coSponsors.map((s) => (
+                    <SponsorCard
+                      key={s.people_id}
+                      sponsor={s}
+                      legislators={legislators}
+                      rosterPhoto={
+                        matchLegislatorByLegiscanId(legislators, s.people_id)?.photo_url ??
+                        matchLegislatorBySponsorName(legislators, s.name)?.photo_url
+                      }
+                    />
+                  ))}
+                </Box>
+              </Box>
             )}
 
             {/* Bill text versions — compact, deduped by stage, toggleable like the timeline */}
