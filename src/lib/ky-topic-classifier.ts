@@ -132,15 +132,20 @@ const HONORS_MEMORIALS: KYTopicTag = 'Honors & Memorials';
  *
  * `designating`/appointment resolutions are deliberately excluded — those are
  * demoted in search but are not honors or memorials, so they fall through to
- * normal topic classification.
+ * normal topic classification. Substantive ACTs are excluded too: a naming act
+ * ("AN ACT relating to naming the … Armory in honor of Rep. …", HB467) carries
+ * "in honor of" but has legal effect and a real policy topic (Veterans Affairs),
+ * so it must keep keyword classification.
  */
 const CEREMONIAL_LEAD_RE =
   /^(?:a\s+(?:joint\s+|concurrent\s+)?resolution\s+)?(?:honor(?:ing|s)?|recogniz(?:e|es|ing)|congratulat(?:e|es|ing)|commemorat(?:e|es|ing)|celebrat(?:e|es|ing)|mourn(?:s|ing)?|memorializ(?:e|es|ing))\b/i;
 const IN_HONOR_OR_MEMORY_RE = /\bin\s+(?:loving\s+)?(?:honor|memory)\b/i;
+const SUBSTANTIVE_ACT_RE = /^an\s+act\b/i;
 
 export function isCeremonialResolution(title: string | null | undefined): boolean {
   const t = (title ?? '').trim();
   if (!t) return false;
+  if (SUBSTANTIVE_ACT_RE.test(t)) return false;
   return CEREMONIAL_LEAD_RE.test(t) || IN_HONOR_OR_MEMORY_RE.test(t);
 }
 
