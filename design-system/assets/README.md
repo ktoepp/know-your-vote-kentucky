@@ -9,11 +9,13 @@ folder is the design-system-side index.
 | File | Form | Use |
 |---|---|---|
 | `Logo-03.png` | Color badge | Nav + footer wordmark on **light** surfaces (`Navigation.tsx`, `SiteFooter.tsx`). |
-| `logo-wordmark-white.svg` | White horizontal lockup (mark + "knowyourvote kentucky.com") | **Dark / gradient** surfaces. Used on the marketing hero (`LandingHero.tsx`). |
+| `logo-wordmark-white.svg` | White horizontal lockup (mark + "knowyourvote kentucky.com") | **Dark / gradient** surfaces (available; no dark surface currently displays a logo). |
 | `logo-white.svg` | White compact badge | Dark surfaces where a square/stacked mark fits better than the wordmark. |
 
 Rule: **color logo on light, white knockout on dark.** Never place the color
-logo on the hero gradient/photo, or the white logo on a light surface.
+logo on the hero gradient/photo, or the white logo on a light surface. The
+knockout files are ready for any future dark surface; the marketing hero
+currently leads with its headline (no logo).
 
 ## Favicon / app icons (white-on-blue `#1E40AF`)
 

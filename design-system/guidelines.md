@@ -359,10 +359,11 @@ white knockout (`logo-wordmark-white.svg` / `logo-white.svg`) on **dark /
 gradient** surfaces (marketing hero). Never mix.
 
 > **v1.1 (open decision #3 — resolved).** The solid-white knockout logo and the
-> white-on-blue favicon were delivered. The knockout wordmark now sits on the
-> marketing hero (`LandingHero.tsx`); the favicon/app-icon set (`favicon.ico`
+> white-on-blue favicon were delivered. The favicon/app-icon set (`favicon.ico`
 > 16/32/48, `apple-touch-icon`, `icon-192/512`) is white-on-`#1E40AF`, generated
 > from `favicon-mark-white.svg` and wired into `layout.tsx` + `manifest.json`.
+> The knockout wordmark is available for dark surfaces but is not currently
+> placed (the marketing hero leads with its headline).
 
 ---
 

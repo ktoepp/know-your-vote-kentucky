@@ -108,7 +108,7 @@ logged, not silently resolved.
 |---|---|---|---|
 | 1 | **Aesthet Nova licensing** — paid Pangram Pangram face. | **Skip for now** — keep the Typekit kit + Georgia fallback; revisit before self-hosting for production. | ⏭ deferred |
 | 2 | **Party colors overlap brand/semantic** — D=`#2563EB` (brand), R=`#DC2626` (error). | **Change** — distinct hues: D indigo `#4338CA`, R rose `#BE123C`, I slate `#475569`. Applied to `globals.css` + `bill-display.ts`. | ✅ done |
-| 3 | **White knockout logo + favicon** — never produced. | **Delivered** — knockout wordmark on the hero; white-on-blue favicon/app-icon set generated + wired (`layout.tsx`, `manifest.json`). | ✅ done |
+| 3 | **White knockout logo + favicon** — never produced. | **Delivered** — white-on-blue favicon/app-icon set generated + wired (`layout.tsx`, `manifest.json`); knockout wordmark available for dark surfaces (not placed on the hero). | ✅ done |
 | 4 | **Dense table archetype** — power-user ICP unserved. | **Defer** — noted in `TASKS.md` for v1.2. | ⏭ v1.2 |
 | 5 | **Where docs live** — `design-system/`, `/docs`, or separate repo. | **Keep `design-system/`** — confirmed. | ✅ done |
 | 6 | **Token migration scope** — rename in this PR or follow-up. | **Migrate now** — Phases 1–2 + party colors applied to code (`tsc`/`lint` clean). Alias retirement (Phase 4) still follow-up. | ✅ done |
