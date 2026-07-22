@@ -135,6 +135,70 @@ export function isActivePendingBillStatus(status: string | null | undefined): bo
   );
 }
 
+/** SR / HR — a simple resolution, disposed of by a single chamber's adoption vote. */
+function isKySimpleResolutionDesignation(billNumber: string | null | undefined): boolean {
+  const m = /^([A-Z]+)/.exec(normalizeKyBillDesignation(billNumber));
+  const prefix = m ? m[1] : '';
+  return prefix === 'HR' || prefix === 'SR';
+}
+
+/**
+ * True when an action string records a KY resolution's adoption by a recorded chamber
+ * vote — "adopted 38-0", "passed 38-0" (roll call), or "adopted by voice vote".
+ *
+ * Kentucky disposes of a simple resolution with a single adoption vote that LegiScan
+ * tags with `importance: 0` and frequently leaves coded as status 1 (Introduced), so
+ * neither the numeric status nor the importance flag reflects the adoption — the action
+ * wording is the reliable signal. Deliberately narrow: it requires an explicit vote
+ * outcome (a "<yea>-<nay>" tally or "by voice vote") and rejects procedural text that
+ * merely contains "adopted"/"passed" — "committee substitute adopted", "floor amendment
+ * adopted", "passed over and retained on the orders of the day". That narrowness guards
+ * the SR231 regression: a resolution still pending at sine die whose last action was such
+ * procedural text must NOT read as adopted.
+ */
+export function actionIndicatesResolutionAdopted(action: string | null | undefined): boolean {
+  const a = (action || '').trim().toLowerCase();
+  if (!a) return false;
+  if (a.includes('amendment') || a.includes('substitute') || a.includes('passed over') || a.includes('withdrawn')) {
+    return false;
+  }
+  if (/\b(adopted|passed)\b[^.]*?\b\d{1,3}\s*-\s*\d{1,3}\b/.test(a)) return true;
+  if (/\badopted by voice vote\b/.test(a)) return true;
+  return false;
+}
+
+/**
+ * Effective display status for a KY bill, correcting one systematic LegiScan gap: a
+ * simple resolution adopted by a *roll-call* vote ("adopted 38-0") is tagged importance 0
+ * and left coded as status 1 (Introduced), whereas a *voice-vote* adoption of the same
+ * resolution is stored as "Passed". Left uncorrected, the roll-call form understates the
+ * outcome and — once the session ends — reads as "Adjourned Sine Die" even though the
+ * voting record shows it was adopted (e.g. SR252 2026RS, adopted 38-0).
+ *
+ * When the last action records that adoption and the stored status still understates it
+ * (blank or a pending stage), report "Passed" — matching how voice-vote adoptions are
+ * already stored, so the status chip, progress meter, and the detailed voting record all
+ * agree. Every other bill returns its stored status unchanged. Scoped to simple
+ * resolutions (SR/HR); regular bills and joint/concurrent resolutions get their passage
+ * status from LegiScan directly (a one-chamber adoption is not final for a two-chamber
+ * concurrent resolution).
+ */
+export function effectiveKyBillDisplayStatus(bill: {
+  status?: string | null;
+  last_action?: string | null;
+  bill_number?: string | null;
+}): string {
+  const stored = (bill.status || '').trim();
+  if (
+    isKySimpleResolutionDesignation(bill.bill_number) &&
+    actionIndicatesResolutionAdopted(bill.last_action) &&
+    (stored === '' || isActivePendingBillStatus(stored))
+  ) {
+    return 'Passed';
+  }
+  return stored;
+}
+
 /** Governor has signed the bill (KY sync often stores short label "Signed"). */
 export function isSignedByGovernorBillStatus(status: string | null | undefined): boolean {
   if (status == null) return false;

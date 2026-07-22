@@ -10,6 +10,7 @@ import {
   billStatusChipLabel,
   billStatusToTooltipKey,
   classifyKyBillBrowseBucket,
+  effectiveKyBillDisplayStatus,
   formatBillLabelText,
   isActivePendingBillStatus,
   isSignedByGovernorBillStatus,
@@ -101,8 +102,12 @@ function statusVisual(
 }
 
 export function BillStatusMetaChip({ bill, statusOverride, variant = 'card' }: BillStatusMetaChipProps) {
-  const rawStatus = statusOverride ?? bill.status;
-  const billForBucket = statusOverride != null && statusOverride !== bill.status ? { ...bill, status: statusOverride } : bill;
+  // Correct the systematic LegiScan gap for adopted simple resolutions (roll-call
+  // adoptions coded as "Introduced") using the bill's own last action, so a resolution
+  // the voting record shows was adopted reads as "Passed" rather than
+  // "Adjourned Sine Die". No-op for every other bill. See effectiveKyBillDisplayStatus.
+  const rawStatus = effectiveKyBillDisplayStatus({ ...bill, status: statusOverride ?? bill.status });
+  const billForBucket = rawStatus !== bill.status ? { ...bill, status: rawStatus } : bill;
   if (!rawStatus) return null;
 
   // Bills still "In Committee" (or similarly pending) when the session adjourned are dead.
