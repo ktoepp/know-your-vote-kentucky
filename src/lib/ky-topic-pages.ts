@@ -2,7 +2,7 @@ import { KY_TOPICS, type KYTopicTag } from '@/lib/ky-topic-classifier';
 
 /**
  * URL + copy helpers for the topic landing pages (/bills/topics/education).
- * Slugs derive from the fixed 22-tag taxonomy in `KY_TOPICS`; the reverse map
+ * Slugs derive from the fixed 23-tag taxonomy in `KY_TOPICS`; the reverse map
  * makes every slug statically enumerable for `generateStaticParams`.
  */
 
@@ -81,6 +81,8 @@ export const KY_TOPIC_INTROS: Record<KYTopicTag, string> = {
     'Bills tagged Gambling cover sports wagering, the lottery, horse racing, and charitable gaming.',
   Transportation:
     'Bills tagged Transportation cover roads and highways, motor vehicles, licensing, and public transit.',
+  'Honors & Memorials':
+    'Resolutions tagged Honors & Memorials are ceremonial — honoring or congratulating a person or group, or adjourning in memory of a Kentuckian who has died.',
 };
 
 /** Voice-and-tone mandated disclosure — shown wherever automated tags drive a list. */

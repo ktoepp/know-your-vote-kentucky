@@ -56,9 +56,20 @@ export function summarizeAudit(results: CheckerResult[], startedAtMs: number, se
   };
 }
 
+/**
+ * Reasons carry raw upstream text — a transient 504 skip reason can drag in a
+ * full HTML error body (the Open States client wraps `<html>…504 Gateway
+ * Time-out…</html>` into its message). Clip to one readable line so a single
+ * outage doesn't flood the digest.
+ */
+function clipReason(s: string, max = 140): string {
+  const flat = s.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
 function domainStatusLine(r: CheckerResult): string {
-  if (r.error) return `• ${r.domain}: ERROR — ${r.error}`;
-  if (r.skipped) return `• ${r.domain}: skipped${r.skipReason ? ` — ${r.skipReason}` : ''}`;
+  if (r.error) return `• ${r.domain}: ERROR — ${clipReason(r.error)}`;
+  if (r.skipped) return `• ${r.domain}: skipped${r.skipReason ? ` — ${clipReason(r.skipReason)}` : ''}`;
   const parts = [`${r.checked} checked`, `${r.passed} ok`];
   if (r.failures > 0) parts.push(`${r.failures} fail`);
   if (r.warnings > 0) parts.push(`${r.warnings} warn`);

@@ -70,6 +70,17 @@ function clip(s: string | null | undefined, max = 800): string {
   return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
+/**
+ * Bill numbers repeat every session — there are 17 different "HB142" rows across
+ * 2010-2026 — so a bare bill_number is neither a unique verdict key (two
+ * same-numbered bills sampled together collide in the response Map, silently
+ * dropping one verdict) nor an actionable finding label (an operator can't tell
+ * which session was flagged). Pair the number with its session for both.
+ */
+function billKey(billNumber: string, session: string | null | undefined): string {
+  return session ? `${billNumber} · ${session}` : billNumber;
+}
+
 async function reviewSummaries(
   db: SupabaseClient,
   cfg: AuditConfig,
@@ -78,6 +89,7 @@ async function reviewSummaries(
 ): Promise<number> {
   const data = await sampleTable<{
     bill_number: string;
+    session: string | null;
     title: string;
     description: string | null;
     ai_summary: string | null;
@@ -85,14 +97,14 @@ async function reviewSummaries(
     editor_notes: string | null;
   }>(db, {
     table: 'ky_bills',
-    select: 'bill_number, title, description, ai_summary, legiscan_subjects, editor_notes',
+    select: 'bill_number, session, title, description, ai_summary, legiscan_subjects, editor_notes',
     seed: cfg.seed,
     limit: cfg.llmSample,
     filter: (q) => q.not('ai_summary', 'is', null).neq('ai_summary', ''),
   });
 
   const items = data.map((b) => ({
-    key: b.bill_number as string,
+    key: billKey(b.bill_number, b.session),
     title: clip(b.title as string, 300),
     // The summary generator sees the full description; the auditor must too, or claims grounded
     // past the clip read as fabricated (2026-07-05: HB257 "school climate" at char ~1050 of 1275).
@@ -113,8 +125,8 @@ Flag a summary when:
 - it states a fabricated fact or a claim that contradicts the title/description; OR
 - its "Who it may affect:" clause names audiences that are NOT supported by the title/description/subjects, or are overbroad/overclaimed (impact is inferential, so this is the highest-risk part).
 
-Return ONLY a JSON array, one object per bill:
-{ "key": "<bill_number>", "ok": true|false, "severity": "fail"|"warn"|"info", "issue": "<short reason, empty if ok>" }
+Return ONLY a JSON array, one object per bill, echoing each bill's "key" verbatim:
+{ "key": "<key>", "ok": true|false, "severity": "fail"|"warn"|"info", "issue": "<short reason, empty if ok>" }
 
 Use severity "fail" for hallucinated facts, contradictions, or fabricated audiences; "warn" for misleading emphasis, notable omissions, or overbroad audience claims; "info"/ok=true when faithful and grounded. An omitted "Who it may affect:" clause is fine — do NOT penalize a missing clause.
 
@@ -147,13 +159,14 @@ async function reviewTopics(
 ): Promise<number> {
   const data = await sampleTable<{
     bill_number: string;
+    session: string | null;
     title: string;
     description: string | null;
     topics: string[] | null;
     legiscan_subjects: unknown;
   }>(db, {
     table: 'ky_bills',
-    select: 'bill_number, title, description, topics, legiscan_subjects',
+    select: 'bill_number, session, title, description, topics, legiscan_subjects',
     seed: cfg.seed ^ 0x85ebca6b, // distinct stream from the summary sample
     limit: cfg.llmSample,
     filter: (q) => q.not('topics', 'is', null),
@@ -167,7 +180,7 @@ async function reviewTopics(
             .filter(Boolean)
         : [];
       return {
-        key: b.bill_number as string,
+        key: billKey(b.bill_number, b.session),
         title: clip(b.title as string, 300),
         // Keyword classifier runs on the full description — clipping shorter than the classifier's
         // input makes keyword-matched topics look unsupported.
@@ -181,8 +194,8 @@ async function reviewTopics(
 
   const prompt = `You are auditing topic classifications on a Kentucky General Assembly transparency website. Each bill has site-assigned "topics" (derived by a keyword classifier) plus official "legiscanSubjects". Judge whether the assigned topics reasonably describe the bill given its title/description and official subjects.
 
-Return ONLY a JSON array, one object per bill:
-{ "key": "<bill_number>", "ok": true|false, "severity": "fail"|"warn"|"info", "issue": "<short reason, empty if ok>" }
+Return ONLY a JSON array, one object per bill, echoing each bill's "key" verbatim:
+{ "key": "<key>", "ok": true|false, "severity": "fail"|"warn"|"info", "issue": "<short reason, empty if ok>" }
 
 Use severity "fail" for clearly wrong/irrelevant topics; "warn" for an obviously-missing major topic; "info"/ok=true when reasonable.
 

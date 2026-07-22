@@ -141,6 +141,55 @@ export function norm(v: string | null | undefined): string {
   return (v ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
+const TRANSIENT_NETWORK_CODES = new Set([
+  'ECONNABORTED',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EPIPE',
+  'ERR_NETWORK',
+  'ERR_BAD_RESPONSE',
+]);
+
+/**
+ * True when an error looks like a *transient upstream outage* — an HTTP 5xx / 429,
+ * a request timeout, or a low-level network failure — rather than a problem on our
+ * side (an auth 4xx, schema drift, or a logic bug).
+ *
+ * Checkers whose whole run hinges on a single upstream fetch (the Open States
+ * roster, the LRC calendar) use this to degrade that fetch to a `skipped` result
+ * instead of a checker-level `error`. A `skipped` domain is quiet; an `error`
+ * red-pages #errors and fails CI. Reclassifying an outage we can't control mirrors
+ * the skip-not-error policy already applied to the LegiScan quota stop
+ * (decisions.md § 2026-06-28) — a genuine bug (4xx/auth/schema) still pages.
+ */
+export function isTransientUpstreamError(e: unknown): boolean {
+  const err = e as
+    | { response?: { status?: number }; status?: number; code?: unknown; message?: unknown }
+    | null
+    | undefined;
+
+  const status =
+    err?.response?.status ?? (typeof err?.status === 'number' ? err.status : undefined);
+  if (typeof status === 'number') return status >= 500 || status === 429;
+
+  const code = typeof err?.code === 'string' ? err.code.toUpperCase() : '';
+  if (TRANSIENT_NETWORK_CODES.has(code)) return true;
+
+  // Fall back to the message for errors that wrap the upstream status as text
+  // (e.g. the Open States client throws `Error("OpenStates API 504: …")`).
+  const msg =
+    err && typeof err === 'object' && 'message' in err
+      ? String((err as { message?: unknown }).message ?? '')
+      : String(e ?? '');
+  if (/(?:status(?:\s+code)?\s+|\bapi\s+|\bhttp\s+)(?:429|5\d\d)\b/i.test(msg)) return true;
+  return /\b(?:gateway time-?out|timed?\s*out|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN)\b/i.test(
+    msg,
+  );
+}
+
 export function diffFinding(
   severity: Severity,
   domain: string,

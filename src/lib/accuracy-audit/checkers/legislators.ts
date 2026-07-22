@@ -15,6 +15,7 @@ import {
 import { extractCommitteeMembershipSlugsFromOpenStatesPerson } from '../../ky-committee-utils';
 import {
   diffFinding,
+  isTransientUpstreamError,
   norm,
   summarizeResult,
   type AuditConfig,
@@ -90,8 +91,19 @@ export async function checkLegislators(db: SupabaseClient, cfg: AuditConfig): Pr
   try {
     roster = await getKyOpenStatesClient().fetchLegislators();
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // A transient Open States outage (5xx / gateway timeout — common on the cold,
+    // heavy /people endpoint) is not our bug: skip the roster diff this run rather
+    // than red-page #errors for an upstream we can't control. A genuine failure
+    // (auth 4xx, schema drift) still surfaces as an operational error.
+    if (isTransientUpstreamError(e)) {
+      return summarizeResult('legislators', 0, findings, started, {
+        skipped: true,
+        skipReason: `Open States roster fetch unavailable (transient): ${msg}`,
+      });
+    }
     return summarizeResult('legislators', 0, findings, started, {
-      error: `Open States roster fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+      error: `Open States roster fetch failed: ${msg}`,
     });
   }
 
