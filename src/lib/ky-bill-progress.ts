@@ -29,6 +29,7 @@ import type { KYBill } from '@/types/kentucky';
 import {
   classifyKyBillBrowseBucket,
   effectiveBillChamber,
+  effectiveKyBillDisplayStatus,
   isActivePendingBillStatus,
   normalizeKyBillDesignation,
 } from '@/lib/bill-display';
@@ -126,15 +127,25 @@ export function getBillProgress(bill: KYBill): BillProgress {
   const kind = billProgressKind(bill.bill_number);
   const stages = stagesFor(kind, bill);
   const lastIndex = stages.length - 1;
-  const bucket = classifyKyBillBrowseBucket(bill);
+
+  // Correct one systematic LegiScan gap before deriving progress: a simple resolution
+  // adopted by roll call ("adopted 38-0") is coded as status 1 (Introduced) even though
+  // the voting record shows it passed. `effectiveKyBillDisplayStatus` reports "Passed"
+  // for that case (matching how voice-vote adoptions are already stored), so the meter
+  // agrees with the voting record instead of reading "Adjourned Sine Die" — every other
+  // bill's status is returned unchanged. Derive the bucket and every status test below
+  // from this corrected value so the whole model stays self-consistent.
+  const effectiveStatus = effectiveKyBillDisplayStatus(bill);
+  const billForStatus = effectiveStatus === bill.status ? bill : { ...bill, status: effectiveStatus };
+  const bucket = classifyKyBillBrowseBucket(billForStatus);
 
   // Mirror the status chip exactly (see BillStatusMetaChip): a bill still pending
   // when its session adjourned is dead — "Adjourned Sine Die", not adopted/introduced.
   // Deriving this the same way keeps the meter and the tag in agreement.
-  const adjournedSineDie = sessionHasEnded(bill.session) && isActivePendingBillStatus(bill.status);
+  const adjournedSineDie = sessionHasEnded(bill.session) && isActivePendingBillStatus(effectiveStatus);
   const statusLabel = adjournedSineDie
     ? 'Adjourned Sine Die'
-    : (bill.status || '').trim() || 'Introduced';
+    : (effectiveStatus || '').trim() || 'Introduced';
 
   if (adjournedSineDie) {
     return { kind, stages, reachedIndex: 0, terminal: 'adjourned', statusLabel };
@@ -178,11 +189,14 @@ export function getBillProgress(bill: KYBill): BillProgress {
   } else {
     // Resolutions use "adopted" vocabulary and never go to the governor, so the
     // bill-centric bucket classifier can land an adopted resolution in "other"
-    // (status like "Adopted") — handle adoption directly. Derive it from the mapped
-    // `status` ONLY, never `last_action`: procedural steps like "passed over" or
-    // "committee substitute adopted" would false-match and wrongly show a pending
-    // resolution as adopted (regression: SR231, pending at sine die, read "Adopted").
-    const s = (bill.status ?? '').toLowerCase();
+    // (status like "Adopted") — handle adoption directly. Work from `effectiveStatus`,
+    // NOT raw `last_action`: broadly scanning the action text for "adopted"/"passed"
+    // false-matches procedural steps like "passed over" or "committee substitute
+    // adopted" and would wrongly show a pending resolution as adopted (regression:
+    // SR231, pending at sine die, read "Adopted"). `effectiveKyBillDisplayStatus`
+    // already folds in the ONE narrow, vote-outcome-gated adoption signal that raw
+    // status misses (roll-call adoptions coded "Introduced"), preserving that guard.
+    const s = (effectiveStatus ?? '').toLowerCase();
     const isAdopted = bucket === 'signed' || bucket === 'passed' || /\b(adopted|enrolled)\b/.test(s);
     if (isFailedBill(bill)) {
       reachedIndex = 0;
