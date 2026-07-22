@@ -370,17 +370,25 @@ export function formatLegislativeRoleLabel(role: string | null | undefined): str
   return formatBillLabelText(raw);
 }
 
-/** Solid badge color for party chips (abbrev or full party name). */
+/**
+ * Solid badge color for party chips (abbrev or full party name). Mirrors the
+ * `--party-*` tokens in globals.css — kept as literal hex because this feeds a
+ * MUI `bgcolor` that must resolve without CSS custom properties. Hues are
+ * deliberately distinct from brand blue / error red (see the token comment).
+ */
 export function partyBadgeBackgroundColor(party: string | null | undefined): string {
-  if (party == null || String(party).trim() === '') return '#555';
+  const DEM = '#4338CA'; // --party-d (indigo)
+  const REP = '#BE123C'; // --party-r (rose)
+  const IND = '#475569'; // --party-i (slate)
+  if (party == null || String(party).trim() === '') return IND;
   const label = formatPartyLabel(party).toLowerCase();
-  if (label.includes('democ')) return '#1565c0';
-  if (label.includes('republic')) return '#c62828';
+  if (label.includes('democ')) return DEM;
+  if (label.includes('republic')) return REP;
   const u = String(party).trim().toUpperCase();
-  if (u === 'D' || u === 'DEM') return '#1565c0';
-  if (u === 'R') return '#c62828';
-  if (label.includes('independ')) return '#555';
-  return '#555';
+  if (u === 'D' || u === 'DEM') return DEM;
+  if (u === 'R') return REP;
+  if (label.includes('independ')) return IND;
+  return IND;
 }
 
 /**

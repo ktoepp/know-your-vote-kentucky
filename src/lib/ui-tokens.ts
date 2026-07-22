@@ -158,7 +158,12 @@ export type ChipScale = keyof typeof CHIP;
  * Values use the MUI system scale (multiples of `theme.shape.borderRadius` / `theme.spacing`).
  */
 export const CARD = {
-  /** Border radius on the outer Card (`sx` scale — 3 × 8px = 24px). */
+  /**
+   * Border radius on the outer Card (`sx` scale — 3 × 8px = 24px). This is the
+   * canonical "large" card step, mirrored by the `--radius-lg` CSS token /
+   * Tailwind `rounded-card`. Controls (buttons, inputs, MUI Card/Paper) use the
+   * 8px `--radius` step instead.
+   */
   borderRadius: 3,
   /** Inner CardContent padding — responsive. */
   padding: { xs: 2, sm: 2.5 },
