@@ -84,19 +84,6 @@
                   "Helvetica Neue", Arial, sans-serif;
   --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-heading: var(--font-display);
-
-  /* Back-compat aliases (consumers still reference these names) */
-  --bg-primary:    var(--bg-surface);
-  --bg-secondary:  var(--bg-page);
-  --blue-primary:  var(--primary);
-  --blue-secondary:var(--primary-light);
-  --blue-light:    var(--primary-light);
-  --green-primary: var(--success);
-  --red-primary:   var(--error);
-  --yellow-primary:var(--warning);
-  --info:          var(--primary);
-  --focus-ring:    var(--primary);
-  --hover-bg:      var(--bg-tertiary);
 }
 
 /* Base */

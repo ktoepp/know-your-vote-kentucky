@@ -78,7 +78,7 @@ field pairs color with text and errors are announced.
 | Finding | Detail | Status |
 |---|---|---|
 | **Party color drift** | Two disagreeing sources: CSS vars (`--party-d/r/i`) and `bill-display.ts#partyBadgeBackgroundColor` (`#1565c0`/`#c62828`/`#555`). Unified onto one distinct set. | ✅ |
-| **Token duplication** | Target is one semantic set (`--primary`, `--text-*`). Back-compat aliases (`--blue-primary`, `--green-primary`, `--info`, …) still resolve in `globals.css`; retire as call sites migrate. | 📄 (`cleanup.md` Phase 4) |
+| **Token duplication** | Back-compat aliases (`--blue-primary`, `--green-primary`, `--info`, `background`/`foreground`, …) removed from `globals.css` + `tailwind.config.js`; the one live consumer (`error.tsx` → `--bg-primary`) migrated to `--bg-surface`. Only the singular semantic set remains. | ✅ |
 | **Card radius drift** | `/design-system` page copy claimed "12px" — false; corrected to the real values (MUI Card 8px, CivicCard 24px). Collapsing CivicCard to one radius is a **visual** change deferred pending a design call, not applied here. | 📄 |
 | **Bill card link** | Whole card is one link (stretched-link), not a div + inner button. | ✅ |
 | **Progress meter parity** | Meter, status chip, and browse filters all derive from `ky-bill-progress.ts` / `classifyKyBillBrowseBucket` — they agree by construction. | ✅ |

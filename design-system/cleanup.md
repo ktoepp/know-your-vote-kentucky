@@ -20,8 +20,12 @@ drift.
   `bill-display.ts` unified with the tokens).
 - ✅ **Doc pointer + page copy** — `globals.css` header and the `/design-system`
   radius copy corrected.
-- ⬜ **Phase 3 (CivicCard radius collapse)** — deferred (visual decision).
-- ⬜ **Phase 4 (retire back-compat aliases)** — follow-up.
+- ✅ **Phase 4 (retire back-compat aliases)** — applied. Only `--bg-primary`
+  was still referenced (`error.tsx`, migrated to `--bg-surface`); the entire
+  alias block in `globals.css` and the `background`/`foreground` Tailwind
+  aliases were removed.
+- ⬜ **Phase 3 (CivicCard radius)** — pending a visual decision (keep the
+  rounded 24px look as a named `--radius-lg`, or collapse to 8px).
 - ⬜ **Phase 5 (party — done; font self-host)** — font awaits licensing (#1).
 
 ---

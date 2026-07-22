@@ -38,9 +38,6 @@ module.exports = {
         'party-r':        'var(--party-r)',
         'party-d':        'var(--party-d)',
         'party-i':        'var(--party-i)',
-        // Legacy aliases (back-compat with components that pre-date the rename)
-        background: 'var(--bg-surface)',
-        foreground: 'var(--text-primary)',
       },
       fontFamily: {
         display: ['var(--font-display)'],
