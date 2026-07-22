@@ -735,7 +735,7 @@ function HistoryTimeline({
                   <LegislativeStageTooltip stage="clerical" showIcon={false} position="top">
                     <Box
                       component="span"
-                      sx={{ color: 'text.disabled', fontWeight: 400, cursor: 'help', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
+                      sx={{ color: 'text.tertiary', fontWeight: 400, cursor: 'help', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
                     >
                       {' '}
                       (clerical)
@@ -743,7 +743,7 @@ function HistoryTimeline({
                   </LegislativeStageTooltip>
                 )}
                 {!isImportant && !tooltipsEnabled && (
-                  <Box component="span" sx={{ color: 'text.disabled', fontWeight: 400 }}>
+                  <Box component="span" sx={{ color: 'text.tertiary', fontWeight: 400 }}>
                     {' '}
                     (clerical)
                   </Box>

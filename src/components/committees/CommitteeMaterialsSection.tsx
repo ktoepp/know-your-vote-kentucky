@@ -121,7 +121,7 @@ export function CommitteeMaterialsSection({
                         sx={{
                           fontWeight: 500,
                           wordBreak: 'break-word',
-                          color: 'text.disabled',
+                          color: 'text.tertiary',
                           display: 'inline-flex',
                           alignItems: 'baseline',
                           gap: 0.75,

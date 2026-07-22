@@ -26,18 +26,18 @@ module.exports = {
         // Semantic
         success:        'var(--success)',
         'success-tint': 'var(--success-tint)',
+        'success-light':'var(--success-light)',
         error:          'var(--error)',
         'error-tint':   'var(--error-tint)',
         warning:        'var(--warning)',
+        'warning-tint': 'var(--warning-tint)',
+        'warning-light':'var(--warning-light)',
         // Chamber & party
         'chamber-senate': 'var(--chamber-senate)',
         'chamber-house':  'var(--chamber-house)',
         'party-r':        'var(--party-r)',
         'party-d':        'var(--party-d)',
         'party-i':        'var(--party-i)',
-        // Legacy aliases (back-compat with components that pre-date the rename)
-        background: 'var(--bg-surface)',
-        foreground: 'var(--text-primary)',
       },
       fontFamily: {
         display: ['var(--font-display)'],
@@ -45,7 +45,8 @@ module.exports = {
         mono:    ['var(--font-mono)'],
       },
       borderRadius: {
-        md:   '8px',
+        md:   '8px',            // controls (mirrors --radius / MUI shape.borderRadius)
+        card: 'var(--radius-lg)', // CivicCard tiles (24px) — `rounded-card`
         full: '9999px',
       },
       boxShadow: {

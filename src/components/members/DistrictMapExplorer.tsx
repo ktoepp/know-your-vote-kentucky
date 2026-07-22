@@ -993,7 +993,7 @@ export default function DistrictMapExplorer() {
               <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
                 Search your address above, or select anywhere on the map to find your House and Senate districts and representatives.
               </Typography>
-              <Typography variant="caption" color="text.disabled" display="block" sx={{ mt: 1.5 }}>
+              <Typography variant="caption" color="text.tertiary" display="block" sx={{ mt: 1.5 }}>
                 Every Kentucky address has two state legislators — a House member (100 districts) and a senator (38 districts).
               </Typography>
             </Paper>

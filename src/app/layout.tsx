@@ -44,6 +44,15 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL(siteOrigin),
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48' },
+      { url: '/branding/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/branding/icon-512.png', type: 'image/png', sizes: '512x512' },
+    ],
+    apple: '/branding/apple-touch-icon.png',
+    shortcut: '/favicon.ico',
+  },
   openGraph: {
     siteName: "Know Your Vote Kentucky",
     locale: "en_US",

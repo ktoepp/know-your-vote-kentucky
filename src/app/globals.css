@@ -25,7 +25,7 @@
 
 /* ===================================================================
    KYvKY design tokens — canonical names mirror the Framer design.
-   Source of truth: kyvky/project/guidelines.md
+   Source of truth: design-system/guidelines.md
    =================================================================== */
 
 :root {
@@ -46,21 +46,31 @@
   --text-secondary:#334155;
   --text-primary:  #0F172A;
 
-  /* Semantic */
-  --success:       #16A34A;
+  /* Semantic
+     v1.1: --success / --warning promoted to AA-passing values (≥4.5:1 as text
+     on --bg-surface). The brighter originals live on as *-light for non-text
+     fills only, where WCAG 1.4.11 (≥3:1) applies. */
+  --success:       #15803D;
   --success-tint:  #F0FDF4;
+  --success-light: #16A34A;
   --error:         #DC2626;
   --error-tint:    #FEF2F2;
-  --warning:       #D97706;
+  --warning:       #B45309;
+  --warning-tint:  #FFFBEB;
+  --warning-light: #D97706;
 
   /* Chamber & party
-     House was #16A34A (same as --success). Reassigned to cyan-700 so
+     House was #16A34A (the old success green). Reassigned to cyan-700 so
      chamber signal is distinct from "passed / signed" green throughout the app. */
   --chamber-senate:#6B21A8;
   --chamber-house: #0891B2;
-  --party-r:       #DC2626;
-  --party-d:       #2563EB;
-  --party-i:       #64748B;
+  /* Party — deliberately distinct from --primary (brand blue) and --error /
+     veto red, so a party badge never reads as editorial alignment or collides
+     with status color. D=indigo, R=rose, I=slate; the D/R/I letter carries the
+     meaning, color is secondary. All clear ≥4.5:1 with --party-fg (white). */
+  --party-d:       #4338CA;
+  --party-r:       #BE123C;
+  --party-i:       #475569;
   --party-fg:      #FFFFFF;
 
   /* Elevation */
@@ -75,18 +85,11 @@
   --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-heading: var(--font-display);
 
-  /* Back-compat aliases (consumers still reference these names) */
-  --bg-primary:    var(--bg-surface);
-  --bg-secondary:  var(--bg-page);
-  --blue-primary:  var(--primary);
-  --blue-secondary:var(--primary-light);
-  --blue-light:    var(--primary-light);
-  --green-primary: var(--success);
-  --red-primary:   var(--error);
-  --yellow-primary:var(--warning);
-  --info:          var(--primary);
-  --focus-ring:    var(--primary);
-  --hover-bg:      var(--bg-tertiary);
+  /* Radius — MUI mirrors --radius via theme.shape.borderRadius (8).
+     --radius-lg is the CivicCard tile step (ui-tokens.ts#CARD.borderRadius = 3 ×8px). */
+  --radius:      8px;    /* buttons, inputs, chips-as-rect, alerts, small cards */
+  --radius-lg:   24px;   /* CivicCard bill / member / committee / meeting tiles */
+  --radius-full: 9999px; /* pills, chips, avatars, meter segments */
 }
 
 /* Base */
