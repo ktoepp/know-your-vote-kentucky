@@ -14,6 +14,21 @@ export function LandingHero() {
     >
       <Box sx={LANDING_HERO_SCRIM} />
       <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
+        {/* White knockout wordmark on the dark scrim (see design-system/assets). */}
+        <Box
+          component="img"
+          src="/branding/logo-wordmark-white.svg"
+          alt="Know Your Vote Kentucky"
+          sx={{
+            display: 'block',
+            mx: 'auto',
+            mb: { xs: 3, md: 4 },
+            height: { xs: 34, sm: 42, md: 50 },
+            width: 'auto',
+            maxWidth: '100%',
+            filter: 'drop-shadow(0 1px 8px rgba(15, 23, 42, 0.45))',
+          }}
+        />
         <Typography
           variant="h2"
           component="h1"

@@ -1,35 +1,42 @@
 # Design system — assets
 
-Catalog of brand assets referenced by the design system. Shipping binary files
-live in the app under [`public/branding/`](../../public/branding); this folder
-is the design-system-side index and gap list.
+Catalog of brand assets. Shipping files live under
+[`public/branding/`](../../public/branding) (served at `/branding/…`); this
+folder is the design-system-side index.
 
-## Shipping (in `public/branding/`)
+## Logos
 
-| File | Use |
-|---|---|
-| `Logo-03.png` | Primary wordmark/logo (color, on light backgrounds). |
-| `favicon.png` | Favicon source. |
-| `apple-touch-icon.png` | iOS home-screen icon. |
-| `icon-192.png`, `icon-512.png` | PWA manifest icons (`public/manifest.json`). |
-| `../favicon.ico` | Root favicon. |
+| File | Form | Use |
+|---|---|---|
+| `Logo-03.png` | Color badge | Nav + footer wordmark on **light** surfaces (`Navigation.tsx`, `SiteFooter.tsx`). |
+| `logo-wordmark-white.svg` | White horizontal lockup (mark + "knowyourvote kentucky.com") | **Dark / gradient** surfaces. Used on the marketing hero (`LandingHero.tsx`). |
+| `logo-white.svg` | White compact badge | Dark surfaces where a square/stacked mark fits better than the wordmark. |
 
-## Gaps — open decision #3 (not in this change)
+Rule: **color logo on light, white knockout on dark.** Never place the color
+logo on the hero gradient/photo, or the white logo on a light surface.
 
-The following were requested but **never produced**, so they are intentionally
-absent rather than faked:
+## Favicon / app icons (white-on-blue `#1E40AF`)
 
-- **Solid-white knockout logo** — for dark / gradient (hero) backgrounds. Needs
-  a real single-color knockout export, not a CSS inversion of the color logo.
-- **White-on-blue default favicon** — requested as the default mark.
+Generated from `favicon-mark-white.svg` (the square white mark) composited on
+brand blue — regenerate with `scripts`-style `sharp` if the source changes.
 
-**Action:** provide/approve the source files (SVG preferred for the logo) and
-they land in a follow-up. Until then, use `Logo-03.png` on light surfaces only;
-do not place the color logo on the hero gradient.
+| File | Size | Wired in |
+|---|---|---|
+| `../favicon.ico` | 16 / 32 / 48 (multi) | `layout.tsx` icons + `manifest.json` |
+| `favicon.png` | 48 | fallback |
+| `apple-touch-icon.png` | 180 | `layout.tsx` `icons.apple` + manifest |
+| `icon-192.png` | 192 | `manifest.json` (PWA) |
+| `icon-512.png` | 512 | `manifest.json` (PWA) |
+
+Sources: `favicon-mark-white.svg` (250×250, square — the one used).
+`favicon-mark-white-nonsquare.svg` (165×127) is an earlier non-square export
+kept for reference; it is **not** used and is a candidate for removal.
 
 ## Conventions
 
-- Prefer **SVG** for logo/wordmark (crisp at any size, themeable).
-- Export raster icons at the sizes the manifest declares (192, 512).
-- Any new brand color must trace back to a token in
+- Logos are **SVG** (crisp at any size, themeable). Raster app icons are PNG at
+  the sizes the manifest declares.
+- App-icon background is `--primary` (`#1E40AF`); the mark is white.
+- Any new brand color must trace to a token in
   [`../guidelines.md`](../guidelines.md) §2 — no one-off hexes.
+- Web-safe filenames only (no spaces) so `/branding/…` URLs don't need encoding.

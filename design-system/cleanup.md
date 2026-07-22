@@ -26,8 +26,8 @@ drift.
   aliases were removed.
 - ✅ **Phase 3 (CivicCard radius)** — resolved by keeping the 24px look and
   naming it (`--radius-lg` / `rounded-card`); zero visual change.
-- ⬜ **Font self-host (decision #1)** — awaits licensing.
-- ⬜ **White knockout logo (decision #3)** — awaits the asset.
+- ✅ **White knockout logo + favicon (decision #3)** — delivered and wired.
+- ⬜ **Font self-host (decision #1)** — awaits licensing (only remaining item).
 
 ---
 

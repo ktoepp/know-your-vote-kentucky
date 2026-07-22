@@ -352,14 +352,17 @@ to minimize (voice guide, "honest sourcing").
 ## 7. Assets
 
 Brand assets are catalogued in [`assets/README.md`](./assets/README.md).
-Shipping logo/icon files live in `public/branding/` (`Logo-03.png`,
-`favicon.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`).
+Shipping files live in `public/branding/`.
 
-> **Open decision #3 (unresolved).** A solid-white knockout logo (for
-> dark/gradient backgrounds) and a white-on-blue default favicon were requested
-> but never produced. They are **not** in this change. Provide/approve the
-> source and they land in a follow-up. Do not fabricate a knockout by CSS-only
-> inversion of the color logo — request the real asset.
+**Logo rule:** color logo (`Logo-03.png`) on **light** surfaces (nav, footer);
+white knockout (`logo-wordmark-white.svg` / `logo-white.svg`) on **dark /
+gradient** surfaces (marketing hero). Never mix.
+
+> **v1.1 (open decision #3 — resolved).** The solid-white knockout logo and the
+> white-on-blue favicon were delivered. The knockout wordmark now sits on the
+> marketing hero (`LandingHero.tsx`); the favicon/app-icon set (`favicon.ico`
+> 16/32/48, `apple-touch-icon`, `icon-192/512`) is white-on-`#1E40AF`, generated
+> from `favicon-mark-white.svg` and wired into `layout.tsx` + `manifest.json`.
 
 ---
 
