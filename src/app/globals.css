@@ -84,6 +84,12 @@
                   "Helvetica Neue", Arial, sans-serif;
   --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-heading: var(--font-display);
+
+  /* Radius — MUI mirrors --radius via theme.shape.borderRadius (8).
+     --radius-lg is the CivicCard tile step (ui-tokens.ts#CARD.borderRadius = 3 ×8px). */
+  --radius:      8px;    /* buttons, inputs, chips-as-rect, alerts, small cards */
+  --radius-lg:   24px;   /* CivicCard bill / member / committee / meeting tiles */
+  --radius-full: 9999px; /* pills, chips, avatars, meter segments */
 }
 
 /* Base */

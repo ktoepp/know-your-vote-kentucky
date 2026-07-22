@@ -131,19 +131,21 @@ Cards, Paper, Accordion default to **elevation 0 + 1px border** (`theme.ts`).
 
 ### 2.6 Radius
 
-Collapsed to a **two-step scale**:
+Three named steps — one for controls, one for card tiles, one for pills:
 
 | Token | Value | Use |
 |---|---|---|
-| `--radius` (theme `shape.borderRadius`) | `8px` | Buttons, inputs, chips-as-rect, alerts, tooltips, small cards. |
-| `--radius-full` | `9999px` | Pills, chips, avatars, meter segments. |
+| `--radius` (theme `shape.borderRadius`; Tailwind `rounded-md`) | `8px` | Buttons, inputs, chips-as-rect, alerts, tooltips, MUI Card/Paper. |
+| `--radius-lg` (`ui-tokens#CARD.borderRadius`; Tailwind `rounded-card`) | `24px` | CivicCard bill / member / committee / meeting tiles. |
+| `--radius-full` (Tailwind `rounded-full`) | `9999px` | Pills, chips, avatars, meter segments. |
 
-> **Reconciliation note (v1.1).** Card radius is currently inconsistent:
-> `ui-tokens.ts#CARD.borderRadius` renders CivicCard at **24px**, the MUI
-> `MuiCard` override is **8px**, and the in-app `/design-system` page copy says
-> **12px**. v1.1 canonicalizes card radius at **8px** (small surfaces) with an
-> optional larger `--radius-lg 16px` for marketing/hero cards — *pick one per
-> surface, not three by accident.* Migration in [`cleanup.md`](./cleanup.md).
+> **v1.1 reconciliation (resolved).** Card radius previously read three ways —
+> `CARD.borderRadius` 24px, `MuiCard` 8px, and the `/design-system` page copy
+> claiming 12px. The rounded 24px CivicCard look is intentional and is kept; it
+> is now a **named** step (`--radius-lg`, mirrored in the CSS token and Tailwind
+> `rounded-card`), MUI Card/Paper stays at 8px for control-density surfaces, and
+> the false "12px" page copy was corrected. So: **8px controls · 24px cards ·
+> full pills** — three deliberate steps, no accidental drift.
 
 ### 2.7 Spacing & layout
 
@@ -387,7 +389,7 @@ Shipping logo/icon files live in `public/branding/` (`Logo-03.png`,
 - Specified AA-passing `--success` (`#15803D`), `--warning` (`#B45309`), and
   read-metadata on `--text-tertiary` (off `--text-muted`).
 - Reconciled fonts (Aesthet Nova 500 + Instrument Sans), type scale (H1 40),
-  and a two-step radius.
+  and named the radius scale (8px controls · 24px cards · full pills).
 - Bill card as a real link; input error/success, skip link, reduced-motion.
 - Added Feedback & loading patterns (§6.9) and the 4-stage progress meter
   (§6.5) matching the live component.

@@ -79,7 +79,7 @@ field pairs color with text and errors are announced.
 |---|---|---|
 | **Party color drift** | Two disagreeing sources: CSS vars (`--party-d/r/i`) and `bill-display.ts#partyBadgeBackgroundColor` (`#1565c0`/`#c62828`/`#555`). Unified onto one distinct set. | ✅ |
 | **Token duplication** | Back-compat aliases (`--blue-primary`, `--green-primary`, `--info`, `background`/`foreground`, …) removed from `globals.css` + `tailwind.config.js`; the one live consumer (`error.tsx` → `--bg-primary`) migrated to `--bg-surface`. Only the singular semantic set remains. | ✅ |
-| **Card radius drift** | `/design-system` page copy claimed "12px" — false; corrected to the real values (MUI Card 8px, CivicCard 24px). Collapsing CivicCard to one radius is a **visual** change deferred pending a design call, not applied here. | 📄 |
+| **Card radius drift** | Resolved: the intentional 24px CivicCard look is kept and **named** (`--radius-lg` / Tailwind `rounded-card` / `ui-tokens#CARD`); MUI Card/Paper stays 8px; the false "12px" page copy was fixed. Three deliberate steps (8 / 24 / full), no drift — zero visual change. | ✅ |
 | **Bill card link** | Whole card is one link (stretched-link), not a div + inner button. | ✅ |
 | **Progress meter parity** | Meter, status chip, and browse filters all derive from `ky-bill-progress.ts` / `classifyKyBillBrowseBucket` — they agree by construction. | ✅ |
 | **Chip status hue** | `outlined` override yields to `outlinedSuccess`/`Error` so "Signed"/"Vetoed" keep color (regression previously rendered them gray). | ✅ |
@@ -126,6 +126,9 @@ logged, not silently resolved.
   migration**, and the **distinct party colors** are now applied to
   `globals.css` / `theme.ts` / `tailwind.config.js` / `bill-display.ts` and the
   affected components (`tsc --noEmit` and `next lint` clean).
-- **Still follow-up (`cleanup.md`):** back-compat alias retirement (Phase 4) and
-  the CivicCard radius collapse (a visual decision). Font self-hosting and the
-  white knockout logo await their inputs (decisions #1, #3).
+- **Migration complete:** contrast promotions, `text.tertiary` + read-metadata,
+  distinct party colors, back-compat alias retirement (Phase 4), and the radius
+  reconciliation (Phase 3, named steps — zero visual change) are all applied.
+- **Only external inputs remain:** font self-hosting (decision #1, licensing)
+  and the white knockout logo (decision #3, asset from owner). The v1.2 dense
+  table (decision #4) is logged in `TASKS.md`.

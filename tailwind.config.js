@@ -45,7 +45,8 @@ module.exports = {
         mono:    ['var(--font-mono)'],
       },
       borderRadius: {
-        md:   '8px',
+        md:   '8px',            // controls (mirrors --radius / MUI shape.borderRadius)
+        card: 'var(--radius-lg)', // CivicCard tiles (24px) — `rounded-card`
         full: '9999px',
       },
       boxShadow: {

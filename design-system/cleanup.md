@@ -24,9 +24,10 @@ drift.
   was still referenced (`error.tsx`, migrated to `--bg-surface`); the entire
   alias block in `globals.css` and the `background`/`foreground` Tailwind
   aliases were removed.
-- ⬜ **Phase 3 (CivicCard radius)** — pending a visual decision (keep the
-  rounded 24px look as a named `--radius-lg`, or collapse to 8px).
-- ⬜ **Phase 5 (party — done; font self-host)** — font awaits licensing (#1).
+- ✅ **Phase 3 (CivicCard radius)** — resolved by keeping the 24px look and
+  naming it (`--radius-lg` / `rounded-card`); zero visual change.
+- ⬜ **Font self-host (decision #1)** — awaits licensing.
+- ⬜ **White knockout logo (decision #3)** — awaits the asset.
 
 ---
 
@@ -66,17 +67,19 @@ rg -n "text-muted|#94A3B8|text\.disabled" src
 Review each hit: is it text a user reads? → `--text-tertiary`. Decorative/
 disabled? → leave.
 
-## Phase 3 — Radius reconciliation
+## Phase 3 — Radius reconciliation ✅ (done)
 
-Pick one card radius (guidelines §2.6 canonicalizes **8px**, optional
-`--radius-lg 16px` for hero/marketing).
+Resolved by **naming** the existing steps rather than flattening (the rounded
+24px CivicCard look is intentional — product call, 2026-07-22):
 
-- `ui-tokens.ts#CARD.borderRadius: 3` (=24px) → `1` (=8px), or introduce
-  `--radius-lg` and use it deliberately on marketing cards only.
-- Fix the `/design-system` page copy that says "cards override to 12px" — state
-  the real value.
-- Confirm `MuiCard`/`MuiPaper`/`MuiAccordion` overrides (8px) and CivicCard
-  agree after the change.
+- Added `--radius` (8px), `--radius-lg` (24px), `--radius-full` to `globals.css`;
+  Tailwind gained `rounded-card` → `var(--radius-lg)`.
+- `ui-tokens.ts#CARD.borderRadius: 3` (=24px) documented as the `--radius-lg`
+  step; value unchanged (zero visual change).
+- MUI Card/Paper/Accordion stay at 8px (`--radius`) for control-density surfaces.
+- Fixed the `/design-system` page copy that falsely claimed "12px".
+
+Net scale: **8px controls · 24px cards · full pills.**
 
 ## Phase 4 — Retire back-compat aliases
 
