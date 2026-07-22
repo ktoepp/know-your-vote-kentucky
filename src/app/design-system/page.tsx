@@ -200,7 +200,7 @@ export default function DesignSystemPage() {
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ fontFamily: 'monospace' }}>shape.borderRadius</TableCell>
-                    <TableCell>{theme.shape.borderRadius}px (buttons / inputs); cards override to 12px in theme</TableCell>
+                    <TableCell>{theme.shape.borderRadius}px (buttons / inputs; MUI Card / Paper); CivicCard bill/member tiles use 24px (<Typography component="span" sx={{ fontFamily: 'monospace' }}>ui-tokens.ts#CARD</Typography>)</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ fontFamily: 'monospace' }}>palette.background.default</TableCell>
@@ -274,7 +274,7 @@ export default function DesignSystemPage() {
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Buttons use sentence case (<Typography component="span" sx={{ fontFamily: 'monospace' }}>textTransform: none</Typography>), 8px radius,
-              40px min height. Cards and Paper default to 12px radius and a light border.
+              44px min height. MUI Card and Paper default to 8px radius and a light border; CivicCard-based tiles use 24px (<Typography component="span" sx={{ fontFamily: 'monospace' }}>ui-tokens.ts#CARD</Typography>).
             </Typography>
             <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }}>
               <Button variant="contained" color="primary" endIcon={<ArrowForward />}>

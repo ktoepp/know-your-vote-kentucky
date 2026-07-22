@@ -1,6 +1,17 @@
 import { createTheme, ThemeOptions } from '@mui/material/styles';
 
 /**
+ * `text.tertiary` — the smallest readable metadata color (slate-500, ≈4.6:1 on
+ * white, passes AA). Distinct from `text.disabled` (slate-400, #94A3B8), which
+ * v1.1 reserves for genuinely decorative / inactive marks that fail AA as text.
+ */
+declare module '@mui/material/styles' {
+  interface TypeText {
+    tertiary: string;
+  }
+}
+
+/**
  * Heading / display type (Adobe Typekit kit — loaded non-blocking in root
  * layout; `aesthet-nova-fallback` is the size-adjusted Georgia face in
  * globals.css that prevents layout shift during the font swap).
@@ -51,14 +62,19 @@ export const civicPaletteTokens = {
     contrastText: '#FFFFFF',
   },
   secondary: {
-    main: '#16A34A',
+    // v1.1: promoted to the AA-passing green so white text on a contained
+    // secondary button (and secondary-colored text) clears 4.5:1. `light`
+    // keeps the bright green for non-text fills.
+    main: '#15803D',
     light: '#22C55E',
-    dark: '#15803D',
+    dark: '#166534',
     contrastText: '#FFFFFF',
   },
   neutral: slate,
-  success: { main: '#16A34A', light: '#22C55E', dark: '#15803D' },
-  warning: { main: '#D97706', light: '#F59E0B', dark: '#B45309' },
+  // v1.1: `main` is the AA-passing value used for text/icons; `light` is the
+  // bright original, kept for non-text fills (meter segments, large blocks).
+  success: { main: '#15803D', light: '#16A34A', dark: '#166534' },
+  warning: { main: '#B45309', light: '#D97706', dark: '#92400E' },
   error:   { main: '#DC2626', light: '#EF4444', dark: '#B91C1C' },
   // `info` aliases `primary` — the system has one blue.
   info:    { main: '#1E40AF', light: '#2563EB', dark: '#1E3A8A' },
@@ -113,7 +129,8 @@ export const lightTheme = createTheme({
     text: {
       primary:   slate[900],
       secondary: slate[700],
-      disabled:  slate[400],
+      tertiary:  slate[500],   // AA-passing metadata (see TypeText augmentation)
+      disabled:  slate[400],   // decorative / inactive only — fails AA as text
     },
     divider: slate[200],
   },

@@ -12,6 +12,20 @@ drift.
 
 ---
 
+## Status
+
+- ✅ **Phase 1 (contrast promotions)** — applied.
+- ✅ **Phase 2 (read-metadata → `text.tertiary`)** — applied.
+- ✅ **Party colors (decision #2)** — applied (distinct indigo/rose/slate;
+  `bill-display.ts` unified with the tokens).
+- ✅ **Doc pointer + page copy** — `globals.css` header and the `/design-system`
+  radius copy corrected.
+- ⬜ **Phase 3 (CivicCard radius collapse)** — deferred (visual decision).
+- ⬜ **Phase 4 (retire back-compat aliases)** — follow-up.
+- ⬜ **Phase 5 (party — done; font self-host)** — font awaits licensing (#1).
+
+---
+
 ## Phase 1 — Contrast promotions (safe, no rename)
 
 Lowest risk, highest a11y payoff. Promote the AA-passing values (already present

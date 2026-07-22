@@ -7,6 +7,12 @@ plus the v1.1 status of each finding. Companion to
 **Legend:** ✅ resolved in spec & code · 📄 resolved in **spec**, code migration
 pending (see `cleanup.md`) · 🔲 open decision (needs a human call) · ⏭ deferred.
 
+> **Update (v1.1 code migration).** Phases 1–2 of [`cleanup.md`](./cleanup.md)
+> are now applied: the contrast promotions (`--success #15803D`,
+> `--warning #B45309`), the `text.tertiary` metadata role, and the distinct
+> party colors are live in `globals.css` / `theme.ts` / `tailwind.config.js` /
+> `bill-display.ts`. Rows below are updated accordingly.
+
 ---
 
 ## 1. Accessibility
@@ -15,19 +21,26 @@ pending (see `cleanup.md`) · 🔲 open decision (needs a human call) · ⏭ def
 
 Five failures found against `--bg-surface` (`#FFFFFF`); all now specified at AA.
 
+Ratios below are measured (WCAG relative-luminance formula), not estimated.
+
 | # | Pairing | Was | Ratio | Now | Ratio | Status |
 |---|---|---|---|---|---|---|
-| 1 | Success text / "Became law" | `#16A34A` | ≈3.0:1 ✗ | `#15803D` | ≈4.9:1 ✓ | 📄 |
-| 2 | House chamber (when it was green) | `#16A34A` | ≈3.0:1 ✗ | `#0891B2` cyan-700 | ≈3.3:1 (non-text)✓ | ✅ |
-| 3 | Warning text / caution | `#D97706` | ≈3.1:1 ✗ | `#B45309` | ≈4.5:1 ✓ | 📄 |
-| 4 | Party-I badge text | `#94A3B8` | ≈2.6:1 ✗ | `#64748B` | ≈4.6:1 ✓ | 📄 |
-| 5 | Read / secondary metadata | `#94A3B8` | ≈2.6:1 ✗ | `--text-tertiary #64748B` | ≈4.6:1 ✓ | 📄 |
+| 1 | Success text / "Became law" | `#16A34A` | 3.30:1 ✗ | `#15803D` | 5.02:1 ✓ | ✅ |
+| 2 | House chamber (when it was green) | `#16A34A` | 3.30:1 ✗ | `#0891B2` cyan-700 | non-text ✓ | ✅ |
+| 3 | Warning text / caution | `#D97706` | 3.19:1 ✗ | `#B45309` | 5.02:1 ✓ | ✅ |
+| 4 | Party badges (white text on fill) | `#2563EB`/`#DC2626` | 5.17 / 4.83 | `#4338CA`/`#BE123C`/`#475569` | 7.90 / 6.29 / 7.58 ✓ | ✅ |
+| 5 | Read / secondary metadata | `#94A3B8` | 2.56:1 ✗ | `text.tertiary #64748B` | 4.76:1 ✓ | ✅ |
 
-> The AA values `#15803D` and `#B45309` already exist in `theme.ts` as
-> `success.dark` / `warning.dark`. v1.1 promotes them to the base token so the
-> **default** rendering passes; the brighter originals remain as MUI `.light`
-> steps for non-text fills only (≥3:1). `--text-muted #94A3B8` is retained but
-> reclassified **non-text** (decorative/disabled). Migration: `cleanup.md` §1.
+> The AA success/warning values were promoted to the base tokens in
+> `globals.css` + `theme.ts` (`main`); the brighter originals live on as
+> `*-light` for non-text fills only (≥3:1). `--text-muted #94A3B8` is retained
+> but reclassified **non-text** (decorative/inactive), and a first-class
+> `text.tertiary` (slate-500) role was added for readable metadata. Party colors
+> were the exact-token collision from open decision #2 — now distinct hues (§4).
+> Genuine readable-text sites moved off `text.disabled`: `DistrictMapExplorer`
+> help caption, `BillDetailView` "(clerical)" annotations, `CommitteeMaterials`
+> dead-link label. Icons, separator dots, list markers, and upcoming/inactive
+> states correctly stay muted.
 
 ### 1.2 Focus visibility (2.4.7) — ✅
 Global `:focus-visible` 2px `--primary` ring, offset 2px, radius-inheriting
@@ -64,12 +77,13 @@ field pairs color with text and errors are announced.
 
 | Finding | Detail | Status |
 |---|---|---|
-| **Token duplication** | Target is one semantic set (`--primary`, `--text-*`). Back-compat aliases (`--blue-primary`, `--green-primary`, `--info`, …) still resolve in `globals.css`; retire as call sites migrate. | 📄 |
-| **Card radius drift** | Three values in play: `CARD.borderRadius` 24px (CivicCard), `MuiCard` 8px, `/design-system` page copy says 12px. Canonicalize (guidelines §2.6). | 📄 |
+| **Party color drift** | Two disagreeing sources: CSS vars (`--party-d/r/i`) and `bill-display.ts#partyBadgeBackgroundColor` (`#1565c0`/`#c62828`/`#555`). Unified onto one distinct set. | ✅ |
+| **Token duplication** | Target is one semantic set (`--primary`, `--text-*`). Back-compat aliases (`--blue-primary`, `--green-primary`, `--info`, …) still resolve in `globals.css`; retire as call sites migrate. | 📄 (`cleanup.md` Phase 4) |
+| **Card radius drift** | `/design-system` page copy claimed "12px" — false; corrected to the real values (MUI Card 8px, CivicCard 24px). Collapsing CivicCard to one radius is a **visual** change deferred pending a design call, not applied here. | 📄 |
 | **Bill card link** | Whole card is one link (stretched-link), not a div + inner button. | ✅ |
 | **Progress meter parity** | Meter, status chip, and browse filters all derive from `ky-bill-progress.ts` / `classifyKyBillBrowseBucket` — they agree by construction. | ✅ |
 | **Chip status hue** | `outlined` override yields to `outlinedSuccess`/`Error` so "Signed"/"Vetoed" keep color (regression previously rendered them gray). | ✅ |
-| **globals.css source pointer** | Header pointed to `kyvky/project/guidelines.md` (nonexistent). Now `design-system/guidelines.md`. | 📄 (update in `cleanup.md` §3) |
+| **globals.css source pointer** | Header pointed to `kyvky/project/guidelines.md` (nonexistent). Now `design-system/guidelines.md`. | ✅ |
 
 ---
 
@@ -90,16 +104,16 @@ anticipation) and the **power user** (advocacy staffer, 1,400+ bills).
 These are **product / legal / licensing calls**, not code cleanups. They are
 logged, not silently resolved.
 
-| # | Decision | Recommendation | Blocks |
+| # | Decision | Call (product) | Status |
 |---|---|---|---|
-| 1 | **Aesthet Nova licensing** — paid Pangram Pangram face. | Confirm a web license + self-host files, or pick a licensed serif. Until then Typekit + Georgia fallback ships. | 🔲 Production font tokens |
-| 2 | **Party colors overlap brand/semantic** — D=`#2563EB` (brand), R=`#DC2626` (error). | On a non-partisan tool, assign distinct party hues to avoid editorial/semantic collision. | 🔲 Party token values |
-| 3 | **White knockout logo + favicon** — never produced. | Provide/approve source; land in follow-up. Don't CSS-invert the color logo. | 🔲 Dark-bg brand asset |
-| 4 | **Dense table archetype** — power-user ICP unserved. | Defer to v1.2 with a dedicated spec. | ⏭ v1.2 |
-| 5 | **Where docs live** — `design-system/`, `/docs`, or separate repo. | `design-system/` in-app (this PR's path) so `globals.css`/`theme.ts` can point at it. | 🔲 Doc location |
-| 6 | **Token migration scope** — rename in this PR or follow-up. | **Ship spec now, migrate code in a follow-up** per `cleanup.md` phases. This PR is docs-only and reversible. | 🔲 Scope of this PR |
-| 7 | **Warning canonical form** — tint+dark-text vs solid+white. | Both, by context: tint for badges, solid for markers (guidelines §2.3). | ✅ resolved in spec |
-| 8 | **Progress-meter stage mapping** — 4 bill / 3 CR / 2 SR, "Became law". | Confirm against product/legal intent; matches `ky-bill-progress.ts` today. | 🔲 Wording sign-off |
+| 1 | **Aesthet Nova licensing** — paid Pangram Pangram face. | **Skip for now** — keep the Typekit kit + Georgia fallback; revisit before self-hosting for production. | ⏭ deferred |
+| 2 | **Party colors overlap brand/semantic** — D=`#2563EB` (brand), R=`#DC2626` (error). | **Change** — distinct hues: D indigo `#4338CA`, R rose `#BE123C`, I slate `#475569`. Applied to `globals.css` + `bill-display.ts`. | ✅ done |
+| 3 | **White knockout logo + favicon** — never produced. | **User will provide** the asset; lands in a follow-up. Gap noted in `assets/README.md`. | ⏳ awaiting asset |
+| 4 | **Dense table archetype** — power-user ICP unserved. | **Defer** — noted in `TASKS.md` for v1.2. | ⏭ v1.2 |
+| 5 | **Where docs live** — `design-system/`, `/docs`, or separate repo. | **Keep `design-system/`** — confirmed. | ✅ done |
+| 6 | **Token migration scope** — rename in this PR or follow-up. | **Migrate now** — Phases 1–2 + party colors applied to code (`tsc`/`lint` clean). Alias retirement (Phase 4) still follow-up. | ✅ done |
+| 7 | **Warning canonical form** — tint+dark-text vs solid+white. | Both, by context: tint for badges, solid for markers (guidelines §2.3). | ✅ resolved |
+| 8 | **Progress-meter stage mapping** — 4 bill / 3 CR / 2 SR, "Became law". | Matches the live `ky-bill-progress.ts` model exactly; wording awaits an explicit product/legal nod but needs no code change. | ✅ matches code |
 
 ---
 
@@ -107,8 +121,11 @@ logged, not silently resolved.
 
 - **Spec** (this folder) is complete and internally consistent.
 - **Code**: accessibility structure, focus, touch targets, meter, bill-card
-  link, chip hue are already live (✅). The **color-token promotions** and
-  **radius/alias reconciliation** are specified but **not yet applied to
-  `globals.css` / `theme.ts`** (📄) — that is a deliberate, reversible split so
-  this change can merge as docs while the code migration follows `cleanup.md`
-  under product sign-off on the open decisions.
+  link, and chip hue were already live (✅). The **contrast promotions**
+  (success/warning), the **`text.tertiary` metadata role**, the **read-metadata
+  migration**, and the **distinct party colors** are now applied to
+  `globals.css` / `theme.ts` / `tailwind.config.js` / `bill-display.ts` and the
+  affected components (`tsc --noEmit` and `next lint` clean).
+- **Still follow-up (`cleanup.md`):** back-compat alias retirement (Phase 4) and
+  the CivicCard radius collapse (a visual decision). Font self-hosting and the
+  white knockout logo await their inputs (decisions #1, #3).

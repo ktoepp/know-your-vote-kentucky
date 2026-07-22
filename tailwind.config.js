@@ -26,9 +26,12 @@ module.exports = {
         // Semantic
         success:        'var(--success)',
         'success-tint': 'var(--success-tint)',
+        'success-light':'var(--success-light)',
         error:          'var(--error)',
         'error-tint':   'var(--error-tint)',
         warning:        'var(--warning)',
+        'warning-tint': 'var(--warning-tint)',
+        'warning-light':'var(--warning-light)',
         // Chamber & party
         'chamber-senate': 'var(--chamber-senate)',
         'chamber-house':  'var(--chamber-house)',

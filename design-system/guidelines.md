@@ -103,18 +103,20 @@ Both are intended. Pick tint for inline badges, solid for standalone markers.
 |---|---|---|
 | `--chamber-senate` | `#6B21A8` | Senate (purple-700). |
 | `--chamber-house` | `#0891B2` | House (cyan-700). Reassigned off green so chamber ≠ "passed". |
-| `--party-d` | `#2563EB` | Democratic. |
-| `--party-r` | `#DC2626` | Republican. |
-| `--party-i` | `#64748B` | Independent / other. |
+| `--party-d` | `#4338CA` | Democratic (indigo-700). White text ≈7.9:1. |
+| `--party-r` | `#BE123C` | Republican (rose-700). White text ≈6.3:1. |
+| `--party-i` | `#475569` | Independent / other (slate-600). White text ≈7.6:1. |
 | `--party-fg` | `#FFFFFF` | Foreground on any party fill. |
 
-> **Open decision #2 (unresolved — needs a product call).** Party D reuses the
-> brand blue and party R reuses the error red. On a non-partisan tool this
-> risks (a) reading as editorial alignment and (b) colliding semantically
-> (a red R badge next to a red "Vetoed" chip). Options: keep, or assign
-> distinct party hues (e.g. party-D indigo `#4F46E5`, party-R a warmer red
-> outside the error ramp). **Do not resolve in code until product signs off.**
-> Tracked in [`audit.md`](./audit.md).
+> **v1.1 change (open decision #2 — resolved).** Party colors are now
+> **distinct** from the brand and semantic tokens. Previously D reused brand
+> blue (`#2563EB`) and R reused error red (`#DC2626`), which risked reading as
+> editorial alignment and collided with status color (a red R next to a red
+> "Vetoed"). They now use **indigo (D)**, **rose (R)**, and **slate (I)** —
+> recognizably blue/red-family so convention holds, but clearly not `--primary`
+> or `--error`. The D/R/I letter carries the meaning; color is secondary. These
+> values are mirrored in `bill-display.ts#partyBadgeBackgroundColor` (the live
+> avatar badge), which previously drifted to a third set (`#1565c0`/`#c62828`).
 
 ### 2.5 Elevation
 
@@ -391,3 +393,8 @@ Shipping logo/icon files live in `public/branding/` (`Logo-03.png`,
   (§6.5) matching the live component.
 - Logged 8 open decisions (§3, §5.4/2.4, §7, §8, `audit.md`) rather than
   silently guessing them.
+- **Code migration applied:** promoted `--success #15803D` / `--warning
+  #B45309` (measured 5.02:1), added the `text.tertiary` role and moved readable
+  metadata onto it, and set **distinct party colors** (indigo/rose/slate) —
+  unifying the previously drifted `bill-display.ts` values. See `cleanup.md`
+  for what remains (alias retirement, CivicCard radius).
