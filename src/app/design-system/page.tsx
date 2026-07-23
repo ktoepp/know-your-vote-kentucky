@@ -44,7 +44,7 @@ const C = {
   error: '#DC2626',
   errorTint: '#FEF2F2',
   errorBorder: '#FECACA',
-  chamberHouse: '#0891B2',
+  chamberHouse: '#0E7490',
   chamberSenate: '#6B21A8',
   partyD: '#4338CA',
   partyR: '#BE123C',
@@ -799,7 +799,7 @@ function SecColor({ copied, onCopy }: { copied: string | null; onCopy: (v: strin
         copied={copied}
         onCopy={onCopy}
         items={[
-          ['--chamber-house', '#0891B2', 'House (cyan-700)'],
+          ['--chamber-house', '#0E7490', 'House (cyan-700)'],
           ['--chamber-senate', '#6B21A8', 'Senate (purple-700)'],
           ['--party-d', '#4338CA', 'Democratic · indigo'],
           ['--party-r', '#BE123C', 'Republican · rose'],

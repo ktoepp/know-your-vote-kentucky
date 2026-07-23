@@ -29,6 +29,7 @@ export function LandingHero() {
         </Typography>
         <Typography
           variant="subtitle1"
+          component="p"
           sx={{
             opacity: 0.95,
             mb: 5,
