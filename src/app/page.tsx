@@ -16,10 +16,10 @@ import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-se
 export const revalidate = 60;
 
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Know Your Vote Kentucky — Track Kentucky bills and find your legislators',
+  title: 'Know Your Vote Kentucky — Track bills, find legislators',
   absoluteTitle: true,
   description:
-    'Free, non-partisan tracking for the Kentucky General Assembly. Browse bills, look up your state representatives and senators, and receive email updates when legislation you follow moves.',
+    'Free, non-partisan tracking for the Kentucky General Assembly. Browse bills, look up your legislators, and get email updates when bills you follow move.',
   path: '/',
 });
 

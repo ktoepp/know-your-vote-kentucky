@@ -102,7 +102,7 @@ Both are intended. Pick tint for inline badges, solid for standalone markers.
 | Token | Value | Meaning |
 |---|---|---|
 | `--chamber-senate` | `#6B21A8` | Senate (purple-700). |
-| `--chamber-house` | `#0891B2` | House (cyan-700). Reassigned off green so chamber ≠ "passed". |
+| `--chamber-house` | `#0E7490` | House (cyan-700). Reassigned off green so chamber ≠ "passed". White text ≈5.4:1. |
 | `--party-d` | `#4338CA` | Democratic (indigo-700). White text ≈7.9:1. |
 | `--party-r` | `#BE123C` | Republican (rose-700). White text ≈6.3:1. |
 | `--party-i` | `#475569` | Independent / other (slate-600). White text ≈7.6:1. |

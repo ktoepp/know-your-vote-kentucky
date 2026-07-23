@@ -61,9 +61,13 @@
 
   /* Chamber & party
      House was #16A34A (the old success green). Reassigned to cyan-700 so
-     chamber signal is distinct from "passed / signed" green throughout the app. */
+     chamber signal is distinct from "passed / signed" green throughout the app.
+     ChamberChip renders white text on this fill (and uses it as text in the
+     outlined variant), so it must clear WCAG 1.4.3 text contrast (≥4.5:1), not
+     just the 3:1 non-text floor: cyan-700 #0E7490 → white ≈5.4:1. The earlier
+     #0891B2 (cyan-600) was only 3.68:1 and failed as text. */
   --chamber-senate:#6B21A8;
-  --chamber-house: #0891B2;
+  --chamber-house: #0E7490;
   /* Party — deliberately distinct from --primary (brand blue) and --error /
      veto red, so a party badge never reads as editorial alignment or collides
      with status color. D=indigo, R=rose, I=slate; the D/R/I letter carries the
