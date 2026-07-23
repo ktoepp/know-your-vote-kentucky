@@ -26,7 +26,7 @@ import {
 } from '@mui/material';
 import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import { gaChamberFilterLabel } from '@/lib/ky-committee-display';
-import { Cancel, Search, ArrowForward, InfoOutlined, Groups, Gavel } from '@mui/icons-material';
+import { Cancel, Search, ArrowForward, InfoOutlined, Groups, Gavel, Tune } from '@mui/icons-material';
 import ListSubheader from '@mui/material/ListSubheader';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
@@ -241,6 +241,8 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
   /** Default-session search found nothing, so the shown results span all sessions. */
   const [sessionBroadened, setSessionBroadened] = useState(false);
   const [committees, setCommittees] = useState<KyCommitteeSearchResult[] | null>(null);
+  /** Mobile only: the bill filter row is collapsed behind a "Filters" button. */
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const legislators = legislatorRoster;
   // Only the bill-scoped params drive the bill search; switching the category tab (`type`)
   // must NOT re-run it. Keyed on just these so tab switches are instant.
@@ -434,6 +436,16 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
     chamberSelect || (statusSelect && statusSelect !== 'all') || dateRangeSelect || committeeSelect || sessionSelect,
   );
 
+  /** Count of applied filters (drives the mobile "Filters" button badge + the suggestions gate). */
+  const activeFilterCount =
+    (chamberSelect ? 1 : 0) +
+    (statusSelect && statusSelect !== 'all' ? 1 : 0) +
+    (dateRangeSelect ? 1 : 0) +
+    (committeeSelect ? 1 : 0) +
+    (sessionSelect || sessionParamIsAll ? 1 : 0);
+  /** No filters applied → surface the suggested searches (initial load, and after "Clear all"). */
+  const noFiltersActive = activeFilterCount === 0;
+
   const showBillFilters = category === 'all' || category === 'bills';
 
   const setFilterParam = (key: string, value: string) => {
@@ -544,7 +556,21 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
           )}
 
           {showBillFilters && (
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2, flexWrap: 'wrap', alignItems: { xs: 'stretch', sm: 'flex-end' } }}>
+            <Button
+              type="button"
+              onClick={() => setFiltersOpen((o) => !o)}
+              startIcon={<Tune />}
+              size="small"
+              variant="outlined"
+              aria-expanded={filtersOpen}
+              sx={{ display: { xs: 'inline-flex', sm: 'none' }, mt: 2, alignSelf: 'flex-start' }}
+            >
+              Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </Button>
+          )}
+
+          {showBillFilters && (
+            <Box sx={{ display: { xs: filtersOpen ? 'flex' : 'none', sm: 'flex' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2, flexWrap: 'wrap', alignItems: { xs: 'stretch', sm: 'flex-end' } }}>
               <Box>
                 <Typography
                   variant="caption"
@@ -697,7 +723,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               }} variant="outlined" sx={{ ml: 0.5 }} />
             </Box>
           )}
-          {!searched && (
+          {noFiltersActive && (
             <Box sx={{ mt: 2 }}>
               <Typography
                 variant="caption"
