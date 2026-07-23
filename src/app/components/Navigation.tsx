@@ -382,16 +382,16 @@ function NavSearch() {
         size="small"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search bills…"
-        inputProps={{ 'aria-label': 'Search bills' }}
+        placeholder="Search bills, members…"
+        inputProps={{ 'aria-label': 'Search bills, members, and committees' }}
         sx={{
-          width: { md: 170, lg: 210 },
+          width: { md: 180, lg: 230 },
           '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: 'background.paper' },
         }}
         InputProps={{
           endAdornment: (
             <InputAdornment position="end">
-              <IconButton type="submit" size="small" edge="end" aria-label="Search" title="Search bills">
+              <IconButton type="submit" size="small" edge="end" aria-label="Search" title="Search bills, members, and committees">
                 <SearchIcon sx={{ fontSize: '1.15rem' }} />
               </IconButton>
             </InputAdornment>
@@ -552,6 +552,24 @@ export default function Navigation() {
             {/* Desktop inline search — type + Enter or click the icon to open the
                 bill search page with the query. */}
             <NavSearch />
+
+            {/* Mobile/tablet search — always-visible, one tap to the unified search page
+                (no need to open the menu). Hidden at md+, where the inline NavSearch field shows. */}
+            <IconButton
+              component={Link}
+              href="/search"
+              aria-label="Search bills, members, and committees"
+              title="Search"
+              sx={{
+                display: { xs: 'inline-flex', md: 'none' },
+                color: 'text.primary',
+                p: 1.5,
+                borderRadius: 2,
+                '&:hover': { backgroundColor: 'rgba(0,0,0,0.05)' },
+              }}
+            >
+              <SearchIcon />
+            </IconButton>
 
             {/* Mobile menu button */}
             <Box sx={{ display: { xs: 'block', lg: 'none' } }}>
