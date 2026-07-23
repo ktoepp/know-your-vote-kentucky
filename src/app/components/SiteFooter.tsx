@@ -30,6 +30,7 @@ const footerLegalLinks = [
   { href: '/privacy', label: 'Privacy' },
   { href: '/terms', label: 'Terms' },
   { href: '/licenses', label: 'Licenses' },
+  { href: '/design-system', label: 'Design system' },
 ];
 
 export default function SiteFooter() {
