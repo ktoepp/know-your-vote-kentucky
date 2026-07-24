@@ -21,6 +21,14 @@ stays crisp that small; 32px and up keep the full mark. Browsers pick the 16px
 frame for non-retina tabs and the 32px frame for retina, so the full mark still
 shows wherever the pixels allow.
 
+`/favicon.ico` is served from `public/favicon.ico` — that's the path
+`layout.tsx`'s icons metadata and `manifest.json` reference. The repo's stock
+`src/app/favicon.ico` (Next's file-convention default, present since the first
+commit) collides with it: with both, Next logs "conflicting public file and page
+file" and the dev server 500s on /favicon.ico, and in prod the stale app-route
+default wins over the branded one. So this script deletes `src/app/favicon.ico`
+if it reappears.
+
 Re-run after any change to the source mark, then commit the outputs.
 """
 
@@ -150,17 +158,20 @@ def main() -> None:
         img.save(os.path.join(ROOT, path), "PNG", optimize=True)
         print(f"{path}  {img.width}x{img.height}  full-bleed")
 
-    # Multi-resolution .ico for legacy tab/bookmark surfaces. This lives ONLY in
-    # `src/app/` — App Router serves it at /favicon.ico, and a second copy in
-    # `public/` makes Next fail that route with "conflicting public file and page
-    # file" (a 500 on every request for it).
-    #
-    # Each frame is its own image (ICO stores them verbatim, no downscaling): the
-    # 16px frame is the check-only fallback, 32/48/64 the full mark.
-    ico = "src/app/favicon.ico"
+    # Multi-resolution .ico at the path layout.tsx + manifest.json reference. Each
+    # frame is its own image (ICO stores them verbatim, no downscaling): the 16px
+    # frame is the check-only fallback, 32/48/64 the full mark.
+    ico = "public/favicon.ico"
     frames = [render_check(16)] + [render(s, circle=True, mark=mark) for s in (32, 48, 64)]
     write_ico(os.path.join(ROOT, ico), frames)
     print(f"{ico}  16 (check) / 32 / 48 / 64  circle")
+
+    # Drop Next's stock file-convention favicon — it collides with the branded
+    # public/favicon.ico above (dev 500; stale default wins in prod).
+    stale = os.path.join(ROOT, "src/app/favicon.ico")
+    if os.path.exists(stale):
+        os.remove(stale)
+        print("src/app/favicon.ico  removed (conflicts with public/favicon.ico)")
 
 
 if __name__ == "__main__":

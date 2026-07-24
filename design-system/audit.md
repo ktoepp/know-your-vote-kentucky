@@ -108,7 +108,7 @@ logged, not silently resolved.
 |---|---|---|---|
 | 1 | **Aesthet Nova licensing** — paid Pangram Pangram face. | **Skip for now** — keep the Typekit kit + Georgia fallback; revisit before self-hosting for production. | ⏭ deferred |
 | 2 | **Party colors overlap brand/semantic** — D=`#2563EB` (brand), R=`#DC2626` (error). | **Change** — distinct hues: D indigo `#4338CA`, R rose `#BE123C`, I slate `#475569`. Applied to `globals.css` + `bill-display.ts`. | ✅ done |
-| 3 | **White knockout logo + favicon** — never produced. | **User will provide** the asset; lands in a follow-up. Gap noted in `assets/README.md`. | ⏳ awaiting asset |
+| 3 | **White knockout logo + favicon** — never produced. | **Delivered** — white-on-blue favicon/app-icon set generated + wired (`layout.tsx`, `manifest.json`); knockout wordmark available for dark surfaces (not placed on the hero). | ✅ done |
 | 4 | **Dense table archetype** — power-user ICP unserved. | **Defer** — noted in `TASKS.md` for v1.2. | ⏭ v1.2 |
 | 5 | **Where docs live** — `design-system/`, `/docs`, or separate repo. | **Keep `design-system/`** — confirmed. | ✅ done |
 | 6 | **Token migration scope** — rename in this PR or follow-up. | **Migrate now** — Phases 1–2 + party colors applied to code (`tsc`/`lint` clean). Alias retirement (Phase 4) still follow-up. | ✅ done |
@@ -129,6 +129,6 @@ logged, not silently resolved.
 - **Migration complete:** contrast promotions, `text.tertiary` + read-metadata,
   distinct party colors, back-compat alias retirement (Phase 4), and the radius
   reconciliation (Phase 3, named steps — zero visual change) are all applied.
-- **Only external inputs remain:** font self-hosting (decision #1, licensing)
-  and the white knockout logo (decision #3, asset from owner). The v1.2 dense
-  table (decision #4) is logged in `TASKS.md`.
+- **One item remains:** font self-hosting (decision #1, awaits licensing). The
+  white knockout logo + favicon (decision #3) is now delivered and wired. The
+  v1.2 dense table (decision #4) is logged in `TASKS.md`.

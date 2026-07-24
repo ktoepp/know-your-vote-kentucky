@@ -1,23 +1,25 @@
 # Design system — assets
 
-Catalog of brand assets referenced by the design system. Shipping binary files
-live in the app under [`public/branding/`](../../public/branding); this folder
-is the design-system-side index and gap list.
+Catalog of brand assets. Shipping files live under
+[`public/branding/`](../../public/branding) (served at `/branding/…`); this
+folder is the design-system-side index.
 
-## Shipping (in `public/branding/`)
+## Logos
 
-| File | Use |
-|---|---|
-| `Logo-03.png` | Primary wordmark/logo (color, on light backgrounds). |
-| `KYvKY Logo-02 white.svg`, `KYvKY Logo-03 white.svg` | Solid-white knockout wordmark, for dark / gradient backgrounds. |
-| `Logo_favicon white.svg` | White knockout of the icon mark alone. |
-| `mark-color-512.png` | Color icon mark on transparent — **source of record** for the generated icon set. |
-| `favicon.png` | Favicon source. |
-| `apple-touch-icon.png` | iOS home-screen icon. |
-| `icon-192.png`, `icon-512.png` | PWA manifest icons (`public/manifest.json`). |
-| `../favicon.ico`, `src/app/favicon.ico` | Root favicon (App Router serves the `src/app/` copy). |
+| File | Form | Use |
+|---|---|---|
+| `Logo-03.png` | Color badge | Nav + footer wordmark on **light** surfaces (`Navigation.tsx`, `SiteFooter.tsx`). |
+| `logo-wordmark-white.svg` | White horizontal lockup (mark + "knowyourvote kentucky.com") | **Dark / gradient** surfaces (available; no dark surface currently displays a logo). |
+| `logo-white.svg` | White compact badge | Dark surfaces where a square/stacked mark fits better than the wordmark. |
+| `favicon-mark-white.svg` | White square icon mark | Knockout of the icon mark alone (250×250). |
+| `mark-color-512.png` | Color icon mark on transparent | **Source of record** for the generated icon set below. Input only — never an output. |
 
-## Icon set — generated, not hand-edited
+Rule: **color logo on light, white knockout on dark.** Never place the color
+logo on the hero gradient/photo, or the white logo on a light surface. The
+knockout files are ready for any future dark surface; the marketing hero
+currently leads with its headline (no logo).
+
+## Favicon / app icons — generated, not hand-edited
 
 Everything in the icon set is produced by
 [`scripts/generate-favicons.py`](../../scripts/generate-favicons.py) from
@@ -34,6 +36,21 @@ python3 scripts/generate-favicons.py
   full-bleed squares. iOS applies its own squircle mask and composites
   transparent corners over black, so a pre-cut circle renders badly there.
 
+| File | Size | Wired in |
+|---|---|---|
+| `../favicon.ico` | 16 / 32 / 48 / 64 (multi) | `layout.tsx` icons + `manifest.json` |
+| `favicon.png` | 512 | fallback |
+| `apple-touch-icon.png` | 180 | `layout.tsx` `icons.apple` + manifest |
+| `icon-192.png` | 192 | `manifest.json` (PWA) |
+| `icon-512.png` | 512 | `manifest.json` (PWA) |
+| `../../src/app/icon.png`, `apple-icon.png` | 512 / 180 | Next file-convention fallbacks |
+
+**`/favicon.ico` is served from `public/favicon.ico`** — the path `layout.tsx`
+and `manifest.json` reference. Next's stock `src/app/favicon.ico` (a file-based
+default present since the repo's first commit) collides with it: with both, the
+dev server 500s on `/favicon.ico` and the stale default wins in prod, so the
+generator deletes `src/app/favicon.ico`.
+
 **Small sizes:** the full mark (two `ky` words, the state outline, and the check)
 has too much detail to survive a 16px favicon frame, so the `.ico`'s 16px frame
 drops to a **check-only** glyph — the brand's signature "vote" element, still
@@ -41,6 +58,9 @@ crisp that small. 32/48/64 keep the full mark. Browsers use the 16px frame for
 non-retina tabs and the 32px frame for retina, so the full mark shows wherever
 the pixels allow. The `.ico` is assembled by hand (`write_ico`) because Pillow's
 own ICO save can't hold per-size artwork.
+
+`favicon-mark-white-nonsquare.svg` (165×127) is an earlier non-square export kept
+for reference; it is **not** used and is a candidate for removal.
 
 ## Gaps — open decision #3
 
@@ -51,7 +71,11 @@ inversion of the color logo.
 
 ## Conventions
 
-- Prefer **SVG** for logo/wordmark (crisp at any size, themeable).
-- Export raster icons at the sizes the manifest declares (192, 512).
-- Any new brand color must trace back to a token in
+- Logos are **SVG** (crisp at any size, themeable). Raster app icons are PNG at
+  the sizes the manifest declares.
+- App-icon disc is the darker favicon blue `#184D8F`; the mark is white. (The
+  brand primary token stays `#1E40AF` — the darker step is favicon-only, for
+  small-size contrast.)
+- Any new brand color must trace to a token in
   [`../guidelines.md`](../guidelines.md) §2 — no one-off hexes.
+- Web-safe filenames only (no spaces) so `/branding/…` URLs don't need encoding.
