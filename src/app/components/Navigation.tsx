@@ -612,9 +612,6 @@ export default function Navigation() {
                           '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
                         }}
                       >
-                        <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
-                          {React.cloneElement(child.icon, { sx: { fontSize: '1.25rem' } })}
-                        </ListItemIcon>
                         <ListItemText
                           primary={child.label}
                           sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1rem', color: 'inherit' } }}
@@ -624,50 +621,9 @@ export default function Navigation() {
                   ))}
                 </React.Fragment>
               ))}
-              <ListItem sx={{ px: 2, py: 0 }}>
-                <ListItemButton
-                  component={Link}
-                  href="/search"
-                  onClick={() => setMobileMenuOpen(false)}
-                  sx={{
-                    borderRadius: 2,
-                    mb: 0.5,
-                    color: isActive('/search') ? mobileNav.colorActive : mobileNav.color,
-                    backgroundColor: isActive('/search') ? mobileNav.activeBg : 'transparent',
-                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
-                    <SearchIcon aria-hidden />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary="Search"
-                    sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem', color: 'inherit' } }}
-                  />
-                </ListItemButton>
-              </ListItem>
               {!loading && !user && (
                 <>
                   <Divider sx={{ my: 1 }} />
-                  <ListItem sx={{ px: 2, py: 0 }}>
-                    <ListItemButton
-                      component={Link}
-                      href="/auth/register"
-                      onClick={() => setMobileMenuOpen(false)}
-                      sx={{
-                        borderRadius: 2,
-                        mb: 0.5,
-                        color: 'primary.contrastText',
-                        backgroundColor: 'primary.main',
-                        '&:hover': { backgroundColor: 'primary.dark' },
-                      }}
-                    >
-                      <ListItemText
-                        primary="Sign up"
-                        sx={{ textAlign: 'center', '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem' } }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
                   <ListItem sx={{ px: 2, py: 0 }}>
                     <ListItemButton
                       component={Link}
@@ -675,6 +631,7 @@ export default function Navigation() {
                       onClick={() => setMobileMenuOpen(false)}
                       sx={{
                         borderRadius: 2,
+                        mb: 0.5,
                         color: mobileNav.color,
                         '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
                       }}
@@ -682,6 +639,23 @@ export default function Navigation() {
                       <ListItemText
                         primary="Log in"
                         sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem' } }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem sx={{ px: 2, py: 0 }}>
+                    <ListItemButton
+                      component={Link}
+                      href="/auth/register"
+                      onClick={() => setMobileMenuOpen(false)}
+                      sx={{
+                        borderRadius: 2,
+                        backgroundColor: 'primary.main',
+                        '&:hover': { backgroundColor: 'primary.dark' },
+                      }}
+                    >
+                      <ListItemText
+                        primary="Sign up"
+                        sx={{ textAlign: 'center', '& .MuiListItemText-primary': { fontWeight: 700, fontSize: '1.125rem', color: 'primary.contrastText' } }}
                       />
                     </ListItemButton>
                   </ListItem>

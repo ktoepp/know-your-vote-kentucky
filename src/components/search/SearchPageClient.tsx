@@ -461,6 +461,15 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
+  /** Drop every bill filter at once, preserving the query (and category tab). */
+  const clearBillFilters = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const k of ['chamber', 'status', 'dateRange', 'committee', 'session']) params.delete(k);
+    const qc = canonicalUrlQ.trim();
+    if (qc) params.set('q', qc);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+
   const billCount = bills?.length ?? 0;
   const memberCount = members.length;
   const committeeCount = committees?.length ?? 0;
@@ -561,9 +570,10 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               onClick={() => setFiltersOpen((o) => !o)}
               startIcon={<Tune />}
               size="small"
-              variant="outlined"
+              variant="text"
+              color="inherit"
               aria-expanded={filtersOpen}
-              sx={{ display: { xs: 'inline-flex', sm: 'none' }, mt: 2, alignSelf: 'flex-start' }}
+              sx={{ display: { xs: 'inline-flex', sm: 'none' }, mt: 2, alignSelf: 'flex-start', color: 'text.secondary', fontWeight: 600 }}
             >
               Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
             </Button>
@@ -712,15 +722,17 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
               {sessionParamIsAll && (
                 <Chip label="All sessions" size="small" onDelete={() => setFilterParam('session', '')} deleteIcon={<Cancel />} color="primary" variant="outlined" />
               )}
-              <Chip label="Clear all" size="small" onClick={() => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.delete('chamber');
-                params.delete('status');
-                params.delete('dateRange');
-                params.delete('committee');
-                params.delete('session');
-                router.replace(`${pathname}?${params.toString()}`);
-              }} variant="outlined" sx={{ ml: 0.5 }} />
+              <Button
+                type="button"
+                onClick={clearBillFilters}
+                startIcon={<Cancel />}
+                size="small"
+                variant="text"
+                color="inherit"
+                sx={{ ml: 0.5, color: 'text.secondary' }}
+              >
+                Clear filters
+              </Button>
             </Box>
           )}
           {noFiltersActive && (
@@ -882,31 +894,6 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                     Searching with only a numeral lists every designation that uses that bill number across types (for
                     example House and Senate measures with the same number).
                   </Typography>
-                )}
-                {hasActiveBillFilters && (
-                  <Box sx={{ mt: 2 }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => {
-                        const params = new URLSearchParams(searchParams.toString());
-                        params.delete('chamber');
-                        params.delete('status');
-                        params.delete('dateRange');
-                        params.delete('committee');
-                        params.delete('session');
-                        const qc = canonicalUrlQ.trim();
-                        if (!qc) {
-                          router.replace(`${pathname}?${params.toString()}`);
-                          return;
-                        }
-                        params.set('q', qc);
-                        router.replace(`${pathname}?${params.toString()}`);
-                      }}
-                    >
-                      Clear filters
-                    </Button>
-                  </Box>
                 )}
               </Paper>
             )}
