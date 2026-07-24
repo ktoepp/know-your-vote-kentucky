@@ -352,7 +352,9 @@ function UserMenu() {
         href="/auth/register"
         variant="contained"
         size="small"
-        sx={{ whiteSpace: 'nowrap' }}
+        // Hidden on phones so the wide wordmark + search + menu icons fit; Sign up lives
+        // in the mobile menu instead.
+        sx={{ whiteSpace: 'nowrap', display: { xs: 'none', sm: 'inline-flex' } }}
       >
         Sign up
       </Button>
@@ -716,6 +718,25 @@ export default function Navigation() {
               {!loading && !user && (
                 <>
                   <Divider sx={{ my: 1 }} />
+                  <ListItem sx={{ px: 2, py: 0 }}>
+                    <ListItemButton
+                      component={Link}
+                      href="/auth/register"
+                      onClick={() => setMobileMenuOpen(false)}
+                      sx={{
+                        borderRadius: 2,
+                        mb: 0.5,
+                        color: 'primary.contrastText',
+                        backgroundColor: 'primary.main',
+                        '&:hover': { backgroundColor: 'primary.dark' },
+                      }}
+                    >
+                      <ListItemText
+                        primary="Sign up"
+                        sx={{ textAlign: 'center', '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem' } }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
                   <ListItem sx={{ px: 2, py: 0 }}>
                     <ListItemButton
                       component={Link}
