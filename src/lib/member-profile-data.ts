@@ -25,7 +25,7 @@ function createAnonClient(): SupabaseClient | null {
 }
 
 const BILL_SUMMARY =
-  'id, bill_number, title, status, last_action_date, last_action, session, chamber, legiscan_id';
+  'id, bill_number, title, status, last_action_date, last_action, session, chamber, legiscan_id, official_short_titles';
 
 /** Sponsored-bill rows need `sponsors` (to classify this member's role) and `topics` (client-side topic filter). */
 const SPONSORED_BILL_SELECT = `${BILL_SUMMARY}, sponsors, topics`;
