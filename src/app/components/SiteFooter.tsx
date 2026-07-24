@@ -8,21 +8,41 @@ import { APP_VERSION } from '@/lib/app-version';
 
 const NAV_WORDMARK_SRC = '/branding/Logo-03.png';
 
-const footerNavLinks = [
-  { href: '/bills', label: 'Bills' },
-  { href: '/committees', label: 'Committees' },
-  { href: '/meetings', label: 'Meetings' },
-  { href: '/members', label: 'Members' },
-  { href: '/districts', label: 'Districts' },
-  { href: '/search', label: 'Search' },
-  { href: '/legislature/resources', label: 'Frankfort resources' },
-  { href: '/glossary', label: 'Glossary' },
-  { href: '/guides', label: 'Guides' },
-];
-
-const footerAuthLinks = [
-  { href: '/auth/login', label: 'Log in' },
-  { href: '/auth/register', label: 'Sign up' },
+/**
+ * Three columns: what the site tracks, your account, then the secondary /
+ * reference material. Keeping the reference links out of the primary column
+ * stops the browse surfaces from being buried mid-list.
+ */
+const footerColumns: { heading: string; ariaLabel: string; links: { href: string; label: string }[] }[] = [
+  {
+    heading: 'Explore',
+    ariaLabel: 'Footer navigation',
+    links: [
+      { href: '/bills', label: 'Bills' },
+      { href: '/committees', label: 'Committees' },
+      { href: '/meetings', label: 'Meetings' },
+      { href: '/members', label: 'Members' },
+      { href: '/districts', label: 'Districts' },
+      { href: '/search', label: 'Search' },
+    ],
+  },
+  {
+    heading: 'Account',
+    ariaLabel: 'Footer account links',
+    links: [
+      { href: '/auth/login', label: 'Log in' },
+      { href: '/auth/register', label: 'Sign up' },
+    ],
+  },
+  {
+    heading: 'Learn more',
+    ariaLabel: 'Footer reference links',
+    links: [
+      { href: '/legislature/resources', label: 'Frankfort resources' },
+      { href: '/glossary', label: 'Glossary' },
+      { href: '/guides', label: 'Guides' },
+    ],
+  },
 ];
 
 const footerLegalLinks = [
@@ -58,12 +78,13 @@ export default function SiteFooter() {
           {/* Left: logo + tagline */}
           <Box sx={{ maxWidth: 320 }}>
             <Link href="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: 12 }}>
-              <Box sx={{ position: 'relative', height: 40, width: 200 }}>
+              <Box sx={{ position: 'relative', height: 40, width: 200, userSelect: 'none' }}>
                 <Image
                   src={NAV_WORDMARK_SRC}
                   alt="Know Your Vote Kentucky"
                   fill
                   sizes="200px"
+                  draggable={false}
                   style={{ objectFit: 'contain', objectPosition: 'left center' }}
                 />
               </Box>
@@ -77,45 +98,50 @@ export default function SiteFooter() {
             </Typography>
           </Box>
 
-          {/* Right: nav + auth columns */}
-          <Box sx={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <Stack spacing={1.25} component="nav" aria-label="Footer navigation">
-              {footerNavLinks.map(({ href, label }) => (
-                <MuiLink
-                  key={href}
-                  component={Link}
-                  href={href}
-                  underline="none"
+          {/* Right: three link columns — explore / account / reference */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, auto)' },
+              columnGap: { xs: 3, sm: 5, md: 6 },
+              rowGap: 3.5,
+              flexShrink: 0,
+            }}
+          >
+            {footerColumns.map(({ heading, ariaLabel, links }) => (
+              <Stack key={heading} spacing={1.25} component="nav" aria-label={ariaLabel}>
+                <Typography
+                  variant="overline"
+                  component="p"
+                  aria-hidden
                   sx={{
-                    color: 'text.primary',
-                    fontSize: '0.9375rem',
-                    fontWeight: 500,
-                    '&:hover': { color: 'primary.main' },
+                    color: 'text.tertiary',
+                    fontWeight: 700,
+                    fontSize: '0.6875rem',
+                    letterSpacing: '0.08em',
+                    lineHeight: 1,
                   }}
                 >
-                  {label}
-                </MuiLink>
-              ))}
-            </Stack>
-
-            <Stack spacing={1.25} component="nav" aria-label="Footer account links">
-              {footerAuthLinks.map(({ href, label }) => (
-                <MuiLink
-                  key={href}
-                  component={Link}
-                  href={href}
-                  underline="none"
-                  sx={{
-                    color: 'text.primary',
-                    fontSize: '0.9375rem',
-                    fontWeight: 500,
-                    '&:hover': { color: 'primary.main' },
-                  }}
-                >
-                  {label}
-                </MuiLink>
-              ))}
-            </Stack>
+                  {heading}
+                </Typography>
+                {links.map(({ href, label }) => (
+                  <MuiLink
+                    key={href}
+                    component={Link}
+                    href={href}
+                    underline="none"
+                    sx={{
+                      color: 'text.primary',
+                      fontSize: '0.9375rem',
+                      fontWeight: 500,
+                      '&:hover': { color: 'primary.main' },
+                    }}
+                  >
+                    {label}
+                  </MuiLink>
+                ))}
+              </Stack>
+            ))}
           </Box>
         </Box>
 

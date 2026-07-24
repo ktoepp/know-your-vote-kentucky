@@ -484,6 +484,9 @@ export default function Navigation() {
                     height: { xs: 40, sm: 48 },
                     width: { xs: 200, sm: 280 },
                     flexShrink: 0,
+                    // The wordmark is a graphic, not copy — keep it out of text
+                    // selection (and out of drag-to-desktop) entirely.
+                    userSelect: 'none',
                   }}
                   aria-hidden
                 >
@@ -493,6 +496,7 @@ export default function Navigation() {
                     fill
                     sizes="(max-width: 600px) 200px, 280px"
                     priority
+                    draggable={false}
                     style={{ objectFit: 'contain', objectPosition: 'left center' }}
                   />
                 </Box>
