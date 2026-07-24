@@ -34,9 +34,13 @@ python3 scripts/generate-favicons.py
   full-bleed squares. iOS applies its own squircle mask and composites
   transparent corners over black, so a pre-cut circle renders badly there.
 
-**Known limit:** the mark (two `ky` words, the state outline, and the check) is
-detailed enough that the 16px frame reads as a blob. 32px and up are legible. A
-simplified small-size mark would be a separate design decision.
+**Small sizes:** the full mark (two `ky` words, the state outline, and the check)
+has too much detail to survive a 16px favicon frame, so the `.ico`'s 16px frame
+drops to a **check-only** glyph — the brand's signature "vote" element, still
+crisp that small. 32/48/64 keep the full mark. Browsers use the 16px frame for
+non-retina tabs and the 32px frame for retina, so the full mark shows wherever
+the pixels allow. The `.ico` is assembled by hand (`write_ico`) because Pillow's
+own ICO save can't hold per-size artwork.
 
 ## Gaps — open decision #3
 
