@@ -43,6 +43,15 @@ export function kyDistrictPath(ref: KyDistrictRef): string {
   return `/districts/${kyDistrictSlug(ref)}`;
 }
 
+/**
+ * Interactive district map, preselected to this district — the params
+ * `DistrictMapExplorer` reads on mount. Prefer this over `kyDistrictPath` when
+ * the user's intent is "show me where this district is."
+ */
+export function kyDistrictMapPath(ref: KyDistrictRef): string {
+  return `/members/map?chamber=${ref.chamber}&district=${ref.districtNumber}`;
+}
+
 /** "Kentucky House District 19" — page H1s and breadcrumbs. */
 export function kyDistrictDisplayName(ref: KyDistrictRef): string {
   return `Kentucky ${ref.chamber === 'house' ? 'House' : 'Senate'} District ${ref.districtNumber}`;
