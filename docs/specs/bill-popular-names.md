@@ -1,6 +1,8 @@
 # Bill popular / colloquial names
 
-Status: **Planned** (not yet started). Owner: Katie. Branch: `claude/bill-colloquial-names-yrxmb7`.
+Status: **In progress.** Steps 1–2 (schema + official-names sync) built & verified; steps
+3–5 (search, editorial script, display) pending. Owner: Katie. Branch:
+`claude/bill-colloquial-names-yrxmb7`.
 
 ## Context
 
@@ -55,25 +57,32 @@ New migration `0XX_ky_bills_popular_names.sql` on `ky_bills`:
 Mirror in `KYBill` (`src/types/kentucky.ts`); add both columns to
 `KY_BILL_SEARCH_SELECT` (`src/lib/ky-bill-search-select.ts`) and the browse selects.
 
-## Sync — official names (reuse the LRC scraper pattern)
+## Sync — official names (reuse the LRC scraper pattern) — DONE
 
-Model exactly on `src/lib/ky-lrc-enrollment-actions-sync.ts`:
+Modeled on `src/lib/ky-lrc-enrollment-actions-sync.ts`:
 
-- `src/lib/lrc-popular-names-parser.ts` — parse the LRC page into
-  `{ popularName, billNumber }[]`.
+- `src/lib/lrc-popular-names-parser.ts` — parses the page into
+  `{ popularName, bills[] }`, plus `popularNamesByBillNumber()` which inverts to a
+  per-bill title list (deduped). **Real structure** (see fixture): an
+  `<h3>Short Titles and Popular Names</h3>` followed by repeating
+  `<h4>{name}</h4><ul><li><a href="HB120.html">…</a></li></ul>`. One name can map to
+  several bills; several `<li>` can point at one bill via amendment anchors (`#HCS1`),
+  deduped on the href filename (the canonical bill token).
 - `src/lib/ky-lrc-popular-names-sync.ts` — axios fetch with the existing
-  `KnowYourVoteKentucky/1.0` User-Agent → parse → resolve bill numbers to
-  `ky_bills.id` by session (reuse the session-scoped resolver / `lrc-session-label`
-  helpers) → write `official_short_titles`.
-- **Page-discovery wrinkle:** unlike `enrollment_actions.html`, the popular-names page
-  filename is a per-session content ID (`07rs → 6650`, `22rs → 7765`), not derivable.
-  The sync fetches the session record **index** and follows the link labeled
-  "Short Titles and Popular Names," then parses that page. Guard for sessions where the
-  page doesn't exist yet.
-- Register a `bill-popular-names` source in the `SYNC_SOURCES` registry
-  (`src/lib/ky-sync-pipeline.ts`) so it runs via `/api/sync?source=bill-popular-names`.
-- CLI `scripts/sync-lrc-popular-names.ts` (`npm run sync:ky:popular-names`, `--dryRun`),
-  plus a **weekly** cron entry in `vercel.json` (these change rarely).
+  `KnowYourVoteKentucky/1.0` User-Agent → parse → resolve bill numbers to `ky_bills.id`
+  by session (`lrc-session-label` helpers) → write `official_short_titles`, replacing
+  each listed bill's list wholesale (LRC is source of truth) and only writing changed
+  rows. A 404 (no list published yet) is a normal skip, not an error.
+- **Page URL is stable:** `record/{slug}/7765.html` for the current record system
+  (confirmed: 22RS and 25RS both live there); the legacy `6650.htm`-style numeric ids
+  were only the old system. No index-discovery needed — `lrcPopularNamesUrl(slug)`.
+- Registered as the **`lrc-popular-names`** source in the `SYNC_SOURCES` registry
+  (`src/lib/ky-sync-pipeline.ts`) — runs via `/api/sync?source=lrc-popular-names`.
+  (Named `lrc-*` for consistency with its sibling scrapers, not `bill-popular-names`.)
+- CLI `scripts/sync-lrc-popular-names.ts`: `npm run sync:ky:lrc-popular-names[:dry]`,
+  and `npm run spike:lrc:popular-names` (parses the committed fixture, no DB/network).
+- **Weekly** cron in `vercel.json` (`30 15 * * 0`) — these change rarely.
+- Fixture: `fixtures/lrc/lrc-popular-names-25rs-live.html`.
 
 ## Editorial path — media names
 
@@ -113,11 +122,12 @@ Model exactly on `src/lib/ky-lrc-enrollment-actions-sync.ts`:
 
 ## Rollout order
 
-1. Migration + types / selects.
-2. LRC parser + sync + CLI + weekly cron (official names live).
-3. Search normalization + ranking (+ trigram leg).
-4. Editorial script.
-5. Display (bill page, search list, digest).
+1. ✅ Migration + types / selects (migration `043`).
+2. ✅ LRC parser + sync + CLI + weekly cron (official names). Spike verified; typecheck +
+   lint clean. Still needs a live DB run to confirm bill-id resolution counts.
+3. ☐ Search normalization + ranking (+ trigram leg).
+4. ☐ Editorial script.
+5. ☐ Display (bill page, search list, digest).
 
 ---
 
