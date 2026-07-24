@@ -20,6 +20,21 @@ let omitLegiscanSubjectSearchFilter = false;
 /** Skip RPC when migrations 017/018 not applied or PostgREST cache stale. */
 let omitKyBillsPlainSearchRpc = false;
 
+/** Skip the popular-name RPC when migration 044 isn't applied or PostgREST cache is stale. */
+let omitKyBillsPopularNameRpc = false;
+
+/** PostgREST when `ky_bills_popular_name_search` is missing from DB or not yet in schema cache. */
+function isMissingKyBillsPopularNameRpc(err: { message?: string; details?: string; code?: string } | null | undefined): boolean {
+  const blob = `${err?.message ?? ''} ${err?.details ?? ''}`.toLowerCase();
+  if (!blob.includes('ky_bills_popular_name_search')) return false;
+  return (
+    blob.includes('does not exist') ||
+    blob.includes('could not find') ||
+    blob.includes('schema cache') ||
+    err?.code === 'PGRST202'
+  );
+}
+
 /** PostgREST when `ky_bills_plain_search` is missing from DB or not yet in schema cache. */
 function isMissingKyBillsPlainSearchRpc(err: { message?: string; details?: string; code?: string } | null | undefined): boolean {
   const blob = `${err?.message ?? ''} ${err?.details ?? ''}`.toLowerCase();
@@ -324,8 +339,40 @@ function relevanceScoreForKyBillSearch(
   score += scoreLegiscanSubjectSearch(bill.legiscan_subjects_search, qLow);
   score += scoreKeywordOverlapTokens(bill, tokens);
   score += scoreTopicTokensPartial(bill, tokens);
+  score += scorePopularNames(
+    [...(bill.official_short_titles ?? []), ...(bill.editorial_popular_names ?? [])],
+    normalizePopularNameForMatch(safe),
+  );
 
   return score;
+}
+
+/** Strip to lowercase alphanumerics so punctuation/spacing don't block a name match ("C.R.O.W.N. Act" → "crownact"). */
+function normalizePopularNameForMatch(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Exact normalized name equals the query — the strongest popular-name signal. */
+const POPULAR_NAME_EXACT_SCORE = 5200;
+/** Query is a substring of a name (or vice-versa) — strong, below an exact hit. */
+const POPULAR_NAME_SUBSTRING_SCORE = 2600;
+
+/**
+ * Score a bill by how well the query matches its popular names (official + editorial),
+ * comparing on the punctuation/space-insensitive normalized form. Returns the best single
+ * match so a bill with many names isn't over-rewarded. Retrieval is handled by the
+ * `ky_bills_popular_name_search` RPC; this makes a matched name rank near the top.
+ */
+function scorePopularNames(names: string[], qNorm: string): number {
+  if (names.length === 0 || qNorm.length < 3) return 0;
+  let best = 0;
+  for (const name of names) {
+    const n = normalizePopularNameForMatch(name);
+    if (!n) continue;
+    if (n === qNorm) best = Math.max(best, POPULAR_NAME_EXACT_SCORE);
+    else if (n.includes(qNorm) || qNorm.includes(n)) best = Math.max(best, POPULAR_NAME_SUBSTRING_SCORE);
+  }
+  return best;
 }
 
 /** Rank LegiScan subject matches (`legiscan_subjects_search`): full-line phrase match boosts chip clicks. */
@@ -429,6 +476,33 @@ export async function fetchKyBillsMatchingSearch(
       }
     }
 
+    // Popular / colloquial names: punctuation- and space-insensitive + trigram-fuzzy retrieval
+    // (migration 044). FTS can't reach names like "C.R.O.W.N. Act" or "J.E. Jones …", so this
+    // leg backfills them; the client scorer below then boosts a matched name to the top.
+    let popularNameRows: KYBill[] | null = null;
+    if (safe.length >= 3 && !omitKyBillsPopularNameRpc) {
+      const pnRes = await supabase
+        .rpc('ky_bills_popular_name_search', { search_query: safe, max_rows: mergeCap })
+        .select(KY_BILL_SEARCH_SELECT);
+      if (pnRes.error) {
+        if (isMissingKyBillsPopularNameRpc(pnRes.error)) {
+          omitKyBillsPopularNameRpc = true;
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(
+              '[ky-search-bills] ky_bills_popular_name_search RPC unavailable (run migration 044 or reload schema). Skipping popular-name leg until restart.',
+            );
+          }
+        } else if (process.env.NODE_ENV === 'development') {
+          console.warn(
+            '[ky-search-bills] ky_bills_popular_name_search RPC failed (popular-name leg skipped).',
+            pnRes.error.message ?? pnRes.error,
+          );
+        }
+      } else {
+        popularNameRows = (pnRes.data as KYBill[] | null) ?? null;
+      }
+    }
+
     const supplemental: Array<PromiseLike<{ data: KYBill[] | null; error: unknown }>> = [];
     if (compactDesignation) {
       supplemental.push(
@@ -511,6 +585,7 @@ export async function fetchKyBillsMatchingSearch(
     merged = mergeUniqueByIdAllChunks<KYBill>(
       billNumberCompactRows,
       ftsRows,
+      popularNameRows,
       legiscanSubjectRows,
       topicRows,
       ...ilikeFallbackRows,

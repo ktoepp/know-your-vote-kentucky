@@ -71,7 +71,10 @@
     "backfill:lrc:committee-materials:dry": "tsx scripts/backfill-lrc-committee-materials-history.ts --dry-run",
     "sync:ky:lrc-enrollment-actions": "tsx scripts/sync-lrc-enrollment-actions.ts",
     "sync:ky:lrc-enrollment-actions:dry": "tsx scripts/sync-lrc-enrollment-actions.ts --dry-run",
-    "spike:lrc:enrollment-actions": "tsx scripts/sync-lrc-enrollment-actions.ts --spike"
+    "spike:lrc:enrollment-actions": "tsx scripts/sync-lrc-enrollment-actions.ts --spike",
+    "sync:ky:lrc-popular-names": "tsx scripts/sync-lrc-popular-names.ts",
+    "sync:ky:lrc-popular-names:dry": "tsx scripts/sync-lrc-popular-names.ts --dry-run",
+    "spike:lrc:popular-names": "tsx scripts/sync-lrc-popular-names.ts --spike"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",

@@ -18,7 +18,7 @@ export type KyBillsBrowseChamberFilter = '' | 'house' | 'senate' | 'joint';
 
 /** Columns needed for browse cards + filters (omit long narrative fields). */
 export const KY_BILL_BROWSE_SELECT =
-  'id,bill_number,title,status,last_action,last_action_date,introduced_date,session,chamber,sponsors,topics,legiscan_id,committee_name,openstates_id';
+  'id,bill_number,title,status,last_action,last_action_date,introduced_date,session,chamber,sponsors,topics,legiscan_id,committee_name,openstates_id,official_short_titles';
 
 // PostgREST caps responses at ~1000 rows by default, so the in-memory path can never
 // actually receive more than that. Keep the cap aligned with reality so the `capped`
