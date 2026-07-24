@@ -83,6 +83,7 @@ type BillRow = {
   chamber: 'house' | 'senate' | null;
   topics: string[] | null;
   legiscan_subjects: Array<{ subject_id?: number; subject_name?: string }> | null;
+  official_short_titles: string[] | null;
 };
 
 type CommitteeEventRow = {
@@ -218,7 +219,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const chunk = billIds.slice(i, i + CHUNK);
     const { data: bills } = await supabaseAdmin
       .from('ky_bills')
-      .select('id, bill_number, title, session, status, last_action, chamber, topics, legiscan_subjects')
+      .select('id, bill_number, title, session, status, last_action, chamber, topics, legiscan_subjects, official_short_titles')
       .in('id', chunk);
     for (const b of bills ?? []) {
       billById.set(String(b.id), b as BillRow);
@@ -476,6 +477,9 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       const group: BillDigestGroup = {
         billNumber: bill.bill_number || '',
         billTitle: bill.title || '',
+        // Official short title only (neutral); the first when a bill carries several. Media
+        // names (editorial_popular_names) are deliberately kept out of the digest for now.
+        shortTitle: bill.official_short_titles?.[0] ?? undefined,
         billHref: `${origin}/bills/${(bill.bill_number && kyBillSlug({ bill_number: bill.bill_number, session: bill.session })) || billId}`,
         progress,
         lines,

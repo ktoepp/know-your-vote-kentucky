@@ -1,8 +1,11 @@
 # Bill popular / colloquial names
 
-Status: **In progress.** Steps 1–2 (schema + official-names sync) built & verified; steps
-3–5 (search, editorial script, display) pending. Owner: Katie. Branch:
-`claude/bill-colloquial-names-yrxmb7`.
+Status: **Feature-complete on branch.** Steps 1–5 built, typecheck + lint clean, and the
+DB layer (migrations 043/044, both RPCs, the 2025 RS data) is applied and verified in the
+production Supabase project. Remaining before "done": a live `lrc-popular-names` sync run
+against the LRC site (couldn't run from the build env — egress-blocked; 2025 RS was
+bootstrapped directly from the fixture instead), a visual pass on the rendered app, and the
+flagged digest follow-up. Owner: Katie. Branch: `claude/bill-colloquial-names-yrxmb7`.
 
 ## Context
 
@@ -84,30 +87,44 @@ Modeled on `src/lib/ky-lrc-enrollment-actions-sync.ts`:
 - **Weekly** cron in `vercel.json` (`30 15 * * 0`) — these change rarely.
 - Fixture: `fixtures/lrc/lrc-popular-names-25rs-live.html`.
 
-## Editorial path — media names
+## Editorial path — media names — DONE
 
-- `scripts/set-bill-popular-name.ts` — twin of `scripts/set-bill-editor-note.ts`;
-  add/remove/dedupe entries in `editorial_popular_names` for a given bill.
+- `scripts/set-bill-popular-name.ts` — twin of `scripts/set-bill-editor-note.ts`.
+  `--add` / `--remove` / `--list` / `--clear`, one name per run (never split on commas),
+  case-insensitive dedupe, order preserved. Writes `editorial_popular_names` only; never
+  touches the LRC-owned `official_short_titles`. Run via `npx tsx` (no npm alias, matching
+  the editor-note sibling).
 
-## Search — `src/lib/ky-search-bills.ts`
+## Search — `src/lib/ky-search-bills.ts` — DONE
 
-- Both arrays already in `search_vector` → free full-text hits.
-- Add both to the parallel `ilike` legs and to `relevanceScoreForKyBillSearch` weighting
-  so a name query ranks the right bill highly.
-- **Normalization-tolerant matching:** normalize both query and stored names — lowercase,
-  strip punctuation / apostrophes / hyphens, collapse whitespace, strip a leading "the."
-  Add a `pg_trgm` similarity leg **scoped to the popular-name columns only** (not the
-  whole corpus, to avoid noise), gated behind a similarity threshold.
-- Add both columns to the select list so results can render the official short title.
+- Both arrays are in `search_vector` (weight B) → free full-text hits for well-tokenized
+  names. **But** FTS can't retrieve punctuation-heavy names — verified against prod:
+  "crown act", "je jones" return nothing via `to_tsvector`. So:
+- **Migration `044`** adds `popular_names_search` — a generated column that strips **all**
+  non-alphanumerics (punctuation *and* spaces) and lowercases, so "C.R.O.W.N. Act" →
+  `crownact` and "Phone-Down Kentucky Act" → `phonedownkentuckyact` both match a query
+  normalized the same way. A `gin_trgm_ops` index (pg_trgm) adds spelling tolerance.
+- RPC **`ky_bills_popular_name_search(query, max_rows)`** matches by normalized substring
+  OR trigram similarity, scoped to the name column only. Verified in prod: crown act→HB125,
+  je jones→HB293, phone down kentucky→HB496, mold act→HB452, and the misspelling
+  **crwn act→HB125**.
+- `ky-search-bills.ts` calls the RPC as a supplemental retrieval leg (graceful-degrade flag
+  `omitKyBillsPopularNameRpc`), merges it, and `relevanceScoreForKyBillSearch` now scores
+  name matches on the same normalized form (`scorePopularNames`, exact 5200 / substring 2600)
+  so a name-matched bill ranks near the top.
+- Both columns are in `KY_BILL_SEARCH_SELECT` (search) and `official_short_titles` is in
+  `KY_BILL_BROWSE_SELECT` (browse cards).
 
-## Display
+## Display — DONE
 
-- **Bill detail page** (`src/app/bills/…`): official short title as **"Short title: …"**;
-  media names in an **"Also called"** row (no disclaimer). Chips / labels.
-- **Search results list**: show `official_short_titles` inline under the formal title;
-  media names stay **matching-only** (not printed in the compact list).
-- **Email digest** (`src/lib/email/bill-digest-email.tsx`): `HB 5 — Safer Kentucky Act`,
-  **official short titles only**. Media names excluded (see follow-up flag above).
+- **Bill detail page** (`BillDetailView.tsx`): a **"Short title:"** row (official) and an
+  **"Also called:"** row (editorial, no disclaimer) under the H1, names joined with " · ".
+- **Result / browse cards** (`KYBillCard.tsx`): `official_short_titles` shown inline under
+  the formal title ("Short title: …"); editorial names stay **matching-only**.
+  `official_short_titles` added to `KY_BILL_BROWSE_SELECT` so browse cards carry it too.
+- **Email digest** (`bill-digest-email.tsx` + `run-bill-digest-cron.tsx`):
+  `HB 5 — Safer Kentucky Act` next to the number, **official short title only** (the first
+  when several). Media names excluded (see follow-up flag).
 
 ## Verification
 
@@ -122,12 +139,28 @@ Modeled on `src/lib/ky-lrc-enrollment-actions-sync.ts`:
 
 ## Rollout order
 
-1. ✅ Migration + types / selects (migration `043`).
-2. ✅ LRC parser + sync + CLI + weekly cron (official names). Spike verified; typecheck +
-   lint clean. Still needs a live DB run to confirm bill-id resolution counts.
-3. ☐ Search normalization + ranking (+ trigram leg).
-4. ☐ Editorial script.
-5. ☐ Display (bill page, search list, digest).
+1. ✅ Migration + types / selects (migration `043`, applied to prod).
+2. ✅ LRC parser + sync + CLI + weekly cron. Spike verified. **2025 RS populated in prod**
+   (67/67 names resolved, 100%) by generating the SQL from the parser — a live LRC fetch
+   is still pending (egress-blocked from the build env; the weekly cron does it on Vercel).
+3. ✅ Search: migration `044` + `ky_bills_popular_name_search` RPC + scoring. Verified in prod.
+4. ✅ Editorial script (`set-bill-popular-name.ts`).
+5. ✅ Display (bill page, cards, digest). typecheck + lint clean.
+
+## Applied to production (Supabase `pmpadtydauuqysnxekno`)
+
+- Migrations 043 + 044 executed (raw SQL, matching the repo's file-based flow — not recorded
+  in `schema_migrations`, consistent with 001–042).
+- `official_short_titles` populated for 2025 RS (67 bills). All other sessions populate on
+  the next weekly `lrc-popular-names` cron. Nothing written to `editorial_popular_names` yet.
+
+## Still to do
+
+- One live `npm run sync:ky:lrc-popular-names -- --dry-run` from an env that can reach LRC,
+  to confirm the fetch/parse/resolve path against the site (the parser is fixture-verified;
+  only the HTTP fetch is unexercised).
+- Visual QA of the three display surfaces in the running app.
+- ⚑ Digest follow-up: revisit media names in the email once there's real editorial data.
 
 ---
 

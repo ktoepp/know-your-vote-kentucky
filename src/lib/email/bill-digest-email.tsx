@@ -38,6 +38,8 @@ export type BillDigestGroup = {
   billNumber: string;
   /** Bill title; empty for committee groups (their lines carry the full event text). */
   billTitle: string;
+  /** Official LRC short title ("Safer Kentucky Act"), shown next to the number when present. */
+  shortTitle?: string;
   billHref: string;
   /** Topics (from the user's filters) this bill matched — shown in the topic section. */
   matchedTopics?: string[];
@@ -241,7 +243,10 @@ export function BillDigestEmail(props: {
                     {g.billNumber && (
                       <strong style={numberText} className="dg-link">{g.billNumber}</strong>
                     )}
-                    {g.billNumber && g.billTitle && <br />}
+                    {g.billNumber && g.shortTitle && (
+                      <span style={shortTitleText} className="dg-ink"> — {g.shortTitle}</span>
+                    )}
+                    {g.billNumber && (g.billTitle || g.shortTitle) && <br />}
                     {g.billTitle && (
                       <span style={titleText} className="dg-ink">{g.billTitle}</span>
                     )}
@@ -337,6 +342,7 @@ const billBlock = {
 const groupLink = { display: 'block', textDecoration: 'none', marginBottom: 8 };
 const numberText = { fontSize: 16, color: '#1e40af' };
 const titleText = { fontSize: 14, lineHeight: '1.45', color: '#1e293b' };
+const shortTitleText = { fontSize: 16, color: '#1e293b', fontWeight: 600 };
 const lineText = { fontSize: 13, margin: '4px 0', color: '#334155' };
 const footerText = { fontSize: 12, color: '#64748b', margin: '0 0 6px', lineHeight: '1.5' };
 const footerLinks = { fontSize: 12, color: '#64748b', margin: 0 };

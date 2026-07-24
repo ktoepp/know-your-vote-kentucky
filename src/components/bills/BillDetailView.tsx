@@ -1029,6 +1029,28 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               {bill.title}
             </Typography>
 
+            {((bill.official_short_titles?.length ?? 0) > 0 ||
+              (bill.editorial_popular_names?.length ?? 0) > 0) && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 2 }}>
+                {(bill.official_short_titles?.length ?? 0) > 0 && (
+                  <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                    <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                      {bill.official_short_titles!.length > 1 ? 'Short titles: ' : 'Short title: '}
+                    </Box>
+                    {bill.official_short_titles!.join(' · ')}
+                  </Typography>
+                )}
+                {(bill.editorial_popular_names?.length ?? 0) > 0 && (
+                  <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                    <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                      Also called:{' '}
+                    </Box>
+                    {bill.editorial_popular_names!.join(' · ')}
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             {bill.description && (
               <Box sx={{ mb: 2 }}>
                 <ExpandableText
