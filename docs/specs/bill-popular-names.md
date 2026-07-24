@@ -42,8 +42,9 @@ scrape, which costs **zero LegiScan quota**.
 - Media names on the bill page use the label **"Also called"** — no disclaimer text.
 - Search matching must be **normalization-tolerant** (punctuation, apostrophes, casing,
   spacing, leading "the") with light **spelling** tolerance.
-- ⚑ **Follow-up:** revisit whether media names should appear in the **digest email**
-  once we have real coverage data. Left out of v1 deliberately.
+- ~~⚑ Follow-up: revisit media names in the digest.~~ **Resolved (Katie, 2026-07-24):
+  include them.** The digest now shows an attributed "Also called:" line from
+  `editorial_popular_names`, alongside the official short title next to the number.
 
 ## Data model
 
@@ -87,6 +88,19 @@ Modeled on `src/lib/ky-lrc-enrollment-actions-sync.ts`:
 - **Weekly** cron in `vercel.json` (`30 15 * * 0`) — these change rarely.
 - Fixture: `fixtures/lrc/lrc-popular-names-25rs-live.html`.
 
+### Session coverage & backfill
+
+The sync is **not** incremental — each run iterates all `KY_SESSIONS`, fetches
+`record/{slug}/7765.html` per session, and replaces `official_short_titles`. So the weekly
+cron *is* the backfill: one run covers 2026 RS (`26rs`), 2025, 2024, … automatically.
+- **2026 RS** populates as soon as LRC publishes its `26rs/7765.html` page; until then a 404
+  is a silent skip.
+- **Legacy sessions** on the old record system (`6650.htm`-style URLs) 404 on `7765.html`
+  and skip — a known, logged coverage gap, not an error.
+- The cron lives in `vercel.json` **on this branch**, so it first fires after PR #200 merges
+  and deploys. To backfill sooner, run `npm run sync:ky:lrc-popular-names` (or hit
+  `/api/sync?source=lrc-popular-names`) from an env that can reach LRC.
+
 ## Editorial path — media names — DONE
 
 - `scripts/set-bill-popular-name.ts` — twin of `scripts/set-bill-editor-note.ts`.
@@ -123,8 +137,8 @@ Modeled on `src/lib/ky-lrc-enrollment-actions-sync.ts`:
   the formal title ("Short title: …"); editorial names stay **matching-only**.
   `official_short_titles` added to `KY_BILL_BROWSE_SELECT` so browse cards carry it too.
 - **Email digest** (`bill-digest-email.tsx` + `run-bill-digest-cron.tsx`):
-  `HB 5 — Safer Kentucky Act` next to the number, **official short title only** (the first
-  when several). Media names excluded (see follow-up flag).
+  `HB 5 — Safer Kentucky Act` next to the number (official short title, first when several),
+  **plus** an attributed **"Also called:"** line from `editorial_popular_names` when present.
 
 ## Verification
 

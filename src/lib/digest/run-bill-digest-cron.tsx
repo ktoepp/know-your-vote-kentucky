@@ -84,6 +84,7 @@ type BillRow = {
   topics: string[] | null;
   legiscan_subjects: Array<{ subject_id?: number; subject_name?: string }> | null;
   official_short_titles: string[] | null;
+  editorial_popular_names: string[] | null;
 };
 
 type CommitteeEventRow = {
@@ -219,7 +220,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const chunk = billIds.slice(i, i + CHUNK);
     const { data: bills } = await supabaseAdmin
       .from('ky_bills')
-      .select('id, bill_number, title, session, status, last_action, chamber, topics, legiscan_subjects, official_short_titles')
+      .select('id, bill_number, title, session, status, last_action, chamber, topics, legiscan_subjects, official_short_titles, editorial_popular_names')
       .in('id', chunk);
     for (const b of bills ?? []) {
       billById.set(String(b.id), b as BillRow);
@@ -477,9 +478,10 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       const group: BillDigestGroup = {
         billNumber: bill.bill_number || '',
         billTitle: bill.title || '',
-        // Official short title only (neutral); the first when a bill carries several. Media
-        // names (editorial_popular_names) are deliberately kept out of the digest for now.
+        // Official short title next to the number (the first when a bill carries several).
         shortTitle: bill.official_short_titles?.[0] ?? undefined,
+        // Editorial media names shown as an attributed "Also called" line under the title.
+        alsoCalled: bill.editorial_popular_names?.length ? bill.editorial_popular_names : undefined,
         billHref: `${origin}/bills/${(bill.bill_number && kyBillSlug({ bill_number: bill.bill_number, session: bill.session })) || billId}`,
         progress,
         lines,

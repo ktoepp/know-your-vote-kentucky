@@ -40,6 +40,8 @@ export type BillDigestGroup = {
   billTitle: string;
   /** Official LRC short title ("Safer Kentucky Act"), shown next to the number when present. */
   shortTitle?: string;
+  /** Editorial media / advocacy names, shown as an attributed "Also called" line. */
+  alsoCalled?: string[];
   billHref: string;
   /** Topics (from the user's filters) this bill matched — shown in the topic section. */
   matchedTopics?: string[];
@@ -251,6 +253,11 @@ export function BillDigestEmail(props: {
                       <span style={titleText} className="dg-ink">{g.billTitle}</span>
                     )}
                   </Link>
+                  {g.alsoCalled && g.alsoCalled.length > 0 && (
+                    <Text style={topicNote} className="dg-muted">
+                      Also called: {g.alsoCalled.join(' · ')}
+                    </Text>
+                  )}
                   {g.matchedTopics && g.matchedTopics.length > 0 && (
                     <Text style={topicNote} className="dg-muted">
                       Matches your{' '}
