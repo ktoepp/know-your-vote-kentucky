@@ -15,16 +15,20 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  FormControlLabel,
   Paper,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
 import {
   PersonOutline,
   ShieldOutlined,
+  HelpOutline,
   Logout as LogoutIcon,
 } from '@mui/icons-material';
 import { useUser } from '../lib/UserContext';
+import { useTooltips } from '@/lib/TooltipContext';
 import { supabase } from '../lib/supabaseClient';
 import type { KyUserProfileRow } from '@/types/user-profile';
 import { KY_USER_PROFILE_SELECT } from '@/lib/ky-user-profile-select';
@@ -73,6 +77,7 @@ function SectionCard({
 export default function ProfilePage() {
   const router = useRouter();
   const { user, session, loading: authLoading } = useUser();
+  const { tooltipsEnabled, setTooltipsEnabled } = useTooltips();
   const [profile, setProfile] = useState<KyUserProfileRow | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -325,6 +330,7 @@ export default function ProfilePage() {
       >
         {[
           { href: '#account', label: 'Account' },
+          { href: '#preferences', label: 'Preferences' },
           { href: '#notifications', label: 'Notifications' },
           { href: '#followed-bills', label: 'Followed bills' },
           { href: '#followed-committees', label: 'Followed committees' },
@@ -412,6 +418,22 @@ export default function ProfilePage() {
             Saved.
           </Typography>
         )}
+      </SectionCard>
+
+      <SectionCard id="preferences" icon={<HelpOutline sx={{ fontSize: 28 }} />} title="Preferences">
+        <FormControlLabel
+          control={
+            <Switch
+              checked={tooltipsEnabled}
+              onChange={(e) => setTooltipsEnabled(e.target.checked)}
+              inputProps={{ 'aria-label': 'Toggle educational tooltips' }}
+            />
+          }
+          label="Educational tooltips"
+        />
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          Show the small explainer tooltips that define legislative terms and icons across the site.
+        </Typography>
       </SectionCard>
 
       <Paper component="section" id="notifications" elevation={1} sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 2, mb: 3, ...PROFILE_SECTION_SCROLL_MARGIN }}>

@@ -6,8 +6,9 @@ import { fetchKyActiveLegislatorRosterSlim } from '@/lib/ky-legislator-roster-se
 import { buildPageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Search Kentucky bills',
-  description: 'Search Kentucky General Assembly bills by number, title, topic, and more.',
+  title: 'Search Kentucky bills, members, and committees',
+  description:
+    'Search the Kentucky General Assembly in one place — bills by number, title, or topic; members by name or district; and committees.',
   path: '/search',
 });
 
@@ -23,7 +24,7 @@ export default async function SearchPage() {
     <Box sx={{ bgcolor: 'background.default' }}>
       <Container maxWidth="lg" sx={{ pt: 4 }}>
         <Typography variant="h4" component="h1" fontWeight={700} sx={{ mb: 3 }}>
-          Search Kentucky bills
+          Search
         </Typography>
       </Container>
       <Suspense
