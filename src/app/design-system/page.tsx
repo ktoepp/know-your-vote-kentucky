@@ -638,7 +638,6 @@ function SecOverview() {
     >
       <Card style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
-          {kpi('1', 'blue — one brand hue, no separate info color')}
           {kpi('8px', 'base spacing unit')}
           {kpi('AA', 'contrast floor, never a stretch goal')}
           {kpi('3', 'radius steps · 8 / 24 / full')}
