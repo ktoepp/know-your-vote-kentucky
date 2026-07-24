@@ -8,11 +8,13 @@ import {
   KY_SENATE_DISTRICT_COUNT,
   allKyDistrictRefs,
   findLegislatorForKyDistrict,
+  kyDistrictMapPath,
   kyDistrictPath,
   kyDistrictShortName,
   type KyDistrictRef,
 } from '@/lib/ky-district-pages';
 import { fetchKyMembersBrowseRoster } from '@/lib/ky-legislator-roster-server';
+import { partyBadgeBackgroundColor } from '@/lib/bill-display';
 import { buildPageMetadata } from '@/lib/seo';
 
 export const revalidate = 3600;
@@ -28,17 +30,22 @@ export const metadata: Metadata = buildPageMetadata({
 
 function DistrictList({
   title,
+  caption,
   refs,
-  memberNameFor,
+  memberFor,
 }: {
   title: string;
+  caption: string;
   refs: KyDistrictRef[];
-  memberNameFor: (ref: KyDistrictRef) => string | null;
+  memberFor: (ref: KyDistrictRef) => { name: string; party: string | null } | null;
 }) {
   return (
-    <Box sx={{ mb: 4 }}>
-      <Typography variant="h6" component="h2" fontWeight={700} gutterBottom>
+    <Box component="section" sx={{ mb: 5 }}>
+      <Typography variant="h6" component="h2" fontWeight={700}>
         {title}
+      </Typography>
+      <Typography variant="body2" color="text.tertiary" sx={{ mb: 2 }}>
+        {caption}
       </Typography>
       <Box
         component="ul"
@@ -47,26 +54,74 @@ function DistrictList({
           m: 0,
           p: 0,
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-          columnGap: 3,
-          rowGap: 0.75,
+          gridTemplateColumns: {
+            xs: 'repeat(auto-fill, minmax(150px, 1fr))',
+            sm: 'repeat(auto-fill, minmax(180px, 1fr))',
+          },
+          gap: 1.5,
         }}
       >
         {refs.map((ref) => {
-          const memberName = memberNameFor(ref);
+          const member = memberFor(ref);
           return (
-            <Box component="li" key={kyDistrictPath(ref)}>
-              <Typography variant="body2">
-                <MuiLink component={NextLink} href={kyDistrictPath(ref)} underline="hover">
+            <Box component="li" key={kyDistrictPath(ref)} sx={{ display: 'flex' }}>
+              <MuiLink
+                component={NextLink}
+                href={kyDistrictMapPath(ref)}
+                underline="none"
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.25,
+                  flex: 1,
+                  minWidth: 0,
+                  p: 1.5,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  bgcolor: 'background.paper',
+                  color: 'text.primary',
+                  '@media (prefers-reduced-motion: no-preference)': {
+                    transition: 'border-color .15s ease, box-shadow .15s ease',
+                  },
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    boxShadow: 'var(--shadow-md, 0 4px 12px rgba(15,23,42,.06))',
+                  },
+                  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
+                }}
+              >
+                <Typography variant="subtitle2" component="span" fontWeight={700}>
                   {kyDistrictShortName(ref)}
-                </MuiLink>
-                {memberName && (
-                  <Typography component="span" variant="body2" color="text.secondary">
-                    {' '}
-                    — {memberName}
+                </Typography>
+                {member ? (
+                  <Typography
+                    variant="caption"
+                    component="span"
+                    color="text.secondary"
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}
+                  >
+                    <Box
+                      component="span"
+                      aria-hidden
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        bgcolor: partyBadgeBackgroundColor(member.party),
+                      }}
+                    />
+                    <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {member.name}
+                    </Box>
+                  </Typography>
+                ) : (
+                  <Typography variant="caption" component="span" color="text.tertiary">
+                    Seat vacant
                   </Typography>
                 )}
-              </Typography>
+              </MuiLink>
             </Box>
           );
         })}
@@ -77,14 +132,16 @@ function DistrictList({
 
 export default async function DistrictsIndexPage() {
   const roster = await fetchKyMembersBrowseRoster().catch(() => []);
-  const memberNameFor = (ref: KyDistrictRef) =>
-    findLegislatorForKyDistrict(roster, ref)?.name ?? null;
+  const memberFor = (ref: KyDistrictRef) => {
+    const leg = findLegislatorForKyDistrict(roster, ref);
+    return leg ? { name: leg.name, party: leg.party ?? null } : null;
+  };
   const refs = allKyDistrictRefs();
   const houseRefs = refs.filter((r) => r.chamber === 'house');
   const senateRefs = refs.filter((r) => r.chamber === 'senate');
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 4, sm: 6 } }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
       <JsonLd
         data={[
           buildCollectionPageJsonLd({
@@ -103,15 +160,24 @@ export default async function DistrictsIndexPage() {
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
         Kentucky has {KY_HOUSE_DISTRICT_COUNT} state House districts and {KY_SENATE_DISTRICT_COUNT}{' '}
-        state Senate districts. Select a district to see its current member, map, and recent bills,
-        or use{' '}
+        state Senate districts. Select a district to see it on the map, or use{' '}
         <MuiLink component={NextLink} href="/members/map" underline="hover">
           Find my legislators
         </MuiLink>{' '}
         to look up your districts by address.
       </Typography>
-      <DistrictList title="House districts" refs={houseRefs} memberNameFor={memberNameFor} />
-      <DistrictList title="Senate districts" refs={senateRefs} memberNameFor={memberNameFor} />
+      <DistrictList
+        title="House districts"
+        caption={`${KY_HOUSE_DISTRICT_COUNT} seats · two-year terms`}
+        refs={houseRefs}
+        memberFor={memberFor}
+      />
+      <DistrictList
+        title="Senate districts"
+        caption={`${KY_SENATE_DISTRICT_COUNT} seats · four-year terms`}
+        refs={senateRefs}
+        memberFor={memberFor}
+      />
     </Container>
   );
 }
