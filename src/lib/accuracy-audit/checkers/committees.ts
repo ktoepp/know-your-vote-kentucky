@@ -19,7 +19,13 @@ import {
   parseLegislativeCalendarHtml,
   type LrcCalendarMeeting,
 } from '../../lrc-legislative-calendar-parser';
-import { summarizeResult, type AuditConfig, type CheckerResult, type Finding } from '../types';
+import {
+  isTransientUpstreamError,
+  summarizeResult,
+  type AuditConfig,
+  type CheckerResult,
+  type Finding,
+} from '../types';
 import { normalizeCommitteeNameForDupes } from '../../ky-committee-utils';
 
 const FETCH_HEADERS = {
@@ -92,8 +98,20 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
     });
     html = res.data;
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // A transient LRC outage (5xx / gateway timeout / network blip) skips the
+    // live-calendar diff rather than red-paging #errors; the near-duplicate
+    // findings gathered above still report. A genuine failure (e.g. a 404 meaning
+    // the calendar URL moved) stays an operational error. Mirrors the per-committee
+    // LRC-fetch handling in the materials checker.
+    if (isTransientUpstreamError(e)) {
+      return summarizeResult('committees', 0, findings, started, {
+        skipped: true,
+        skipReason: `LRC calendar unavailable (transient): ${msg}`,
+      });
+    }
     return summarizeResult('committees', 0, findings, started, {
-      error: `LRC calendar fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+      error: `LRC calendar fetch failed: ${msg}`,
     });
   }
 

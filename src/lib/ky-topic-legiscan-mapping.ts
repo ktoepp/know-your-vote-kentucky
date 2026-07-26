@@ -208,6 +208,10 @@ const TOPIC_TO_SUBJECT_PATTERNS: Record<KYTopicTag, SubjectPattern[]> = {
     /railroad|railway/i,
     /\btraffic\b/i,
   ],
+  // No LegiScan subject bridges to this tag — ceremonial resolutions are detected
+  // by title shape (ky-topic-classifier.isCeremonialResolution), and LegiScan does
+  // not subject-code honor/memorial resolutions. Intentionally empty.
+  'Honors & Memorials': [],
 };
 
 /** Pre-built lookup for fast subject → topic resolution. */

@@ -25,6 +25,7 @@ import { normalizeLegistarOrdinanceText } from './legistar-text';
 import { syncKyLrcCalendar } from './ky-lrc-calendar-sync';
 import { syncKyLrcCommitteeMaterials } from './ky-lrc-committee-materials-sync';
 import { syncKyLrcEnrollmentActions } from './ky-lrc-enrollment-actions-sync';
+import { syncKyLrcPopularNames } from './ky-lrc-popular-names-sync';
 import {
   fetchBillHistorySnapshots,
   recordBillStatusHistoryForBuiltBatch,
@@ -2094,6 +2095,48 @@ export const SYNC_SOURCES: Record<string, (options: SyncOptions) => Promise<Sync
           : stats.unresolvedBills > 0
             ? `${stats.unresolvedBills} bill ref(s) could not be resolved`
             : undefined;
+      if (!opts.dryRun) {
+        await updateSourceStatus(source, status, itemsSynced, errorMsg);
+      }
+      return {
+        source,
+        status,
+        itemsSynced,
+        error: errorMsg,
+        duration: Date.now() - start,
+      };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      logError(source, message);
+      if (!opts.dryRun) await updateSourceStatus(source, 'error', 0, message);
+      return {
+        source,
+        status: 'error',
+        itemsSynced: 0,
+        error: message,
+        duration: Date.now() - start,
+      };
+    }
+  },
+  /**
+   * Short titles / popular names — scrapes
+   * apps.legislature.ky.gov/record/{slug}/7765.html and writes each bill's
+   * official short title(s) to ky_bills.official_short_titles. Zero LegiScan
+   * quota; changes rarely, so wired to a weekly cron.
+   * See docs/specs/bill-popular-names.md.
+   */
+  'lrc-popular-names': async (opts) => {
+    const start = Date.now();
+    const source = 'lrc-popular-names';
+    try {
+      const db = getSupabase();
+      const stats = await syncKyLrcPopularNames(db, { dryRun: opts.dryRun });
+      const itemsSynced = stats.billsUpdated;
+      const status = stats.errors > 0 ? 'error' : 'success';
+      const errorMsg =
+        stats.errors > 0
+          ? `${stats.errors} fetch/update error(s); unresolved bills=${stats.unresolvedBills}`
+          : undefined;
       if (!opts.dryRun) {
         await updateSourceStatus(source, status, itemsSynced, errorMsg);
       }

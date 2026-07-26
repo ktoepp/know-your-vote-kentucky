@@ -1,6 +1,7 @@
 import { Container } from '@mui/material';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import { HomeBillCarousel } from '@/components/home/HomeBillCarousel';
+import { HomeSearchSection } from '@/components/home/HomeSearchSection';
 import { LandingFeatures } from '@/components/home/LandingFeatures';
 import { LandingMapSection } from '@/components/home/LandingMapSection';
 import { LandingTopics } from '@/components/home/LandingTopics';
@@ -30,6 +31,7 @@ export function HomePageContent({
       <Container maxWidth="lg">
         <LandingFeatures currentSessionBillCount={currentSessionBillCount} />
         <LandingMapSection />
+        <HomeSearchSection />
         {trendingBills && trendingBills.length > 0 ? (
           <HomeBillCarousel
             title="Most viewed bills"

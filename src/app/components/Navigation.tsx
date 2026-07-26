@@ -35,13 +35,10 @@ import {
   AccountCircle,
   CalendarMonth,
   Gavel,
-  Help as HelpIcon,
   KeyboardArrowDown as ExpandMoreIcon,
 } from '@mui/icons-material';
 import { KentuckyStateIcon } from '@/components/icons/KentuckyStateIcon';
-import { useTooltips } from '@/lib/TooltipContext';
 import { useUser } from "../lib/UserContext";
-import { ICON_REM } from '@/lib/ui-tokens';
 
 /** Served from `public/branding/` so deploys include it (`/branding/` is gitignored for source exports). */
 const NAV_WORDMARK_SRC = '/branding/Logo-03.png';
@@ -262,26 +259,6 @@ function CommitteesNavItem({ item }: { item: NavLinkConfig }) {
   );
 }
 
-function TooltipToggleMenuItem({ onClose }: { onClose?: () => void }) {
-  const { tooltipsEnabled, toggleTooltips } = useTooltips();
-  return (
-    <MenuItem
-      onClick={() => {
-        toggleTooltips();
-        onClose?.();
-      }}
-      sx={{ gap: 1 }}
-    >
-      <ListItemIcon sx={{ minWidth: 36 }}>
-        <HelpIcon fontSize="small" sx={{ opacity: tooltipsEnabled ? 1 : 0.5 }} aria-hidden />
-      </ListItemIcon>
-      <ListItemText
-        primary={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
-      />
-    </MenuItem>
-  );
-}
-
 // UserMenu component
 function UserMenu() {
   const pathname = usePathname();
@@ -327,8 +304,6 @@ function UserMenu() {
           <MenuItem component={Link} href="/dashboard">Dashboard</MenuItem>
           <MenuItem component={Link} href="/profile">Profile</MenuItem>
           <Divider />
-          <TooltipToggleMenuItem />
-          <Divider />
           <MenuItem component={Link} href="/auth/logout">Logout</MenuItem>
         </Menu>
       </>
@@ -352,7 +327,9 @@ function UserMenu() {
         href="/auth/register"
         variant="contained"
         size="small"
-        sx={{ whiteSpace: 'nowrap' }}
+        // Hidden on phones so the wide wordmark + search + menu icons fit; Sign up lives
+        // in the mobile menu instead.
+        sx={{ whiteSpace: 'nowrap', display: { xs: 'none', sm: 'inline-flex' } }}
       >
         Sign up
       </Button>
@@ -382,16 +359,16 @@ function NavSearch() {
         size="small"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search bills…"
-        inputProps={{ 'aria-label': 'Search bills' }}
+        placeholder="Search bills, members…"
+        inputProps={{ 'aria-label': 'Search bills, members, and committees' }}
         sx={{
-          width: { md: 170, lg: 210 },
+          width: { md: 180, lg: 230 },
           '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: 'background.paper' },
         }}
         InputProps={{
           endAdornment: (
             <InputAdornment position="end">
-              <IconButton type="submit" size="small" edge="end" aria-label="Search" title="Search bills">
+              <IconButton type="submit" size="small" edge="end" aria-label="Search" title="Search bills, members, and committees">
                 <SearchIcon sx={{ fontSize: '1.15rem' }} />
               </IconButton>
             </InputAdornment>
@@ -407,7 +384,6 @@ export default function Navigation() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const { tooltipsEnabled, toggleTooltips } = useTooltips();
   const { user, loading } = useUser();
 
   const isActive = (path: string) => isNavPathActive(path, pathname);
@@ -530,32 +506,32 @@ export default function Navigation() {
           {/* Spacer */}
           <Box sx={{ flexGrow: 1 }} />
 
-          {/* Right side items — order: Log in / Sign up → tooltip → search. */}
+          {/* Right side items — order: Log in / Sign up → search. */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {/* User menu (Log in / Sign up, or account avatar) */}
             <UserMenu />
 
-            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-              <IconButton
-                onClick={toggleTooltips}
-                aria-label={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
-                aria-pressed={tooltipsEnabled}
-                title={tooltipsEnabled ? 'Disable educational tooltips' : 'Enable educational tooltips'}
-                sx={{
-                  color: 'text.primary',
-                  p: 1.25,
-                  borderRadius: 2,
-                  backgroundColor: tooltipsEnabled ? 'rgba(0,0,0,0.06)' : 'transparent',
-                  '&:hover': { backgroundColor: 'rgba(0,0,0,0.08)' },
-                }}
-              >
-                <HelpIcon sx={{ fontSize: ICON_REM.nav, opacity: tooltipsEnabled ? 1 : 0.55 }} aria-hidden />
-              </IconButton>
-            </Box>
-
             {/* Desktop inline search — type + Enter or click the icon to open the
                 bill search page with the query. */}
             <NavSearch />
+
+            {/* Mobile/tablet search — always-visible, one tap to the unified search page
+                (no need to open the menu). Hidden at md+, where the inline NavSearch field shows. */}
+            <IconButton
+              component={Link}
+              href="/search"
+              aria-label="Search bills, members, and committees"
+              title="Search"
+              sx={{
+                display: { xs: 'inline-flex', md: 'none' },
+                color: 'text.primary',
+                p: 1.5,
+                borderRadius: 2,
+                '&:hover': { backgroundColor: 'rgba(0,0,0,0.05)' },
+              }}
+            >
+              <SearchIcon />
+            </IconButton>
 
             {/* Mobile menu button */}
             <Box sx={{ display: { xs: 'block', lg: 'none' } }}>
@@ -640,9 +616,6 @@ export default function Navigation() {
                           '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
                         }}
                       >
-                        <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
-                          {React.cloneElement(child.icon, { sx: { fontSize: '1.25rem' } })}
-                        </ListItemIcon>
                         <ListItemText
                           primary={child.label}
                           sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1rem', color: 'inherit' } }}
@@ -652,53 +625,6 @@ export default function Navigation() {
                   ))}
                 </React.Fragment>
               ))}
-              <ListItem sx={{ px: 2, py: 0 }}>
-                <ListItemButton
-                  component={Link}
-                  href="/search"
-                  onClick={() => setMobileMenuOpen(false)}
-                  sx={{
-                    borderRadius: 2,
-                    mb: 0.5,
-                    color: isActive('/search') ? mobileNav.colorActive : mobileNav.color,
-                    backgroundColor: isActive('/search') ? mobileNav.activeBg : 'transparent',
-                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
-                    <SearchIcon aria-hidden />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary="Search"
-                    sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem', color: 'inherit' } }}
-                  />
-                </ListItemButton>
-              </ListItem>
-              <Divider sx={{ my: 1 }} />
-              <ListItem sx={{ px: 2, py: 0 }}>
-                <ListItemButton
-                  onClick={() => {
-                    toggleTooltips();
-                    setMobileMenuOpen(false);
-                  }}
-                  sx={{
-                    borderRadius: 2,
-                    color: tooltipsEnabled ? mobileNav.colorActive : mobileNav.color,
-                    backgroundColor: tooltipsEnabled ? mobileNav.activeBg : 'transparent',
-                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
-                    <HelpIcon aria-hidden />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={tooltipsEnabled ? 'Disable tooltips' : 'Enable tooltips'}
-                    sx={{
-                      '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1rem' },
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
               {!loading && !user && (
                 <>
                   <Divider sx={{ my: 1 }} />
@@ -709,6 +635,7 @@ export default function Navigation() {
                       onClick={() => setMobileMenuOpen(false)}
                       sx={{
                         borderRadius: 2,
+                        mb: 0.5,
                         color: mobileNav.color,
                         '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
                       }}
@@ -716,6 +643,23 @@ export default function Navigation() {
                       <ListItemText
                         primary="Log in"
                         sx={{ '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.125rem' } }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem sx={{ px: 2, py: 0 }}>
+                    <ListItemButton
+                      component={Link}
+                      href="/auth/register"
+                      onClick={() => setMobileMenuOpen(false)}
+                      sx={{
+                        borderRadius: 2,
+                        backgroundColor: 'primary.main',
+                        '&:hover': { backgroundColor: 'primary.dark' },
+                      }}
+                    >
+                      <ListItemText
+                        primary="Sign up"
+                        sx={{ textAlign: 'center', '& .MuiListItemText-primary': { fontWeight: 700, fontSize: '1.125rem', color: 'primary.contrastText' } }}
                       />
                     </ListItemButton>
                   </ListItem>

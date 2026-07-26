@@ -26,10 +26,16 @@ Ratios below are measured (WCAG relative-luminance formula), not estimated.
 | # | Pairing | Was | Ratio | Now | Ratio | Status |
 |---|---|---|---|---|---|---|
 | 1 | Success text / "Became law" | `#16A34A` | 3.30:1 ✗ | `#15803D` | 5.02:1 ✓ | ✅ |
-| 2 | House chamber (when it was green) | `#16A34A` | 3.30:1 ✗ | `#0891B2` cyan-700 | non-text ✓ | ✅ |
+| 2 | House chamber (white text on chip fill) | `#16A34A` | 3.30:1 ✗ | `#0E7490` cyan-700 | 5.36:1 ✓ | ✅ |
 | 3 | Warning text / caution | `#D97706` | 3.19:1 ✗ | `#B45309` | 5.02:1 ✓ | ✅ |
 | 4 | Party badges (white text on fill) | `#2563EB`/`#DC2626` | 5.17 / 4.83 | `#4338CA`/`#BE123C`/`#475569` | 7.90 / 6.29 / 7.58 ✓ | ✅ |
 | 5 | Read / secondary metadata | `#94A3B8` | 2.56:1 ✗ | `text.tertiary #64748B` | 4.76:1 ✓ | ✅ |
+
+> Row 2 correction: `--chamber-house` was first set to `#0891B2` and signed off
+> as a **non-text** fill (3:1 floor). But `ChamberChip` renders white text on it
+> (and uses the hue as text in its outlined variant), so WCAG 1.4.3 (≥4.5:1)
+> applies — `#0891B2` was only 3.68:1. Corrected to true cyan-700 `#0E7490`
+> (white ≈5.36:1); the token's "cyan-700" label now matches its value.
 
 > The AA success/warning values were promoted to the base tokens in
 > `globals.css` + `theme.ts` (`main`); the brighter originals live on as

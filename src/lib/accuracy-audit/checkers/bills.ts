@@ -157,11 +157,19 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
       lastAction.action,
       Array.isArray(bill.history) ? bill.history : undefined,
     );
-    if (expectedStatus && norm(expectedStatus) !== norm(row.status)) {
+    const statusMismatch = !!expectedStatus && norm(expectedStatus) !== norm(row.status);
+    if (statusMismatch) {
       findings.push(diffFinding('fail', 'bills', row.bill_number, 'status', expectedStatus, row.status));
     }
 
-    if (norm(lastAction.action) && norm(lastAction.action) !== norm(row.last_action)) {
+    // last_action is reconstructed here from `getBill`'s history[], but the sync
+    // stores it from `getMasterList`/`getSearch`, which phrases the *same* action
+    // differently (e.g. "To: Interim Joint Committee on Appropriations and Revenue"
+    // vs "to Appropriations & Revenue (H)"). A raw string diff therefore false-flags
+    // on phrasing alone — see HB48 in the 2026-07-19 run. `status` (a `fail`, mapped
+    // through the tolerant status mapper) is the reliable staleness signal; only
+    // surface the last_action text as supporting context when status *also* diverged.
+    if (statusMismatch && norm(lastAction.action) && norm(lastAction.action) !== norm(row.last_action)) {
       findings.push(
         diffFinding('warn', 'bills', row.bill_number, 'last_action', lastAction.action, row.last_action),
       );

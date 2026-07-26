@@ -270,7 +270,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   general_assembly: {
     category: 'legislative_bodies_and_people',
     title: "Kentucky General Assembly",
-    content: "Kentucky's state legislature. It has two chambers: the House of Representatives (100 members) and the Senate (38 members). It meets every year in Frankfort."
+    content: "Kentucky's state legislature. It has two chambers: the House of Representatives (100 members) and the Senate (38 members). It convenes in Frankfort each January — up to 60 legislative days in even-numbered years and 30 in odd-numbered years."
   },
 
   house: {

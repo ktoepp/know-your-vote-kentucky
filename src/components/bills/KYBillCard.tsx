@@ -111,6 +111,26 @@ export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardPro
       >
         {bill.title}
       </Typography>
+      {(bill.official_short_titles?.length ?? 0) > 0 && (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{
+            mt: -0.75,
+            mb: 1.5,
+            fontSize: '0.8125rem',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          <Box component="span" sx={{ fontWeight: 600 }}>
+            {bill.official_short_titles!.length > 1 ? 'Short titles: ' : 'Short title: '}
+          </Box>
+          {bill.official_short_titles!.join(' · ')}
+        </Typography>
+      )}
     </>
   );
 

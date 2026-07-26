@@ -30,6 +30,12 @@ export const KY_TOPICS = [
   'Alcohol & Cannabis',
   'Gambling',
   'Transportation',
+  // Ceremonial resolutions — honors, congratulations, and in-memoriams. Assigned
+  // by title shape (see isCeremonialResolution), not body keywords, so these
+  // instruments are browsable/searchable as a category instead of collecting
+  // incidental policy tags (e.g. SR35 2023, an honor "upon his election", was
+  // mislabeled Voting Rights).
+  'Honors & Memorials',
 ] as const;
 
 export type KYTopicTag = (typeof KY_TOPICS)[number];
@@ -101,11 +107,46 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   // name in a vehicle bill). Bare 'bridge' deliberately NOT included here — it matched financial
   // "bridge loans"; genuine bridge bills are still surfaced via the LegiScan /bridge/ subject mapping.
   Transportation: ['road', 'highway', 'transit', 'transportation', 'motor vehicle', 'license plate', 'railroad', 'railway', 'vehicle registration', "driver's license", 'school bus', 'toll road', 'public transit', 'mass transit'],
+  // Detected structurally from the title (isCeremonialResolution), never from body
+  // keywords — a keyword list here would false-tag substantive bills. Intentionally empty.
+  'Honors & Memorials': [],
 };
 
 /** Escape regex metacharacters in a keyword before embedding in a pattern. */
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** The `Honors & Memorials` tag for ceremonial resolutions. */
+const HONORS_MEMORIALS: KYTopicTag = 'Honors & Memorials';
+
+/**
+ * Ceremonial resolutions — honoring/congratulating a person or group, or
+ * memorializing the deceased. Detected by title shape because these instruments
+ * carry no policy content; matching body keywords only produces false tags
+ * (SR35 2023, "honoring Congressman … upon his election", was mislabeled Voting
+ * Rights off the word "election"). Mirrors the ceremonial half of the search
+ * demotion (SEARCH_CEREMONIAL_RESOLUTION_RE in ky-search-bills.ts), widened to
+ * the short LRC title forms ("Adjourn in honor and loving memory of …",
+ * "Honor …", "Memorialize …") the classifier also sees.
+ *
+ * `designating`/appointment resolutions are deliberately excluded — those are
+ * demoted in search but are not honors or memorials, so they fall through to
+ * normal topic classification. Substantive ACTs are excluded too: a naming act
+ * ("AN ACT relating to naming the … Armory in honor of Rep. …", HB467) carries
+ * "in honor of" but has legal effect and a real policy topic (Veterans Affairs),
+ * so it must keep keyword classification.
+ */
+const CEREMONIAL_LEAD_RE =
+  /^(?:a\s+(?:joint\s+|concurrent\s+)?resolution\s+)?(?:honor(?:ing|s)?|recogniz(?:e|es|ing)|congratulat(?:e|es|ing)|commemorat(?:e|es|ing)|celebrat(?:e|es|ing)|mourn(?:s|ing)?|memorializ(?:e|es|ing))\b/i;
+const IN_HONOR_OR_MEMORY_RE = /\bin\s+(?:loving\s+)?(?:honor|memory)\b/i;
+const SUBSTANTIVE_ACT_RE = /^an\s+act\b/i;
+
+export function isCeremonialResolution(title: string | null | undefined): boolean {
+  const t = (title ?? '').trim();
+  if (!t) return false;
+  if (SUBSTANTIVE_ACT_RE.test(t)) return false;
+  return CEREMONIAL_LEAD_RE.test(t) || IN_HONOR_OR_MEMORY_RE.test(t);
 }
 
 /**
@@ -141,6 +182,11 @@ const TOPIC_KEYWORD_REGEXES: { topic: KYTopicTag; keyword: string; regex: RegExp
  * Returns matched topics sorted by relevance (number of keyword hits).
  */
 export function classifyTopics(title: string, description: string): string[] {
+  // Ceremonial resolutions get the single structural tag and skip keyword
+  // matching entirely — their body words (a district, a profession, "election")
+  // describe the honoree, not a policy area the resolution addresses.
+  if (isCeremonialResolution(title)) return [HONORS_MEMORIALS];
+
   const text = stripBoilerplate(`${title} ${description}`);
   const hitsByTopic = new Map<KYTopicTag, number>();
 
