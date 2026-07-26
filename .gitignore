@@ -78,3 +78,6 @@ diagnose-after.txt
 
 # CI-only sentinel written by sync/audit scripts to dedupe Slack failure posts
 .slack-notified
+
+# ICP persona walkthrough research (persona, findings, improvement plan) — local working docs
+/docs/icp-review/
