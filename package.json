@@ -98,9 +98,9 @@
     "lottie-react": "^2.4.1",
     "lucide-react": "^1.8.0",
     "mapbox-gl": "^3.22.0",
-    "next": "15.5.18",
+    "next": "15.5.22",
     "openai": "^5.6.0",
-    "postcss": "8.5.10",
+    "postcss": "8.5.23",
     "posthog-js": "^1.378.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
@@ -123,7 +123,7 @@
     "@types/ws": "^8.18.1",
     "adm-zip": "^0.5.17",
     "eslint": "^9",
-    "eslint-config-next": "15.5.18",
+    "eslint-config-next": "15.5.22",
     "pg": "^8.20.0",
     "shpjs": "^6.2.0",
     "tailwindcss": "^4.1.10",
@@ -131,7 +131,8 @@
     "typescript": "^5.8.3"
   },
   "overrides": {
-    "postcss": "8.5.10",
+    "postcss": "8.5.23",
+    "sharp": "0.35.3",
     "minimatch@3.1.5": {
       "brace-expansion": "1.1.13"
     }
