@@ -121,7 +121,7 @@
     "@types/react-dom": "^18.2.25",
     "@types/shpjs": "^3.4.7",
     "@types/ws": "^8.18.1",
-    "adm-zip": "^0.5.17",
+    "adm-zip": "^0.6.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.22",
     "pg": "^8.20.0",
@@ -133,9 +133,7 @@
   "overrides": {
     "postcss": "8.5.23",
     "sharp": "0.35.3",
-    "minimatch@3.1.5": {
-      "brace-expansion": "1.1.13"
-    }
+    "brace-expansion": "5.0.8"
   },
   "keywords": [],
   "author": "",
