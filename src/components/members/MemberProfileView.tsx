@@ -470,7 +470,11 @@ export function MemberProfileView({
                 {tally && voteRecord && (
                   <Card variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
                     <CardContent>
-                      {voteRecord.totalRollCalls === 0 ? (
+                      {voteRecord.unavailable ? (
+                        <Typography variant="body2" color="text.secondary">
+                          This member&rsquo;s voting record could not be loaded. Please try again shortly.
+                        </Typography>
+                      ) : voteRecord.totalRollCalls === 0 ? (
                         <Typography variant="body2" color="text.secondary">
                           No recorded votes found for this session yet.
                         </Typography>
