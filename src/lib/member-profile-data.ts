@@ -166,15 +166,23 @@ export interface MemberVoteRecord {
   recent: MemberRecentRollVote[];
   /** All roll calls in session (up to maxRows) for client-side filtering. */
   votes: MemberRecentRollVote[];
+  /**
+   * True when the record could not be loaded (Supabase unavailable or the roll-call
+   * query errored/timed out) rather than the member genuinely having no recorded votes.
+   * Lets the profile distinguish a transient failure from an empty session instead of
+   * mislabeling an outage as "no votes."
+   */
+  unavailable: boolean;
 }
 
-function emptyMemberVoteRecord(sessionName: string): MemberVoteRecord {
+function emptyMemberVoteRecord(sessionName: string, unavailable = false): MemberVoteRecord {
   return {
     sessionName,
     totalRollCalls: 0,
     tally: { yea: 0, nay: 0, notVoting: 0, absent: 0, unknown: 0 },
     recent: [],
     votes: [],
+    unavailable,
   };
 }
 
@@ -289,7 +297,8 @@ export async function fetchMemberVoteRecord(
 ): Promise<MemberVoteRecord> {
   const supabase = createAnonClient();
   const sessionNameEarly = options?.sessionName ?? getCivicDataSessionName();
-  if (!supabase) return emptyMemberVoteRecord(sessionNameEarly);
+  // No client == misconfiguration/outage, not a member with an empty session.
+  if (!supabase) return emptyMemberVoteRecord(sessionNameEarly, true);
 
   const sessionName = options?.sessionName ?? getCivicDataSessionName();
   let peopleId = leg.legiscan_id != null ? Number(leg.legiscan_id) : null;
@@ -311,8 +320,13 @@ export async function fetchMemberVoteRecord(
   });
 
   if (error) {
-    console.warn('get_votes_for_legislator failed', error.message);
-    return emptyMemberVoteRecord(sessionName);
+    // A failed roll-call query (e.g. a statement timeout) must not read as "no votes" —
+    // flag it unavailable so the profile shows a distinct, honest message and the failure
+    // stays visible in logs rather than silently degrading the record.
+    console.warn(
+      `get_votes_for_legislator failed (people_id=${peopleKey}, session=${sessionName}): ${error.message}`,
+    );
+    return emptyMemberVoteRecord(sessionName, true);
   }
 
   const votes = (rows ?? []) as KYVote[];
@@ -351,5 +365,6 @@ export async function fetchMemberVoteRecord(
     tally: tallyFromMap(tallies),
     recent: allVotes.slice(0, recentLimit),
     votes: allVotes,
+    unavailable: false,
   };
 }
