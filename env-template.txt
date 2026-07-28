@@ -186,6 +186,9 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 #   SLACK_WEBHOOK_ERRORS — failed sync steps, health-check failures
 #   SLACK_WEBHOOK_SUPPORT — optional copy of *critical* only: sync crashes + health failures
 #                             (does not receive per-source row failures; those stay on ERRORS)
+#   SLACK_WEBHOOK_SIGNUPS — new verified-user announcements (#user-signups). NO fallback: kept out
+#                             of the status-reports firehose so signups are visible. If unset, the
+#                             notify-signups pipeline escalates to SLACK_WEBHOOK_ERRORS instead.
 #
 # Legacy names still work: SLACK_WEBHOOK_SYNC (digest), SLACK_WEBHOOK_ALERTS (errors),
 # SLACK_WEBHOOK_URL (fallback for digest then errors chain).
@@ -212,6 +215,7 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # SLACK_WEBHOOK_STATUS_REPORTS=https://hooks.slack.com/services/T.../B.../xxx
 # SLACK_WEBHOOK_ERRORS=https://hooks.slack.com/services/T.../B.../xxx
 # SLACK_WEBHOOK_SUPPORT=https://hooks.slack.com/services/T.../B.../xxx
+# SLACK_WEBHOOK_SIGNUPS=https://hooks.slack.com/services/T.../B.../xxx
 # SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../xxx
 # SLACK_WEBHOOK_ALERTS=https://hooks.slack.com/services/T.../B.../xxx
 # SLACK_WEBHOOK_SYNC=https://hooks.slack.com/services/T.../B.../xxx

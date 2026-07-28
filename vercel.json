@@ -16,6 +16,9 @@
     },
     "src/app/api/cron/notify/route.ts": {
       "maxDuration": 120
+    },
+    "src/app/api/cron/notify-signups/route.ts": {
+      "maxDuration": 60
     }
   },
   "headers": [
@@ -47,6 +50,7 @@
     { "path": "/api/cron/notify", "schedule": "0 11 * * *" },
     { "path": "/api/sync?source=lrc-committee-materials", "schedule": "30 13 * * *" },
     { "path": "/api/cron/health-check", "schedule": "0 14 * * *" },
+    { "path": "/api/cron/notify-signups", "schedule": "0 */6 * * *" },
     { "path": "/api/sync?source=lrc-enrollment-actions", "schedule": "45 14 * * *" },
     { "path": "/api/sync?source=lrc-popular-names", "schedule": "30 15 * * 0" }
   ]
