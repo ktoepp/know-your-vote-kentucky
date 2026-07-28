@@ -1781,3 +1781,25 @@ Same-day follow-on to the prod-bundle security pass (PR #206, which took audit 1
 - **`@types/adm-zip@^0.5.8` left in place.** adm-zip 0.6.0 bundles its own types, making the `@types` package redundant, but the two coexist without conflict (`tsc` clean). Removing it is a valid future cleanup, kept out of this pass to keep the diff minimal.
 
 **Revisit if:** an `eslint` major upgrade eventually pulls a `minimatch`/`brace-expansion` that satisfies the advisory natively — at that point the blanket `brace-expansion` override can be dropped. Until then a targeted override is the correct, minimal lever.
+
+---
+
+## 2026-07-28 — New-verified-user Slack alerts made server-authoritative + moved off #status-reports
+
+Fixes a real "lack of visibility" bug: verified signups were being silently missed and, when they did fire, were buried in the sync-digest firehose.
+
+- **Root cause #1 (under-counting).** The `notifyNewUserSlack` alert fired only from `POST /api/me/ack-email-verification`, which runs only if the browser completes the fire-and-forget POST on `/auth/verify`. When that POST never lands (tab closed, JS error, mail-app link preview), Supabase still sets `auth.users.email_confirmed_at` but the app never learns it, so no alert fires. Production snapshot on 2026-07-28: **11 confirmed users, only 5 app-stamped, 6 confirmed-but-never-announced (55%).**
+- **Root cause #2 (burial).** Even when it fired, the notice went through `webhookUrlForSyncDigest()` → **#status-reports**, drowned by hourly bills-sync digests, quota lines, `ky_sources` snapshots, accuracy audits, and link verifies.
+- **Root cause #3 (silent).** `notifyNewUserSlack` no-op'd when no digest webhook was set, and the caller swallowed errors — a misconfig produced zero signal.
+
+**Resolution.**
+- **Server-authoritative off `email_confirmed_at`.** New reconciliation path keyed on the auth column, not the browser-driven `email_verified_at` (which stays app-controlled per migration 032). Migration **045**: adds `ky_user_profiles.signup_notified_at` (idempotency stamp) + SECURITY DEFINER RPC `ky_pending_signup_notifications(p_limit)` (service_role only) that returns confirmed-but-un-announced users via a join on `auth.users`. Backfill marks all currently-confirmed users as already-announced so no historical burst hits #user-signups (clear `signup_notified_at` to replay history).
+- **Dedicated channel.** `notifyNewUserSlack` now posts to **`SLACK_WEBHOOK_SIGNUPS` (#user-signups)** with **no fallback** to the digest webhook — that fallback was the burial bug.
+- **New pipeline.** `src/lib/new-signup-notifications.ts::runNewSignupNotifications()` claims each row (conditional null→timestamp update, so the cron and the ack fast-path never double-post), posts, and rolls the stamp back on post failure so the next run retries. Driven by cron `GET /api/cron/notify-signups` (`0 */6 * * *`, Bearer CRON_SECRET/SYNC_API_KEY) as the guarantee, and fired inline (fast path) from `ack-email-verification`.
+- **Fails loud, to #errors.** Missing `SLACK_WEBHOOK_SIGNUPS`, a failed Slack post, or a cron exception escalate to `SLACK_WEBHOOK_ERRORS` via `notifySignupPipelineFailureSlack()`.
+
+**Operator action required:** set `SLACK_WEBHOOK_SIGNUPS` (Incoming Webhook for #user-signups) in Vercel prod. Until then, the pipeline escalates a single "not configured — N pending" notice to #errors rather than dropping signups.
+
+**Corrects stale note:** the 2026-06-16 entry says the alert is called from `welcome-email/route.tsx`; it had since moved to `ack-email-verification`, and as of this entry the trigger is the `signup_notified_at`-keyed pipeline above (cron + ack fast path), no longer gated on `email_verified_at`.
+
+**Revisit if:** wanting alerts on *registration* (pre-verification) too — this pipeline is post-confirmation by design.
