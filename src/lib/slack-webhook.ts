@@ -56,6 +56,22 @@ function webhookUrlForSupportEscalation(): string | null {
   return process.env.SLACK_WEBHOOK_SUPPORT?.trim() || null;
 }
 
+/**
+ * New-signup announcements (#user-signups). Deliberately has NO fallback to the
+ * sync-digest webhook: routing signups through #status-reports buried them under
+ * routine sync noise (the visibility bug this channel exists to fix). When it's
+ * unset, {@link notifyNewUserSlack} reports "skipped" and the reconciliation
+ * pipeline escalates to #errors instead of silently dropping the notice.
+ */
+function webhookUrlForSignups(): string | null {
+  return process.env.SLACK_WEBHOOK_SIGNUPS?.trim() || null;
+}
+
+/** Whether a dedicated #user-signups webhook is configured. */
+export function signupsWebhookConfigured(): boolean {
+  return webhookUrlForSignups() !== null;
+}
+
 async function postToAlertsAndSupport(text: string): Promise<void> {
   const alertUrl = webhookUrlForAlerts();
   const supportUrl = webhookUrlForSupportEscalation();
@@ -484,20 +500,36 @@ function maskEmail(email: string): string {
 }
 
 /**
- * Posts a new-signup notice to the status-reports digest channel. Server-side and
- * fires exactly once per user (called from ack-email-verification on first verify),
- * unlike the client `user_registered` PostHog event it can't be dropped by ad-blockers.
- * No-op when no digest webhook is configured.
+ * Posts a new-signup notice to the dedicated #user-signups channel
+ * ({@link webhookUrlForSignups}). Kept out of the sync-digest firehose so the
+ * notice is actually visible. Returns delivery status so the reconciliation
+ * pipeline can stamp-on-success / retry-on-failure and escalate to #errors.
+ *
+ * `skipped: true` means no #user-signups webhook is configured — the caller
+ * should escalate to #errors rather than treat it as delivered.
  */
 export async function notifyNewUserSlack(params: {
   email: string;
   displayName?: string | null;
-}): Promise<void> {
-  const url = webhookUrlForSyncDigest();
-  if (!url) return;
+}): Promise<{ ok: boolean; status: number; skipped?: boolean }> {
+  const url = webhookUrlForSignups();
+  if (!url) return { ok: false, status: 0, skipped: true };
   const name = params.displayName?.trim();
   const who = name ? `${name} · \`${maskEmail(params.email)}\`` : `\`${maskEmail(params.email)}\``;
-  await postSlackIncomingWebhook(url, `*KY Vote — new verified user* :tada:\n${who}`);
+  return postSlackIncomingWebhook(url, `*KY Vote — new verified user* :tada:\n${who}`);
+}
+
+/**
+ * Escalates a failure in the new-signup notification pipeline to #errors
+ * (the alerts webhook): the #user-signups webhook is unconfigured, a Slack post
+ * failed, or the reconciliation cron itself threw. Best-effort; no-op when no
+ * alerts webhook is configured.
+ */
+export async function notifySignupPipelineFailureSlack(detail: string): Promise<void> {
+  const url = webhookUrlForAlerts();
+  if (!url) return;
+  const clipped = detail.length > 1500 ? `${detail.slice(0, 1500)}…` : detail;
+  await postSlackIncomingWebhook(url, `*KY Vote — new-signup alert pipeline problem*\n${clipped}`);
 }
 
 /**

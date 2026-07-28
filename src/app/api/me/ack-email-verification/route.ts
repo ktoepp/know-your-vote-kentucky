@@ -5,7 +5,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
-import { notifyNewUserSlack } from '@/lib/slack-webhook';
+import { runNewSignupNotifications } from '@/lib/new-signup-notifications';
 
 export async function POST(request: NextRequest) {
   const auth = await getAuthedUser(request);
@@ -46,18 +46,12 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { data: profile } = await supabaseAdmin
-    .from('ky_user_profiles')
-    .select('email, display_name')
-    .eq('user_id', auth.userId)
-    .maybeSingle();
-
-  if (profile?.email) {
-    void notifyNewUserSlack({
-      email: profile.email as string,
-      displayName: profile.display_name as string | null,
-    }).catch((e) => console.error('[Slack] new-user notify failed:', e));
-  }
+  // Fast path for the happy case (browser completed the verify POST). Announcement
+  // is server-authoritative and idempotent (keyed on signup_notified_at), so the
+  // notify-signups cron still covers users whose browser never reaches here.
+  void runNewSignupNotifications({ limit: 5 }).catch((e) =>
+    console.error('[Slack] new-user notify failed:', e),
+  );
 
   return NextResponse.json({ verified: true, email_verified_at: data.email_verified_at });
 }
