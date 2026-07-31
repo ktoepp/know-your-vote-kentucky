@@ -7,6 +7,11 @@ import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
+import {
+  evaluateSourceHealth,
+  UNMONITORED_SOURCES,
+  type SourceRow,
+} from '@/lib/source-health';
 
 // Auth is handled by middleware (src/middleware.ts) — no inline check needed.
 
@@ -65,14 +70,23 @@ async function fetchCounter(key: string): Promise<Record<string, number> | null>
   return (data as CounterRow & { payload: Record<string, number> })?.payload ?? null;
 }
 
-async function fetchSources(): Promise<Array<{ id: string; last_synced_at: string | null; last_status: string | null }>> {
+/**
+ * `ky_sources` columns are `source_name` / `last_sync_at` / `status`. This
+ * previously selected `id, last_synced_at, last_status` — none of which exist —
+ * so PostgREST errored, the `return []` below swallowed it, and the Data Sources
+ * table rendered permanently empty.
+ */
+async function fetchSources(): Promise<SourceRow[]> {
   if (!supabaseAdmin) return [];
   const { data, error } = await supabaseAdmin
     .from('ky_sources')
-    .select('id, last_synced_at, last_status')
-    .order('id');
-  if (error || !data) return [];
-  return data as Array<{ id: string; last_synced_at: string | null; last_status: string | null }>;
+    .select('source_name, status, last_sync_at, items_synced, error_message')
+    .order('source_name');
+  if (error || !data) {
+    if (error) console.error('[admin/sync-status] ky_sources query failed:', error.message);
+    return [];
+  }
+  return data as SourceRow[];
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +103,11 @@ export default async function SyncStatusPage() {
       fetchCounter('rate_limit_denies'),
       fetchSources(),
     ]);
+
+  // Freshness/status verdict per source — same evaluator the health-check cron
+  // uses, so this page and the Slack alert can never disagree.
+  const health = evaluateSourceHealth(sources);
+  const breachBySource = new Map(health.breaches.map((b) => [b.source, b]));
 
   // LegiScan quota
   const monthKey = currentMonthKey();
@@ -226,27 +245,43 @@ export default async function SyncStatusPage() {
                   </Box>
                 </Box>
                 <Box component="tbody">
-                  {sources.map((src, i) => (
-                    <Box component="tr" key={src.id}>
+                  {sources.map((src, i) => {
+                    const breach = breachBySource.get(src.source_name);
+                    const unmonitored = src.source_name in UNMONITORED_SOURCES;
+                    return (
+                    <Box component="tr" key={src.source_name}>
                       <Box component="td" sx={{ py: 1, pr: 2, borderBottom: i < sources.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
                         <Typography variant="body2" fontFamily="monospace">
-                          {src.id}
+                          {src.source_name}
                         </Typography>
+                        {unmonitored ? (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            not monitored — {UNMONITORED_SOURCES[src.source_name]}
+                          </Typography>
+                        ) : breach ? (
+                          <Typography variant="caption" color="error" display="block">
+                            {breach.kind}: {breach.message}
+                          </Typography>
+                        ) : null}
                       </Box>
                       <Box component="td" sx={{ py: 1, pr: 2, borderBottom: i < sources.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
-                        <Typography variant="body2" title={src.last_synced_at ?? undefined}>
-                          {formatRelative(src.last_synced_at)}
+                        <Typography variant="body2" title={src.last_sync_at ?? undefined}>
+                          {formatRelative(src.last_sync_at)}
                         </Typography>
                       </Box>
                       <Box component="td" sx={{ py: 1, borderBottom: i < sources.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
-                        {src.last_status ? (
+                        {src.status ? (
                           <Chip
-                            label={src.last_status}
+                            label={src.status}
                             size="small"
                             color={
-                              src.last_status === 'ok' || src.last_status === 'success'
+                              breach
+                                ? 'error'
+                                : unmonitored
+                                ? 'default'
+                                : src.status === 'success'
                                 ? 'success'
-                                : src.last_status === 'error'
+                                : src.status === 'error'
                                 ? 'error'
                                 : 'default'
                             }
@@ -256,7 +291,8 @@ export default async function SyncStatusPage() {
                         )}
                       </Box>
                     </Box>
-                  ))}
+                    );
+                  })}
                 </Box>
               </Box>
             )}
