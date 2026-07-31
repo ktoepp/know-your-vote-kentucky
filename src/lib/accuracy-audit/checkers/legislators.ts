@@ -72,9 +72,54 @@ function districtNumber(d: string | number | null | undefined): string {
   return m ? String(parseInt(m[0], 10)) : String(d).trim().toLowerCase();
 }
 
+/**
+ * Normalize a photo URL so only *real* drift compares unequal.
+ *
+ * Ignored on purpose, because none of it changes which image a user sees:
+ *  - scheme (http vs https — the KY site is reachable on both and sources differ),
+ *  - a `www.` prefix and host case,
+ *  - a trailing slash and any query string / fragment (cache-busting params),
+ *  - percent-encoding: stored URLs encode the spaces in
+ *    "/Legislators%20Thumbnail%20Images/", Open States may not.
+ * Path case is preserved below the decode because some hosts are case-sensitive;
+ * we lowercase only for the final comparison, which is a deliberate trade of a
+ * little precision for far fewer false positives.
+ */
+function normalizePhotoUrl(v: string | null | undefined): string {
+  const raw = (v ?? '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    let path = u.pathname.replace(/\/+$/, '');
+    try {
+      path = decodeURIComponent(path);
+    } catch {
+      /* malformed escape: compare the raw path */
+    }
+    return `${host}${path}`.toLowerCase();
+  } catch {
+    return norm(raw);
+  }
+}
+
+/** Final path segment of a photo URL — the image asset's filename. */
+function photoBasename(v: string): string {
+  const i = v.lastIndexOf('/');
+  return i >= 0 ? v.slice(i + 1) : v;
+}
+
+/**
+ * Fraction of comparable photo URLs that must differ before the mismatch is
+ * treated as one upstream convention change instead of per-member drift.
+ */
+const PHOTO_SYSTEMIC_RATIO = 0.5;
+
 export async function checkLegislators(db: SupabaseClient, cfg: AuditConfig): Promise<CheckerResult> {
   const started = Date.now();
   const findings: Finding[] = [];
+  const photoMismatches: Array<{ label: string; expected: string; actual: string }> = [];
+  let photoComparable = 0;
 
   const { data, error } = await db
     .from('ky_legislators')
@@ -195,6 +240,24 @@ export async function checkLegislators(db: SupabaseClient, cfg: AuditConfig): Pr
         field: 'photo_url',
         message: 'Open States has a photo but none is stored',
       });
+    } else if (os.image && row.photo_url) {
+      // Presence alone used to be the whole check, so a stale photo (a member
+      // replaced mid-term keeping their predecessor's headshot) went unnoticed.
+      // Roster is already in hand, so this costs no extra API call.
+      const expected = normalizePhotoUrl(os.image);
+      const actual = normalizePhotoUrl(row.photo_url);
+      // Same filename on a different host is a mirror/CDN variation of the same
+      // asset (legislature.ky.gov vs an Open States cache), not photo drift.
+      const sameAsset =
+        expected === actual || photoBasename(expected) === photoBasename(actual);
+      // Collected rather than reported inline — see the systematic-difference
+      // check after the loop.
+      if (!sameAsset) {
+        photoComparable += 1;
+        photoMismatches.push({ label, expected: os.image, actual: row.photo_url });
+      } else {
+        photoComparable += 1;
+      }
     }
 
     // Committee membership drift — warn only (content finding per CI policy § 2026-06-03).
@@ -217,6 +280,36 @@ export async function checkLegislators(db: SupabaseClient, cfg: AuditConfig): Pr
           expected: [...osSlugs].sort().join(', '),
           actual: [...dbSlugs].sort().join(', '),
         });
+      }
+    }
+  }
+
+  // Photo drift: per-legislator only when it is genuinely per-legislator.
+  //
+  // If Open States ever changes its image-hosting convention (a different host
+  // AND filename scheme), every single member compares unequal at once. That is
+  // one fact about the feed, not 141 facts about legislators, and reporting it
+  // 141 times would swamp the digest and train us to skim past the domain. Above
+  // the threshold we emit a single finding naming the systematic difference;
+  // below it, individual rows are real drift and reported individually.
+  if (photoMismatches.length > 0) {
+    const systemic =
+      photoComparable > 0 && photoMismatches.length / photoComparable >= PHOTO_SYSTEMIC_RATIO;
+    if (systemic) {
+      const sample = photoMismatches[0]!;
+      findings.push({
+        severity: 'warn',
+        domain: 'legislators',
+        field: 'photo_url',
+        message:
+          `${photoMismatches.length} of ${photoComparable} photo URLs differ from Open States — ` +
+          'this looks like an upstream hosting-convention change rather than per-member drift',
+        expected: sample.expected,
+        actual: sample.actual,
+      });
+    } else {
+      for (const m of photoMismatches) {
+        findings.push(diffFinding('warn', 'legislators', m.label, 'photo_url', m.expected, m.actual));
       }
     }
   }

@@ -2110,6 +2110,12 @@ export const SYNC_SOURCES: Record<string, (options: SyncOptions) => Promise<Sync
       const db = getSupabase();
       const stats = await syncKyLrcEnrollmentActions(db, { dryRun: opts.dryRun });
       const itemsSynced = stats.historyInserted;
+      // `sessionsAbsent` (LRC publishes no page for that session) is expected and
+      // deliberately excluded from `errors` — counting it marked this source red
+      // on every run. See ky-lrc-enrollment-actions-sync.ts § EnrollmentActionsFetch.
+      if (stats.sessionsAbsent > 0) {
+        log(source, `${stats.sessionsAbsent} session(s) have no enrollment-actions page (expected)`);
+      }
       const status = stats.errors > 0 ? 'error' : 'success';
       const errorMsg =
         stats.errors > 0

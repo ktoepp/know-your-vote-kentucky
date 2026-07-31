@@ -61,6 +61,25 @@ jobs:
       - name: Run content accuracy audit
         run: npm run audit:accuracy
 
+      # Advisory triage of what the audit just recorded, posted to the status
+      # channel as a follow-up to the raw digest (never a replacement for it).
+      # `if: success()` deliberately, not `always()`: when the audit itself
+      # failed operationally there are no findings worth interpreting, and the
+      # #errors escalation has already fired.
+      - name: Triage findings
+        if: success()
+        continue-on-error: true
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+          SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_SYNC_NOTIFY_CLI: 'true'
+        run: npm run triage:findings -- --source=audit
+
       - name: Slack notify on workflow failure or timeout
         if: cancelled() || failure()
         env:

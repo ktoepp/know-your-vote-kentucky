@@ -43,6 +43,12 @@ export interface KyLrcEnrollmentActionsSyncOptions {
 
 export interface KyLrcEnrollmentActionsSyncStats {
   sessionsProcessed: number;
+  /**
+   * Sessions LRC publishes no enrollment-actions page for (404). Expected for
+   * older sessions — tracked separately from `errors` so a routine absence does
+   * not mark the whole run failed.
+   */
+  sessionsAbsent: number;
   entriesParsed: number;
   billRefsParsed: number;
   historyInserted: number;
@@ -192,7 +198,22 @@ async function insertHistoryItems(db: SupabaseClient, items: HistoryItem[]): Pro
   return { inserted, skipped };
 }
 
-async function fetchEnrollmentActionsHtml(sessionSlug: string): Promise<string | null> {
+/**
+ * Outcome of fetching one session's enrollment-actions page.
+ *
+ * `absent` and `failed` were previously collapsed into a single `null`, and the
+ * caller counted both as errors. Since this sync walks *every* session in
+ * `KY_SESSIONS` (22 of them) and LRC only publishes an enrollment-actions page
+ * for recent sessions, the older ones 404 on every run — so the job reported
+ * `error` to ky_sources daily, permanently, for a condition that is entirely
+ * expected. A source that is always red is a source nobody reads.
+ */
+type EnrollmentActionsFetch =
+  | { kind: 'ok'; html: string }
+  | { kind: 'absent' }
+  | { kind: 'failed'; message: string };
+
+async function fetchEnrollmentActionsHtml(sessionSlug: string): Promise<EnrollmentActionsFetch> {
   const url = lrcEnrollmentActionsUrl(sessionSlug);
   try {
     const res = await axios.get<string>(url, {
@@ -201,11 +222,18 @@ async function fetchEnrollmentActionsHtml(sessionSlug: string): Promise<string |
       headers: FETCH_HEADERS,
       validateStatus: (status) => status < 500,
     });
-    if (res.status === 404 || !res.data) return null;
-    return res.data;
+    // 404: LRC has no enrollment-actions page for this session. Expected for
+    // older sessions and not a problem with the sync.
+    if (res.status === 404) return { kind: 'absent' };
+    // Any other non-2xx, or a 200 with an empty body, is a real anomaly — the
+    // page should exist and be readable.
+    if (res.status >= 400) return { kind: 'failed', message: `HTTP ${res.status}` };
+    if (!res.data) return { kind: 'failed', message: `HTTP ${res.status} with empty body` };
+    return { kind: 'ok', html: res.data };
   } catch (e) {
-    logError(`fetch ${url}: ${e instanceof Error ? e.message : String(e)}`);
-    return null;
+    const message = e instanceof Error ? e.message : String(e);
+    logError(`fetch ${url}: ${message}`);
+    return { kind: 'failed', message };
   }
 }
 
@@ -215,6 +243,7 @@ export async function syncKyLrcEnrollmentActions(
 ): Promise<KyLrcEnrollmentActionsSyncStats> {
   const stats: KyLrcEnrollmentActionsSyncStats = {
     sessionsProcessed: 0,
+    sessionsAbsent: 0,
     entriesParsed: 0,
     billRefsParsed: 0,
     historyInserted: 0,
@@ -237,13 +266,19 @@ export async function syncKyLrcEnrollmentActions(
     }
 
     log(`Fetching ${lrcEnrollmentActionsUrl(slug)} (${sessionName})…`);
-    const html = await fetchEnrollmentActionsHtml(slug);
-    if (!html) {
+    const fetched = await fetchEnrollmentActionsHtml(slug);
+    if (fetched.kind === 'absent') {
+      // Not an error: LRC simply does not publish this page for the session.
+      stats.sessionsAbsent += 1;
+      log(`${sessionName}: no enrollment-actions page published (404) — skipping`);
+      continue;
+    }
+    if (fetched.kind === 'failed') {
       stats.errors += 1;
       continue;
     }
 
-    const parsed = parseEnrollmentActionsHtml(html, slug);
+    const parsed = parseEnrollmentActionsHtml(fetched.html, slug);
     stats.sessionsProcessed += 1;
     stats.entriesParsed += parsed.stats.actionGroupCount;
     stats.billRefsParsed += parsed.stats.billRefCount;

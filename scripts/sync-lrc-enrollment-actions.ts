@@ -67,7 +67,8 @@ async function runSync() {
   const stats = await syncKyLrcEnrollmentActions(db, { dryRun, sessions });
 
   console.log(
-    `\nDone: sessions=${stats.sessionsProcessed} entries=${stats.entriesParsed} ` +
+    `\nDone: sessions=${stats.sessionsProcessed} absent=${stats.sessionsAbsent} ` +
+      `entries=${stats.entriesParsed} ` +
       `billRefs=${stats.billRefsParsed} inserted=${stats.historyInserted} ` +
       `skipped=${stats.historySkipped} unresolved=${stats.unresolvedBills} errors=${stats.errors}` +
       (dryRun ? ' [DRY RUN]' : ''),

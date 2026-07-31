@@ -193,6 +193,158 @@ export function diffAgendaItems(
   return findings;
 }
 
+/**
+ * Bill-request numbers ("BR 25") are pre-filed drafts an interim committee
+ * discusses before the bill gets an HB/SB number. They deliberately do not exist
+ * in `ky_bills`, so an unresolved BR reference is correct behaviour, not drift.
+ */
+const BILL_REQUEST_PREFIX = /^\s*BR\b/i;
+
+/**
+ * Whole-corpus consistency checks over stored committee data.
+ *
+ * These need no upstream fetch, which is the point: the live LRC calendar covers
+ * only the current week, so every other check in this file goes quiet the moment
+ * the calendar is empty — during interim, that is most of the time, and the
+ * domain then verified nothing at all while still reporting "skipped" as though
+ * that were fine. The corpus is ~390 meetings and ~2,000 agenda rows, nearly all
+ * of it outside any live window and much of it written by backfills that no
+ * upstream diff will ever revisit.
+ *
+ * Each check was sized against production before being added; the thresholds and
+ * exclusions below exist to keep this actionable rather than noisy.
+ */
+async function checkStoredCorpusInvariants(
+  db: SupabaseClient,
+  findings: Finding[],
+): Promise<number> {
+  let checked = 0;
+
+  // --- Agenda rows present and correctly ordered -----------------------------
+  const { data: meetings, error: mErr } = await db
+    .from('ky_committee_meetings')
+    .select('id, meeting_date, agenda_content_hash, member_refs, ky_committees ( name )');
+  if (mErr) throw new Error(`ky_committee_meetings: ${mErr.message}`);
+
+  const { data: agenda, error: aErr } = await db
+    .from('ky_committee_agenda_items')
+    .select('meeting_id, sort_order, bill_number, bill_session_label, ky_bill_id');
+  if (aErr) throw new Error(`ky_committee_agenda_items: ${aErr.message}`);
+
+  const byMeeting = new Map<string, Array<{ sort_order: number; bill_number: string | null; ky_bill_id: string | null }>>();
+  for (const r of agenda ?? []) {
+    const k = r.meeting_id as string;
+    if (!byMeeting.has(k)) byMeeting.set(k, []);
+    byMeeting.get(k)!.push(r as never);
+  }
+
+  for (const m of meetings ?? []) {
+    checked += 1;
+    const c = m.ky_committees as { name?: string } | { name?: string }[] | null;
+    const label = `${(Array.isArray(c) ? c[0]?.name : c?.name) ?? 'committee'} ${m.meeting_date}`;
+    const items = byMeeting.get(m.id as string) ?? [];
+    const hash = m.agenda_content_hash as string | null;
+
+    // Silent agenda loss: the sync deletes agenda rows before re-inserting and a
+    // failed insert leaves a valid hash over an empty agenda. Checked here for
+    // the whole corpus, not just meetings on the current calendar.
+    if (items.length === 0 && hash && hash !== EMPTY_AGENDA_HASH) {
+      findings.push({
+        severity: 'fail',
+        domain: 'committees',
+        entity: label,
+        field: 'agenda_items',
+        message:
+          'agenda_content_hash records agenda text but no ky_committee_agenda_items rows are stored (agenda lost on write)',
+      });
+      continue;
+    }
+    if (items.length === 0) continue;
+
+    // sort_order drives render order and is the agenda's only ordering key, so a
+    // gap or duplicate silently reorders or hides lines on the committee page.
+    const orders = items.map((i) => i.sort_order).sort((a, b) => a - b);
+    const contiguous =
+      orders[0] === 0 &&
+      orders[orders.length - 1] === orders.length - 1 &&
+      new Set(orders).size === orders.length;
+    if (!contiguous) {
+      findings.push({
+        severity: 'warn',
+        domain: 'committees',
+        entity: label,
+        field: 'agenda_items.sort_order',
+        message: `agenda sort_order is not a contiguous 0..${orders.length - 1} sequence — rendered order is unreliable`,
+        actual: orders.join(','),
+      });
+    }
+
+    // A roster is what the committee page's Members section renders. A meeting
+    // with a parsed agenda but no member_refs means the roster was dropped.
+    const refs = m.member_refs as unknown[] | null;
+    if (!refs || refs.length === 0) {
+      findings.push({
+        severity: 'warn',
+        domain: 'committees',
+        entity: label,
+        field: 'member_refs',
+        message: 'meeting has agenda items but no member_refs — the committee Members section has nothing to render',
+      });
+    }
+  }
+
+  // --- Bill references actually resolve --------------------------------------
+  // An agenda line naming a real bill that never resolved renders as plain text
+  // instead of a link, which is the most common user-visible agenda defect.
+  // BR (bill request) numbers are excluded: they have no ky_bills row by design.
+  const unresolved = (agenda ?? []).filter(
+    (r) => r.bill_number && !r.ky_bill_id && !BILL_REQUEST_PREFIX.test(String(r.bill_number)),
+  );
+  if (unresolved.length > 0) {
+    const sample = [...new Set(unresolved.map((r) => String(r.bill_number)))].sort();
+    findings.push({
+      severity: 'warn',
+      domain: 'committees',
+      field: 'agenda_items.ky_bill_id',
+      message:
+        `${unresolved.length} agenda line(s) name a bill that never resolved to a ky_bills row ` +
+        `(renders as plain text, not a link): ${sample.slice(0, 8).join(', ')}` +
+        (sample.length > 8 ? `, +${sample.length - 8} more` : ''),
+    });
+  }
+
+  // --- Materials joined to the right committee -------------------------------
+  // `meeting_id` is a best-effort date match at sync time; a material pointing at
+  // another committee's meeting would file the document under the wrong body.
+  const { data: mats, error: matErr } = await db
+    .from('ky_committee_materials')
+    .select('id, title, committee_id, meeting_id')
+    .not('meeting_id', 'is', null);
+  if (matErr) throw new Error(`ky_committee_materials: ${matErr.message}`);
+
+  const committeeByMeeting = new Map<string, string>();
+  for (const m of meetings ?? []) committeeByMeeting.set(m.id as string, '');
+  const { data: meetingOwners } = await db
+    .from('ky_committee_meetings')
+    .select('id, committee_id');
+  for (const m of meetingOwners ?? []) committeeByMeeting.set(m.id as string, m.committee_id as string);
+
+  for (const mt of mats ?? []) {
+    const owner = committeeByMeeting.get(mt.meeting_id as string);
+    if (owner && owner !== mt.committee_id) {
+      findings.push({
+        severity: 'fail',
+        domain: 'committees',
+        entity: String(mt.title ?? mt.id),
+        field: 'materials.meeting_id',
+        message: 'material is linked to a meeting belonging to a different committee',
+      });
+    }
+  }
+
+  return checked;
+}
+
 export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Promise<CheckerResult> {
   const started = Date.now();
   const findings: Finding[] = [];
@@ -243,6 +395,21 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
   }
 
 
+  // Corpus invariants run FIRST and unconditionally. Every check below this
+  // point depends on the live calendar, which lists only the current week — so
+  // when the calendar is empty (most of the interim) the domain used to report
+  // `skipped` having verified nothing at all.
+  let invariantsChecked = 0;
+  try {
+    invariantsChecked = await checkStoredCorpusInvariants(db, findings);
+  } catch (e) {
+    // A query failure here is our own DB, not a flaky upstream — that is an
+    // operational error and should page.
+    return summarizeResult('committees', 0, findings, started, {
+      error: `stored-corpus invariants failed: ${e instanceof Error ? e.message : String(e)}`,
+    });
+  }
+
   let html: string;
   try {
     const res = await axios.get<string>(LRC_LEGISLATIVE_CALENDAR_URL, {
@@ -259,12 +426,12 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
     // the calendar URL moved) stays an operational error. Mirrors the per-committee
     // LRC-fetch handling in the materials checker.
     if (isTransientUpstreamError(e)) {
-      return summarizeResult('committees', 0, findings, started, {
+      return summarizeResult('committees', invariantsChecked, findings, started, {
         skipped: true,
         skipReason: `LRC calendar unavailable (transient): ${msg}`,
       });
     }
-    return summarizeResult('committees', 0, findings, started, {
+    return summarizeResult('committees', invariantsChecked, findings, started, {
       error: `LRC calendar fetch failed: ${msg}`,
     });
   }
@@ -273,9 +440,11 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
   const scheduled = scheduledMeetingsFromParsed(parsed);
 
   if (scheduled.length === 0) {
-    return summarizeResult('committees', 0, findings, started, {
+    return summarizeResult('committees', invariantsChecked, findings, started, {
       skipped: true,
-      skipReason: 'live calendar has no scheduled meetings right now',
+      // Not a true skip any more: the corpus invariants above already ran.
+      skipReason:
+        'live calendar has no scheduled meetings right now (stored-corpus invariants still ran)',
     });
   }
 
@@ -288,7 +457,7 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
       .select('id, lrc_rsn, committee_type')
       .in('lrc_rsn', rsns);
     if (error) {
-      return summarizeResult('committees', 0, findings, started, { error: error.message });
+      return summarizeResult('committees', invariantsChecked, findings, started, { error: error.message });
     }
     for (const c of committees ?? []) {
       committeeByKey.set(`${c.lrc_rsn}|${c.committee_type}`, c.id as string);
@@ -316,7 +485,7 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
       .gte('meeting_date', sortedDates[0]!)
       .lte('meeting_date', sortedDates[sortedDates.length - 1]!);
     if (error) {
-      return summarizeResult('committees', 0, findings, started, { error: error.message });
+      return summarizeResult('committees', invariantsChecked, findings, started, { error: error.message });
     }
     storedMeetings.push(...(data ?? []));
   }
@@ -415,7 +584,7 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
       .select('meeting_id, sort_order, raw_text, item_kind, bill_number, bill_session_label, ky_bill_id, depth')
       .in('meeting_id', matched.map((m) => m.meetingId));
     if (aErr) {
-      return summarizeResult('committees', checked, findings, started, { error: aErr.message });
+      return summarizeResult('committees', invariantsChecked + checked, findings, started, { error: aErr.message });
     }
 
     const agendaByMeeting = new Map<string, StoredAgendaItem[]>();
@@ -508,5 +677,5 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
     }
   }
 
-  return summarizeResult('committees', checked, findings, started);
+  return summarizeResult('committees', invariantsChecked + checked, findings, started);
 }

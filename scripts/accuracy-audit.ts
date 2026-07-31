@@ -252,8 +252,9 @@ async function main() {
   }
 
   if (!cfg.dryRun) {
+    let slackDelivered = false;
     try {
-      await notifyAccuracyAuditSlack({
+      slackDelivered = await notifyAccuracyAuditSlack({
         body: formatSlackReport(summary, { recurrence }),
         escalateToAlerts: hasOperationalError,
         fromCli: true,
@@ -261,9 +262,11 @@ async function main() {
     } catch (e) {
       console.error('[accuracy-audit] Slack notify failed:', e instanceof Error ? e.message : e);
     }
-    // Operational errors were escalated to #errors above; let the workflow's
-    // failure step stand down. (Content findings exit 0 and never reach here.)
-    if (hasOperationalError) markSlackErrorNotified();
+    // Stand the workflow's failure step down only when our own #errors message
+    // actually landed. Dropping the sentinel after a failed post (Slack down, or
+    // no webhook configured) silenced the fallback too and left the failure
+    // reported nowhere.
+    if (hasOperationalError) markSlackErrorNotified(slackDelivered);
   }
 
   process.exit(hasOperationalError ? 1 : 0);

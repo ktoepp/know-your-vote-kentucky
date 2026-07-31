@@ -2,7 +2,11 @@
  * Committee materials accuracy checker.
  *
  * 1. Re-fetches LRC Committee Documents pages for recently-active committees and
- *    diffs the parsed material links/titles against stored `ky_committee_materials`.
+ *    diffs them against stored `ky_committee_materials` in both directions: live
+ *    materials missing from storage (with title, meeting_date, date_label,
+ *    file_type and sort_order compared), and stored rows the live page no longer
+ *    lists (scoped to meeting groups the page still shows — see the reverse-diff
+ *    comment for why `source_url` cannot be used for that scoping).
  * 2. Probes a rotating sample of stored material URLs (and bill text URLs) for
  *    reachability — 404 is a hard failure, other non-2xx/3xx is a warning.
  */
@@ -14,6 +18,7 @@ import {
 } from '../../lrc-committee-materials-parser';
 import { sampleTable } from '../sampling';
 import {
+  diffFinding,
   norm,
   summarizeResult,
   type AuditConfig,
@@ -44,7 +49,24 @@ interface MaterialRow {
   committee_id: string;
   title: string | null;
   url: string;
+  /** ISO date the material was filed under; drives the materials section's grouping. */
+  meeting_date: string | null;
+  /** As-printed heading ("Thursday, May 21, 2026"); rendered verbatim as the group heading. */
+  date_label: string | null;
+  /** Lowercase extension; drives the per-row file-type badge. */
+  file_type: string | null;
+  /** Index within its meeting group; the materials list is ordered by this. */
+  sort_order: number | null;
 }
+
+/**
+ * Max per-committee "stored but absent from the live page" rows named individually
+ * before the rest collapse into the roll-up count. Kept small on purpose: the
+ * condition is overwhelmingly systemic (a whole batch of rows goes stale at once
+ * when LRC re-shapes its URLs), so listing every row buries every other finding in
+ * the run without adding information. See the reverse-diff comment below.
+ */
+const STALE_EXAMPLES_PER_COMMITTEE = 3;
 
 type LinkKind = 'material' | 'bill';
 
@@ -125,10 +147,72 @@ function validateLinkShape(target: LinkTarget): Finding | null {
   return null;
 }
 
+/**
+ * The pre-migration flat `/CommitteeDocuments/{meeting_id}/file` URL shape,
+ * superseded by the nested `/{rsn}/{meeting_id}/file` form.
+ */
+const LEGACY_FLAT_MATERIAL_URL = /\/CommitteeDocuments\/[0-9]+\/[^/]+$/;
+const NESTED_MATERIAL_URL = /\/CommitteeDocuments\/[0-9]+\/[0-9]+\/[^/]+$/;
+
+/**
+ * One systemic finding for stored materials that are exact duplicates of another
+ * row under the superseded URL shape.
+ *
+ * These render the same document twice in the materials section, and the legacy
+ * copy's URL 404s (see `lrcCommitteeDocumentsUrl`), so a visitor clicking the
+ * wrong one of a visually identical pair gets nothing. It is a single data
+ * defect with a single fix — deleting the superseded rows — so it is reported
+ * once with a total rather than per committee or per row.
+ *
+ * Returns the set of duplicate URLs so the reverse diff can exclude them.
+ */
+async function checkLegacyDuplicateUrls(
+  db: SupabaseClient,
+  findings: Finding[],
+): Promise<Set<string>> {
+  const duplicates = new Set<string>();
+  const { data, error } = await db
+    .from('ky_committee_materials')
+    .select('id, committee_id, title, meeting_date, url');
+  if (error) return duplicates;
+
+  const rows = data ?? [];
+  // Key on the identity of the document itself, not its URL.
+  const nested = new Set(
+    rows
+      .filter((r) => NESTED_MATERIAL_URL.test(String(r.url)))
+      .map((r) => `${r.committee_id}|${r.title}|${r.meeting_date}`),
+  );
+
+  let currentYear = 0;
+  for (const r of rows) {
+    const url = String(r.url);
+    if (!LEGACY_FLAT_MATERIAL_URL.test(url)) continue;
+    if (!nested.has(`${r.committee_id}|${r.title}|${r.meeting_date}`)) continue;
+    duplicates.add(url);
+    if (String(r.meeting_date ?? '') >= `${new Date().getUTCFullYear()}-01-01`) currentYear += 1;
+  }
+
+  if (duplicates.size > 0) {
+    findings.push({
+      severity: 'warn',
+      domain: 'materials',
+      field: 'url',
+      message:
+        `${duplicates.size} stored material(s) duplicate another row under the superseded ` +
+        `/CommitteeDocuments/{meeting_id}/ URL shape (${currentYear} dated this year). Each renders ` +
+        'the document twice in the materials section and the superseded copy 404s. ' +
+        'Fix is a one-time cleanup of the duplicate rows, not a sync change.',
+    });
+  }
+  return duplicates;
+}
+
 async function checkMaterialsDiff(
   db: SupabaseClient,
   cfg: AuditConfig,
   findings: Finding[],
+  legacyDuplicateUrls: Set<string>,
 ): Promise<number> {
   // Seed-sample committees that have an LRC documents page.
   const committees = await sampleTable<CommitteeRow>(db, {
@@ -190,7 +274,7 @@ async function checkMaterialsDiff(
   if (usable.length > 0) {
     const { data: storedRows } = await db
       .from('ky_committee_materials')
-      .select('id, committee_id, title, url')
+      .select('id, committee_id, title, url, meeting_date, date_label, file_type, sort_order')
       .in('committee_id', usable.map((u) => u.committee.id));
     for (const r of (storedRows ?? []) as MaterialRow[]) {
       if (!storedByCommittee.has(r.committee_id)) storedByCommittee.set(r.committee_id, new Map());
@@ -201,12 +285,22 @@ async function checkMaterialsDiff(
   for (const { committee, url, html } of usable) {
     processed += 1;
     const parsed = parseCommitteeMaterialsHtml(html, url);
-    const liveMaterials = parsed.meetings.flatMap((m) => m.materials);
-    if (liveMaterials.length === 0) continue;
+    // Flatten while keeping each material's meeting context and its index within
+    // that meeting: `meeting_date`, `date_label` and `sort_order` are all derived
+    // from the group a material sits in, so they can only be diffed with it.
+    const liveEntries = parsed.meetings.flatMap((meeting) =>
+      meeting.materials.map((mat, index) => ({ mat, meeting, index })),
+    );
+    if (liveEntries.length === 0) continue;
 
     const storedByUrl = storedByCommittee.get(committee.id) ?? new Map<string, MaterialRow>();
 
-    for (const mat of liveMaterials) {
+    // One ordering finding per meeting group at most. A single insertion upstream
+    // shifts every following index, which would otherwise emit one finding per
+    // material for what is one change.
+    const orderingReported = new Set<string>();
+
+    for (const { mat, meeting, index } of liveEntries) {
       const stored = storedByUrl.get(mat.url);
       if (!stored) {
         findings.push({
@@ -228,6 +322,132 @@ async function checkMaterialsDiff(
           expected: mat.title,
           actual: stored.title ?? '',
           url: mat.url,
+        });
+      }
+
+      // Presentation metadata below. All `warn`, never `fail`: a wrong date group
+      // or badge misleads a reader about *when* a document was discussed or *what*
+      // it is, which matters, but the document itself and its link are still
+      // correct — nothing here makes the page state something false about the
+      // legislature. `info` would be too weak: the committee page groups, heads
+      // and orders the entire materials section off these four columns.
+
+      // meeting_date: only diff when the live label actually parsed. `parseDateLabel`
+      // returns null for any heading it doesn't recognize, and a null there says
+      // "unknown", not "the stored date is wrong". Stored values come from a date
+      // column, so slice defensively in case PostgREST ever widens it to a timestamp.
+      const liveDate = meeting.meetingDate;
+      const storedDate = (stored.meeting_date ?? '').slice(0, 10);
+      if (liveDate && storedDate !== liveDate) {
+        findings.push(
+          diffFinding('warn', 'materials', committee.name, 'meeting_date', liveDate, storedDate, mat.url),
+        );
+      }
+
+      // date_label is rendered verbatim as the group heading, so it is compared
+      // through `norm` — LRC's own whitespace/case around the heading varies
+      // between page generations and is invisible once rendered.
+      if (norm(meeting.dateLabel) && norm(meeting.dateLabel) !== norm(stored.date_label)) {
+        findings.push(
+          diffFinding(
+            'warn',
+            'materials',
+            committee.name,
+            'date_label',
+            meeting.dateLabel,
+            stored.date_label,
+            mat.url,
+          ),
+        );
+      }
+
+      // file_type: the parser lower-cases the extension and deliberately returns
+      // null for non-file links (.html year pages), so a null live value carries no
+      // assertion about the stored badge — skip rather than flag it.
+      if (mat.fileType && mat.fileType.toLowerCase() !== (stored.file_type ?? '').toLowerCase()) {
+        findings.push(
+          diffFinding('warn', 'materials', committee.name, 'file_type', mat.fileType, stored.file_type, mat.url),
+        );
+      }
+
+      // sort_order is written by both sync paths as the material's index within its
+      // meeting group, so the live index is directly comparable.
+      const groupKey = meeting.meetingDate ?? meeting.dateLabel;
+      if (stored.sort_order !== index && !orderingReported.has(groupKey)) {
+        orderingReported.add(groupKey);
+        findings.push(
+          diffFinding(
+            'warn',
+            'materials',
+            committee.name,
+            `sort_order[${groupKey}]`,
+            String(index),
+            String(stored.sort_order ?? ''),
+            mat.url,
+          ),
+        );
+      }
+    }
+
+    // Reverse direction: rows we store that the live page no longer lists. These
+    // still render in the committee page's materials section with a link that looks
+    // live, so they are exactly as user-visible as a missing row.
+    //
+    // Scoping is the whole difficulty. `ky_committee_materials` also holds rows from
+    // `backfill:lrc:committee-materials`, which walks each committee's "Other Meeting
+    // Years" chain, so most stored rows legitimately are not on the current page.
+    // `source_url` cannot separate them — every one of the 1,773 stored rows records
+    // a committee-root source_url (`/CommitteeDocuments/{rsn}` or `…/{rsn}/`), none a
+    // year page, because the later daily sync rewrites source_url on update.
+    //
+    // So scope by meeting group instead: consider only stored rows whose meeting_date
+    // matches a date the live page is *currently showing*. If LRC still lists that
+    // meeting, everything we hold under it should be in that group; if LRC has rolled
+    // the meeting off to a year page, the whole group drops out of scope and stays
+    // silent. Every stored row has a non-null meeting_date (verified: 0 of 1,773 are
+    // null), so nothing falls through the scoping for lack of a date.
+    const liveUrls = new Set(liveEntries.map((e) => e.mat.url));
+    const liveDates = new Set(
+      parsed.meetings.map((m) => m.meetingDate).filter((d): d is string => d != null),
+    );
+    if (liveDates.size > 0) {
+      const stale = [...storedByUrl.values()].filter(
+        (row) =>
+          row.meeting_date != null &&
+          liveDates.has(row.meeting_date.slice(0, 10)) &&
+          !liveUrls.has(row.url) &&
+          // Exclude the known duplicate class. Every one of the 802 legacy
+          // flat-URL rows has an exact nested twin (same committee, title and
+          // date), so they are one data defect with one fix — reported once by
+          // `checkLegacyDuplicateUrls` — not evidence that LRC removed a
+          // document. Leaving them in here would put a double-digit count on
+          // ~10 of 12 sampled committees every single run, which is how a check
+          // teaches people to skim past it.
+          !legacyDuplicateUrls.has(row.url),
+      );
+      if (stale.length > 0) {
+        // Rolled up to a single finding per committee rather than one per row. The
+        // condition is systemic in practice: 802 of 1,773 stored rows still carry the
+        // pre-migration flat `/CommitteeDocuments/{meeting_id}/…` URL shape alongside
+        // their nested `/{rsn}/{meeting_id}/…` twin, and one committee alone holds 75
+        // of them in the current year. Emitting them individually would put several
+        // hundred findings in a run and drown every other domain; one finding per
+        // committee, carrying the count and a few examples, is enough to act on and
+        // keeps the per-run ceiling at one per sampled committee. It also matches the
+        // `checked` unit — one committee page examined, at most one entity flagged.
+        const examples = stale.slice(0, STALE_EXAMPLES_PER_COMMITTEE).map((r) => r.url);
+        findings.push({
+          severity: 'warn',
+          domain: 'materials',
+          entity: committee.name,
+          field: 'stored_not_on_lrc',
+          message:
+            `${stale.length} stored material(s) filed under meeting date(s) the LRC page still ` +
+            `lists are absent from that page — likely removed upstream or a stale URL shape; ` +
+            `they still render as working links`,
+          expected: 'listed on the LRC documents page',
+          actual: examples.join(' , ') + (stale.length > examples.length ? ' , …' : ''),
+          url,
         });
       }
     }
@@ -324,9 +544,22 @@ export async function checkMaterials(db: SupabaseClient, cfg: AuditConfig): Prom
   const started = Date.now();
   const findings: Finding[] = [];
 
+  // `checked` sums two different things — committee pages diffed, then link targets
+  // validated — which reads like a unit mix. It is left summed deliberately: the unit
+  // `summarizeResult` actually needs is "distinguishable entities examined", since it
+  // derives `passed` as checked minus the number of *distinct flagged entity labels*.
+  // Each committee page contributes exactly one entity (the committee name, used by
+  // every finding the diff pass emits, including the rolled-up reverse-diff one) and
+  // each link target exactly one (`material: …` / `bill text: …`), and the two label
+  // namespaces cannot collide. Re-basing the diff pass on materials-compared instead
+  // would inflate `checked` while findings still collapse to one entity per committee,
+  // making `passed/checked` read far better than reality — strictly worse.
   let checked = 0;
   try {
-    checked += await checkMaterialsDiff(db, cfg, findings);
+    // Runs first: the reverse diff needs the duplicate set to exclude, and the
+    // systemic finding should precede the per-committee ones in the report.
+    const legacyDuplicateUrls = await checkLegacyDuplicateUrls(db, findings);
+    checked += await checkMaterialsDiff(db, cfg, findings, legacyDuplicateUrls);
   } catch (e) {
     findings.push({
       severity: 'warn',

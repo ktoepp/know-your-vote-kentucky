@@ -28,12 +28,33 @@ const VERCEL_SYNC_CRON_MONITORS: Record<
     maxRuntime: 8,
     checkinMargin: 5,
   },
-  "lrc-calendar": {
-    schedule: { type: "crontab", value: "0 12 * * *" },
-    maxRuntime: 5,
+  // `lrc-calendar` intentionally has NO monitor: that job moved off Vercel Cron to
+  // GitHub Actions (.github/workflows/sync-lrc-calendar.yml), so a monitor here
+  // would never receive a check-in and would fire missed-check-in alerts forever.
+  // If a `vercel-cron-sync-lrc-calendar` monitor still exists in Sentry, delete it there.
+  "lrc-committee-materials": {
+    schedule: { type: "crontab", value: "30 13 * * *" },
+    maxRuntime: 8,
     checkinMargin: 5,
   },
+  "lrc-enrollment-actions": {
+    schedule: { type: "crontab", value: "45 14 * * *" },
+    maxRuntime: 8,
+    checkinMargin: 5,
+  },
+  "lrc-popular-names": {
+    // Weekly (Sundays) — a wider margin because a single missed Sunday is the
+    // whole week's signal and we'd rather not page on a few minutes of drift.
+    schedule: { type: "crontab", value: "30 15 * * 0" },
+    maxRuntime: 8,
+    checkinMargin: 15,
+  },
   // Local-government crons paused 2026-05-18 — see docs/specs/committee-calendar.md
+  //
+  // NOT covered here: /api/cron/health-check, /api/cron/notify and
+  // /api/cron/notify-signups. This map is keyed by `?source=` and is only consulted
+  // by withVercelSyncCronMonitor on the sync routes — those three are standalone
+  // handlers with no source, so they need their own Sentry check-ins, not an entry here.
 };
 
 function monitorSlugForSource(source: string): string {

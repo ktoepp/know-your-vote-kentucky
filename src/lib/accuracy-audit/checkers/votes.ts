@@ -34,6 +34,8 @@ interface VoteRow {
   yea_count: number | null;
   nay_count: number | null;
   absent_count: number | null;
+  /** NULL on rows synced before migration 035 (see the nv_count check below). */
+  nv_count: number | null;
   roll_call: StoredRollCallEntry[] | null;
   ky_bills: { bill_number: string | null } | { bill_number: string | null }[] | null;
 }
@@ -53,7 +55,7 @@ export async function checkVotes(db: SupabaseClient, cfg: AuditConfig): Promise<
     rows = await sampleTable<VoteRow>(db, {
       table: 'ky_votes',
       select:
-        'id, roll_call_id, date, description, yea_count, nay_count, absent_count, roll_call, ky_bills ( bill_number )',
+        'id, roll_call_id, date, description, yea_count, nay_count, absent_count, nv_count, roll_call, ky_bills ( bill_number )',
       seed: cfg.seed,
       limit: cfg.votesLimit,
       filter: (q) => q.not('roll_call_id', 'is', null),
@@ -123,6 +125,19 @@ export async function checkVotes(db: SupabaseClient, cfg: AuditConfig): Promise<
     if (Number(row.absent_count ?? 0) !== rc.absent) {
       findings.push(
         diffFinding('warn', 'votes', label, 'absent_count', String(rc.absent), String(row.absent_count ?? 0)),
+      );
+    }
+
+    // nv_count is rendered as the "NV" chip on bill detail (ky-bill-detail-server.ts),
+    // so a wrong value is user-visible — but it is only *populated* for rows synced
+    // after migration 035. Older rows are NULL, which means "not yet backfilled",
+    // not "zero NV votes": comparing them would flag the entire pre-035 corpus as a
+    // mismatch. Skip NULL and only diff rows that actually carry a stored value.
+    // Severity mirrors absent_count (`warn`): NV/absent are the soft half of the
+    // tally — advisory drift, not a wrong pass/fail outcome for the bill.
+    if (row.nv_count != null && Number(row.nv_count) !== rc.nv) {
+      findings.push(
+        diffFinding('warn', 'votes', label, 'nv_count', String(rc.nv), String(row.nv_count)),
       );
     }
 

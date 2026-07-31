@@ -1,0 +1,111 @@
+# Sync-source health check — an independent second path to the Vercel cron.
+#
+# `/api/cron/health-check` (Vercel, 14:00 UTC daily) evaluates the same data via
+# the same module. This exists because that cron is itself unmonitored: if it
+# stops firing, or CRON_SECRET is rotated so every request 401s, the endpoint
+# goes silent and nothing notices — the thing that would have complained is the
+# thing that stopped. Running the evaluator from a second scheduler means
+# whichever one survives still reports.
+#
+# Both paths share `src/lib/source-health.ts` and the same edge-trigger
+# fingerprint in ky_sync_state, so they cannot disagree about what "healthy"
+# means and one breach does not page twice.
+#
+# Required secrets: NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL),
+#   SUPABASE_SERVICE_ROLE_KEY, SLACK_WEBHOOK_ERRORS, SLACK_SYNC_NOTIFY_CLI=true
+name: Sync source health
+
+on:
+  workflow_dispatch:
+    inputs:
+      strict:
+        description: 'Exit non-zero when any source is unhealthy'
+        type: boolean
+        default: false
+  schedule:
+    # 02:00 UTC — deliberately ~12h out of phase with the Vercel cron (14:00),
+    # so a source that breaks just after one check is caught by the other within
+    # half a day rather than a full one.
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: source-health
+  cancel-in-progress: false
+
+jobs:
+  source-health:
+    name: Evaluate ky_sources health
+    runs-on: ubuntu-latest
+    # Reads one small table and posts at most one Slack message.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Evaluate sync source health
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_SYNC_NOTIFY_CLI: 'true'
+        run: |
+          npm run health:sources ${{ inputs.strict && '-- --strict' || '' }}
+
+      # Advisory triage of any breach the step above found. Runs only on
+      # success: a failed evaluation has nothing to interpret, and the fallback
+      # step below already reports that case.
+      - name: Triage source health
+        if: success()
+        continue-on-error: true
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+          SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_SYNC_NOTIFY_CLI: 'true'
+        run: npm run triage:findings -- --source=health
+
+      # Last-resort net: fires only when the step above could not report for
+      # itself (setup failure, OOM, timeout kill). The script drops
+      # .slack-notified after a *delivered* Slack post, so a successful alert
+      # does not double-post — but a failed delivery deliberately leaves the
+      # marker absent so this step still speaks up.
+      - name: Slack notify on workflow failure or timeout
+        if: cancelled() || failure()
+        env:
+          SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_ERRORS" ]; then
+            echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set"
+            exit 0
+          fi
+          if [ -f .slack-notified ]; then
+            echo "Skip Slack: script already reported"
+            exit 0
+          fi
+          if [ "${{ job.status }}" = "cancelled" ]; then
+            HEADLINE="*Source health check timed out or was cancelled*"
+          else
+            HEADLINE="*Source health check failed*"
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            --data "{\"text\":\"$HEADLINE\nThe run could not report for itself.\n$RUN_URL\"}" \
+            "$SLACK_WEBHOOK_ERRORS" || true
