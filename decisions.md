@@ -1832,7 +1832,20 @@ Fixes a real "lack of visibility" bug: verified signups were being silently miss
 
 **Also fixed:** `/admin/sync-status` selected `id, last_synced_at, last_status` — none of which exist on `ky_sources` (real columns are `source_name`, `last_sync_at`, `status`). PostgREST errored, `if (error || !data) return []` swallowed it, and the one human view of source health rendered permanently empty. It now shares the health evaluator, so the page and the Slack alert cannot disagree.
 
-**Known remaining gap (not addressed):** `ky_sources` records `success` with `items_synced: 0` indefinitely — `lrc-calendar` reported success 4h before this pass while no `ky_committee_meetings` row had been written since 2026-07-26. Freshness of the *source row* is now checked; "did the pipeline actually produce data" is not.
+### "Did the pipeline actually produce data" — closed
+
+`ky_sources` recorded `success` with `items_synced: 0` indefinitely, so a job running on schedule that had silently stopped yielding was indistinguishable from a healthy one. `lrc-calendar` reported success 4h before this pass while no `ky_committee_meetings` row had been written since 2026-07-26, and no live-calendar meeting exists after 2026-07-20 (every August meeting in the DB comes from the interim-PDF backfill, `scraped_at` 2026-05-22).
+
+**The naive check would be wrong.** Zero output is legitimate for change-hash-gated syncs (bills, votes sync 0 for weeks during interim) and for interim weeks with no committee meetings at all. Treating any zero as a failure would alarm constantly. Two complementary assertions instead:
+
+- **Structural parse assertion (`lrc-calendar`).** The parser already distinguishes *"LRC published day headings that say No meetings scheduled"* (`dayCount > 0`, a real empty week) from *"we parsed no day headings at all"* (`dayCount === 0`, we can no longer read the page) — and the sync **discarded that distinction**, collapsing both into `success` with `itemsSynced: 0`. The second case now reports `error`. **Why this matters:** the fetch still returns HTTP 200, so a page restructure or a 200-served maintenance page trips nothing else. Verified: the live fixture parses 5 day headings; a restructured page and a 200 error page both parse 0 and are caught.
+- **Zero-yield tracking (all sources).** Migration **047** adds `last_nonzero_sync_at` + `consecutive_zero_syncs` to `ky_sources`, maintained in `updateSourceStatus`. New `stalled` breach kind driven by a per-source `maxZeroYieldHours` — **opt-in by design**, declared only where a prolonged zero is genuinely suspicious: `lrc-calendar` 21d (longer than any interim gap between meeting clusters), `lrc-committee-materials` 14d, `legislators` 7d. `bills` / `votes` / `dataset` / `lrc-popular-names` carry **no** budget precisely because their zeros are normal.
+
+**Deploy ordering:** `fetchSourceRows` falls back to the pre-047 column set when the yield columns are absent, so this ships safely ahead of the migration — without it a missing column surfaces as "Supabase query failed", a false infrastructure alarm and the same class of bug that left `/admin/sync-status` silently empty.
+
+**Verified** against the real `ky_sources` snapshot: today's 11-day calendar gap sits inside the 21-day budget and does not fire; the same state 12 days on does; rows lacking the yield columns produce no breaches.
+
+**Open question this surfaced (not resolved):** whether the current live-calendar zero yield is a genuine interim gap or an upstream/parser break could not be confirmed — this environment's network policy blocks `apps.legislature.ky.gov`. The 21-day budget will answer it by ~2026-08-10 if the yield does not resume.
 
 ### Sampling: the efficiency problem and the coverage problem were the same problem
 
@@ -1860,7 +1873,6 @@ Agenda logic exercised against `fixtures/lrc/legislative-calendar-live.html` (80
 
 ### Not addressed (backlog)
 
-- "Pipeline produced data" assertion (`items_synced: 0` forever reads as healthy).
 - Stateful `last_audited_at` sampling rotation for real coverage guarantees.
 - Verification beyond the live calendar's ~5-day window — 146 upcoming and all backfilled historical meetings are still unverified.
 - `member_refs` (drives the committee Members section), `ky_committees.chamber` (a regex guess that drives the chamber filters), and `profile_url` are displayed and unverified.
