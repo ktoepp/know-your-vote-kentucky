@@ -26,6 +26,16 @@ export interface SourceExpectation {
    * pipeline is not.
    */
   maxAgeHours: number;
+  /**
+   * How long the source may keep succeeding while yielding nothing before that
+   * counts as stalled.
+   *
+   * Opt-in, and deliberately so. A zero yield is perfectly normal for
+   * change-gated syncs (bills, votes) and during quiet interim weeks, so a
+   * budget is declared only where a prolonged zero is genuinely suspicious.
+   * Omit to skip the check for a source.
+   */
+  maxZeroYieldHours?: number;
 }
 
 /**
@@ -35,16 +45,36 @@ export interface SourceExpectation {
  * Keep in sync with `vercel.json` → `crons` and `.github/workflows/*.yml`.
  */
 export const MONITORED_SOURCES: Record<string, SourceExpectation> = {
+  // bills / votes are change-hash gated and legitimately sync 0 items for weeks
+  // during interim, so they carry no zero-yield budget.
   bills: { scheduler: 'Vercel cron', schedule: '0 5 * * *', maxAgeHours: 36 },
-  legislators: { scheduler: 'Vercel cron', schedule: '0 6 * * *', maxAgeHours: 36 },
+  legislators: {
+    scheduler: 'Vercel cron',
+    schedule: '0 6 * * *',
+    maxAgeHours: 36,
+    // Upserts the full ~141-member roster every run; a zero means the Open
+    // States fetch returned nothing.
+    maxZeroYieldHours: 24 * 7,
+  },
   votes: { scheduler: 'Vercel cron', schedule: '15 6 * * *', maxAgeHours: 36 },
-  'lrc-committee-materials': { scheduler: 'Vercel cron', schedule: '30 13 * * *', maxAgeHours: 36 },
+  'lrc-committee-materials': {
+    scheduler: 'Vercel cron',
+    schedule: '30 13 * * *',
+    maxAgeHours: 36,
+    // Re-upserts every document it finds, so a healthy run is in the hundreds.
+    maxZeroYieldHours: 24 * 14,
+  },
   'lrc-enrollment-actions': { scheduler: 'Vercel cron', schedule: '45 14 * * *', maxAgeHours: 36 },
   'lrc-popular-names': { scheduler: 'Vercel cron', schedule: '30 15 * * 0', maxAgeHours: 240 },
   'lrc-calendar': {
     scheduler: 'GitHub Actions sync-lrc-calendar.yml',
     schedule: '0 12,18 * * *',
     maxAgeHours: 30,
+    // Interim gaps between committee meeting clusters run ~2 weeks; three weeks
+    // of nothing means the live calendar stopped yielding. The sync's own
+    // day-heading assertion catches an outright parse break far sooner — this
+    // is the backstop for a subtler stall.
+    maxZeroYieldHours: 24 * 21,
   },
   dataset: {
     scheduler: 'GitHub Actions legiscan-dataset-weekly.yml',
@@ -79,7 +109,7 @@ export const UNMONITORED_SOURCES: Record<string, string> = {
  */
 const STUCK_RUNNING_HOURS = 6;
 
-export type BreachKind = 'missing' | 'error' | 'stuck_running' | 'stale';
+export type BreachKind = 'missing' | 'error' | 'stuck_running' | 'stale' | 'stalled';
 
 export interface SourceBreach {
   source: string;
@@ -94,6 +124,9 @@ export interface SourceRow {
   last_sync_at: string | null;
   items_synced: number | null;
   error_message: string | null;
+  /** Migration 047; null on rows written before it was applied. */
+  last_nonzero_sync_at?: string | null;
+  consecutive_zero_syncs?: number | null;
 }
 
 export interface SourceHealth {
@@ -179,6 +212,32 @@ export function evaluateSourceHealth(rows: SourceRow[], now: Date = new Date()):
         ageHours,
         message: `last synced ${round1(ageHours)}h ago, over the ${expect.maxAgeHours}h budget for ${expect.scheduler} (${expect.schedule})`,
       });
+      continue;
+    }
+
+    // Running on schedule but producing nothing. `status` cannot express this:
+    // the runs succeed, `last_sync_at` advances, and only the yield is missing.
+    if (expect.maxZeroYieldHours != null) {
+      // Fall back to last_sync_at when the column is null — either migration 047
+      // has not been applied, or the source has never yielded. Both mean "no
+      // observed yield", and dating it from the last run avoids alerting on
+      // history we never recorded.
+      const yieldAgeHours =
+        hoursBetween(row.last_nonzero_sync_at ?? null, now) ??
+        (row.items_synced && row.items_synced > 0 ? 0 : ageHours);
+
+      if (yieldAgeHours > expect.maxZeroYieldHours) {
+        const streak = row.consecutive_zero_syncs ?? 0;
+        breaches.push({
+          source,
+          kind: 'stalled',
+          ageHours: yieldAgeHours,
+          message:
+            `running on schedule but has synced 0 items for ${round1(yieldAgeHours)}h ` +
+            `(budget ${expect.maxZeroYieldHours}h${streak > 0 ? `, ${streak} consecutive empty runs` : ''}) — ` +
+            'the job succeeds but the pipeline is not producing data',
+        });
+      }
     }
   }
 
@@ -202,14 +261,35 @@ export function evaluateSourceHealth(rows: SourceRow[], now: Date = new Date()):
   };
 }
 
-/** Read the `ky_sources` snapshot. Throws on query failure so callers can 503. */
+/** Columns that exist regardless of whether migration 047 has been applied. */
+const BASE_SOURCE_COLUMNS = 'source_name, status, last_sync_at, items_synced, error_message';
+/** Yield-tracking columns added by migration 047. */
+const YIELD_SOURCE_COLUMNS = 'last_nonzero_sync_at, consecutive_zero_syncs';
+
+/**
+ * Read the `ky_sources` snapshot. Throws on query failure so callers can 503.
+ *
+ * Falls back to the pre-047 column set when the yield columns are absent, so the
+ * health check keeps working if this deploys ahead of the migration. Without the
+ * fallback a missing column would surface as "Supabase query failed" — a false
+ * infrastructure alarm, and the same class of bug that left /admin/sync-status
+ * silently empty.
+ */
 export async function fetchSourceRows(): Promise<SourceRow[]> {
   if (!supabaseAdmin) throw new Error('Supabase admin client not initialized');
-  const { data, error } = await supabaseAdmin
+
+  const full = await supabaseAdmin
     .from('ky_sources')
-    .select('source_name, status, last_sync_at, items_synced, error_message');
-  if (error) throw new Error(error.message);
-  return (data ?? []) as SourceRow[];
+    .select(`${BASE_SOURCE_COLUMNS}, ${YIELD_SOURCE_COLUMNS}`);
+  if (!full.error) return (full.data ?? []) as SourceRow[];
+
+  const base = await supabaseAdmin.from('ky_sources').select(BASE_SOURCE_COLUMNS);
+  if (base.error) throw new Error(base.error.message);
+  console.warn(
+    '[source-health] yield-tracking columns unavailable (migration 047 not applied?); ' +
+      'stalled-pipeline checks are inactive',
+  );
+  return (base.data ?? []) as SourceRow[];
 }
 
 /** Multi-line Slack/console body describing the breaches. */

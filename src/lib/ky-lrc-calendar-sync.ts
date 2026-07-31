@@ -510,6 +510,29 @@ export async function syncKyLrcCalendar(
 
     log(`Parsed ${parsed.stats.dayCount} days, ${scheduled.length} scheduled meetings`);
 
+    // Distinguish the two very different zero-meeting outcomes, which the sync
+    // previously collapsed into an identical `success` with itemsSynced=0:
+    //
+    //   - LRC published day headings that say "No meetings scheduled" — a real,
+    //     healthy empty week, routine during interim.
+    //   - We parsed no day headings at all — we can no longer read the page.
+    //     The fetch still returned HTTP 200, so nothing else notices.
+    //
+    // Only the second is a failure, and the parser already knows the difference.
+    if (parsed.stats.dayCount === 0) {
+      const message =
+        `calendar HTML parsed to 0 day headings (${html.length} bytes) — ` +
+        'the page structure likely changed; the parser needs updating';
+      logError(message);
+      return {
+        source: SOURCE,
+        status: 'error',
+        itemsSynced: 0,
+        error: message,
+        duration: Date.now() - start,
+      };
+    }
+
     const { meetingsSynced, agendaSynced, hearingEventsRecorded, meetingsCancelled, errors } =
       await upsertLrcCalendarMeetings(db, scheduled, {
         ...options,

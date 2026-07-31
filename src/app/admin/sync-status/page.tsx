@@ -9,6 +9,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import {
   evaluateSourceHealth,
+  fetchSourceRows,
   UNMONITORED_SOURCES,
   type SourceRow,
 } from '@/lib/source-health';
@@ -78,15 +79,12 @@ async function fetchCounter(key: string): Promise<Record<string, number> | null>
  */
 async function fetchSources(): Promise<SourceRow[]> {
   if (!supabaseAdmin) return [];
-  const { data, error } = await supabaseAdmin
-    .from('ky_sources')
-    .select('source_name, status, last_sync_at, items_synced, error_message')
-    .order('source_name');
-  if (error || !data) {
-    if (error) console.error('[admin/sync-status] ky_sources query failed:', error.message);
+  try {
+    return (await fetchSourceRows()).sort((a, b) => a.source_name.localeCompare(b.source_name));
+  } catch (e) {
+    console.error('[admin/sync-status] ky_sources query failed:', e instanceof Error ? e.message : e);
     return [];
   }
-  return data as SourceRow[];
 }
 
 // ---------------------------------------------------------------------------
