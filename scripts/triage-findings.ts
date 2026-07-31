@@ -204,9 +204,17 @@ async function main() {
     process.exit(0);
   }
 
+  // Omit absent sections entirely rather than passing null. Given `audit: null`
+  // the model reasons about the null itself ("confirm whether that is expected")
+  // — speculation about our payload shape, presented to an operator as though it
+  // were a finding. What isn't in scope simply isn't mentioned.
+  const payload: Record<string, unknown> = {};
+  if (audit) payload.audit = audit;
+  if (health) payload.sourceHealth = health;
+
   let triage: string | null = null;
   try {
-    triage = await requestTriage({ audit, sourceHealth: health });
+    triage = await requestTriage(payload);
   } catch (e) {
     console.error('[triage] model call failed:', e instanceof Error ? e.message : e);
   }
