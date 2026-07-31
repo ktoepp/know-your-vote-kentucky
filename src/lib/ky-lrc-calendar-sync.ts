@@ -45,6 +45,12 @@ export type LrcCalendarUpsertStats = {
   agendaSynced: number;
   hearingEventsRecorded: number;
   meetingsCancelled: number;
+  /**
+   * Row-level write failures (committee/meeting upsert, agenda insert, cancel
+   * update). Previously these were logged and dropped, so a run that lost every
+   * agenda row still reported `success` to `ky_sources`.
+   */
+  errors: number;
 };
 
 function log(msg: string) {
@@ -79,9 +85,71 @@ function classifyAgendaKind(rawText: string, refs: LrcBillReference[]): string {
   return 'other';
 }
 
-function agendaContentHash(meeting: LrcCalendarMeeting): string {
+/**
+ * Fingerprint of the **upstream** agenda text, used to detect that LRC edited an
+ * agenda since our last sync (drives `agenda_updated` events).
+ *
+ * Note what this deliberately is not: it is computed from `rawText`, before
+ * {@link normalizeKyGaAgendaLine}, so it does not describe what we stored. It
+ * cannot detect a normalization bug, a failed agenda insert, or a bill that
+ * failed to resolve — the stored rows could be empty and the hash would still
+ * match. Verifying stored agenda content is the accuracy checker's job
+ * (`accuracy-audit/checkers/committees.ts`), which compares against
+ * {@link deriveAgendaItems} field by field.
+ */
+export function agendaContentHash(meeting: LrcCalendarMeeting): string {
   const payload = meeting.agendaItems.map((i) => i.rawText).join('\n');
   return createHash('sha256').update(payload).digest('hex');
+}
+
+/** sha256 of the empty payload — a meeting whose agenda legitimately has no lines. */
+export const EMPTY_AGENDA_HASH = createHash('sha256').update('').digest('hex');
+
+/** A `ky_committee_agenda_items` row derived from a parsed agenda line, minus `ky_bill_id`. */
+export interface DerivedAgendaItem {
+  sort_order: number;
+  raw_text: string;
+  item_kind: string;
+  bill_number: string | null;
+  bill_session_label: string | null;
+  depth: number;
+  /** Key into the bill-id map; null when the line names no bill. */
+  billLookupKey: string | null;
+}
+
+/**
+ * Derive the stored shape of a meeting's agenda rows from its parsed lines.
+ *
+ * Single source of truth shared by the sync (which writes these rows) and the
+ * accuracy checker (which verifies them). Keeping one implementation is the
+ * point: the checker used to carry its own copy of the content hash, and a
+ * checker that re-implements the sync's derivations can only ever agree with
+ * itself.
+ */
+export function deriveAgendaItems(meeting: LrcCalendarMeeting): DerivedAgendaItem[] {
+  return meeting.agendaItems.map((item, idx) => {
+    const refs = item.billReferences.length
+      ? item.billReferences
+      : extractLrcBillReferences(item.rawText);
+    const primary = primaryBillFromLine(refs);
+    // Fall back to the session that was current on the meeting's date when the
+    // agenda line names a bill without a session marker ("SB 58: …"). Interim
+    // committees review enacted bills this way constantly.
+    const resolvedSession = primary.billNumber
+      ? primary.sessionLabel ?? inferSessionLabelFromMeetingDate(meeting.meetingDate)
+      : null;
+    return {
+      sort_order: idx,
+      raw_text: normalizeKyGaAgendaLine(item.rawText),
+      item_kind: classifyAgendaKind(item.rawText, refs),
+      bill_number: primary.billNumber,
+      bill_session_label: resolvedSession,
+      depth: item.depth,
+      billLookupKey: primary.billNumber
+        ? billSessionLookupKey(primary.billNumber, resolvedSession)
+        : null,
+    };
+  });
 }
 
 async function fetchCalendarHtml(): Promise<string> {
@@ -183,6 +251,7 @@ export async function upsertLrcCalendarMeetings(
   let agendaSynced = 0;
   let hearingEventsRecorded = 0;
   let meetingsCancelled = 0;
+  let errors = 0;
   const syncedMeetingIds = new Set<string>();
   const seenMeetingDates: string[] = [];
 
@@ -206,6 +275,7 @@ export async function upsertLrcCalendarMeetings(
       .single();
 
     if (cErr || !committee) {
+      errors++;
       logError(`Committee upsert failed (${committeeRow.name}): ${cErr?.message}`);
       continue;
     }
@@ -251,6 +321,7 @@ export async function upsertLrcCalendarMeetings(
       .single();
 
     if (mErr || !meetingRecord) {
+      errors++;
       logError(`Meeting upsert failed: ${mErr?.message}`);
       continue;
     }
@@ -302,34 +373,26 @@ export async function upsertLrcCalendarMeetings(
 
     await db.from('ky_committee_agenda_items').delete().eq('meeting_id', meetingRecord.id);
 
-    const agendaRows = meeting.agendaItems.map((item, idx) => {
-      const refs = item.billReferences.length ? item.billReferences : extractLrcBillReferences(item.rawText);
-      const primary = primaryBillFromLine(refs);
-      // Fall back to the session that was current on the meeting's date when the
-      // agenda line names a bill without a session marker ("SB 58: …"). Interim
-      // committees review enacted bills this way constantly.
-      const resolvedSession = primary.billNumber
-        ? primary.sessionLabel ?? inferSessionLabelFromMeetingDate(meeting.meetingDate)
-        : null;
-      const lookupKey = primary.billNumber
-        ? billSessionLookupKey(primary.billNumber, resolvedSession)
-        : '';
-      return {
-        meeting_id: meetingRecord.id,
-        sort_order: idx,
-        raw_text: normalizeKyGaAgendaLine(item.rawText),
-        item_kind: classifyAgendaKind(item.rawText, refs),
-        bill_number: primary.billNumber,
-        bill_session_label: resolvedSession,
-        ky_bill_id: lookupKey ? billIdByKey.get(lookupKey) ?? null : null,
-        depth: item.depth,
-      };
-    });
+    const agendaRows = deriveAgendaItems(meeting).map((d) => ({
+      meeting_id: meetingRecord.id,
+      sort_order: d.sort_order,
+      raw_text: d.raw_text,
+      item_kind: d.item_kind,
+      bill_number: d.bill_number,
+      bill_session_label: d.bill_session_label,
+      ky_bill_id: d.billLookupKey ? billIdByKey.get(d.billLookupKey) ?? null : null,
+      depth: d.depth,
+    }));
 
     if (agendaRows.length > 0) {
       const { error: aErr } = await db.from('ky_committee_agenda_items').insert(agendaRows);
       if (aErr) {
-        logError(`Agenda insert failed: ${aErr.message}`);
+        // The delete above already ran, so a failed insert leaves the meeting
+        // with zero agenda rows *and* a valid content hash — silently empty on
+        // the committee page. Count it so the run reports `error` to
+        // ky_sources instead of `success`.
+        errors++;
+        logError(`Agenda insert failed (meeting ${meetingRecord.id}): ${aErr.message}`);
       } else {
         agendaSynced += agendaRows.length;
       }
@@ -379,6 +442,7 @@ export async function upsertLrcCalendarMeetings(
       .eq('status', 'scheduled');
 
     if (diffErr) {
+      errors++;
       logError(`Cancellation diff query failed: ${diffErr.message}`);
     } else {
       const nowIso = new Date().toISOString();
@@ -391,6 +455,7 @@ export async function upsertLrcCalendarMeetings(
           .update({ status: 'cancelled', scraped_at: nowIso })
           .eq('id', id);
         if (updErr) {
+          errors++;
           logError(`Cancel update failed (${id}): ${updErr.message}`);
           continue;
         }
@@ -412,7 +477,7 @@ export async function upsertLrcCalendarMeetings(
     }
   }
 
-  return { meetingsSynced, agendaSynced, hearingEventsRecorded, meetingsCancelled };
+  return { meetingsSynced, agendaSynced, hearingEventsRecorded, meetingsCancelled, errors };
 }
 
 export async function syncKyLrcCalendar(
@@ -445,19 +510,23 @@ export async function syncKyLrcCalendar(
 
     log(`Parsed ${parsed.stats.dayCount} days, ${scheduled.length} scheduled meetings`);
 
-    const { meetingsSynced, agendaSynced, hearingEventsRecorded, meetingsCancelled } =
+    const { meetingsSynced, agendaSynced, hearingEventsRecorded, meetingsCancelled, errors } =
       await upsertLrcCalendarMeetings(db, scheduled, {
         ...options,
         sourceUrl: LRC_LEGISLATIVE_CALENDAR_URL,
       });
 
     log(
-      `Synced ${meetingsSynced} meetings, ${agendaSynced} agenda lines, ${hearingEventsRecorded} hearing_scheduled events, ${meetingsCancelled} cancellations`,
+      `Synced ${meetingsSynced} meetings, ${agendaSynced} agenda lines, ${hearingEventsRecorded} hearing_scheduled events, ${meetingsCancelled} cancellations${errors > 0 ? `, ${errors} write error(s)` : ''}`,
     );
+    // Row-level write failures make this a partial run, not a clean one. Without
+    // this the sync reported `success` after losing agenda rows, and the
+    // health check had nothing to notice.
     return {
       source: SOURCE,
-      status: 'success',
+      status: errors > 0 ? 'error' : 'success',
       itemsSynced: meetingsSynced,
+      error: errors > 0 ? `${errors} row-level write error(s) during calendar upsert` : undefined,
       duration: Date.now() - start,
     };
   } catch (err: unknown) {
