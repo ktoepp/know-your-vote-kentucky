@@ -117,6 +117,47 @@ export interface DerivedAgendaItem {
   billLookupKey: string | null;
 }
 
+/** The bill fields of an agenda row, derived from one line of agenda prose. */
+export interface DerivedAgendaBillRef {
+  bill_number: string | null;
+  bill_session_label: string | null;
+  billLookupKey: string | null;
+}
+
+/**
+ * Derive a line's bill number + session from its text alone.
+ *
+ * Split out of {@link deriveAgendaItems} so a repair pass over *stored* rows
+ * (`scripts/repair-agenda-bill-links.ts`) resolves them exactly the way the
+ * sync would, without needing the parsed-HTML shape the sync works from.
+ *
+ * @param preparsedRefs references already extracted upstream; re-parsed from
+ *   `rawText` when absent, which is the only option for a stored row.
+ */
+export function deriveAgendaBillRef(
+  rawText: string,
+  meetingDate: string | null,
+  preparsedRefs?: LrcBillReference[],
+): DerivedAgendaBillRef {
+  const refs = preparsedRefs?.length ? preparsedRefs : extractLrcBillReferences(rawText);
+  const primary = primaryBillFromLine(refs);
+  // Fall back to the session that was current on the meeting's date when the
+  // agenda line names a bill without a session marker ("SB 58: …"). Interim
+  // committees review enacted bills this way constantly. Only a fallback: a
+  // line naming an older session ("2024 RS HB 833") must keep that session, or
+  // the lookup silently lands on the same bill number in the current session.
+  const resolvedSession = primary.billNumber
+    ? primary.sessionLabel ?? inferSessionLabelFromMeetingDate(meetingDate)
+    : null;
+  return {
+    bill_number: primary.billNumber,
+    bill_session_label: resolvedSession,
+    billLookupKey: primary.billNumber
+      ? billSessionLookupKey(primary.billNumber, resolvedSession)
+      : null,
+  };
+}
+
 /**
  * Derive the stored shape of a meeting's agenda rows from its parsed lines.
  *
@@ -131,23 +172,15 @@ export function deriveAgendaItems(meeting: LrcCalendarMeeting): DerivedAgendaIte
     const refs = item.billReferences.length
       ? item.billReferences
       : extractLrcBillReferences(item.rawText);
-    const primary = primaryBillFromLine(refs);
-    // Fall back to the session that was current on the meeting's date when the
-    // agenda line names a bill without a session marker ("SB 58: …"). Interim
-    // committees review enacted bills this way constantly.
-    const resolvedSession = primary.billNumber
-      ? primary.sessionLabel ?? inferSessionLabelFromMeetingDate(meeting.meetingDate)
-      : null;
+    const billRef = deriveAgendaBillRef(item.rawText, meeting.meetingDate, refs);
     return {
       sort_order: idx,
       raw_text: normalizeKyGaAgendaLine(item.rawText),
       item_kind: classifyAgendaKind(item.rawText, refs),
-      bill_number: primary.billNumber,
-      bill_session_label: resolvedSession,
+      bill_number: billRef.bill_number,
+      bill_session_label: billRef.bill_session_label,
       depth: item.depth,
-      billLookupKey: primary.billNumber
-        ? billSessionLookupKey(primary.billNumber, resolvedSession)
-        : null,
+      billLookupKey: billRef.billLookupKey,
     };
   });
 }
