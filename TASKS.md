@@ -15,9 +15,9 @@ _Active development only. Shipped work moves to Recently completed; deferred/rev
 - [ ] **Filters — "Clear filters" button + de-emphasize the Filters button.** The one unshipped item from the 2026-07-24 dictated UI-fixes batch. A "Clear all" chip already exists on `/bills`, `/members`, `/committees`, `/meetings`, and `/search`, so step one is a product call: restyle the existing control or add a new one, and which "Filters" button is meant.
 - [ ] **Signed-in mobile a11y sweep** — profile/feed/follow flows; needs an authenticated session (carried from 2026-06-01 and 2026-06-12).
 
-### Accuracy + health-check hardening — follow-ups (2026-07-31, PRs #214-#217)
+### Accuracy + health-check hardening — follow-ups (2026-07-31, PRs #214-#218)
 
-Rationale and evidence for each is in [decisions.md § 2026-07-31](./decisions.md) (two entries). Ordered by user impact.
+**Next-agent brief with verification queries, sizing, and the gotchas: [docs/handoff-data-defects-2026-07-31.md](./docs/handoff-data-defects-2026-07-31.md).** Rationale and evidence for each is in [decisions.md § 2026-07-31](./decisions.md) (three entries). Ordered by user impact.
 
 - [ ] **Committee materials — delete 802 duplicate rows with a dead URL.** 45% of `ky_committee_materials` carries the superseded flat `/CommitteeDocuments/{meeting_id}/…` URL shape, and **all 802 have an exact nested twin** (same `committee_id`, `title`, `meeting_date`). Each document therefore renders **twice** on the committee page and the superseded copy 404s; **263 are dated this year**. Fix is a one-time cleanup migration deleting the superseded rows, then `npm run probe:committee-links` to confirm no live link was lost. Deliberately not done by the audit work — deleting 802 production rows is an operator call. The accuracy audit reports it once as a systemic `materials` finding until it's cleared.
 - [ ] **`ky_votes.nv_count` backfill.** NULL on **all 6,944 rows** while `absent_count` is 100% populated: migration 035 added the column and the sync writes it, but no vote has synced since (interim, `items_synced: 0`), so the NV chip renders 0 for every vote. The new `nv_count` accuracy check skips NULL as not-yet-backfilled, so it can only reveal this once votes re-sync. Needs a backfill or a forced vote re-sync.
