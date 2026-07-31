@@ -50,6 +50,53 @@ function isAcceptableBillTextHost(url: string): boolean {
 }
 
 /**
+ * Extract the bill identifier a stored `bill_text_url` points at, as
+ * `{ letters, digits }`.
+ *
+ * Two URL families are in the corpus, and both embed the bill in the path:
+ *   - KY record pages: .../record/23RS/hb377.html, .../record/12RS/HC148.htm
+ *   - LegiScan pages:  https://legiscan.com/KY/bill/HB118/2025
+ * Anything else (or a path with no bill-shaped token) yields null, meaning
+ * "cannot assert" — silence, not a finding.
+ */
+function billIdentifierFromUrl(url: string): { letters: string; digits: string } | null {
+  let path: string;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    return null;
+  }
+  // Scan right-to-left: the bill token is the last letters+digits segment
+  // (`hb377`, `HC148`, `HB118`); trailing year/session segments are digits-only
+  // or digits+letters ("23RS") and so don't match the letters-first shape.
+  const segments = path.split('/').filter(Boolean);
+  for (let i = segments.length - 1; i >= 0; i -= 1) {
+    const token = segments[i].replace(/\.(?:html?|htm)$/i, '');
+    const m = token.match(/^([a-z]{1,3})0*(\d{1,4})$/i);
+    if (m) return { letters: m[1].toLowerCase(), digits: m[2] };
+  }
+  return null;
+}
+
+/**
+ * True when a stored bill_text_url plausibly points at *this* bill.
+ *
+ * The digit part must match exactly — that is the check that catches the real
+ * hazard (a correct host serving the wrong bill's text). The letter part is
+ * compared prefix-tolerantly because the LRC record pages abbreviate resolution
+ * prefixes: HCR148 lives at /record/12RS/HC148.htm and SCR279 at SC279.htm.
+ * Requiring exact letters would false-flag every concurrent/joint resolution.
+ */
+function urlMatchesBillNumber(url: string, billNumber: string): boolean | null {
+  const fromUrl = billIdentifierFromUrl(url);
+  const m = (billNumber || '').trim().match(/^([a-z]{1,3})0*(\d{1,4})$/i);
+  if (!fromUrl || !m) return null;
+  const letters = m[1].toLowerCase();
+  if (fromUrl.digits !== m[2]) return false;
+  return letters.startsWith(fromUrl.letters) || fromUrl.letters.startsWith(letters);
+}
+
+/**
  * `getBill` (the detail endpoint) does NOT return a top-level `last_action` —
  * that field only comes from `getMasterList`/`getSearch`, which is what the sync
  * stores from. The detail response instead carries the action log in `history[]`.
@@ -210,6 +257,30 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
         message: 'stored bill text URL is malformed or from an unexpected host',
         actual: row.bill_text_url,
       });
+    } else if (row.bill_text_url) {
+      // A full value comparison against upstream is NOT possible here: `getBill`
+      // exposes only legiscan.com-hosted links (`bill.url`, `texts[].url`), while
+      // KYVKY deliberately stores the official KY legislature record page. The
+      // doc_id in texts[] identifies a LegiScan text document, not anything present
+      // in the stored URL, so there is nothing to equate.
+      //
+      // What we *can* assert without inventing a comparison: the bill identifier
+      // embedded in the stored path must be this bill. That closes the actual gap —
+      // a right-host/wrong-bill URL (e.g. HB377's row linking to hb337.html) used to
+      // pass the host allowlist silently. `null` means the URL shape carries no
+      // bill token to check, so we stay quiet rather than guess.
+      const matches = urlMatchesBillNumber(row.bill_text_url, row.bill_number);
+      if (matches === false) {
+        findings.push({
+          severity: 'warn',
+          domain: 'bills',
+          entity: row.bill_number,
+          field: 'bill_text_url',
+          message: 'stored bill text URL points at a different bill than this row',
+          expected: row.bill_number,
+          actual: row.bill_text_url,
+        });
+      }
     }
 
     const apiIds = sponsorIdSet(bill.sponsors);

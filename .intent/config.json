@@ -199,12 +199,6 @@
       "category": "other"
     },
     {
-      "name": "verify:recent-ship",
-      "command": "npm run verify:recent-ship",
-      "mode": "command",
-      "category": "other"
-    },
-    {
       "name": "sync:ky:lrc-calendar",
       "command": "npm run sync:ky:lrc-calendar",
       "mode": "command",

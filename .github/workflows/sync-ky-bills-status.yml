@@ -53,6 +53,11 @@ jobs:
   sync-bills:
     name: Sync bill statuses (conservative)
     runs-on: ubuntu-latest
+    # Worst realistic run: hash-gated sync (~2 min) + 120s retry wait + a second sync,
+    # then backfill:bill-summaries --limit=300 Anthropic calls (the long pole, ~15-20 min).
+    # 45 leaves headroom for that while still cutting a hung LegiScan/Anthropic fetch loose
+    # well before GitHub's 6h default — the job fires every 6h, so a 6h hang overlaps runs.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 

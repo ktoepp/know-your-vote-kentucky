@@ -526,7 +526,7 @@ async function main() {
       url: row.finalUrl,
     }));
 
-  await notifyLegislatorLinksVerifySlack({
+  const slackDelivered = await notifyLegislatorLinksVerifySlack({
     legislators: rows.length,
     probes: table.length,
     failed,
@@ -536,11 +536,16 @@ async function main() {
     skippedTransient,
     failures,
     fromCli: true,
-  }).catch((e) => console.error('[Slack] verify notify failed:', e));
+  }).catch((e) => {
+    console.error('[Slack] verify notify failed:', e);
+    return false;
+  });
 
   // Failures were already posted to #errors above; suppress the workflow's
-  // generic failure-notify step to avoid a duplicate message.
-  if (failed > 0) markSlackErrorNotified();
+  // generic failure-notify step to avoid a duplicate message — but only if the
+  // post actually landed. If Slack was down or no webhook is configured, keep the
+  // sentinel absent so that fallback step is still the one thing that reports.
+  if (failed > 0) markSlackErrorNotified(slackDelivered);
   process.exit(failed > 0 ? 1 : 0);
 }
 

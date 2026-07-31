@@ -16,8 +16,18 @@ export const SLACK_NOTIFIED_MARKER = '.slack-notified';
 /**
  * Drop the {@link SLACK_NOTIFIED_MARKER} file so the workflow failure step skips.
  * No-op outside GitHub Actions, so it never writes during Vercel runtime or local dev.
+ *
+ * `delivered` is the honest answer to "did our rich #errors message actually land?".
+ * Pass the boolean returned by the `notify*` call that preceded this one: when Slack
+ * is down or no alerts webhook is configured, the post silently failed and dropping
+ * the sentinel would stand the workflow's fallback step down too — leaving the
+ * failure reported NOWHERE. So `delivered: false` deliberately does NOT write the
+ * marker, and the generic workflow step becomes the last line of defence (a
+ * duplicate message is far cheaper than a missed outage). Defaults to `true` for
+ * back-compat with callers that don't yet thread delivery status through.
  */
-export function markSlackErrorNotified(): void {
+export function markSlackErrorNotified(delivered: boolean = true): void {
+  if (!delivered) return;
   if (process.env.GITHUB_ACTIONS !== 'true') return;
   try {
     writeFileSync(SLACK_NOTIFIED_MARKER, new Date().toISOString());
@@ -65,6 +75,15 @@ function webhookUrlForSupportEscalation(): string | null {
  */
 function webhookUrlForSignups(): string | null {
   return process.env.SLACK_WEBHOOK_SIGNUPS?.trim() || null;
+}
+
+/**
+ * Whether any #errors-class webhook is configured at all. Lets a script tell
+ * "nobody was told, because there is nowhere to tell" apart from a genuine
+ * delivery failure before it decides whether to drop the sentinel.
+ */
+export function slackDeliveryConfigured(): boolean {
+  return webhookUrlForAlerts() !== null;
 }
 
 /** Whether a dedicated #user-signups webhook is configured. */
@@ -322,6 +341,11 @@ export type LegislatorLinkVerifyFailure = {
  * (set SLACK_SYNC_NOTIFY_CLI=true — same flag as manual-sync.ts).
  *
  * Success → status-reports digest. Failures → errors webhook (and digest when configured).
+ *
+ * Returns whether at least one post actually landed. The caller must feed that
+ * into {@link markSlackErrorNotified} — a `false` here means the workflow's
+ * generic failure step is the only remaining reporter and must not be silenced.
+ * `false` also covers the early returns (gate off, no webhook configured).
  */
 export async function notifyLegislatorLinksVerifySlack(params: {
   legislators: number;
@@ -334,14 +358,14 @@ export async function notifyLegislatorLinksVerifySlack(params: {
   failures?: LegislatorLinkVerifyFailure[];
   fromCli?: boolean;
   runUrl?: string;
-}): Promise<void> {
+}): Promise<boolean> {
   if (params.fromCli !== true || process.env.SLACK_SYNC_NOTIFY_CLI !== 'true') {
-    return;
+    return false;
   }
 
   const syncUrl = webhookUrlForSyncDigest();
   const alertUrl = webhookUrlForAlerts();
-  if (!syncUrl && !alertUrl) return;
+  if (!syncUrl && !alertUrl) return false;
 
   const trigger = syncTriggerLabel(false, true);
   const header = `*KY Vote — legislator link verify* (${trigger})`;
@@ -367,16 +391,18 @@ export async function notifyLegislatorLinksVerifySlack(params: {
 
   const body = `${header}\n${stats}${failureBlock}${runLine}`;
 
+  let delivered = false;
   if (params.failed > 0 && alertUrl) {
-    await postSlackIncomingWebhook(alertUrl, body);
+    delivered = (await postSlackIncomingWebhook(alertUrl, body)).ok;
     if (syncUrl && syncUrl !== alertUrl) {
-      await postSlackIncomingWebhook(syncUrl, body);
+      delivered = (await postSlackIncomingWebhook(syncUrl, body)).ok || delivered;
     }
   } else if (syncUrl) {
-    await postSlackIncomingWebhook(syncUrl, body);
+    delivered = (await postSlackIncomingWebhook(syncUrl, body)).ok;
   } else if (alertUrl) {
-    await postSlackIncomingWebhook(alertUrl, body);
+    delivered = (await postSlackIncomingWebhook(alertUrl, body)).ok;
   }
+  return delivered;
 }
 
 /**
@@ -555,6 +581,10 @@ export async function notifySignupPipelineFailureSlack(detail: string): Promise<
  *
  * From CLI / GitHub Actions, gated by SLACK_SYNC_NOTIFY_CLI=true (same flag as
  * the sync + legislator-link verifiers).
+ *
+ * Returns whether at least one post actually landed, so the caller can pass it to
+ * {@link markSlackErrorNotified} rather than dropping the sentinel on a post that
+ * never made it out (which would silence the workflow fallback step too).
  */
 export async function notifyAccuracyAuditSlack(params: {
   body: string;
@@ -566,20 +596,22 @@ export async function notifyAccuracyAuditSlack(params: {
    */
   escalateToAlerts: boolean;
   fromCli?: boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   if (params.fromCli === true && process.env.SLACK_SYNC_NOTIFY_CLI !== 'true') {
-    return;
+    return false;
   }
 
   const syncUrl = webhookUrlForSyncDigest();
   const alertUrl = webhookUrlForAlerts();
 
+  let delivered = false;
   const posted = new Set<string>();
   if (syncUrl) {
-    await postSlackIncomingWebhook(syncUrl, params.body);
+    delivered = (await postSlackIncomingWebhook(syncUrl, params.body)).ok || delivered;
     posted.add(syncUrl);
   }
   if (params.escalateToAlerts && alertUrl && !posted.has(alertUrl)) {
-    await postSlackIncomingWebhook(alertUrl, params.body);
+    delivered = (await postSlackIncomingWebhook(alertUrl, params.body)).ok || delivered;
   }
+  return delivered;
 }
