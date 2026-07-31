@@ -1,7 +1,7 @@
 {
   "name": "know-your-vote-kentucky",
   "version": "0.1.1",
-  "description": "Kentucky General Assembly transparency app — bills, members, district map — Next.js 15, Supabase, LegiScan & Open States.",
+  "description": "Kentucky General Assembly transparency app \u2014 bills, members, district map \u2014 Next.js 15, Supabase, LegiScan & Open States.",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -34,6 +34,8 @@
     "preview:welcome": "tsx scripts/preview-welcome-email.tsx",
     "audit:accuracy": "tsx scripts/accuracy-audit.ts",
     "audit:accuracy:dry": "tsx scripts/accuracy-audit.ts --dry-run",
+    "health:sources": "tsx scripts/check-source-health.ts",
+    "health:sources:json": "tsx scripts/check-source-health.ts --json",
     "topics:reclassify": "tsx scripts/reclassify-bill-topics.ts",
     "topics:reclassify:dry": "tsx scripts/reclassify-bill-topics.ts --dry-run",
     "backfill:bill-summaries": "tsx scripts/backfill-bill-summaries.ts",
