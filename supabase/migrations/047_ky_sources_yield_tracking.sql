@@ -20,8 +20,12 @@ COMMENT ON COLUMN public.ky_sources.last_nonzero_sync_at IS
 COMMENT ON COLUMN public.ky_sources.consecutive_zero_syncs IS
   'Successful runs since the last one that synced at least one item.';
 
--- Seed from the current row so existing sources do not all read as stalled on
--- the first health check after deploy.
+-- Seed a baseline for EVERY existing source, not just those whose last run
+-- yielded. A source left NULL here has no fixed reference point, and the
+-- evaluator would have to date it from `last_sync_at` — which advances on every
+-- run, so the measured age would reset each time and a genuinely stalled source
+-- could never breach its budget. History we never recorded cannot be
+-- reconstructed, so the clock honestly starts from the last observed run.
 UPDATE public.ky_sources
   SET last_nonzero_sync_at = last_sync_at
-  WHERE items_synced > 0 AND last_nonzero_sync_at IS NULL;
+  WHERE last_nonzero_sync_at IS NULL AND last_sync_at IS NOT NULL;

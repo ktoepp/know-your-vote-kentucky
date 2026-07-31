@@ -127,6 +127,8 @@ export interface SourceRow {
   /** Migration 047; null on rows written before it was applied. */
   last_nonzero_sync_at?: string | null;
   consecutive_zero_syncs?: number | null;
+  /** Fixed anchor used when no yield has ever been observed. */
+  created_at?: string | null;
 }
 
 export interface SourceHealth {
@@ -218,13 +220,17 @@ export function evaluateSourceHealth(rows: SourceRow[], now: Date = new Date()):
     // Running on schedule but producing nothing. `status` cannot express this:
     // the runs succeed, `last_sync_at` advances, and only the yield is missing.
     if (expect.maxZeroYieldHours != null) {
-      // Fall back to last_sync_at when the column is null — either migration 047
-      // has not been applied, or the source has never yielded. Both mean "no
-      // observed yield", and dating it from the last run avoids alerting on
-      // history we never recorded.
+      // When last_nonzero_sync_at is null — migration 047 not applied, or the
+      // source has not yielded since it was — fall back to `created_at`, which
+      // is fixed. It must NOT fall back to last_sync_at: that advances on every
+      // run, so the measured age would reset each time and a genuinely stalled
+      // source could never breach its budget. Migration 047 seeds a baseline
+      // for existing rows so this path is only reached by a brand-new source.
       const yieldAgeHours =
-        hoursBetween(row.last_nonzero_sync_at ?? null, now) ??
-        (row.items_synced && row.items_synced > 0 ? 0 : ageHours);
+        row.items_synced && row.items_synced > 0
+          ? 0
+          : hoursBetween(row.last_nonzero_sync_at ?? row.created_at ?? null, now);
+      if (yieldAgeHours == null) continue;
 
       if (yieldAgeHours > expect.maxZeroYieldHours) {
         const streak = row.consecutive_zero_syncs ?? 0;
@@ -262,7 +268,8 @@ export function evaluateSourceHealth(rows: SourceRow[], now: Date = new Date()):
 }
 
 /** Columns that exist regardless of whether migration 047 has been applied. */
-const BASE_SOURCE_COLUMNS = 'source_name, status, last_sync_at, items_synced, error_message';
+const BASE_SOURCE_COLUMNS =
+  'source_name, status, last_sync_at, items_synced, error_message, created_at';
 /** Yield-tracking columns added by migration 047. */
 const YIELD_SOURCE_COLUMNS = 'last_nonzero_sync_at, consecutive_zero_syncs';
 

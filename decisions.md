@@ -1889,3 +1889,17 @@ Agenda logic exercised against `fixtures/lrc/legislative-calendar-live.html` (80
 - `ky_votes.nv_count` is stored, rendered on bill detail, and never compared.
 - Dead-man's switches: 6 of 9 Vercel crons have no Sentry monitor, including the health check itself; the `lrc-calendar` monitor in `sentry-sync-cron.ts` still points at a job that moved to GitHub Actions.
 - `verify:recent-ship` is a dangling npm script (`scripts/verify-recent-ship.ts` does not exist).
+
+---
+
+## 2026-07-31 — Addendum: the stalled-pipeline check shipped inert
+
+**Caught while verifying migration 047 against the real `ky_sources` rows after merging PR #214.** The seed only backfilled `last_nonzero_sync_at` for sources whose *last* run yielded (`items_synced > 0`), leaving it NULL for exactly the sources the check exists to watch — `lrc-calendar` among them.
+
+**Why that broke the check.** With the column NULL the evaluator fell back to `last_sync_at`, which advances on **every run**. The measured "hours without yield" therefore reset each time the job ran, so a genuinely stalled source could never breach its budget. The check would have stayed silent forever on the one source that motivated it.
+
+**Fix, two parts:**
+- **Data/migration:** seed a baseline for *every* existing source, not just recently-yielding ones. History we never recorded cannot be reconstructed, so the clock honestly starts from the last observed run — `lrc-calendar`'s 21-day budget now runs from 2026-07-31.
+- **Code:** the NULL fallback is now `created_at`, a fixed anchor, never `last_sync_at`. A moving fallback is the bug; the comment in `source-health.ts` says so explicitly so it does not get "simplified" back.
+
+**Lesson worth keeping:** the original fallback was written to avoid false alarms on history we never recorded, and it did — by disabling the check entirely. A guard that suppresses noise by making a detector unfalsifiable is worse than the noise. Verifying against the real post-migration rows, rather than the synthetic fixtures used pre-merge, is what surfaced it.
