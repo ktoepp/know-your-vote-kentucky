@@ -1903,3 +1903,80 @@ Agenda logic exercised against `fixtures/lrc/legislative-calendar-live.html` (80
 - **Code:** the NULL fallback is now `created_at`, a fixed anchor, never `last_sync_at`. A moving fallback is the bug; the comment in `source-health.ts` says so explicitly so it does not get "simplified" back.
 
 **Lesson worth keeping:** the original fallback was written to avoid false alarms on history we never recorded, and it did — by disabling the check entirely. A guard that suppresses noise by making a detector unfalsifiable is worse than the noise. Verifying against the real post-migration rows, rather than the synthetic fixtures used pre-merge, is what surfaced it.
+
+---
+
+## 2026-07-31 — Hardening pass: corpus verification, false-alarm removal, triage agent
+
+**Trigger.** Follow-up to § 2026-07-31 (accuracy + health-check gap pass), closing the operational items and coverage gaps that entry left open. The three verification checkpoints were run manually first (GitHub Actions `workflow_dispatch`) rather than waiting for schedule; two of them changed what got built.
+
+### The live-calendar question, closed
+
+Manual run of `sync-lrc-calendar.yml` logged **`Parsed 5 days, 0 scheduled meetings`**. `dayCount > 0` means the page parses fine and the new day-heading assertion correctly stayed quiet — the zero yield since 2026-07-20 is a **genuine interim gap, not a parser break**. The open question from the previous entry is resolved, and the assertion is validated on its healthy-empty-week path. (The earlier entry could not settle this because the sandbox's network policy blocks `apps.legislature.ky.gov`; dispatching the workflow runs it from GitHub's network instead. Worth remembering as the general escape hatch for upstream checks.)
+
+### Two false alarms removed — the same bug shape, twice
+
+**`lrc-enrollment-actions` was permanently red for an expected condition.** The sync walks every session in `KY_SESSIONS` (22), and LRC publishes an enrollment-actions page only for recent ones, so the rest 404. `fetchEnrollmentActionsHtml` returned `null` for a 404 and for a genuine network failure alike, and the caller counted both as errors — hence "11 session fetch error(s)" and a red `ky_sources` row on **every run since the source shipped**. Now a discriminated `ok | absent | failed`; only `failed` counts, `absent` is tracked and logged.
+
+**This is the identical shape to the calendar bug fixed in the previous entry** ("LRC says no meetings" vs "we can't read the page", collapsed into one `success` with 0 items). Two independent instances of the same anti-pattern — *distinct outcomes flattened into one sentinel value, then interpreted as the wrong one* — suggests it is worth watching for elsewhere. **The tell:** a function returning `null`/`false` from more than one `return` for materially different reasons.
+
+**Lesson recorded:** a check that is always red is worse than no check, because it costs the same attention and carries none. Both fixes are about restoring signal, not about suppressing errors.
+
+### Committees: the domain verified nothing during interim
+
+Every check in `checkers/committees.ts` depended on the live calendar, which lists only the current week — so an empty week (most of the interim) returned `skipped` with **none** of the ~390 stored meetings or ~2,000 agenda rows examined, most of which arrived via Wayback/PDF backfills that no upstream diff will ever revisit.
+
+**Decision:** add a `checkStoredCorpusInvariants` pass that runs **first and unconditionally**, so the domain always does real work and the live diff becomes an addition rather than the whole thing. Every early return now carries the invariant count, so the digest no longer reports "0 checked" on a quiet week.
+
+**Every invariant was sized against production before being written** — the discipline that mattered most here:
+
+| invariant | violations at time of writing |
+|---|---|
+| hash records agenda text but zero rows stored | 0 |
+| agenda `sort_order` not a contiguous 0..n-1 run | 0 |
+| `ky_bill_id` points at a different bill than the line names | 0 |
+| a named bill that never resolved (renders as plain text) | **12** |
+| agenda present but `member_refs` empty | **1** |
+| material linked to another committee's meeting | 0 |
+
+**`BR nn` excluded deliberately.** Of 17 unresolved agenda bill refs, 5 are bill-request numbers — pre-filed drafts an interim committee discusses before a bill gets an HB/SB number, which have no `ky_bills` row *by design*. The remaining 12 are real: the bill exists but `bill_session_label` is NULL, so the lookup key missed — stale rows from before session inference landed, fixable by re-syncing those meetings. Flagging the BRs would have been permanent noise; not splitting them would have made the whole check untrustworthy.
+
+### Real defect surfaced: 45% of committee materials are duplicates with a dead URL
+
+**802 of 1,773 `ky_committee_materials` rows carry the superseded flat `/CommitteeDocuments/{meeting_id}/…` URL shape, and all 802 have an exact nested twin** (same `committee_id`, `title`, `meeting_date`). Each document therefore renders **twice** in the materials section, and the superseded copy 404s. **263 are dated this year** — documents users would actually click.
+
+**Decision: report, do not delete.** Deleting 802 production rows is a destructive, irreversible action and belongs to the operator, not to a verification change. The checker reports it **once** as a systemic finding naming the cleanup, and excludes those URLs from the new reverse diff — which would otherwise have put a double-digit count on ~10 of 12 sampled committees on every run. **Same principle as the `photo_url` systemic-difference guard:** one data defect with one fix is one finding, not N.
+
+**Backlog:** a cleanup migration deleting the superseded rows (the nested twins carry identical content), then a `probe:committee-links` pass to confirm no live links were lost.
+
+### Triage agent on the check workflows
+
+Both `accuracy-audit.yml` and the new `source-health.yml` now run `scripts/triage-findings.ts` after a successful check. It reads what the checks **recorded** (`ky_accuracy_runs` / `ky_accuracy_findings` + live source health), including how many days each fingerprint has been recurring — the one signal that materially changes triage and that the model cannot infer from finding text — and posts an operator-facing summary to the status channel.
+
+**Boundaries, extending the § 2026-06-03 advisory/deterministic split:**
+- Given **only recorded findings**; it never re-derives or fetches primary sources, so it cannot invent drift.
+- Never changes a severity, never closes a finding, never fails a workflow (`continue-on-error`).
+- Posts to **#status-reports, never #errors** — interpretation of already-reported findings is not a new alert, and escalating it would undo the "green = the agent ran" separation.
+- **Silent on a clean run.** A daily "all clear" is precisely the noise that makes a channel unreadable.
+
+**Not yet exercised end-to-end:** the model call needs `ANTHROPIC_API_KEY` in a workflow, so it runs for the first time post-merge.
+
+### Monitoring
+
+- **`source-health.yml`** (new, 02:00 UTC) runs the same evaluator as the Vercel cron from a second scheduler, deliberately ~12h out of phase. The health check was itself unmonitored: if the Vercel cron stops firing or `CRON_SECRET` rotates, the thing that would have complained *is* the thing that stopped. Both paths share one evaluator and one edge-trigger fingerprint, so they cannot disagree or double-page.
+- **`markSlackErrorNotified(delivered)`** — a failed Slack post no longer drops the `.slack-notified` sentinel. It previously stood the workflow fallback down too, leaving the failure reported nowhere; `postToAlertsAndSupport` and the `notify*` functions now return delivery status.
+- **Sentry cron monitors** — removed the stale `lrc-calendar` entry (that job moved to GH Actions and the monitor would fire perpetual missed check-ins); added the three uncovered Vercel sync crons.
+- `sync-ky-bills-status.yml` gained `timeout-minutes`; dangling `verify:recent-ship` removed from `package.json` and `.intent/config.json`.
+
+### Data gap found, not fixable here
+
+**`ky_votes.nv_count` is NULL on all 6,944 rows** while `absent_count` is 100% populated. The sync writes it and migration 035 added it, but no vote has synced since (interim, `items_synced: 0`), so the NV chip renders 0 for every vote. The new `nv_count` check skips NULL as not-yet-backfilled — it can only reveal this once votes re-sync. **Needs a backfill**, not a checker change.
+
+### Still open
+
+- Cleanup migration for the 802 duplicate material rows (above).
+- Re-sync the 12 meetings whose agenda bill refs have a NULL `bill_session_label`.
+- `ky_votes.nv_count` backfill.
+- Corpus invariants prove internal consistency, not agreement with LRC. The live-calendar diff is still the only upstream comparison for meetings and still covers only the current week; verifying backfilled history needs a different source (committee profile pages or the interim PDF).
+- Stateful `last_audited_at` sampling rotation (from the previous entry) — `ky_accuracy_findings` is the substrate but it is not built.
+- `/api/cron/notify` Sentry alert rules remain unconfigured (`TASKS.md`).
