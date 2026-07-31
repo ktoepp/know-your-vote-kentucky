@@ -13,10 +13,11 @@
  *
  * Requires: SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL).
  * Optional: LEGISCAN_API_KEY, OPENSTATES_API_KEY, ANTHROPIC_API_KEY, SLACK_WEBHOOK_*.
- * Tunable:  ACCURACY_DAYS, ACCURACY_BILLS_LIMIT, ACCURACY_VOTES_LIMIT,
+ * Tunable:  ACCURACY_ACTIVE_DAYS (alias ACCURACY_DAYS), ACCURACY_ACTIVE_SHARE,
+ *           ACCURACY_BILLS_LIMIT, ACCURACY_VOTES_LIMIT,
  *           ACCURACY_MATERIALS_COMMITTEE_LIMIT, ACCURACY_LINK_SAMPLE,
  *           ACCURACY_LLM_SAMPLE, ACCURACY_SKIP_LLM, ACCURACY_LLM_MODEL,
- *           ACCURACY_LEGISCAN_QUOTA_STOP_PCT.
+ *           ACCURACY_LEGISCAN_QUOTA_STOP_PCT, ACCURACY_DOMAIN_TIMEOUT_MS.
  *
  * Exit: 0 for clean runs, content findings, AND expected skips (e.g. a LegiScan
  *       quota stop); 1 only when a checker crashes (an operational error).
@@ -75,6 +76,50 @@ function parseArgs(argv: string[]): {
     }
   }
   return { json, dryRun, skipLlm, domains, seed };
+}
+
+/**
+ * Per-domain wall-clock budget. The LegiScan client retries 5× on a 60s timeout
+ * with exponential backoff, so a single hung bill can burn ~5.5 minutes — eight
+ * of them exhaust the workflow's 45-minute ceiling and the job is killed with no
+ * report at all (the 2026-06-21 cancellation). A per-domain deadline converts
+ * that into one skipped domain and a delivered report.
+ */
+const DOMAIN_TIMEOUT_MS = (() => {
+  const raw = process.env.ACCURACY_DOMAIN_TIMEOUT_MS?.trim();
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 10 * 60_000;
+})();
+
+/**
+ * Race a checker against its deadline. A breach is reported as `skipped` rather
+ * than `error`: it is usually upstream slowness rather than a bug on our side,
+ * and the same reclassification already applies to transient upstream failures.
+ * The skip is loud in the digest, and the domain-level failure-rate escalation
+ * catches a domain that keeps producing nothing.
+ */
+async function runWithDeadline(
+  domain: string,
+  run: () => Promise<CheckerResult>,
+): Promise<CheckerResult> {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<CheckerResult>((resolve) => {
+    timer = setTimeout(
+      () =>
+        resolve(
+          skippedResult(
+            domain,
+            `exceeded the ${Math.round(DOMAIN_TIMEOUT_MS / 60_000)}m per-domain deadline (upstream too slow)`,
+          ),
+        ),
+      DOMAIN_TIMEOUT_MS,
+    );
+  });
+  try {
+    return await Promise.race([run(), deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function skippedResult(domain: string, reason: string): CheckerResult {
@@ -151,7 +196,7 @@ async function main() {
 
     const checker = CHECKERS[domain];
     try {
-      results.push(await checker(db, cfg));
+      results.push(await runWithDeadline(domain, () => checker(db, cfg)));
     } catch (e) {
       results.push({
         domain,

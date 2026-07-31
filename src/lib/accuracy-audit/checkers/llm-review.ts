@@ -98,7 +98,12 @@ async function reviewSummaries(
   }>(db, {
     table: 'ky_bills',
     select: 'bill_number, session, title, description, ai_summary, legiscan_subjects, editor_notes',
-    seed: cfg.seed,
+    // Distinct stream from the bills checker, which samples ky_bills with the
+    // bare cfg.seed. Sharing it made this pass re-review the bills that checker
+    // had just verified deterministically: bottom-k over the ~4.9k rows with an
+    // ai_summary picks nearly the same hash quantile as bottom-k over the full
+    // ~22.5k corpus, so the two samples overlapped almost entirely.
+    seed: cfg.seed ^ 0x27d4eb2f,
     limit: cfg.llmSample,
     filter: (q) => q.not('ai_summary', 'is', null).neq('ai_summary', ''),
   });
