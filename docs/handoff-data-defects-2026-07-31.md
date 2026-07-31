@@ -1,8 +1,20 @@
 # Handoff — data defects found by the 2026-07-31 accuracy/health-check hardening pass
 
-Four defects were **found and verified** during PRs #214–#218 but deliberately **not fixed**, because each either mutates production data destructively or changes something users see. Full evidence: `decisions.md` §§ 2026-07-31 (three entries); tracker items in `TASKS.md` → "Accuracy + health-check hardening — follow-ups".
+Four defects were **found and verified** during PRs #214–#218 but deliberately **not fixed**, because each either mutates production data destructively or changes something users see. (Defects 1–3 were subsequently fixed on 2026-07-31 — see the status note below and the per-defect banners.) Full evidence: `decisions.md` §§ 2026-07-31 (three entries); tracker items in `TASKS.md` → "Accuracy + health-check hardening — follow-ups".
 
-Every number below was measured against production on 2026-07-31. **Re-verify before acting** — some will have changed, and at least one (`nv_count`) is expected to resolve on its own.
+Every number below was measured against production on 2026-07-31. **Re-verify before acting** — some will have changed.
+
+> **Status update, 2026-07-31 (later same day).** Defects 1–3 are resolved; defect 4 is still open. Two claims
+> originally recorded here turned out to be wrong and are corrected in place below — flagged because both
+> would have led the next person astray:
+>
+> - **`nv_count` does not resolve on its own.** The votes cron only ever re-fetches the 5 most-recently-actioned
+>   bills, so closed-session rows are never revisited. A deliberate backfill is required. See Defect 2.
+> - **The backfill cost was understated 3x** (11.6% → 34.8% via the obvious code path). Fetching roll calls
+>   directly rather than through `fetchVotes` brings it to 23.1%. See Defect 2.
+>
+> Also: the "legacy URLs 404" premise under Defect 1 has now been **live-probed** (802/802 dead), rather than
+> resting on a code comment. One twin was dead too — see Defect 1.
 
 ---
 
@@ -17,6 +29,20 @@ Every number below was measured against production on 2026-07-31. **Re-verify be
 ---
 
 ## Defect 1 — 802 duplicate committee-material rows with a dead URL (highest user impact)
+
+> **RESOLVED 2026-07-31.** Probed live from Actions (`probe:legacy-material-urls`, all=true): **802/802 legacy
+> URLs dead (404)**, confirming the premise — which until then rested on a code comment, not a measurement.
+> **801/802 twins alive.** The one exception was `Thumbs.db` (meeting 12802, 2020-07-14), a Windows thumbnail
+> cache file LRC published by accident and has since removed; it 404s on *both* paths because the file is gone,
+> not because our URL shape is wrong. Migration 048 applied: 1,773 → 970 rows, `legacy_flat` now 0, all nested
+> rows intact, deleted rows preserved in `ky_committee_materials_legacy_dupes_048` (803 rows, including the
+> dead `Thumbs.db` twin, which was removed separately so it would not keep rendering a dead link).
+>
+> Note the sample nearly misled us: a 40-row probe returned a clean "supports the cleanup" verdict and missed
+> the dead twin entirely. The full pass found it. **Probe all of it before deleting any of it.**
+>
+> Still open, unrelated to this cleanup: 4 materials remain `link_status = 'dead'`. They have no twin and are
+> not duplicates — genuinely dead documents, needing their own decision.
 
 **What.** 802 of 1,773 `ky_committee_materials` rows (45%) carry the superseded flat
 `/CommitteeDocuments/{meeting_id}/file` URL shape. **All 802 have an exact nested twin** — same
@@ -79,15 +105,29 @@ select count(*) as total, count(nv_count) as nv_populated,
 from ky_votes;
 ```
 
-**This may fix itself.** The votes sync upserts on `(bill_id, roll_call_id)` with `ignoreDuplicates: false`,
-so it *updates* existing rows — the next real sync after interim ends will populate `nv_count` naturally.
-**Check whether the session has resumed before doing anything manual.**
+**~~This may fix itself.~~ It will not — corrected 2026-07-31.** The upsert reasoning is right as far as it
+goes (`ignoreDuplicates: false` does update existing rows), but it never reaches these rows. The votes cron
+runs `?source=votes&limit=5` (`vercel.json`), and the sync selects bills `order by last_action_date desc
+limit 5` (`ky-sync-pipeline.ts:1712`) — five bills per day, always the most recently actioned. Bills from
+closed sessions are never revisited, so the historical corpus stays NULL indefinitely. The 2026 session
+ended mid-April; the next regular session convenes January 2027, and even then only newly-active bills
+would be touched.
 
-**If a backfill is genuinely needed**, mind the cost: **3,487 distinct bills** have votes, spanning 12
-sessions. The sync fetches votes per bill, so a full pass is on the order of **3,487 LegiScan calls ≈ 11.6%
-of the 30,000/month quota**. Check `/admin/sync-status` for current usage first, and prefer scoping to
-recent sessions over a full-corpus pass. Overrides: `force=true` on the sync options, or
-`KY_SYNC_FORCE_INTERIM=true`.
+**A deliberate backfill is required.** Use `npm run backfill:vote-nv-counts` (or the `Backfill vote nv_count`
+workflow — it needs Actions secrets, so it cannot run from a dev sandbox). Estimate-only by default; pass
+`--live` to spend quota. Resumable: targets are selected by `nv_count IS NULL`, so an interrupted run costs
+nothing to restart.
+
+**Cost — the earlier figure here was wrong by 3x.** It is *not* one call per bill. `client.fetchVotes(billId)`
+issues a `getBill` **plus** one `getRollCall` per vote: 3,487 + 6,944 = **10,431 calls (34.8%)**. The
+`getBill` half is pure waste, since `ky_votes` already stores every `roll_call_id`, so the backfill script
+calls `fetchRollCall` directly: **6,944 calls ≈ 23.1%** of the 30,000/month quota. Check
+`/admin/sync-status` for current usage first, and scope with `--session` to spend less.
+
+**Budget wall-clock, not just quota.** The client enforces a 500ms floor between requests
+(`RATE_DELAY`, `ky-legiscan-client.ts:85`); with real latency the observed rate is ~15 rows/min, so a
+full-corpus pass runs for hours and will exceed a single job's timeout. That is expected — re-dispatch to
+resume. Do not "fix" this by removing the throttle.
 
 **Do not** change the accuracy checker's NULL-skip in `checkers/votes.ts` — skipping NULL as
 "not yet backfilled" is correct, and comparing NULL as 0 would flag the entire corpus.
@@ -95,6 +135,18 @@ recent sessions over a full-corpus pass. Overrides: `force=true` on the sync opt
 ---
 
 ## Defect 3 — 12 agenda bill references that never resolved
+
+> **RESOLVED 2026-07-31.** Root cause was in `lrc-bill-reference-parser.ts`: a reference carrying a
+> parenthetical session suffix parsed to a NULL session. Fixed there, verified by re-parsing all 209 stored
+> agenda strings, and the 12 rows repaired in production — each now carries both a session label and a
+> `ky_bill_id`. `bill_session_label IS NULL` is now **0** across all 214 bill-bearing agenda rows.
+>
+> `deriveAgendaBillRef` was extracted from `ky-lrc-calendar-sync.ts` so the repair script
+> (`repair:agenda-bill-links`) resolves stored rows exactly the way the sync does, rather than
+> reimplementing the logic and drifting from it.
+>
+> 5 rows remain unlinked and that is **correct, not residual breakage**: all 5 are `BR ###` — bill *requests*,
+> pre-filed drafts with no bill number yet, which have no `ky_bills` row by design. Do not "fix" these.
 
 **What.** 12 agenda lines name a bill that **does exist** in `ky_bills` but stored
 `bill_session_label = NULL`, so the lookup key missed and the line renders as plain text instead of a
@@ -135,6 +187,13 @@ meeting's agenda rows before re-inserting, so a partial or wrong-window run can 
 ---
 
 ## Defect 4 — `/bills` browse timeouts: fix the `count`, not the sort
+
+> **STILL OPEN as of 2026-07-31.** Diagnosis below re-confirmed (ANALYZE run), but deliberately not changed:
+> the fix trades an exact count for a planner estimate, and on a civic-data site a visibly drifting count is a
+> product call, not a cleanup. Three options were put to the repo owner and none chosen yet: leave it exact;
+> switch to `count: 'planned'`; or keep it exact but bounded (count to N, then render "N+"). **Pick one before
+> touching this** — the third option is worth a look, since it removes the unbounded cost without introducing
+> a number that can be wrong.
 
 **What.** The `ky_bills browse query failed` error (~11/day, 38 distinct users, escalating since 07-28).
 
