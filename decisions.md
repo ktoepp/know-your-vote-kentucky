@@ -1980,3 +1980,36 @@ Both `accuracy-audit.yml` and the new `source-health.yml` now run `scripts/triag
 - Corpus invariants prove internal consistency, not agreement with LRC. The live-calendar diff is still the only upstream comparison for meetings and still covers only the current week; verifying backfilled history needs a different source (committee profile pages or the interim PDF).
 - Stateful `last_audited_at` sampling rotation (from the previous entry) — `ky_accuracy_findings` is the substrate but it is not built.
 - `/api/cron/notify` Sentry alert rules remain unconfigured (`TASKS.md`).
+
+---
+
+## 2026-07-31 — `ky_bills` browse timeout profiled: the composite-index hypothesis is wrong
+
+**Closes the open watch item** from § 2026-07-31 (health check), which recorded a candidate index and explicitly could not confirm it: *"No `EXPLAIN ANALYZE` access this session (no Supabase/DB connector available)."* This session had Supabase MCP access, so the hypothesis could finally be tested rather than carried forward.
+
+**The proposed fix would not have worked.** The hypothesis was that `ORDER BY session DESC, last_action_date DESC NULLS LAST` cannot be satisfied from the two single-column indexes and falls back to a full sort, and that `CREATE INDEX ky_bills_session_last_action_idx` would fix it. The plan shows otherwise:
+
+```
+Limit  (actual time=3.602..3.607 rows=24)
+  -> Incremental Sort  (actual time=3.600..3.602 rows=24)
+       Sort Key: session DESC, last_action_date DESC NULLS LAST
+       Presorted Key: session
+       -> Index Scan Backward using idx_bills_session  (actual time=0.026..2.811 rows=1738)
+```
+
+Postgres already walks `idx_bills_session` backwards and uses an **incremental sort**, top-N heapsorting only within the leading session group (1,738 rows, not 22,547). A composite index would eliminate that small sort and nothing else. **Decision: do not ship it** — it would add write cost on every sync for no measurable gain. This is a plan-shape fact, not a timing artifact, so it holds regardless of load.
+
+**The actual cost is the exact `count()`.** `fetchKyBillsBrowsePageUncached` issues `select('id', { count: 'exact', head: true })` alongside the row query. That is a **`Seq Scan` over the whole 84 MB heap** (22,547 rows / 5,785 buffer pages):
+
+| run | count(*) | browse rows |
+|---|---|---|
+| cold / contended | **4,254 ms** | 247 ms |
+| warm | 11–25 ms | 3.7 ms |
+
+Warm it is trivial; cold or under contention it blows past the 3 s anon `statement_timeout`. **That variance is the tell** — it explains why the error appears ~11×/day rather than on every request, which a uniformly-slow query would produce. The cost also grows with every sync cycle, matching the observed climb.
+
+**Recommended fix (not shipped here):** use PostgREST `count: 'planned'` for the **unfiltered** browse path only — the planner estimate is 23,426 against an actual 22,547, 3.9% off, which is fine for pagination — or cache the unfiltered total. Filtered paths keep exact counts; they are selective and cheap. Left unshipped deliberately: it changes a number users see, so it wants a product call rather than being folded into a verification pass.
+
+**Incidental:** `pg_stat_user_tables.last_analyze` is **null** for `ky_bills` (last autovacuum 2026-07-22, 1,525 dead tuples). Planner estimates are running off autovacuum-only stats; a manual `ANALYZE` is worth doing regardless of the above.
+
+**Method note worth keeping:** the first measurement of each query was 20-400× slower than steady state. A single `EXPLAIN ANALYZE` would have supported almost any conclusion — the plan *shape* is what actually refuted the hypothesis, and the timings only mattered once repeated.
