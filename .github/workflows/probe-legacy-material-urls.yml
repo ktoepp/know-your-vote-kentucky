@@ -1,0 +1,58 @@
+# Confirm the superseded flat committee-material URLs really are dead, from a
+# network that can reach apps.legislature.ky.gov (the dev sandbox cannot).
+#
+# Gate for the migration 048 cleanup: it deletes 802 duplicate rows on the
+# strength of "the flat URL 404s", a claim that until now came from a code
+# comment rather than a live probe. Read-only — probes and reports, never writes
+# link_status.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+name: Probe legacy committee-material URLs
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Legacy URLs to sample (evenly spread across the corpus)'
+        required: false
+        default: '40'
+      all:
+        description: 'Probe all 802 instead of a sample (slow)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  probe:
+    name: Probe legacy material URLs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Probe legacy URLs and their nested twins
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.all }}" = "true" ]; then
+            npm run probe:legacy-material-urls -- --all
+          else
+            npm run probe:legacy-material-urls -- --limit=${{ inputs.limit }}
+          fi

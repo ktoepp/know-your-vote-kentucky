@@ -1,0 +1,89 @@
+# One-time repair of ky_votes.nv_count, which is NULL on every stored roll call.
+#
+# Why a manual workflow and not a cron: the votes cron runs
+# `?source=votes&limit=5`, which re-fetches only the 5 most-recently-actioned
+# bills per day. Bills from closed sessions are never revisited, so this data
+# cannot heal on its own — it needs one deliberate pass.
+#
+# Quota: one LegiScan call per affected bill. As of 2026-07-31 that is ~3,487
+# bills across 12 sessions, ~11.6% of the 30,000/month key limit. Scope with
+# `session` to spend less. The default run is an ESTIMATE ONLY — it prints the
+# bill count and projected quota cost and writes nothing. Set `live: true` to
+# actually spend quota and update rows.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   LEGISCAN_API_KEY
+#   NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+name: Backfill vote nv_count
+
+on:
+  workflow_dispatch:
+    inputs:
+      session:
+        description: 'Session to scope to, e.g. "2026 Regular Session". Leave blank for all sessions (~11.6% of monthly quota).'
+        type: string
+        default: ''
+      live:
+        description: 'Spend LegiScan quota and write rows. Unchecked = print the estimate only.'
+        type: boolean
+        default: false
+      limit:
+        description: 'Cap the number of bills fetched (blank = no cap). Useful for a small trial run first.'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# A second concurrent run would double-spend quota on the same bills.
+concurrency:
+  group: backfill-vote-nv-counts
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    name: Backfill nv_count
+    runs-on: ubuntu-latest
+    # ~3,487 sequential LegiScan fetches plus per-row updates. The client rate
+    # limits, so budget generously; a full-corpus run is the worst case.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Backfill nv_count
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+          # Inputs travel as env vars, never interpolated into the script body:
+          # session labels contain spaces ("2026 Regular Session"), which would
+          # word-split into three arguments, and `${{ }}` in a run block is a
+          # script-injection seam.
+          INPUT_SESSION: ${{ inputs.session }}
+          INPUT_LIMIT: ${{ inputs.limit }}
+          INPUT_LIVE: ${{ inputs.live }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -n "$INPUT_SESSION" ]; then
+            args+=("--session=$INPUT_SESSION")
+          fi
+          if [ -n "$INPUT_LIMIT" ]; then
+            args+=("--limit=$INPUT_LIMIT")
+          fi
+          if [ "$INPUT_LIVE" = "true" ]; then
+            args+=("--live")
+          fi
+          npm run backfill:vote-nv-counts -- "${args[@]}"

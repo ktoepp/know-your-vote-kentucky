@@ -30,26 +30,62 @@ const SESSION_AFTER_HYPHEN =
   /-\s*((?:\d{4}\s+)?(?:Regular|Extraordinary|Special)\s+Session)\b/i;
 
 /**
- * LRC agenda shorthand — "25RS SB 15" / "24SS HB 2" / "22EX HB 1" — expanded
- * from the 2-digit year + session code that appears anywhere in the line.
- * Covers a large fraction of interim-review agenda items that omit the
- * long-form "(2025 Regular Session)" callout.
+ * Session markers that apply to the whole agenda line, in the shapes LRC prose
+ * actually uses — "25RS SB 15", "2024 RS HB 833", "26 RS HB 257", "RS 26 SB 8",
+ * and the long form "2022 Regular Session SB 9". Scanned line-wide rather than
+ * only after the bill token because LRC writes the session on either side of it.
+ *
+ * These matter more than they look: without them a line naming an *older*
+ * session falls through to the meeting-date inference in the calendar sync,
+ * which silently resolves to that bill number in the *current* session — a real
+ * bill, just the wrong one. Ordered most-specific first; earliest match in the
+ * line wins ties.
  */
-const SESSION_SHORTHAND = /\b(\d{2})(RS|SS|EX)\b/i;
+const LINE_SESSION_PATTERNS: RegExp[] = [
+  /\b(\d{4})\s+(Regular|Special|Extraordinary)\s+Session\b/i,
+  /\b(\d{4})\s*(RS|SS|EX)\b/i,
+  /\b(\d{2})\s*(RS|SS|EX)\b/i,
+  /\b(RS|SS|EX)\s+(\d{2})\b/i,
+];
+
 const SESSION_KIND_LABELS: Record<string, string> = {
   RS: 'Regular Session',
   SS: 'Special Session',
   EX: 'Extraordinary Session',
+  REGULAR: 'Regular Session',
+  SPECIAL: 'Special Session',
+  EXTRAORDINARY: 'Extraordinary Session',
 };
 
-function expandSessionShorthand(text: string): string | null {
-  const m = text.match(SESSION_SHORTHAND);
-  if (!m) return null;
-  const yy = parseInt(m[1], 10);
-  const kind = SESSION_KIND_LABELS[m[2].toUpperCase()];
-  if (!kind || !Number.isFinite(yy)) return null;
-  const year = yy >= 70 ? 1900 + yy : 2000 + yy;
+/** Two-digit LRC years are 19xx only for the pre-Y2K archive. */
+function expandSessionYear(token: string): number | null {
+  const n = parseInt(token, 10);
+  if (!Number.isFinite(n)) return null;
+  if (token.length === 4) return n;
+  return n >= 70 ? 1900 + n : 2000 + n;
+}
+
+function sessionLabelFromMatch(m: RegExpExecArray): string | null {
+  // The reversed pattern ("RS 26") puts the kind first; every other one leads
+  // with the year.
+  const [, first = '', second = ''] = m;
+  const yearToken = /^\d+$/.test(first) ? first : second;
+  const kindToken = /^\d+$/.test(first) ? second : first;
+  const year = expandSessionYear(yearToken);
+  const kind = SESSION_KIND_LABELS[kindToken.toUpperCase()];
+  if (year === null || !kind) return null;
   return `${year} ${kind}`;
+}
+
+function lineWideSessionLabel(text: string): string | null {
+  let best: { index: number; label: string } | null = null;
+  for (const re of LINE_SESSION_PATTERNS) {
+    const m = re.exec(text);
+    if (!m) continue;
+    const label = sessionLabelFromMatch(m);
+    if (label && (!best || m.index < best.index)) best = { index: m.index, label };
+  }
+  return best?.label ?? null;
 }
 
 const PATTERNS: { kind: LrcBillReferenceKind; re: RegExp }[] = [
@@ -92,7 +128,7 @@ export function extractLrcBillReferences(text: string): LrcBillReference[] {
   if (!text?.trim()) return [];
   const found: LrcBillReference[] = [];
   const seen = new Set<string>();
-  const shorthandSession = expandSessionShorthand(text);
+  const shorthandSession = lineWideSessionLabel(text);
 
   for (const { kind, re } of PATTERNS) {
     const regex = new RegExp(re.source, re.flags);
