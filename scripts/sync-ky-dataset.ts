@@ -59,6 +59,13 @@ const stateFlag = args.find((a) => a.startsWith('--state='))?.split('=')[1];
 const STATE = (stateFlag || 'KY').toUpperCase();
 const limitFlag = args.find((a) => a.startsWith('--limit='))?.split('=')[1];
 const SESSION_LIMIT = limitFlag ? parseInt(limitFlag, 10) : undefined;
+// Re-import sessions whose dataset_hash is unchanged. Normally pointless — an
+// unchanged hash means LegiScan has no new data — but required after a mapper
+// fix, when the upstream payload is identical yet we now read a field from it
+// that we previously dropped on the floor (see buildVoteRow / nv_count).
+// Costs one getDataset per session, so a full forced pass is ~1 call per session
+// rather than the thousands a per-bill API backfill would spend.
+const FORCE = args.includes('--force');
 
 const ALLOWED_STATES = new Set(['KY']);
 if (!ALLOWED_STATES.has(STATE)) {
@@ -201,8 +208,11 @@ async function main() {
   const changed: LegiScanDatasetListEntry[] = [];
   const unchanged: LegiScanDatasetListEntry[] = [];
   for (const entry of list) {
-    if (stored.get(entry.session_id) === entry.dataset_hash) unchanged.push(entry);
+    if (!FORCE && stored.get(entry.session_id) === entry.dataset_hash) unchanged.push(entry);
     else changed.push(entry);
+  }
+  if (FORCE) {
+    console.log(`[sync:dataset] --force: hash gating bypassed, re-importing all ${changed.length} session(s)`);
   }
   const toProcess = SESSION_LIMIT ? changed.slice(0, SESSION_LIMIT) : changed;
   const deferred = SESSION_LIMIT ? changed.slice(SESSION_LIMIT) : [];

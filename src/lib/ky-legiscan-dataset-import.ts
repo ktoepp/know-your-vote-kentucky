@@ -204,6 +204,11 @@ export function buildVoteRow(rc: any, billUuidByLegiscanId: Map<number, string>)
     description: rc?.desc || null,
     yea_count: Number(rc?.yea) || 0,
     nay_count: Number(rc?.nay) || 0,
+    // `nv` (not voting) is a sibling of `absent` in LegiScan's roll_call schema.
+    // Omitting it here is what left nv_count NULL on all 6,944 stored votes while
+    // absent_count was 100% populated — this import is what wrote every one of
+    // them. Keep the two lines together so the next field addition notices both.
+    nv_count: Number(rc?.nv) || 0,
     absent_count: Number(rc?.absent) || 0,
     passed: rc?.passed === 1 || rc?.passed === true,
     roll_call: detail,

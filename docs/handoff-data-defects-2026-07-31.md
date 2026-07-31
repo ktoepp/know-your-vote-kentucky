@@ -8,10 +8,16 @@ Every number below was measured against production on 2026-07-31. **Re-verify be
 > originally recorded here turned out to be wrong and are corrected in place below — flagged because both
 > would have led the next person astray:
 >
-> - **`nv_count` does not resolve on its own.** The votes cron only ever re-fetches the 5 most-recently-actioned
->   bills, so closed-session rows are never revisited. A deliberate backfill is required. See Defect 2.
-> - **The backfill cost was understated 3x** (11.6% → 34.8% via the obvious code path). Fetching roll calls
->   directly rather than through `fetchVotes` brings it to 23.1%. See Defect 2.
+> - **`nv_count` does not resolve on its own** — and the reason is not what this document (or my own first
+>   diagnosis) said. It is **not** a sync-coverage problem. `sync-ky-dataset.ts` re-imports whole sessions
+>   from the LegiScan bulk dataset weekly and is what wrote all 6,944 vote rows; its `buildVoteRow` mapper
+>   simply **never mapped `nv`**, while mapping `absent` right beside it. That is the entire defect, and it
+>   explains the otherwise-odd signature: one field 100% NULL, its sibling 100% populated. Fixed at the mapper.
+> - **Check the bulk dataset before spending per-bill quota.** The API backfill this appeared to require was
+>   ~6,944 `getRollCall` calls (~23.1% of monthly quota, hours of wall-clock). Re-importing the identical data
+>   from the dataset path costs **~1 call per session, ~13 total.** Two successive cost estimates here were
+>   wrong by 3x and then by ~500x, both by reasoning from the per-bill API without checking what the bulk
+>   path already carried.
 >
 > Also: the "legacy URLs 404" premise under Defect 1 has now been **live-probed** (802/802 dead), rather than
 > resting on a code comment. One twin was dead too — see Defect 1.
@@ -105,29 +111,40 @@ select count(*) as total, count(nv_count) as nv_populated,
 from ky_votes;
 ```
 
-**~~This may fix itself.~~ It will not — corrected 2026-07-31.** The upsert reasoning is right as far as it
-goes (`ignoreDuplicates: false` does update existing rows), but it never reaches these rows. The votes cron
-runs `?source=votes&limit=5` (`vercel.json`), and the sync selects bills `order by last_action_date desc
-limit 5` (`ky-sync-pipeline.ts:1712`) — five bills per day, always the most recently actioned. Bills from
-closed sessions are never revisited, so the historical corpus stays NULL indefinitely. The 2026 session
-ended mid-April; the next regular session convenes January 2027, and even then only newly-active bills
-would be touched.
+**~~This may fix itself.~~ ~~The votes cron only covers 5 bills/day.~~ Both wrong — corrected 2026-07-31.**
 
-**A deliberate backfill is required.** Use `npm run backfill:vote-nv-counts` (or the `Backfill vote nv_count`
-workflow — it needs Actions secrets, so it cannot run from a dev sandbox). Estimate-only by default; pass
-`--live` to spend quota. Resumable: targets are selected by `nv_count IS NULL`, so an interrupted run costs
-nothing to restart.
+**Root cause: a dropped field in the dataset import.** `buildVoteRow`
+(`src/lib/ky-legiscan-dataset-import.ts`) mapped `yea`, `nay`, `absent`, `passed` and `votes` from each
+LegiScan roll call — but not `nv`. That import (`sync-ky-dataset.ts`, weekly, plus the original bulk seed)
+is what wrote every one of the 6,944 rows, so `nv_count` was never populated for any of them. The
+signature was the tell all along: a column 100% NULL while `absent_count`, its sibling in the *same* payload
+object, is 100% populated. That is a mapper omission, not a sync that never ran.
 
-**Cost — the earlier figure here was wrong by 3x.** It is *not* one call per bill. `client.fetchVotes(billId)`
-issues a `getBill` **plus** one `getRollCall` per vote: 3,487 + 6,944 = **10,431 calls (34.8%)**. The
-`getBill` half is pure waste, since `ky_votes` already stores every `roll_call_id`, so the backfill script
-calls `fetchRollCall` directly: **6,944 calls ≈ 23.1%** of the 30,000/month quota. Check
-`/admin/sync-status` for current usage first, and scope with `--session` to spend less.
+The interim/`limit=5` reasoning was a red herring. Vote data is **not** frozen: the dataset sync re-imports
+whole sessions gated on `dataset_hash`, and an unchanged hash means upstream has no new data.
 
-**Budget wall-clock, not just quota.** The client enforces a 500ms floor between requests
-(`RATE_DELAY`, `ky-legiscan-client.ts:85`); with real latency the observed rate is ~15 rows/min, so a
-full-corpus pass runs for hours and will exceed a single job's timeout. That is expected — re-dispatch to
-resume. Do not "fix" this by removing the throttle.
+**Fix.** One line in `buildVoteRow` (`nv_count: Number(rc?.nv) || 0`), then re-import to repopulate existing
+rows: `npm run sync:ky:dataset -- --force` (or the weekly workflow's `force` input). `--force` exists
+precisely for this case — the upstream payload is byte-identical, but we now read a field we used to
+discard, so hash gating would otherwise skip every session. The upsert is
+`onConflict: 'bill_id,roll_call_id'`, so existing rows are updated in place.
+
+**Cost — and the lesson.** Two estimates in this document were wrong, by 3x and then by ~500x, both from
+reasoning about the per-bill API without checking what the bulk dataset already carried:
+
+| approach | calls | note |
+|---|---|---|
+| `fetchVotes` per bill | 10,431 (34.8%) | `getBill` + one `getRollCall` per vote |
+| `fetchRollCall` per stored id | 6,944 (23.1%) | drops the redundant `getBill` |
+| **dataset re-import** | **~13 (0.04%)** | one `getDataset` per session |
+
+`scripts/backfill-vote-nv-counts.ts` still exists as a targeted fallback (e.g. one session, or if a dataset
+is stale), but **it should not be the first resort.** Before spending per-bill quota on any `ky_votes`
+column, check whether the dataset already has the field.
+
+**If you do use the per-bill path**, budget wall-clock too: the client enforces a 500ms floor between
+requests (`RATE_DELAY`, `ky-legiscan-client.ts:85`), so a full pass runs for hours and exceeds a single job
+timeout. It is resumable (`nv_count IS NULL`). Do not "fix" that by removing the throttle.
 
 **Do not** change the accuracy checker's NULL-skip in `checkers/votes.ts` — skipping NULL as
 "not yet backfilled" is correct, and comparing NULL as 0 would flag the entire corpus.
