@@ -65,6 +65,23 @@ jobs:
         run: |
           npm run health:sources ${{ inputs.strict && '-- --strict' || '' }}
 
+      # Advisory triage of any breach the step above found. Runs only on
+      # success: a failed evaluation has nothing to interpret, and the fallback
+      # step below already reports that case.
+      - name: Triage source health
+        if: success()
+        continue-on-error: true
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
+          SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_SYNC_NOTIFY_CLI: 'true'
+        run: npm run triage:findings -- --source=health
+
       # Last-resort net: fires only when the step above could not report for
       # itself (setup failure, OOM, timeout kill). The script drops
       # .slack-notified after a *delivered* Slack post, so a successful alert

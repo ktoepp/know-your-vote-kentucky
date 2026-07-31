@@ -36,6 +36,8 @@
     "audit:accuracy:dry": "tsx scripts/accuracy-audit.ts --dry-run",
     "health:sources": "tsx scripts/check-source-health.ts",
     "health:sources:json": "tsx scripts/check-source-health.ts --json",
+    "triage:findings": "tsx scripts/triage-findings.ts",
+    "triage:findings:dry": "tsx scripts/triage-findings.ts --dry-run",
     "topics:reclassify": "tsx scripts/reclassify-bill-topics.ts",
     "topics:reclassify:dry": "tsx scripts/reclassify-bill-topics.ts --dry-run",
     "backfill:bill-summaries": "tsx scripts/backfill-bill-summaries.ts",

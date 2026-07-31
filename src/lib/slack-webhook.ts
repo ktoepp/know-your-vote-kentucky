@@ -91,15 +91,26 @@ export function signupsWebhookConfigured(): boolean {
   return webhookUrlForSignups() !== null;
 }
 
-async function postToAlertsAndSupport(text: string): Promise<void> {
+/**
+ * Returns whether the message reached at least one channel.
+ *
+ * Callers that drop the `.slack-notified` sentinel MUST honour this: a `false`
+ * here (Slack down, or no alerts webhook configured) means nothing was
+ * delivered, and standing the workflow's fallback step down on that basis
+ * leaves the failure reported nowhere. See {@link markSlackErrorNotified}.
+ */
+async function postToAlertsAndSupport(text: string): Promise<boolean> {
   const alertUrl = webhookUrlForAlerts();
   const supportUrl = webhookUrlForSupportEscalation();
   const targets = new Set<string>();
   if (alertUrl) targets.add(alertUrl);
   if (supportUrl) targets.add(supportUrl);
+  let delivered = false;
   for (const url of targets) {
-    await postSlackIncomingWebhook(url, text);
+    const { ok } = await postSlackIncomingWebhook(url, text);
+    delivered = delivered || ok;
   }
+  return delivered;
 }
 
 export async function postSlackIncomingWebhook(
@@ -524,9 +535,25 @@ export async function notifyHealthCheckFailureSlack(details: string): Promise<vo
  * `shouldAlertOnHealth`) — the health check runs daily and a source that stays
  * broken for a week should page once, not seven times.
  */
-export async function notifySourceHealthSlack(details: string): Promise<void> {
+/**
+ * Agent-generated triage of a check run (see `scripts/triage-findings.ts`).
+ *
+ * Goes to the status/digest channel, never to #errors: this is interpretation of
+ * findings that were already reported, not a new alert, and escalating an
+ * advisory summary would undo the "green = the agent ran" separation that keeps
+ * #errors meaningful (decisions.md § 2026-06-03).
+ */
+export async function notifyTriageSlack(details: string): Promise<boolean> {
+  const url = webhookUrlForSyncDigest();
+  if (!url) return false;
+  const clipped = details.length > 3500 ? `${details.slice(0, 3500)}…` : details;
+  const { ok } = await postSlackIncomingWebhook(url, clipped);
+  return ok;
+}
+
+export async function notifySourceHealthSlack(details: string): Promise<boolean> {
   const clipped = details.length > 2000 ? `${details.slice(0, 2000)}…` : details;
-  await postToAlertsAndSupport(`*KY Vote sync sources degraded*\n${clipped}`);
+  return postToAlertsAndSupport(`*KY Vote sync sources degraded*\n${clipped}`);
 }
 
 /** Mask an email for an ops channel: keep first 2 chars of the local part + domain. */

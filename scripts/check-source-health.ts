@@ -89,12 +89,16 @@ async function main() {
     // Edge-triggered on the same fingerprint the cron uses, so running both
     // schedulers does not double-page for one breach.
     if (await shouldAlertOnHealth(health)) {
-      const delivered = await notifySourceHealthSlack(body)
-        .then(() => true)
-        .catch((e) => {
-          console.error('[source-health] Slack notify failed:', e);
-          return false;
-        });
+      // `notifySourceHealthSlack` reports whether the post actually landed —
+      // resolving successfully is not the same as being delivered, since the
+      // underlying webhook call never throws.
+      const delivered = await notifySourceHealthSlack(body).catch((e) => {
+        console.error('[source-health] Slack notify failed:', e);
+        return false;
+      });
+      if (!delivered) {
+        console.error('[source-health] Slack post was not delivered — leaving the failure sentinel unset');
+      }
       markSlackErrorNotified(delivered);
     } else {
       console.log('\n(breach set unchanged since the last alert — not re-posting)');
