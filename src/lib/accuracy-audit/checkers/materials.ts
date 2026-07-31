@@ -253,19 +253,20 @@ async function checkLinks(db: SupabaseClient, cfg: AuditConfig, findings: Findin
     filter: (q) => q.is('link_checked_at', null),
     cacheKey: 'link_checked_at_null',
   });
-  const materials =
-    unprobed.length >= materialLimit
-      ? unprobed
-      : [
-          ...unprobed,
-          ...(await sampleTable<{ id: string; title: string | null; url: string }>(db, {
-            table: 'ky_committee_materials',
-            select: 'id, title, url',
-            seed: cfg.seed ^ 0x1b873593,
-            limit: materialLimit - unprobed.length + unprobed.length,
-            cacheKey: 'all',
-          })).filter((m) => !unprobed.some((u) => u.id === m.id)),
-        ].slice(0, materialLimit);
+  let materials = unprobed;
+  if (unprobed.length < materialLimit) {
+    // Top up from the full population. Over-fetch by the number already held so
+    // that removing overlaps still leaves enough to reach the limit.
+    const seenIds = new Set(unprobed.map((m) => m.id));
+    const topUp = await sampleTable<{ id: string; title: string | null; url: string }>(db, {
+      table: 'ky_committee_materials',
+      select: 'id, title, url',
+      seed: cfg.seed ^ 0x1b873593,
+      limit: materialLimit + unprobed.length,
+      cacheKey: 'all',
+    });
+    materials = [...unprobed, ...topUp.filter((m) => !seenIds.has(m.id))].slice(0, materialLimit);
+  }
 
   const bills = await sampleTable<{ bill_number: string; bill_text_url: string }>(db, {
     table: 'ky_bills',
