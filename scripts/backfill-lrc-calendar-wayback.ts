@@ -123,6 +123,7 @@ async function main() {
   let totalMeetingsParsed = 0;
   let totalMeetingsUpserted = 0;
   let totalAgenda = 0;
+  let totalErrors = 0;
 
   for (let i = 0; i < timestamps.length; i++) {
     const ts = timestamps[i]!;
@@ -150,8 +151,9 @@ async function main() {
       });
       totalMeetingsUpserted += stats.meetingsSynced;
       totalAgenda += stats.agendaSynced;
+      totalErrors += stats.errors;
       console.log(
-        `  Upserted ${stats.meetingsSynced} meeting(s), ${stats.agendaSynced} agenda line(s)`,
+        `  Upserted ${stats.meetingsSynced} meeting(s), ${stats.agendaSynced} agenda line(s)${stats.errors > 0 ? ` — ${stats.errors} write error(s)` : ''}`,
       );
     }
 
@@ -166,6 +168,7 @@ async function main() {
   if (!dryRun) {
     console.log(`Meetings upserted: ${totalMeetingsUpserted}`);
     console.log(`Agenda lines inserted: ${totalAgenda}`);
+    if (totalErrors > 0) console.log(`Row-level write errors: ${totalErrors}`);
     console.log('Re-run `npm run sync:ky:lrc-calendar` to refresh the current week from LRC live.');
   }
 }

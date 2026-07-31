@@ -489,6 +489,20 @@ export async function notifyHealthCheckFailureSlack(details: string): Promise<vo
   await postToAlertsAndSupport(`*KY Vote health check failed*\n${clipped}`);
 }
 
+/**
+ * Sync-pipeline degradation (a source stale past its SLO, errored, or stuck in
+ * `running`). Distinct from {@link notifyHealthCheckFailureSlack}, which means
+ * the infrastructure itself is unreachable.
+ *
+ * Callers are expected to edge-trigger this (see `source-health.ts` §
+ * `shouldAlertOnHealth`) — the health check runs daily and a source that stays
+ * broken for a week should page once, not seven times.
+ */
+export async function notifySourceHealthSlack(details: string): Promise<void> {
+  const clipped = details.length > 2000 ? `${details.slice(0, 2000)}…` : details;
+  await postToAlertsAndSupport(`*KY Vote sync sources degraded*\n${clipped}`);
+}
+
 /** Mask an email for an ops channel: keep first 2 chars of the local part + domain. */
 function maskEmail(email: string): string {
   const at = email.indexOf('@');

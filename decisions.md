@@ -1813,3 +1813,79 @@ Scheduled health check across connected monitoring services (GitHub Actions + Ve
 - **Not shipping a migration on this alone.** No `EXPLAIN ANALYZE` access this session (no Supabase/DB connector available) to confirm the planner is actually doing a full sort rather than something else (lock contention, pool exhaustion, etc.). Recorded as a concrete candidate rather than another "re-check tomorrow": if profiling confirms it, add `CREATE INDEX ky_bills_session_last_action_idx ON ky_bills (session DESC, last_action_date DESC NULLS LAST);`.
 
 **Revisit if:** the Vercel MCP gap recurs again on the next scheduled check — three prior self-healed occurrences plus this one is enough to stop assuming it'll fix itself; worth checking whether the daily Routine's env (`env_011CUP9uJd4u7xGxxR4Sw2EE`) has a stabler grant than ad hoc sessions, or moving Vercel/Sentry checks to a manual dashboard cadence as floated 2026-06-23. Also revisit once the bills-browse query has actually been profiled — either confirming the composite-index fix or ruling it out.
+
+---
+
+## 2026-07-31 — Accuracy + health-check gap pass: verify stored data, alert on stalled pipelines
+
+**Trigger.** A sweep of the accuracy-audit and health-check routines for missing checks, prompted by a standing inability to verify committees, meetings, and agenda contents. Branch `claude/accuracy-health-check-routines-vcervi`. Findings were confirmed against live primary data, not only by reading code.
+
+### The committee/meeting/agenda blind spot — root cause
+
+**The only agenda assertion was a hash that could not observe our own data.** `agendaContentHash` is computed from LRC's `rawText` *before* `normalizeKyGaAgendaLine`, while the stored `raw_text` is normalized. The checker recomputed that same upstream hash and compared, so it answered "has LRC edited this agenda since we synced?" and never compared a stored field. `raw_text`, `depth`, `item_kind`, `bill_number`, `bill_session_label`, `ky_bill_id`, and `sort_order` were all unverified — including the two most user-visible defects, a bill that fails to link and a flattened agenda hierarchy.
+
+**That enabled a silent data-loss path.** The sync deletes a meeting's agenda rows before re-inserting; a failed insert was only `logError`'d — no counter, no status change. The meeting kept a valid hash over zero agenda rows, the hash comparison passed, and the committee page rendered a blank agenda. **Checked on primary: 0 meetings were in this state**, so the gap was undetectable rather than active. (Of 215 meetings with no agenda rows, 192 have a null hash — PDF/Wayback backfills that never had a parsed agenda — and 23 legitimately hash the empty payload.)
+
+**Decision:** keep the upstream hash for what it is actually good for (change detection driving `agenda_updated` events) and document that limit in code, then verify stored agendas field-by-field against `deriveAgendaItems` — a new export that is now the single derivation used by *both* the sync and the checker. The checker previously carried its own copy of the hash; a checker that re-implements the sync can only ever agree with itself. Added the invariant "hash records agenda text but zero rows stored → fail", and an independent cross-check that a stored `ky_bill_id` points at the bill the line actually names (this one does not re-run the sync's lookup, so it catches genuine mis-resolution). **Trade-off:** field-level comparison mostly proves "stored matches what today's code would derive" — it catches stale rows, partial writes, and upstream edits, but a bug in the derivation itself would be agreed on by both sides. The bill-id cross-check is the one genuinely independent assertion.
+
+**Meetings now match on `(committee_id, meeting_date)` with `time_and_location` diffed as a field.** Keying on it meant an upstream room or time edit read as "meeting missing" — a `fail` pointing at the wrong problem — while the stale row stayed live and still marked `scheduled`. When exactly one stored row exists for that date, it is treated as the same meeting with a changed time.
+
+**Sync write failures now count.** `LrcCalendarUpsertStats` gains `errors`; committee/meeting/agenda/cancellation write failures increment it and the run reports `error` to `ky_sources` instead of `success`.
+
+### Health check was a liveness probe
+
+`/api/cron/health-check` ran `select('source_name').limit(1)` and **discarded the row**. At the time of this pass, primary had `lrc-enrollment-actions` in `error` (3h), `ordinances` stuck in `running` since 2026-05-20 (72 days), and `executive-orders` erroring for 105 days — all returning `{ok:true}`. Nothing anywhere read `ky_sources` for staleness or errors; the only 48h threshold in the codebase is `DataFreshnessNote`, a client component that warns *visitors*.
+
+**Decision:** new `src/lib/source-health.ts` with a per-source freshness SLO registry mirroring the real `vercel.json` + GitHub Actions schedules (~1.5× the nominal interval, so one missed run is tolerated and a stopped pipeline is not), plus breach kinds `missing` / `error` / `stuck_running` / `stale`. Sources with no scheduled job are listed **explicitly** as unmonitored rather than ignored by omission, so an unrecognized source name surfaces as unknown instead of passing silently.
+
+**Two verdicts, deliberately different consequences.** Infrastructure failures (env missing, Supabase unreachable) keep `503 {ok:false}`. Pipeline breaches return `200 {degraded:true}` plus an **edge-triggered** Slack alert (fingerprint in `ky_sync_state`, mirroring the LegiScan quota bands). **Why:** a late weekly sync is not the site being down and must not flip an uptime monitor red, but it is exactly the class of failure that went unnoticed — so it pages once per distinct breach set, not once per daily run. `HEALTH_CHECK_FAIL_ON_DEGRADED=true` opts into 503 for pipeline breaches.
+
+**Also fixed:** `/admin/sync-status` selected `id, last_synced_at, last_status` — none of which exist on `ky_sources` (real columns are `source_name`, `last_sync_at`, `status`). PostgREST errored, `if (error || !data) return []` swallowed it, and the one human view of source health rendered permanently empty. It now shares the health evaluator, so the page and the Slack alert cannot disagree.
+
+### "Did the pipeline actually produce data" — closed
+
+`ky_sources` recorded `success` with `items_synced: 0` indefinitely, so a job running on schedule that had silently stopped yielding was indistinguishable from a healthy one. `lrc-calendar` reported success 4h before this pass while no `ky_committee_meetings` row had been written since 2026-07-26, and no live-calendar meeting exists after 2026-07-20 (every August meeting in the DB comes from the interim-PDF backfill, `scraped_at` 2026-05-22).
+
+**The naive check would be wrong.** Zero output is legitimate for change-hash-gated syncs (bills, votes sync 0 for weeks during interim) and for interim weeks with no committee meetings at all. Treating any zero as a failure would alarm constantly. Two complementary assertions instead:
+
+- **Structural parse assertion (`lrc-calendar`).** The parser already distinguishes *"LRC published day headings that say No meetings scheduled"* (`dayCount > 0`, a real empty week) from *"we parsed no day headings at all"* (`dayCount === 0`, we can no longer read the page) — and the sync **discarded that distinction**, collapsing both into `success` with `itemsSynced: 0`. The second case now reports `error`. **Why this matters:** the fetch still returns HTTP 200, so a page restructure or a 200-served maintenance page trips nothing else. Verified: the live fixture parses 5 day headings; a restructured page and a 200 error page both parse 0 and are caught.
+- **Zero-yield tracking (all sources).** Migration **047** adds `last_nonzero_sync_at` + `consecutive_zero_syncs` to `ky_sources`, maintained in `updateSourceStatus`. New `stalled` breach kind driven by a per-source `maxZeroYieldHours` — **opt-in by design**, declared only where a prolonged zero is genuinely suspicious: `lrc-calendar` 21d (longer than any interim gap between meeting clusters), `lrc-committee-materials` 14d, `legislators` 7d. `bills` / `votes` / `dataset` / `lrc-popular-names` carry **no** budget precisely because their zeros are normal.
+
+**Deploy ordering:** `fetchSourceRows` falls back to the pre-047 column set when the yield columns are absent, so this ships safely ahead of the migration — without it a missing column surfaces as "Supabase query failed", a false infrastructure alarm and the same class of bug that left `/admin/sync-status` silently empty.
+
+**Verified** against the real `ky_sources` snapshot: today's 11-day calendar gap sits inside the 21-day budget and does not fire; the same state 12 days on does; rows lacking the yield columns produce no breaches.
+
+**Open question this surfaced (not resolved):** whether the current live-calendar zero yield is a genuine interim gap or an upstream/parser break could not be confirmed — this environment's network policy blocks `apps.legislature.ky.gov`. The 21-day budget will answer it by ~2026-08-10 if the yield does not resume.
+
+### Sampling: the efficiency problem and the coverage problem were the same problem
+
+**`lookbackDays` / `ACCURACY_DAYS` was dead config** — defined, documented as a lookback, read by zero checkers. So the bills sample was uniform over all 22,547 rows, ~92% of which belong to closed sessions whose upstream record is frozen. Most of each run's LegiScan budget re-verified bills that cannot drift, while the 1,737 current-session rows were sampled at their population share.
+
+**Decision:** replace it with a real `activeDays` (`ACCURACY_ACTIVE_DAYS`, default 365; `ACCURACY_DAYS` still honoured as an alias) and `activeShare` (default 0.75), and add `sampleTableSplit` — most of the draw from bills with recent `last_action_date`, the remainder still rotating across history so old rows accrue coverage. **Why 365 and not 14:** during interim no bill has action inside a short window, so a 14-day window would select nothing; a year keeps the current session in scope year-round. **Side benefit:** shrinks the dominant key scan from ~23 pages to ~2.
+
+**Key scans are now memoized per run** by an explicit `cacheKey`. `sampleTable` paged the entire filtered key set on every call — ~22k UUIDs to choose 40 rows, and `ky_bills` was scanned three times per run — using the same deep-`range()` shape already implicated in production statement timeouts.
+
+**`reviewSummaries` sampled `ky_bills` with the bare `cfg.seed`**, the same stream `checkBills` uses, unlike every other co-sample in the file. Because bottom-k over the ~4.9k rows carrying an `ai_summary` lands at nearly the same hash quantile as bottom-k over the full corpus, the two samples overlapped almost entirely — the LLM pass was re-reviewing bills that had just been checked deterministically. Given its own stream. (An earlier note that `ai_summary` was null corpus-wide is out of date: 4,936 rows carry one.)
+
+**Not changed:** bottom-k consistent sampling itself. Coverage is still memoryless — ~0.18%/run — and a stateful `last_audited_at` rotation would give real coverage guarantees. Deferred rather than dropped; `ky_accuracy_findings` is the substrate for it.
+
+### Triage and reporting
+
+- **Grouped by root cause.** One status-mapper regression across 30 bills used to render as eight near-identical lines plus "…and 22 more". Findings now group by `(domain, field-or-message, severity)` with an affected count and one worked example. `Finding.url` — collected by checkers, never rendered — is now shown.
+- **History (migration 046).** `ky_accuracy_runs` + `ky_accuracy_findings`, fingerprinted over `(domain, entity, field, message)` — deliberately **not** `expected`/`actual`, so a value drifting to a new wrong value still reads as the same open issue. The digest now splits "new" from "recurring for <age>". Recurrence is read **before** the run is written, or every finding matches itself. Persistence is best-effort and never fails a run, so the code ships safely ahead of the migration. **Migration 046 is not yet applied to primary.**
+- **Upstream outages no longer read as drift.** Per-item fetch failures degrade to `warn`, so a total LegiScan outage produced 40 warnings, `checked: 0`, exit 0, and a header saying "warnings". Checkers now count `upstreamFailures`; a domain failing ≥50% of ≥5 attempted items is reported as an upstream outage, escalated as an operational error, and named in the status line. **This is a deliberate narrowing of the 2026-06-03 "green = the agent ran" policy:** content findings still keep CI green, but "the agent ran and verified nothing" is now operational, which is what that policy always intended.
+- **Slack cap raised 3,500 → 38,000** (Slack's limit is ~40k). The old cap truncated whole trailing sections, so `materials` and `llm` were the first to vanish on a noisy run — precisely when they mattered.
+- **Per-domain deadline** (`ACCURACY_DOMAIN_TIMEOUT_MS`, default 10m). The LegiScan client retries 5× on a 60s timeout with backoff, so one hung bill can burn ~5.5 minutes and eight can exhaust the 45-minute workflow ceiling, killing the run with no report (the 2026-06-21 cancellation). A breach is reported as `skipped`, not `error` — usually upstream slowness rather than a bug — and the outage escalation above covers a domain that keeps producing nothing.
+
+### Verification
+
+Agenda logic exercised against `fixtures/lrc/legislative-calendar-live.html` (80 agenda lines): a faithful agenda yields zero findings, while a dropped line, an unresolved bill link, a flattened `depth`, a mis-resolved `ky_bill_id`, and a fully lost agenda are each caught. Source-health evaluator run against the real `ky_sources` snapshot: flags `lrc-enrollment-actions`, stays quiet on the paused sources, recovers cleanly. Report grouping and outage escalation verified on synthetic summaries.
+
+### Not addressed (backlog)
+
+- Stateful `last_audited_at` sampling rotation for real coverage guarantees.
+- Verification beyond the live calendar's ~5-day window — 146 upcoming and all backfilled historical meetings are still unverified.
+- `member_refs` (drives the committee Members section), `ky_committees.chamber` (a regex guess that drives the chamber filters), and `profile_url` are displayed and unverified.
+- `ky_votes.nv_count` is stored, rendered on bill detail, and never compared.
+- Dead-man's switches: 6 of 9 Vercel crons have no Sentry monitor, including the health check itself; the `lrc-calendar` monitor in `sentry-sync-cron.ts` still points at a job that moved to GitHub Actions.
+- `verify:recent-ship` is a dangling npm script (`scripts/verify-recent-ship.ts` does not exist).

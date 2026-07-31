@@ -39,11 +39,33 @@ export interface CheckerResult {
   skipReason?: string;
   /** Checker-level crash; treated as a hard failure by the orchestrator. */
   error?: string;
+  /**
+   * Items whose upstream fetch failed outright (network, 5xx, quota mid-run).
+   *
+   * These degrade to per-item `warn` findings, which meant a *total* upstream
+   * outage was indistinguishable from mild content drift: 40 warnings, `checked`
+   * of 0, exit 0, and a Slack header reading "warnings". Counting them lets the
+   * orchestrator escalate when a domain mostly failed to reach its source.
+   */
+  upstreamFailures?: number;
 }
 
 export interface AuditConfig {
-  /** Only consider content changed/active within this many days. */
-  lookbackDays: number;
+  /**
+   * A bill counts as "active" — still capable of drifting upstream — when its
+   * `last_action_date` falls within this many days. Defaults to a full year so
+   * the current session stays in the window through the interim.
+   *
+   * Replaces the former `lookbackDays` / `ACCURACY_DAYS`, which was defined,
+   * documented as a lookback, and read by no checker. `ACCURACY_DAYS` is still
+   * honoured as an alias so existing configuration keeps working.
+   */
+  activeDays: number;
+  /**
+   * Fraction of the bills sample drawn from the active window; the remainder
+   * rotates across the full corpus.
+   */
+  activeShare: number;
   /** Max bills re-fetched from LegiScan per run. */
   billsLimit: number;
   /** Max roll calls re-fetched from LegiScan per run. */
@@ -92,6 +114,13 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
+function envFloat(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const n = Number.parseFloat(raw);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : fallback;
+}
+
 function envBool(name: string): boolean {
   return (process.env[name]?.trim() || '').toLowerCase() === 'true';
 }
@@ -117,7 +146,8 @@ function resolveSeed(override?: number): number {
 export function buildAuditConfig(overrides: AuditConfigOverrides = {}): AuditConfig {
   return {
     seed: resolveSeed(overrides.seed),
-    lookbackDays: envInt('ACCURACY_DAYS', 14),
+    activeDays: envInt('ACCURACY_ACTIVE_DAYS', envInt('ACCURACY_DAYS', 365)),
+    activeShare: envFloat('ACCURACY_ACTIVE_SHARE', 0.75),
     billsLimit: envInt('ACCURACY_BILLS_LIMIT', 40),
     votesLimit: envInt('ACCURACY_VOTES_LIMIT', 15),
     materialsCommitteeLimit: envInt('ACCURACY_MATERIALS_COMMITTEE_LIMIT', 12),
@@ -221,7 +251,7 @@ export function summarizeResult(
   checked: number,
   findings: Finding[],
   startedAtMs: number,
-  extra: Partial<Pick<CheckerResult, 'skipped' | 'skipReason' | 'error'>> = {},
+  extra: Partial<Pick<CheckerResult, 'skipped' | 'skipReason' | 'error' | 'upstreamFailures'>> = {},
 ): CheckerResult {
   const failures = findings.filter((f) => f.severity === 'fail').length;
   const warnings = findings.filter((f) => f.severity === 'warn').length;

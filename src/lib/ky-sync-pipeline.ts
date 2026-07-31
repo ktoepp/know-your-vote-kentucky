@@ -311,13 +311,35 @@ async function updateSourceStatus(
 ): Promise<void> {
   try {
     const db = getSupabase();
+    const now = new Date().toISOString();
+
+    // Track how long this source has gone without yielding anything. A single
+    // zero is normal (change-gated syncs, quiet interim weeks), but a source
+    // that keeps succeeding and never produces is broken in a way `status`
+    // alone cannot express — see migration 047.
+    const yieldFields: Record<string, unknown> = {};
+    if (status === 'success') {
+      if (itemsSynced > 0) {
+        yieldFields.last_nonzero_sync_at = now;
+        yieldFields.consecutive_zero_syncs = 0;
+      } else {
+        const { data: prior } = await db
+          .from('ky_sources')
+          .select('consecutive_zero_syncs')
+          .eq('source_name', sourceName)
+          .maybeSingle();
+        yieldFields.consecutive_zero_syncs = (prior?.consecutive_zero_syncs ?? 0) + 1;
+      }
+    }
+
     await db.from('ky_sources').upsert(
       {
         source_name: sourceName,
         status,
         items_synced: itemsSynced,
-        last_sync_at: new Date().toISOString(),
+        last_sync_at: now,
         error_message: errorMessage || null,
+        ...yieldFields,
       },
       { onConflict: 'source_name' },
     );

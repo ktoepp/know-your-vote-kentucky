@@ -142,11 +142,13 @@ async function checkMaterialsDiff(
 
   let processed = 0;
 
-  for (const committee of committees) {
-    if (committee.lrc_rsn == null) continue;
+  // Fetch the LRC pages concurrently. These are plain HTML GETs against a
+  // different host than LegiScan and consume no API quota, so there was no
+  // reason to serialize them behind a 30s timeout each — this was the single
+  // largest wall-clock cost in the checker.
+  const fetched = await mapWithConcurrency(committees, 4, async (committee) => {
+    if (committee.lrc_rsn == null) return null;
     const url = lrcCommitteeDocumentsUrl(committee.lrc_rsn);
-
-    let html: string | null = null;
     try {
       const res = await axios.get<string>(url, {
         timeout: 30_000,
@@ -154,31 +156,55 @@ async function checkMaterialsDiff(
         headers: FETCH_HEADERS,
         validateStatus: (s) => s < 500,
       });
-      html = res.status === 404 ? null : res.data;
+      return { committee, url, html: res.status === 404 ? null : res.data, error: null as string | null };
     } catch (e) {
-      findings.push({
-        severity: 'warn',
-        domain: 'materials',
-        entity: committee.name,
-        message: `LRC documents fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+      return {
+        committee,
         url,
-      });
-      continue;
+        html: null,
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
-    if (!html) continue;
+  });
 
+  const usable = fetched.filter(
+    (f): f is { committee: CommitteeRow; url: string; html: string; error: null } => {
+      if (!f) return false;
+      if (f.error) {
+        findings.push({
+          severity: 'warn',
+          domain: 'materials',
+          entity: f.committee.name,
+          message: `LRC documents fetch failed: ${f.error}`,
+          url: f.url,
+        });
+        return false;
+      }
+      return f.html != null;
+    },
+  );
+
+  // One query for every sampled committee's stored materials, replacing a
+  // per-committee select inside the loop.
+  const storedByCommittee = new Map<string, Map<string, MaterialRow>>();
+  if (usable.length > 0) {
+    const { data: storedRows } = await db
+      .from('ky_committee_materials')
+      .select('id, committee_id, title, url')
+      .in('committee_id', usable.map((u) => u.committee.id));
+    for (const r of (storedRows ?? []) as MaterialRow[]) {
+      if (!storedByCommittee.has(r.committee_id)) storedByCommittee.set(r.committee_id, new Map());
+      storedByCommittee.get(r.committee_id)!.set(r.url, r);
+    }
+  }
+
+  for (const { committee, url, html } of usable) {
     processed += 1;
     const parsed = parseCommitteeMaterialsHtml(html, url);
     const liveMaterials = parsed.meetings.flatMap((m) => m.materials);
     if (liveMaterials.length === 0) continue;
 
-    const { data: storedRows } = await db
-      .from('ky_committee_materials')
-      .select('id, committee_id, title, url')
-      .eq('committee_id', committee.id);
-
-    const storedByUrl = new Map<string, MaterialRow>();
-    for (const r of (storedRows ?? []) as MaterialRow[]) storedByUrl.set(r.url, r);
+    const storedByUrl = storedByCommittee.get(committee.id) ?? new Map<string, MaterialRow>();
 
     for (const mat of liveMaterials) {
       const stored = storedByUrl.get(mat.url);
@@ -211,21 +237,44 @@ async function checkMaterialsDiff(
 }
 
 async function checkLinks(db: SupabaseClient, cfg: AuditConfig, findings: Finding[]): Promise<number> {
-  const half = Math.max(1, Math.floor(cfg.linkSampleLimit / 2));
+  // Split the budget without dropping a target: floor() on both halves spent
+  // only 24 of a configured 25.
+  const materialLimit = Math.max(1, Math.ceil(cfg.linkSampleLimit / 2));
+  const billLimit = Math.max(1, cfg.linkSampleLimit - materialLimit);
 
-  const materials = await sampleTable<{ id: string; title: string | null; url: string }>(db, {
+  // Prefer never-probed rows so link coverage advances instead of re-drawing
+  // uniformly. At the time of writing 944 of 1,773 material rows had never been
+  // probed, while the UI's "Link unavailable" affordance reads link_status.
+  const unprobed = await sampleTable<{ id: string; title: string | null; url: string }>(db, {
     table: 'ky_committee_materials',
     select: 'id, title, url',
     seed: cfg.seed,
-    limit: half,
+    limit: materialLimit,
+    filter: (q) => q.is('link_checked_at', null),
+    cacheKey: 'link_checked_at_null',
   });
+  let materials = unprobed;
+  if (unprobed.length < materialLimit) {
+    // Top up from the full population. Over-fetch by the number already held so
+    // that removing overlaps still leaves enough to reach the limit.
+    const seenIds = new Set(unprobed.map((m) => m.id));
+    const topUp = await sampleTable<{ id: string; title: string | null; url: string }>(db, {
+      table: 'ky_committee_materials',
+      select: 'id, title, url',
+      seed: cfg.seed ^ 0x1b873593,
+      limit: materialLimit + unprobed.length,
+      cacheKey: 'all',
+    });
+    materials = [...unprobed, ...topUp.filter((m) => !seenIds.has(m.id))].slice(0, materialLimit);
+  }
 
   const bills = await sampleTable<{ bill_number: string; bill_text_url: string }>(db, {
     table: 'ky_bills',
     select: 'bill_number, bill_text_url',
     seed: cfg.seed ^ 0x9e3779b9, // distinct stream from the materials sample
-    limit: half,
+    limit: billLimit,
     filter: (q) => q.not('bill_text_url', 'is', null),
+    cacheKey: 'bill_text_url_not_null',
   });
 
   const targets: LinkTarget[] = [];

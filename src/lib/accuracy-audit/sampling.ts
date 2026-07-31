@@ -74,10 +74,29 @@ export interface SampleParams {
   keyColumn?: string;
   /** Optional filter applied to BOTH the key scan and the row fetch. */
   filter?: (q: FilteredQuery) => FilteredQuery;
+  /**
+   * Identifies the (table, filter) population so its key scan can be reused
+   * within a run. Two calls sharing a `cacheKey` MUST apply the same filter.
+   * Omit to force a fresh scan.
+   */
+  cacheKey?: string;
 }
 
 /** PostgREST caps a single response; page the key scan to cover the whole table. */
 const KEY_PAGE_SIZE = 1000;
+
+/**
+ * Key scans memoized for the lifetime of a run (the audit is a single short
+ * process, so this is a per-run cache, not a stale-data risk). A scan of
+ * `ky_bills` is ~23 paged requests returning ~22k UUIDs to choose 40 rows;
+ * repeating it for every sample of the same population was pure waste.
+ */
+const keyScanCache = new Map<string, string[]>();
+
+/** Drop memoized key scans. Exposed for tests and long-lived callers. */
+export function clearKeyScanCache(): void {
+  keyScanCache.clear();
+}
 
 /**
  * Seed-sample up to `limit` rows from `table`, stably (see file header).
@@ -93,25 +112,33 @@ export async function sampleTable<T>(db: SupabaseClient, p: SampleParams): Promi
   const keyColumn = p.keyColumn ?? 'id';
   const applyFilter = p.filter ?? ((q: FilteredQuery) => q);
 
-  // 1) Collect all candidate keys under the filter.
-  const keys: string[] = [];
-  for (let from = 0; ; from += KEY_PAGE_SIZE) {
-    const pageQuery = applyFilter(
-      db
-        .from(p.table)
-        .select(keyColumn)
-        .order(keyColumn, { ascending: true })
-        .range(from, from + KEY_PAGE_SIZE - 1) as FilteredQuery,
-    );
-    const { data, error } = await pageQuery;
-    if (error) throw new Error(error.message);
-    const rows = (data ?? []) as Array<Record<string, unknown>>;
-    if (rows.length === 0) break;
-    for (const r of rows) {
-      const v = r[keyColumn];
-      if (v != null) keys.push(String(v));
+  // 1) Collect all candidate keys under the filter (memoized per run).
+  const cacheId = p.cacheKey ? `${p.table}|${keyColumn}|${p.cacheKey}` : null;
+  let keys: string[];
+  const cached = cacheId ? keyScanCache.get(cacheId) : undefined;
+  if (cached) {
+    keys = cached;
+  } else {
+    keys = [];
+    for (let from = 0; ; from += KEY_PAGE_SIZE) {
+      const pageQuery = applyFilter(
+        db
+          .from(p.table)
+          .select(keyColumn)
+          .order(keyColumn, { ascending: true })
+          .range(from, from + KEY_PAGE_SIZE - 1) as FilteredQuery,
+      );
+      const { data, error } = await pageQuery;
+      if (error) throw new Error(error.message);
+      const rows = (data ?? []) as Array<Record<string, unknown>>;
+      if (rows.length === 0) break;
+      for (const r of rows) {
+        const v = r[keyColumn];
+        if (v != null) keys.push(String(v));
+      }
+      if (rows.length < KEY_PAGE_SIZE) break;
     }
-    if (rows.length < KEY_PAGE_SIZE) break;
+    if (cacheId) keyScanCache.set(cacheId, keys);
   }
   if (keys.length === 0) return [];
 
@@ -142,4 +169,73 @@ export async function sampleTable<T>(db: SupabaseClient, p: SampleParams): Promi
     byKey.set(String(r[keyColumn]), r as T);
   }
   return chosen.map((k) => byKey.get(k)).filter((r): r is T => r != null);
+}
+
+/** {@link sampleTableSplit} parameters. */
+export interface SplitSampleParams extends SampleParams {
+  /**
+   * Narrows the population to rows that can still change (for bills, those with
+   * recent legislative action). Applied *in addition to* `filter`.
+   */
+  activeFilter: (q: FilteredQuery) => FilteredQuery;
+  /** Cache key for the active population; see {@link SampleParams.cacheKey}. */
+  activeCacheKey?: string;
+  /** Fraction of `limit` drawn from the active window. Clamped to [0, 1]. */
+  activeShare: number;
+}
+
+/**
+ * Sample with a bias toward rows that can still drift, while keeping a slice of
+ * the draw on the full corpus.
+ *
+ * Uniform sampling over `ky_bills` spends ~92% of a run's LegiScan budget
+ * re-verifying bills from closed sessions whose upstream record is frozen, while
+ * current-session rows — the only ones that change — are sampled at their
+ * population share. Splitting the draw puts most of the budget where drift is
+ * possible and leaves the remainder rotating across history, so old rows still
+ * accrue coverage.
+ *
+ * The two halves use different seed streams so they cannot select correlated
+ * offsets, and the active draw is de-duplicated against the corpus draw.
+ */
+export async function sampleTableSplit<T>(
+  db: SupabaseClient,
+  p: SplitSampleParams,
+  keyOf: (row: T) => string,
+): Promise<T[]> {
+  const share = Math.min(1, Math.max(0, p.activeShare));
+  const activeLimit = Math.round(p.limit * share);
+  const corpusLimit = p.limit - activeLimit;
+
+  const active =
+    activeLimit > 0
+      ? await sampleTable<T>(db, {
+          ...p,
+          limit: activeLimit,
+          cacheKey: p.activeCacheKey,
+          filter: (q) => p.activeFilter(p.filter ? p.filter(q) : q),
+        })
+      : [];
+
+  // A small active population can return fewer rows than asked; spend the
+  // shortfall on the corpus draw rather than under-sampling the run.
+  const remaining = p.limit - active.length;
+  if (remaining <= 0) return active;
+
+  const corpus = await sampleTable<T>(db, {
+    ...p,
+    limit: Math.max(corpusLimit, remaining) + active.length,
+    seed: p.seed ^ 0x7f4a7c15,
+  });
+
+  const seen = new Set(active.map(keyOf));
+  const out = [...active];
+  for (const row of corpus) {
+    if (out.length >= p.limit) break;
+    const k = keyOf(row);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(row);
+  }
+  return out;
 }

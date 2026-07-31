@@ -13,7 +13,7 @@ import {
   type LegiScanHistoryEntry,
 } from '../../ky-legiscan-client';
 import { mapLegiScanBillStatus } from '../../map-legiscan-bill-status';
-import { sampleTable } from '../sampling';
+import { sampleTableSplit } from '../sampling';
 import {
   diffFinding,
   norm,
@@ -91,13 +91,28 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
 
   let rows: BillRow[];
   try {
-    rows = await sampleTable<BillRow>(db, {
-      table: 'ky_bills',
-      select: 'id, legiscan_id, bill_number, title, status, last_action, bill_text_url, sponsors',
-      seed: cfg.seed,
-      limit: cfg.billsLimit,
-      filter: (q) => q.not('legiscan_id', 'is', null),
-    });
+    // Weighted toward bills that can still change. A uniform draw over the
+    // ~22.5k-row corpus spent most of the LegiScan budget re-verifying closed
+    // sessions whose upstream record is frozen; the remainder of the sample
+    // still rotates across history.
+    const activeCutoff = new Date(Date.now() - cfg.activeDays * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    rows = await sampleTableSplit<BillRow>(
+      db,
+      {
+        table: 'ky_bills',
+        select: 'id, legiscan_id, bill_number, title, status, last_action, bill_text_url, sponsors',
+        seed: cfg.seed,
+        limit: cfg.billsLimit,
+        filter: (q) => q.not('legiscan_id', 'is', null),
+        cacheKey: 'legiscan_id_not_null',
+        activeFilter: (q) => q.gte('last_action_date', activeCutoff),
+        activeCacheKey: `legiscan_id_not_null|active>=${activeCutoff}`,
+        activeShare: cfg.activeShare,
+      },
+      (r) => r.id,
+    );
   } catch (e) {
     return summarizeResult('bills', 0, findings, started, {
       error: e instanceof Error ? e.message : String(e),
@@ -113,6 +128,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
 
   const client = getKyLegiScanClient();
   let checked = 0;
+  let upstreamFailures = 0;
 
   for (const row of rows) {
     if (row.legiscan_id == null) continue;
@@ -127,6 +143,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
         entity: row.bill_number,
         message: `LegiScan fetch failed: ${e instanceof Error ? e.message : String(e)}`,
       });
+      upstreamFailures += 1;
       continue;
     }
 
@@ -220,5 +237,5 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
     }
   }
 
-  return summarizeResult('bills', checked, findings, started);
+  return summarizeResult('bills', checked, findings, started, { upstreamFailures });
 }

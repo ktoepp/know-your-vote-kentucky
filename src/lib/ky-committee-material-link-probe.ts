@@ -84,19 +84,25 @@ export async function persistMaterialLinkStatus(
     .eq('id', materialId);
 }
 
-/** Run async tasks with a small concurrency cap + jitter to avoid burst timeouts. */
-export async function mapWithConcurrency<T>(
+/**
+ * Run async tasks with a small concurrency cap + jitter to avoid burst timeouts.
+ * Results are returned in input order.
+ */
+export async function mapWithConcurrency<T, R = void>(
   items: T[],
   limit: number,
-  fn: (item: T) => Promise<void>,
-): Promise<void> {
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
   let cursor = 0;
+  const out = new Array<R>(items.length);
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
     while (cursor < items.length) {
-      const item = items[cursor++]!;
+      const index = cursor++;
+      const item = items[index]!;
       await new Promise((r) => setTimeout(r, Math.random() * 250));
-      await fn(item);
+      out[index] = await fn(item);
     }
   });
   await Promise.all(workers);
+  return out;
 }
