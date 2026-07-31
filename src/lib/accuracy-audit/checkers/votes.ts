@@ -73,6 +73,7 @@ export async function checkVotes(db: SupabaseClient, cfg: AuditConfig): Promise<
 
   const client = getKyLegiScanClient();
   let checked = 0;
+  let upstreamFailures = 0;
 
   for (const row of rows) {
     const label = billLabel(row);
@@ -97,6 +98,7 @@ export async function checkVotes(db: SupabaseClient, cfg: AuditConfig): Promise<
         entity: label,
         message: `LegiScan getRollCall failed: ${e instanceof Error ? e.message : String(e)}`,
       });
+      upstreamFailures += 1;
       continue;
     }
 
@@ -144,5 +146,5 @@ export async function checkVotes(db: SupabaseClient, cfg: AuditConfig): Promise<
     }
   }
 
-  return summarizeResult('votes', checked, findings, started);
+  return summarizeResult('votes', checked, findings, started, { upstreamFailures });
 }

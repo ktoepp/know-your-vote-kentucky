@@ -128,6 +128,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
 
   const client = getKyLegiScanClient();
   let checked = 0;
+  let upstreamFailures = 0;
 
   for (const row of rows) {
     if (row.legiscan_id == null) continue;
@@ -142,6 +143,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
         entity: row.bill_number,
         message: `LegiScan fetch failed: ${e instanceof Error ? e.message : String(e)}`,
       });
+      upstreamFailures += 1;
       continue;
     }
 
@@ -235,5 +237,5 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
     }
   }
 
-  return summarizeResult('bills', checked, findings, started);
+  return summarizeResult('bills', checked, findings, started, { upstreamFailures });
 }

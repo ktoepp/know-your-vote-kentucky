@@ -39,6 +39,15 @@ export interface CheckerResult {
   skipReason?: string;
   /** Checker-level crash; treated as a hard failure by the orchestrator. */
   error?: string;
+  /**
+   * Items whose upstream fetch failed outright (network, 5xx, quota mid-run).
+   *
+   * These degrade to per-item `warn` findings, which meant a *total* upstream
+   * outage was indistinguishable from mild content drift: 40 warnings, `checked`
+   * of 0, exit 0, and a Slack header reading "warnings". Counting them lets the
+   * orchestrator escalate when a domain mostly failed to reach its source.
+   */
+  upstreamFailures?: number;
 }
 
 export interface AuditConfig {
@@ -242,7 +251,7 @@ export function summarizeResult(
   checked: number,
   findings: Finding[],
   startedAtMs: number,
-  extra: Partial<Pick<CheckerResult, 'skipped' | 'skipReason' | 'error'>> = {},
+  extra: Partial<Pick<CheckerResult, 'skipped' | 'skipReason' | 'error' | 'upstreamFailures'>> = {},
 ): CheckerResult {
   const failures = findings.filter((f) => f.severity === 'fail').length;
   const warnings = findings.filter((f) => f.severity === 'warn').length;

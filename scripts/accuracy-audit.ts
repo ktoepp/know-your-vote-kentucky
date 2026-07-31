@@ -44,6 +44,11 @@ import {
   formatSlackReport,
   summarizeAudit,
 } from '../src/lib/accuracy-audit/report';
+import {
+  fetchRecurrence,
+  findingFingerprint,
+  recordAuditRun,
+} from '../src/lib/accuracy-audit/history';
 import { markSlackErrorNotified, notifyAccuracyAuditSlack } from '../src/lib/slack-webhook';
 
 function parseArgs(argv: string[]): {
@@ -213,6 +218,16 @@ async function main() {
 
   const summary = summarizeAudit(results, startedAtMs, cfg.seed);
 
+  // Recurrence must be read *before* this run's findings are written, or every
+  // finding would look like it had been seen before (by itself).
+  const notable = results.flatMap((r) => r.findings.filter((f) => f.severity !== 'info'));
+  const { firstSeenByFingerprint } = await fetchRecurrence(
+    db,
+    [...new Set(notable.map(findingFingerprint))],
+  );
+  const recurrence = (f: typeof notable[number]) =>
+    firstSeenByFingerprint.get(findingFingerprint(f)) ?? null;
+
   // Operational problems — a checker actually *crashed* — fail the job and page
   // #errors. A LegiScan quota stop is NOT an operational error: it is an expected,
   // self-protective skip (the same reclassification applied to the sync pipeline,
@@ -222,6 +237,10 @@ async function main() {
   // Content findings — even deterministic `fail`s — are reported to the status
   // digest but do NOT fail CI either (see decisions.md).
   const hasOperationalError = summary.hasOperationalError;
+
+  if (!cfg.dryRun) {
+    await recordAuditRun(db, summary);
+  }
 
   if (args.json) {
     console.log(JSON.stringify(summary, null, 2));
@@ -235,7 +254,7 @@ async function main() {
   if (!cfg.dryRun) {
     try {
       await notifyAccuracyAuditSlack({
-        body: formatSlackReport(summary),
+        body: formatSlackReport(summary, { recurrence }),
         escalateToAlerts: hasOperationalError,
         fromCli: true,
       });
