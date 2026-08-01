@@ -1,0 +1,102 @@
+# Backfill ky_votes for sessions the dataset importer leaves empty.
+#
+# Why a separate workflow from legiscan-dataset-weekly: that job's getDataset
+# path CANNOT fill these sessions. The 2026-08-01 forced full re-import decoded
+# every KY session before the 2018 Regular Session as "0 roll calls" — LegiScan
+# ships roll-call JSON files in the dataset ZIP only from 2018 onward. Those
+# sessions' bill payloads still carry a votes[] summary, so this job recovers
+# the roll-call ids from there and buys each one with getRollCall, which is the
+# only path that returns the per-member breakdown ky_votes.roll_call needs for
+# member Voting-record pages.
+#
+# Quota: 1 getDatasetList + 1 getDataset per session for discovery, then 1
+# getRollCall per roll call. The default run is DISCOVERY ONLY — it prints what
+# it found and the projected cost, and writes nothing. Set `live: true` to spend
+# quota and write rows.
+#
+# The script is resumable (stored roll calls are skipped), so a run that hits
+# the job timeout can simply be dispatched again. Use `limit` to size a run.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   LEGISCAN_API_KEY
+#   NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+name: Backfill session votes
+
+on:
+  workflow_dispatch:
+    inputs:
+      sessions:
+        description: 'Comma-separated LegiScan session ids, e.g. "1103,1161,1257". Blank = every session with bills but zero votes.'
+        type: string
+        default: ''
+      since_year:
+        description: 'Only sessions ending in this year or later, e.g. 2015. Blank = no year floor.'
+        type: string
+        default: ''
+      live:
+        description: 'Spend LegiScan quota and write rows. Unchecked = discovery and estimate only.'
+        type: boolean
+        default: false
+      limit:
+        description: 'Cap the number of roll calls fetched (blank = no cap). Useful for a trial run, or to fit inside the job timeout.'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# A second concurrent run would double-spend quota on the same roll calls.
+concurrency:
+  group: backfill-session-votes
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    name: Backfill session votes
+    runs-on: ubuntu-latest
+    # Sequential getRollCall fetches at the client's 500ms rate-limit floor plus
+    # round-trip latency: roughly 1k roll calls/hour. Resumability and `limit`
+    # cover anything that doesn't fit.
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Backfill session votes
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+          # Inputs travel as env vars, never interpolated into the script body —
+          # `${{ }}` in a run block is a script-injection seam.
+          INPUT_SESSIONS: ${{ inputs.sessions }}
+          INPUT_SINCE_YEAR: ${{ inputs.since_year }}
+          INPUT_LIMIT: ${{ inputs.limit }}
+          INPUT_LIVE: ${{ inputs.live }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -n "$INPUT_SESSIONS" ]; then
+            args+=("--sessions=$INPUT_SESSIONS")
+          fi
+          if [ -n "$INPUT_SINCE_YEAR" ]; then
+            args+=("--since-year=$INPUT_SINCE_YEAR")
+          fi
+          if [ -n "$INPUT_LIMIT" ]; then
+            args+=("--limit=$INPUT_LIMIT")
+          fi
+          if [ "$INPUT_LIVE" = "true" ]; then
+            args+=("--live")
+          fi
+          npm run backfill:session-votes -- "${args[@]}"

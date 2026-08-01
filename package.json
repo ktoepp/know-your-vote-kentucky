@@ -53,6 +53,7 @@
     "merge:duplicate-committees:live": "tsx scripts/merge-duplicate-committees.ts --live",
     "probe:committee-links": "tsx scripts/probe-committee-material-links.ts",
     "backfill:vote-nv-counts": "tsx scripts/backfill-vote-nv-counts.ts",
+    "backfill:session-votes": "tsx scripts/backfill-session-votes.ts",
     "probe:legacy-material-urls": "tsx scripts/probe-legacy-material-urls.ts",
     "repair:agenda-bill-links": "tsx scripts/repair-agenda-bill-links.ts",
     "repair:agenda-bill-links:live": "tsx scripts/repair-agenda-bill-links.ts --live",
