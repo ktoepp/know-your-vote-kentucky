@@ -246,13 +246,51 @@ export async function fetchStoredDatasetHashes(db: SupabaseClient): Promise<Map<
   return map;
 }
 
-export async function upsertBillRows(db: SupabaseClient, rows: Record<string, unknown>[]): Promise<Map<number, string>> {
-  const BATCH = 200;
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH);
-    const { error } = await db.from('ky_bills').upsert(batch, { onConflict: 'legiscan_id' });
-    if (error) throw new Error(`ky_bills upsert batch ${i / BATCH + 1}: ${error.message}`);
+// Postgres aborts a statement that outruns the project's statement_timeout, and
+// PostgREST surfaces it as SQLSTATE 57014. A 200-row upsert of the widest bill
+// rows tips over that limit under load: on the 2026-08-01 force re-import,
+// ky_bills batch 6 of session 2247 and batch 1 of 2179 both died this way, which
+// aborted both sessions before their votes were written and left 1,075 votes
+// with a NULL nv_count. A timeout is a batch-sizing problem, not a data problem,
+// so halve and retry rather than losing the session.
+const STATEMENT_TIMEOUT = /statement timeout|\b57014\b/i;
+
+async function upsertSlice(
+  db: SupabaseClient,
+  table: string,
+  slice: Record<string, unknown>[],
+  onConflict: string,
+  label: string,
+): Promise<number> {
+  const { error } = await db.from(table).upsert(slice, { onConflict });
+  if (!error) return slice.length;
+  // A single row that still times out is a real fault — surface it.
+  if (slice.length === 1 || !STATEMENT_TIMEOUT.test(error.message)) {
+    throw new Error(`${table} upsert batch ${label}: ${error.message}`);
   }
+  const mid = Math.ceil(slice.length / 2);
+  return (
+    (await upsertSlice(db, table, slice.slice(0, mid), onConflict, `${label}a`)) +
+    (await upsertSlice(db, table, slice.slice(mid), onConflict, `${label}b`))
+  );
+}
+
+async function upsertBatched(
+  db: SupabaseClient,
+  table: string,
+  rows: Record<string, unknown>[],
+  onConflict: string,
+): Promise<number> {
+  const BATCH = 200;
+  let synced = 0;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    synced += await upsertSlice(db, table, rows.slice(i, i + BATCH), onConflict, String(i / BATCH + 1));
+  }
+  return synced;
+}
+
+export async function upsertBillRows(db: SupabaseClient, rows: Record<string, unknown>[]): Promise<Map<number, string>> {
+  await upsertBatched(db, 'ky_bills', rows, 'legiscan_id');
   const ids = rows.map((r) => Number(r.legiscan_id)).filter((n) => Number.isFinite(n));
   const map = new Map<number, string>();
   const CHUNK = 300;
@@ -269,15 +307,7 @@ export async function upsertBillRows(db: SupabaseClient, rows: Record<string, un
 
 export async function upsertLegislatorRows(db: SupabaseClient, rows: Record<string, unknown>[]): Promise<number> {
   if (rows.length === 0) return 0;
-  const BATCH = 200;
-  let synced = 0;
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH);
-    const { error } = await db.from('ky_legislators').upsert(batch, { onConflict: 'legiscan_id' });
-    if (error) throw new Error(`ky_legislators upsert batch ${i / BATCH + 1}: ${error.message}`);
-    synced += batch.length;
-  }
-  return synced;
+  return upsertBatched(db, 'ky_legislators', rows, 'legiscan_id');
 }
 
 export async function upsertVoteRows(db: SupabaseClient, rows: Record<string, unknown>[]): Promise<number> {
@@ -285,15 +315,7 @@ export async function upsertVoteRows(db: SupabaseClient, rows: Record<string, un
   // LegiScan sometimes ships one physical roll call under two roll_call_ids; the
   // (bill_id, roll_call_id) upsert key can't catch that, so filter twins first.
   const { rows: deduped } = await dropDuplicateRollCallRows(db, rows);
-  const BATCH = 200;
-  let synced = 0;
-  for (let i = 0; i < deduped.length; i += BATCH) {
-    const batch = deduped.slice(i, i + BATCH);
-    const { error } = await db.from('ky_votes').upsert(batch, { onConflict: 'bill_id,roll_call_id' });
-    if (error) throw new Error(`ky_votes upsert batch ${i / BATCH + 1}: ${error.message}`);
-    synced += batch.length;
-  }
-  return synced;
+  return upsertBatched(db, 'ky_votes', deduped, 'bill_id,roll_call_id');
 }
 
 export async function recordDatasetImport(
