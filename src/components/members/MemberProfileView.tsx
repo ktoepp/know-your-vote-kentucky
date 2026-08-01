@@ -13,6 +13,7 @@ import {
   FormControl,
   InputAdornment,
   InputLabel,
+  Link as MuiLink,
   MenuItem,
   Paper,
   Select,
@@ -49,6 +50,10 @@ import type { MemberRecentRollVote, MemberSponsoredBill, MemberVoteRecord } from
 import type { MemberCommitteeAssignment } from '@/lib/ky-member-committees';
 import type { VoteBucket } from '@/lib/legiscan-vote-tally';
 import { memberVoteLabel, voteBucketChipColor } from '@/lib/vote-display';
+import {
+  LRC_RECORD_VOTE_SEARCH_URL,
+  legiscanHasNoRollCallsForKySession,
+} from '@/lib/ky-legiscan-coverage';
 
 type VoteFilter = 'all' | VoteBucket;
 
@@ -475,9 +480,19 @@ export function MemberProfileView({
                           This member&rsquo;s voting record could not be loaded. Please try again shortly.
                         </Typography>
                       ) : voteRecord.totalRollCalls === 0 ? (
-                        <Typography variant="body2" color="text.secondary">
-                          No recorded votes found for this session yet.
-                        </Typography>
+                        legiscanHasNoRollCallsForKySession(sessionName) ? (
+                          <Typography variant="body2" color="text.secondary">
+                            LegiScan does not carry roll-call votes for this session. See the LRC{' '}
+                            <MuiLink href={LRC_RECORD_VOTE_SEARCH_URL} target="_blank" rel="noopener noreferrer">
+                              Record Vote Search
+                            </MuiLink>
+                            {' '}for votes from this period.
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No recorded votes found for this session yet.
+                          </Typography>
+                        )
                       ) : (
                         <>
                           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1.5 }}>
