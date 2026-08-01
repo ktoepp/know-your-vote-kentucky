@@ -8,9 +8,14 @@
  * the 5 most-recently-actioned bills per day, so bills from closed sessions are
  * never revisited.
  *
- * Cost: one LegiScan `getRollCall`-bearing bill fetch per affected bill. Scope
- * with --session to keep the spend small; the script prints its estimate and
- * exits before spending anything unless --live is passed.
+ * Cost: one LegiScan `getRollCall` per affected roll call. Note this
+ * deliberately does NOT use `client.fetchVotes(billId)`, which would spend an
+ * extra `getBill` per bill to rediscover roll call ids we already have stored —
+ * ~50% more quota for nothing.
+ *
+ * Resumable: targets are selected by `nv_count IS NULL`, so a run that is
+ * interrupted or times out can simply be re-run, and already-repaired rows cost
+ * nothing. Use --limit to size a run to the time available.
  *
  *   npm run backfill:vote-nv-counts                              # estimate only
  *   npm run backfill:vote-nv-counts -- --session="2026 Regular Session" --live
@@ -26,19 +31,22 @@ const SESSION = sessionArg?.split('=')[1] ?? null;
 const limitArg = process.argv.find((a) => a.startsWith('--limit='));
 const LIMIT = limitArg ? parseInt(limitArg.split('=')[1] ?? '', 10) : Infinity;
 
-type Target = { billId: string; legiscanId: number; billNumber: string; rollCallIds: number[] };
+const MONTHLY_QUOTA = 30000;
+
+type Target = { billId: string; rollCallId: number; billNumber: string };
 
 async function collectTargets(db: ReturnType<typeof createClient>): Promise<Target[]> {
-  const byBill = new Map<string, Target>();
+  const targets: Target[] = [];
   const PAGE = 1000;
   let from = 0;
 
   for (;;) {
     let q = db
       .from('ky_votes')
-      .select('bill_id, roll_call_id, ky_bills!inner(id, legiscan_id, bill_number, session)')
+      .select('bill_id, roll_call_id, ky_bills!inner(bill_number, session)')
       .is('nv_count', null)
-      .not('ky_bills.legiscan_id', 'is', null)
+      .not('roll_call_id', 'is', null)
+      .order('bill_id', { ascending: true })
       .range(from, from + PAGE - 1);
     if (SESSION) q = q.eq('ky_bills.session', SESSION);
 
@@ -47,26 +55,18 @@ async function collectTargets(db: ReturnType<typeof createClient>): Promise<Targ
     if (!data?.length) break;
 
     for (const row of data as any[]) {
-      const bill = row.ky_bills;
-      if (!bill?.legiscan_id || row.roll_call_id == null) continue;
-      const existing = byBill.get(row.bill_id);
-      if (existing) {
-        existing.rollCallIds.push(row.roll_call_id);
-      } else {
-        byBill.set(row.bill_id, {
-          billId: row.bill_id,
-          legiscanId: bill.legiscan_id,
-          billNumber: bill.bill_number,
-          rollCallIds: [row.roll_call_id],
-        });
-      }
+      targets.push({
+        billId: row.bill_id,
+        rollCallId: row.roll_call_id,
+        billNumber: row.ky_bills?.bill_number ?? '(unknown)',
+      });
     }
 
     if (data.length < PAGE) break;
     from += PAGE;
   }
 
-  return [...byBill.values()];
+  return targets;
 }
 
 async function main() {
@@ -78,12 +78,19 @@ async function main() {
   }
 
   const db = createClient(url, key);
-  const targets = (await collectTargets(db)).slice(0, LIMIT === Infinity ? undefined : LIMIT);
-  const voteRows = targets.reduce((n, t) => n + t.rollCallIds.length, 0);
+  const all = await collectTargets(db);
+  const targets = LIMIT === Infinity ? all : all.slice(0, LIMIT);
+  const bills = new Set(targets.map((t) => t.billId)).size;
 
   console.log(`Scope: ${SESSION ?? 'all sessions'}`);
-  console.log(`Bills to fetch: ${targets.length}  (roll calls awaiting nv_count: ${voteRows})`);
-  console.log(`Estimated LegiScan calls: ${targets.length} — ${((targets.length / 30000) * 100).toFixed(1)}% of the 30k monthly quota`);
+  console.log(`Roll calls awaiting nv_count: ${all.length} across ${new Set(all.map((t) => t.billId)).size} bills`);
+  if (targets.length !== all.length) {
+    console.log(`Limited to ${targets.length} roll calls (${bills} bills) this run.`);
+  }
+  console.log(
+    `Estimated LegiScan calls: ${targets.length} (one getRollCall each) — ` +
+      `${((targets.length / MONTHLY_QUOTA) * 100).toFixed(1)}% of the ${MONTHLY_QUOTA / 1000}k monthly quota`,
+  );
 
   if (!LIVE) {
     console.log('\nEstimate only. Re-run with --live to spend quota and write.');
@@ -95,49 +102,48 @@ async function main() {
   let updated = 0;
   let missing = 0;
 
-  for (const target of targets) {
-    let votes;
+  for (const [i, target] of targets.entries()) {
+    let rollCall;
     try {
-      votes = await client.fetchVotes(target.legiscanId);
+      rollCall = await client.fetchRollCall(target.rollCallId);
       fetched += 1;
     } catch (err: any) {
-      console.error(`${target.billNumber}: fetch failed — ${err.message}`);
+      console.error(`${target.billNumber} roll call ${target.rollCallId}: fetch failed — ${err.message}`);
       if (/quota/i.test(err.message ?? '')) {
-        console.error('Stopping early on quota error.');
+        console.error('Stopping early on quota error. Re-run later to resume.');
         break;
       }
       continue;
     }
 
-    const nvByRollCall = new Map<number, number>();
-    for (const vote of votes) {
-      if (vote.roll_call_id == null) continue;
-      nvByRollCall.set(vote.roll_call_id, vote.nv ?? 0);
+    if (!rollCall || rollCall.nv == null) {
+      missing += 1;
+      continue;
     }
 
-    for (const rollCallId of target.rollCallIds) {
-      const nv = nvByRollCall.get(rollCallId);
-      if (nv == null) {
-        missing += 1;
-        continue;
-      }
-      const { error } = await db
-        .from('ky_votes')
-        .update({ nv_count: nv })
-        .eq('bill_id', target.billId)
-        .eq('roll_call_id', rollCallId)
-        .is('nv_count', null);
-      if (error) {
-        console.error(`${target.billNumber} roll call ${rollCallId}: update failed — ${error.message}`);
-        continue;
-      }
-      updated += 1;
+    const { error } = await db
+      .from('ky_votes')
+      .update({ nv_count: rollCall.nv })
+      .eq('bill_id', target.billId)
+      .eq('roll_call_id', target.rollCallId)
+      .is('nv_count', null);
+    if (error) {
+      console.error(`${target.billNumber} roll call ${target.rollCallId}: update failed — ${error.message}`);
+      continue;
+    }
+    updated += 1;
+
+    if ((i + 1) % 250 === 0) {
+      console.log(`  … ${i + 1}/${targets.length} processed (${updated} updated)`);
     }
   }
 
-  console.log(`\nfetched=${fetched} updated=${updated} unmatched=${missing} [APPLIED]`);
+  console.log(`\nfetched=${fetched} updated=${updated} unresolved=${missing} [APPLIED]`);
   if (missing > 0) {
-    console.log('Unmatched roll calls are stored locally but no longer returned by LegiScan for that bill.');
+    console.log('Unresolved roll calls are stored locally but LegiScan returned no nv figure for them.');
+  }
+  if (updated < targets.length) {
+    console.log('Run again to resume — remaining rows are still selected by nv_count IS NULL.');
   }
 }
 

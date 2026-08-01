@@ -5,11 +5,15 @@
 # bills per day. Bills from closed sessions are never revisited, so this data
 # cannot heal on its own — it needs one deliberate pass.
 #
-# Quota: one LegiScan call per affected bill. As of 2026-07-31 that is ~3,487
-# bills across 12 sessions, ~11.6% of the 30,000/month key limit. Scope with
-# `session` to spend less. The default run is an ESTIMATE ONLY — it prints the
-# bill count and projected quota cost and writes nothing. Set `live: true` to
-# actually spend quota and update rows.
+# Quota: one LegiScan getRollCall per affected roll call. As of 2026-07-31 that
+# is 6,944 roll calls across 3,487 bills, ~23.1% of the 30,000/month key limit.
+# Scope with `session` to spend less. The default run is an ESTIMATE ONLY — it
+# prints the roll call count and projected quota cost and writes nothing. Set
+# `live: true` to actually spend quota and update rows.
+#
+# The script is resumable (targets are selected by nv_count IS NULL), so a run
+# that hits the job timeout can simply be dispatched again to pick up where it
+# stopped. Use `limit` to size a run to the time available.
 #
 # Secrets (Settings → Secrets and variables → Actions):
 #   LEGISCAN_API_KEY
@@ -21,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       session:
-        description: 'Session to scope to, e.g. "2026 Regular Session". Leave blank for all sessions (~11.6% of monthly quota).'
+        description: 'Session to scope to, e.g. "2026 Regular Session". Leave blank for all sessions (~23.1% of monthly quota).'
         type: string
         default: ''
       live:
@@ -29,7 +33,7 @@ on:
         type: boolean
         default: false
       limit:
-        description: 'Cap the number of bills fetched (blank = no cap). Useful for a small trial run first.'
+        description: 'Cap the number of roll calls fetched (blank = no cap). Useful for a trial run, or to fit a run inside the job timeout.'
         type: string
         default: ''
 
@@ -48,9 +52,10 @@ jobs:
   backfill:
     name: Backfill nv_count
     runs-on: ubuntu-latest
-    # ~3,487 sequential LegiScan fetches plus per-row updates. The client rate
-    # limits, so budget generously; a full-corpus run is the worst case.
-    timeout-minutes: 120
+    # 6,944 sequential LegiScan fetches plus per-row updates, at a 500ms client
+    # rate-limit floor plus real round-trip latency. A full-corpus run does not
+    # reliably fit even here — that is what resumability and `limit` are for.
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 

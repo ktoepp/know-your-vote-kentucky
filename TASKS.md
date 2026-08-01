@@ -19,12 +19,41 @@ _Active development only. Shipped work moves to Recently completed; deferred/rev
 
 **Next-agent brief with verification queries, sizing, and the gotchas: [docs/handoff-data-defects-2026-07-31.md](./docs/handoff-data-defects-2026-07-31.md).** Rationale and evidence for each is in [decisions.md § 2026-07-31](./decisions.md) (three entries). Ordered by user impact.
 
-- [ ] **Committee materials — delete 802 duplicate rows with a dead URL.** 45% of `ky_committee_materials` carries the superseded flat `/CommitteeDocuments/{meeting_id}/…` URL shape, and **all 802 have an exact nested twin** (same `committee_id`, `title`, `meeting_date`). Each document therefore renders **twice** on the committee page and the superseded copy 404s; **263 are dated this year**. Fix is a one-time cleanup migration deleting the superseded rows, then `npm run probe:committee-links` to confirm no live link was lost. Deliberately not done by the audit work — deleting 802 production rows is an operator call. The accuracy audit reports it once as a systemic `materials` finding until it's cleared.
-- [ ] **`ky_votes.nv_count` backfill.** NULL on **all 6,944 rows** while `absent_count` is 100% populated: migration 035 added the column and the sync writes it, but no vote has synced since (interim, `items_synced: 0`), so the NV chip renders 0 for every vote. The new `nv_count` accuracy check skips NULL as not-yet-backfilled, so it can only reveal this once votes re-sync. Needs a backfill or a forced vote re-sync.
-- [ ] **Re-sync 12 meetings with unresolved agenda bill refs.** 12 agenda lines name a bill that exists in `ky_bills` but stored `bill_session_label = NULL`, so the lookup key missed and the line renders as plain text instead of a link. Stale rows from before session inference landed; re-syncing those meetings should fix them. (The other 5 unresolved refs are `BR nn` bill-request numbers, which correctly have no `ky_bills` row.)
+> **Status 2026-07-31 (evening).** Defects 1 and 3 are shipped and verified in production; defect 2's backfill is running. **Defect 4 is the next resolution** — see the dedicated item directly below. Two new follow-ups surfaced during the work and are filed at the bottom of this section.
+
+#### ▶ Next up
+
+- [ ] **Defect 4 — `/bills` browse: replace the unbounded exact `count`. NEXT RESOLUTION.** The last of the four defects and the only one still untouched. Cause is confirmed, not hypothesised: `EXPLAIN ANALYZE` shows the ORDER BY is already served by `idx_bills_session` via an incremental sort (3.7 ms warm), while the exact `count()` is a **`Seq Scan` over the whole 84 MB heap** — ~11 ms warm but **4,254 ms** cold, past the 3 s anon `statement_timeout`. That variance is why failures are intermittent (~11/day, 38 distinct users) and why they grow with every sync cycle. **Do not ship the composite `(session, last_action_date)` index** — that hypothesis is refuted and it would add write cost on every sync for no gain. Full profiling evidence in the ops-notes bullet below. **Blocked on one product call**, deliberately not made unilaterally because it changes a user-facing number:
+  - *(a)* leave it exact — accepts the timeouts;
+  - *(b)* `count: 'planned'` on the **unfiltered** path only (estimate 23,426 vs actual 22,547, 3.9% off), keeping exact counts on filtered paths, which are selective and cheap;
+  - *(c)* **exact but bounded** — count to a cap (e.g. 1,000) and render "1,000+". Removes the unbounded cost without ever displaying a wrong number; the recommended option for a civic-data site where a visibly drifting count undercuts trust.
+
+  Also worth doing regardless: `pg_stat_user_tables.last_analyze` was null for `ky_bills`; a manual `ANALYZE` has since been run, but it is not scheduled.
+
+#### Shipped / in flight
+
+- [x] **Committee materials — delete 802 duplicate rows with a dead URL. ✅ Done 2026-07-31.** Probed live from Actions first (802/802 legacy URLs dead, 801/802 twins alive) rather than trusting the code comment that claimed the 404s; migration 048 applied, 1,773 → 970 rows, all nested rows intact, deleted rows preserved in `ky_committee_materials_legacy_dupes_048`. A 40-row sample had returned a clean verdict and **missed** the one dead twin the full 802-row pass caught — probe all of it before deleting any of it.
+- [x] **`ky_votes.nv_count` — root cause fixed 2026-07-31.** Cause was a dropped field in the dataset import mapper, not sync coverage — see the retraction in "New follow-ups" below for the full story. Remaining step: run the dataset sync with `--force` to repopulate the existing 6,944 rows (~13 LegiScan calls). The per-bill `backfill:vote-nv-counts` script remains in the repo as a targeted fallback but should **not** be the first resort — it costs ~6,944 calls to do the same job.
+- [x] **Re-sync 12 meetings with unresolved agenda bill refs. ✅ Done 2026-07-31.** Root cause was not stale rows: `lrc-bill-reference-parser.ts` failed on a parenthetical session suffix. Fixed at the parser, verified against all 209 stored agenda strings, 12 rows repaired; `bill_session_label IS NULL` is now 0. The 5 remaining unlinked refs are `BR nn` bill requests and correctly have no `ky_bills` row.
+
+#### Still open
+
 - [ ] **Verify committee meetings beyond the live calendar window.** The LRC weekly calendar is the only upstream comparison for meetings and covers just the current week; the new corpus invariants prove internal consistency, not agreement with LRC. 146 upcoming and all Wayback/PDF-backfilled meetings have no upstream check. Needs a different source — committee profile pages or the interim calendar PDF.
 - [ ] **Stateful sampling rotation (`last_audited_at`).** Accuracy sampling is still memoryless (~0.18%/run); the active-window bias helps but gives no coverage guarantee. `ky_accuracy_findings` (migration 046) is the substrate for building it.
 - [ ] **Confirm `lrc-enrollment-actions` goes green.** The 404-vs-failure classification fix shipped in #216; the next Vercel cron run (`45 14 * * *` UTC) is the first to exercise it. If it stays red, the 11 errors were real rather than expected 404s and need investigating.
+
+#### New follow-ups surfaced 2026-07-31 (found while fixing defects 1–3)
+
+- [x] **✅ Fixed 2026-07-31 — `nv_count` was never a sync-coverage problem; the dataset import silently dropped the field.** Filed here first as "the votes cron only covers 5 bills/day, so the corpus is frozen" — **that framing was wrong and is retracted.** Vote data is *not* frozen: `sync-ky-dataset.ts` re-imports whole sessions (bills + people + roll calls) from the LegiScan bulk dataset weekly, gated on `dataset_hash`, and an unchanged hash means upstream genuinely has no new data. That path — not the `limit=5` cron — is what wrote all 6,944 vote rows. **The real bug was one missing line:** `buildVoteRow` (`src/lib/ky-legiscan-dataset-import.ts`) mapped `yea`/`nay`/`absent`/`passed`/`votes` but not `nv`, so `nv_count` stayed NULL on every row while `absent_count` — its sibling in the same payload — was 100% populated. Fixed at the mapper, plus a `--force` flag on the dataset sync (and a `force` input on the weekly workflow) to re-import unchanged sessions, which is exactly the case a mapper fix creates: identical upstream payload, but we now read a field we previously discarded.
+
+  **The cost lesson is worth keeping.** The per-bill API backfill this defect appeared to need was ~6,944 `getRollCall` calls (~23.1% of monthly quota, hours of wall-clock). Re-importing the same data from the dataset path is **~1 call per session, ~13 total.** Before spending quota per-bill, check whether the bulk dataset already carries the field.
+
+  Residual, low priority: the `?source=votes&limit=5` cron now serves only intra-week freshness for the most-recently-actioned bills, with the dataset sync as the corpus-wide path. Its `limit=5` is not a correctness ceiling. Worth revisiting only if intra-week vote latency becomes a complaint.
+- [ ] **🟡 MEDIUM — 4 committee materials are confirmed dead with no replacement.** Distinct from the 802 duplicates migration 048 removed: these have **no nested twin**, so they are not duplicates and there is nothing to fall back to — the document is simply gone from LRC. They carry `link_status = 'dead'` from the accuracy audit and currently render as dead links. Needs a product call rather than a cleanup: delete the rows, keep them but render as unavailable rather than as a link, or try Wayback for an archived copy (`backfill-lrc-calendar-wayback.ts` is the existing precedent). Low volume, so low urgency — but they are user-visible dead links on a civic-data site, which is exactly the class of thing `docs/voice-and-tone.md` says to be honest about.
+
+  ```sql
+  select id, title, meeting_date, url from ky_committee_materials where link_status = 'dead';
+  ```
 
 ### Deferred follow-ups (flagged, revisit when there's appetite)
 

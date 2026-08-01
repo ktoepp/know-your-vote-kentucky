@@ -1,8 +1,26 @@
 # Handoff — data defects found by the 2026-07-31 accuracy/health-check hardening pass
 
-Four defects were **found and verified** during PRs #214–#218 but deliberately **not fixed**, because each either mutates production data destructively or changes something users see. Full evidence: `decisions.md` §§ 2026-07-31 (three entries); tracker items in `TASKS.md` → "Accuracy + health-check hardening — follow-ups".
+Four defects were **found and verified** during PRs #214–#218 but deliberately **not fixed**, because each either mutates production data destructively or changes something users see. (Defects 1–3 were subsequently fixed on 2026-07-31 — see the status note below and the per-defect banners.) Full evidence: `decisions.md` §§ 2026-07-31 (three entries); tracker items in `TASKS.md` → "Accuracy + health-check hardening — follow-ups".
 
-Every number below was measured against production on 2026-07-31. **Re-verify before acting** — some will have changed, and at least one (`nv_count`) is expected to resolve on its own.
+Every number below was measured against production on 2026-07-31. **Re-verify before acting** — some will have changed.
+
+> **Status update, 2026-07-31 (later same day).** Defects 1–3 are resolved; defect 4 is still open. Two claims
+> originally recorded here turned out to be wrong and are corrected in place below — flagged because both
+> would have led the next person astray:
+>
+> - **`nv_count` does not resolve on its own** — and the reason is not what this document (or my own first
+>   diagnosis) said. It is **not** a sync-coverage problem. `sync-ky-dataset.ts` re-imports whole sessions
+>   from the LegiScan bulk dataset weekly and is what wrote all 6,944 vote rows; its `buildVoteRow` mapper
+>   simply **never mapped `nv`**, while mapping `absent` right beside it. That is the entire defect, and it
+>   explains the otherwise-odd signature: one field 100% NULL, its sibling 100% populated. Fixed at the mapper.
+> - **Check the bulk dataset before spending per-bill quota.** The API backfill this appeared to require was
+>   ~6,944 `getRollCall` calls (~23.1% of monthly quota, hours of wall-clock). Re-importing the identical data
+>   from the dataset path costs **~1 call per session, ~13 total.** Two successive cost estimates here were
+>   wrong by 3x and then by ~500x, both by reasoning from the per-bill API without checking what the bulk
+>   path already carried.
+>
+> Also: the "legacy URLs 404" premise under Defect 1 has now been **live-probed** (802/802 dead), rather than
+> resting on a code comment. One twin was dead too — see Defect 1.
 
 ---
 
@@ -17,6 +35,20 @@ Every number below was measured against production on 2026-07-31. **Re-verify be
 ---
 
 ## Defect 1 — 802 duplicate committee-material rows with a dead URL (highest user impact)
+
+> **RESOLVED 2026-07-31.** Probed live from Actions (`probe:legacy-material-urls`, all=true): **802/802 legacy
+> URLs dead (404)**, confirming the premise — which until then rested on a code comment, not a measurement.
+> **801/802 twins alive.** The one exception was `Thumbs.db` (meeting 12802, 2020-07-14), a Windows thumbnail
+> cache file LRC published by accident and has since removed; it 404s on *both* paths because the file is gone,
+> not because our URL shape is wrong. Migration 048 applied: 1,773 → 970 rows, `legacy_flat` now 0, all nested
+> rows intact, deleted rows preserved in `ky_committee_materials_legacy_dupes_048` (803 rows, including the
+> dead `Thumbs.db` twin, which was removed separately so it would not keep rendering a dead link).
+>
+> Note the sample nearly misled us: a 40-row probe returned a clean "supports the cleanup" verdict and missed
+> the dead twin entirely. The full pass found it. **Probe all of it before deleting any of it.**
+>
+> Still open, unrelated to this cleanup: 4 materials remain `link_status = 'dead'`. They have no twin and are
+> not duplicates — genuinely dead documents, needing their own decision.
 
 **What.** 802 of 1,773 `ky_committee_materials` rows (45%) carry the superseded flat
 `/CommitteeDocuments/{meeting_id}/file` URL shape. **All 802 have an exact nested twin** — same
@@ -79,15 +111,40 @@ select count(*) as total, count(nv_count) as nv_populated,
 from ky_votes;
 ```
 
-**This may fix itself.** The votes sync upserts on `(bill_id, roll_call_id)` with `ignoreDuplicates: false`,
-so it *updates* existing rows — the next real sync after interim ends will populate `nv_count` naturally.
-**Check whether the session has resumed before doing anything manual.**
+**~~This may fix itself.~~ ~~The votes cron only covers 5 bills/day.~~ Both wrong — corrected 2026-07-31.**
 
-**If a backfill is genuinely needed**, mind the cost: **3,487 distinct bills** have votes, spanning 12
-sessions. The sync fetches votes per bill, so a full pass is on the order of **3,487 LegiScan calls ≈ 11.6%
-of the 30,000/month quota**. Check `/admin/sync-status` for current usage first, and prefer scoping to
-recent sessions over a full-corpus pass. Overrides: `force=true` on the sync options, or
-`KY_SYNC_FORCE_INTERIM=true`.
+**Root cause: a dropped field in the dataset import.** `buildVoteRow`
+(`src/lib/ky-legiscan-dataset-import.ts`) mapped `yea`, `nay`, `absent`, `passed` and `votes` from each
+LegiScan roll call — but not `nv`. That import (`sync-ky-dataset.ts`, weekly, plus the original bulk seed)
+is what wrote every one of the 6,944 rows, so `nv_count` was never populated for any of them. The
+signature was the tell all along: a column 100% NULL while `absent_count`, its sibling in the *same* payload
+object, is 100% populated. That is a mapper omission, not a sync that never ran.
+
+The interim/`limit=5` reasoning was a red herring. Vote data is **not** frozen: the dataset sync re-imports
+whole sessions gated on `dataset_hash`, and an unchanged hash means upstream has no new data.
+
+**Fix.** One line in `buildVoteRow` (`nv_count: Number(rc?.nv) || 0`), then re-import to repopulate existing
+rows: `npm run sync:ky:dataset -- --force` (or the weekly workflow's `force` input). `--force` exists
+precisely for this case — the upstream payload is byte-identical, but we now read a field we used to
+discard, so hash gating would otherwise skip every session. The upsert is
+`onConflict: 'bill_id,roll_call_id'`, so existing rows are updated in place.
+
+**Cost — and the lesson.** Two estimates in this document were wrong, by 3x and then by ~500x, both from
+reasoning about the per-bill API without checking what the bulk dataset already carried:
+
+| approach | calls | note |
+|---|---|---|
+| `fetchVotes` per bill | 10,431 (34.8%) | `getBill` + one `getRollCall` per vote |
+| `fetchRollCall` per stored id | 6,944 (23.1%) | drops the redundant `getBill` |
+| **dataset re-import** | **~13 (0.04%)** | one `getDataset` per session |
+
+`scripts/backfill-vote-nv-counts.ts` still exists as a targeted fallback (e.g. one session, or if a dataset
+is stale), but **it should not be the first resort.** Before spending per-bill quota on any `ky_votes`
+column, check whether the dataset already has the field.
+
+**If you do use the per-bill path**, budget wall-clock too: the client enforces a 500ms floor between
+requests (`RATE_DELAY`, `ky-legiscan-client.ts:85`), so a full pass runs for hours and exceeds a single job
+timeout. It is resumable (`nv_count IS NULL`). Do not "fix" that by removing the throttle.
 
 **Do not** change the accuracy checker's NULL-skip in `checkers/votes.ts` — skipping NULL as
 "not yet backfilled" is correct, and comparing NULL as 0 would flag the entire corpus.
@@ -95,6 +152,18 @@ recent sessions over a full-corpus pass. Overrides: `force=true` on the sync opt
 ---
 
 ## Defect 3 — 12 agenda bill references that never resolved
+
+> **RESOLVED 2026-07-31.** Root cause was in `lrc-bill-reference-parser.ts`: a reference carrying a
+> parenthetical session suffix parsed to a NULL session. Fixed there, verified by re-parsing all 209 stored
+> agenda strings, and the 12 rows repaired in production — each now carries both a session label and a
+> `ky_bill_id`. `bill_session_label IS NULL` is now **0** across all 214 bill-bearing agenda rows.
+>
+> `deriveAgendaBillRef` was extracted from `ky-lrc-calendar-sync.ts` so the repair script
+> (`repair:agenda-bill-links`) resolves stored rows exactly the way the sync does, rather than
+> reimplementing the logic and drifting from it.
+>
+> 5 rows remain unlinked and that is **correct, not residual breakage**: all 5 are `BR ###` — bill *requests*,
+> pre-filed drafts with no bill number yet, which have no `ky_bills` row by design. Do not "fix" these.
 
 **What.** 12 agenda lines name a bill that **does exist** in `ky_bills` but stored
 `bill_session_label = NULL`, so the lookup key missed and the line renders as plain text instead of a
@@ -135,6 +204,13 @@ meeting's agenda rows before re-inserting, so a partial or wrong-window run can 
 ---
 
 ## Defect 4 — `/bills` browse timeouts: fix the `count`, not the sort
+
+> **STILL OPEN as of 2026-07-31.** Diagnosis below re-confirmed (ANALYZE run), but deliberately not changed:
+> the fix trades an exact count for a planner estimate, and on a civic-data site a visibly drifting count is a
+> product call, not a cleanup. Three options were put to the repo owner and none chosen yet: leave it exact;
+> switch to `count: 'planned'`; or keep it exact but bounded (count to N, then render "N+"). **Pick one before
+> touching this** — the third option is worth a look, since it removes the unbounded cost without introducing
+> a number that can be wrong.
 
 **What.** The `ky_bills browse query failed` error (~11/day, 38 distinct users, escalating since 07-28).
 

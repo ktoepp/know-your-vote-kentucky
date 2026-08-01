@@ -26,6 +26,10 @@ on:
         description: 'Dry-run: skip DB writes and dataset downloads.'
         type: boolean
         default: false
+      force:
+        description: 'Re-import sessions even if dataset_hash is unchanged. Needed after a mapper fix; ~1 extra call per session.'
+        type: boolean
+        default: false
   schedule:
     # Sundays 08:00 UTC — one hour after accuracy-audit (07:00 UTC), well after
     # LegiScan's Sunday 04-05 ET dataset regen window.
@@ -81,6 +85,9 @@ jobs:
             fi
             if [ -n "${{ inputs.limit }}" ]; then
               EXTRA="$EXTRA --limit=${{ inputs.limit }}"
+            fi
+            if [ "${{ inputs.force }}" = "true" ]; then
+              EXTRA="$EXTRA --force"
             fi
           fi
           npm run sync:ky:dataset -- ${EXTRA}
