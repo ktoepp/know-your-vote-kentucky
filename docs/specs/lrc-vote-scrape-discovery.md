@@ -3,7 +3,7 @@
 **Companion to:** `docs/specs/lrc-vote-scrape.md` (§ 2 "Source inventory" and § 11.1 "Discovery pass").
 **Date:** 2026-08-02
 **Author:** Claude (executing the plan's discovery pass)
-**Status:** discovery-only. No `ky_votes` writes. No workflow change. No UX change.
+**Status:** discovery complete. Result: plan shelved per § 12. No `ky_votes` writes. No workflow change. No UX change.
 
 ## What this pass was
 
@@ -97,6 +97,41 @@ HTTP 404   1245  https://apps.legislature.ky.gov/record/13rs/house_votes/leg_vot
 ```
 
 No `robots.txt` disallow was observed on any probed path (the plan's § 12 blocker was not triggered).
+
+## Second probe (2026-08-02, same session)
+
+Ran the two follow-up checks this report itself recommended. About 25 additional GETs, same fetch discipline.
+
+**A. Walk `house_votes/leg_vote_mod.pdf` backward from 26RS.** Result: it exists for 21RS through 26RS, and returns HTTP 404 for every session 20RS and earlier.
+
+```
+HTTP 200  75405  https://apps.legislature.ky.gov/record/26rs/house_votes/leg_vote_mod.pdf
+HTTP 200  73543  https://apps.legislature.ky.gov/record/25rs/house_votes/leg_vote_mod.pdf
+HTTP 200  74891  https://apps.legislature.ky.gov/record/24rs/house_votes/leg_vote_mod.pdf
+HTTP 200  64229  https://apps.legislature.ky.gov/record/23rs/house_votes/leg_vote_mod.pdf
+HTTP 200  82463  https://apps.legislature.ky.gov/record/22rs/house_votes/leg_vote_mod.pdf
+HTTP 200  75017  https://apps.legislature.ky.gov/record/21rs/house_votes/leg_vote_mod.pdf
+HTTP 404   1245  https://apps.legislature.ky.gov/record/20rs/house_votes/leg_vote_mod.pdf
+HTTP 404   1245  https://apps.legislature.ky.gov/record/19rs/house_votes/leg_vote_mod.pdf
+HTTP 404   1245  https://apps.legislature.ky.gov/record/18rs/house_votes/leg_vote_mod.pdf
+HTTP 404   1245  https://apps.legislature.ky.gov/record/{17,16,15,14,13,12,11,10}rs/house_votes/leg_vote_mod.pdf
+```
+
+Each of those pre-2021 sessions returns HTTP 200 on `record.html` (the snapshot exists), so this is a genuine content gap, not a URL-scheme drift. LRC only started publishing structured per-member vote artifacts alongside its 2021 site work.
+
+**B. Legacy `www.lrc.ky.gov` tree.** The host is offline from this environment — every request (root, `/record/17RS/`, `/record/15RS/`, `/record/13RS/`, both `https` and `http`, both `www.lrc.ky.gov` and bare `lrc.ky.gov`) returns TCP reset (`curl: (35) Recv failure`) or times out. Not a path miss; the host itself does not answer. This matches public reporting that LRC decommissioned `lrc.ky.gov` when it migrated to `legislature.ky.gov` / `apps.legislature.ky.gov` — the legacy tree is not a fallback.
+
+**C. Daily journal PDFs.** Checked as a last resort — some state legislatures publish daily chamber journals with per-member vote transcripts. `apps.legislature.ky.gov/recorddocuments/journal/17RS/…` returns 404 across the guessed shapes. The `record/17rs/proceedings_House.html` page is just an index of bills that saw House floor action, linking to the same per-bill pages that carry chamber tallies only (finding #3 in the first pass).
+
+## Verdict
+
+**Per § 12 of the plan, this fires the second kill condition** — "parser drift is irreducible" applied to the source-not-present variant. LRC does not publish per-member roll-call data for pre-2018 KY sessions on any surface reachable from this environment. There is no data to parse; no parser or workflow work would recover the coverage.
+
+**Action taken:** `docs/specs/lrc-vote-scrape.md` header flipped to `Status: shelved` with a pointer to this report; nothing else in that file changes (the plan remains readable as the reasoned proposal it was, so a future operator who finds a new source can see what the shelf gate was).
+
+**Not changed:** the member-profile empty-state UX (`legiscanHasNoRollCallsForKySession` → LRC Record Vote Search link in `MemberProfileView`) stays exactly as-is. That is now the permanent state for pre-2018 sessions unless a new source appears.
+
+**Follow-up not in this PR:** a `TASKS.md` note naming the specific failure mode (LRC's per-member roll-call artifacts start at 21RS; no legacy surface exists for pre-2018) — left for a small separate change so this PR stays scoped to the plan and its discovery report.
 
 ---
 
