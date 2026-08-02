@@ -1,7 +1,7 @@
 # LRC Record-Vote Scrape — Plan for Pre-2018 KY Roll Calls
 
-**Status:** conditional plan, not queued work. Execute only if pre-2018 member accountability rises to a real product priority.
-**Date:** 2026-08-01
+**Status:** shelved 2026-08-02 per § 12 kill criteria — LRC does not publish per-member roll-call data for pre-2018 KY sessions on any surface reachable from our environment. See `docs/specs/lrc-vote-scrape-discovery.md` for the two-pass discovery evidence. The plan below is kept as-is so a future operator who finds a new source can see what the shelf gate was.
+**Date:** 2026-08-01 (drafted); shelved 2026-08-02.
 **Author:** Claude (drafting; approval pending)
 
 ## 0. Context and framing
