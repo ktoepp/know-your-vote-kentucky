@@ -43,6 +43,7 @@ import {
   type Finding,
 } from '../types';
 import { normalizeCommitteeNameForDupes } from '../../ky-committee-utils';
+import { normalizeBillNumberForLookup } from '../../lrc-session-label';
 
 const FETCH_HEADERS = {
   'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; accuracy-audit)',
@@ -156,9 +157,17 @@ export function diffAgendaItems(
     // Independent cross-check: the stored id must point at the bill the line
     // names. This one does not just re-run the sync's logic, so it can catch a
     // genuine mis-resolution rather than only drift.
+    //
+    // Compare with `normalizeBillNumberForLookup` (strips internal whitespace),
+    // not `norm` — LRC formats bill numbers with a space ("HB 571") while
+    // `ky_bills.bill_number` follows LegiScan and stores no space ("HB571"), so
+    // a plain-`norm` comparison flags every resolved link as a mismatch.
     if (s.ky_bill_id && d.bill_number) {
       const actualNumber = billNumberById.get(s.ky_bill_id);
-      if (actualNumber && norm(actualNumber) !== norm(d.bill_number)) {
+      if (
+        actualNumber &&
+        normalizeBillNumberForLookup(actualNumber) !== normalizeBillNumberForLookup(d.bill_number)
+      ) {
         mismatches.push({
           field: 'ky_bill_id',
           expected: d.bill_number,
