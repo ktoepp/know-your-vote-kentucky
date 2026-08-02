@@ -24,6 +24,12 @@ export const KY_BILL_BROWSE_SELECT =
 // actually receive more than that. Keep the cap aligned with reality so the `capped`
 // flag (rows.length >= cap) is honest and the UI shows the "more may match" caveat.
 const IN_MEMORY_FILTER_CAP = 1000;
+// Bound the browse-count query the same way. An exact head-count on the full
+// ky_bills table drives a Seq Scan over the whole heap (~4.2 s cold, past the 3 s
+// anon statement_timeout — TASKS.md defect 4). Fetching up to CAP+1 ids stops at
+// the first page of the pk index and never scans the whole table; the UI renders
+// "1,000+" when the ceiling is hit and pagination continues past it via load-more.
+const BROWSE_COUNT_CAP = 1000;
 const BILLS_BROWSE_REVALIDATE_SECONDS = 60;
 
 export type KyBillsBrowseQuery = {
@@ -42,6 +48,11 @@ export type KyBillsBrowseQuery = {
 
 export type KyBillsBrowseResult = {
   bills: KYBill[];
+  /**
+   * Row count for this query. When `capped` is true, this is a lower bound
+   * (BROWSE_COUNT_CAP) — actual matches may be higher; the UI renders it as "N+"
+   * and load-more keeps working past the ceiling.
+   */
   total: number;
   capped: boolean;
 };
@@ -225,13 +236,21 @@ async function fetchKyBillsBrowsePageUncached(query: KyBillsBrowseQuery): Promis
   }
 
   const chamber = effectiveChamber(query.chamberMode, query.chamberFilter);
-  let countQ = supabase.from('ky_bills').select('id', { count: 'exact', head: true });
+  // Only the truly unfiltered browse (no session, no topic) triggers the Seq Scan
+  // over the whole ky_bills heap that timed out at ~4.2 s cold (TASKS.md defect 4).
+  // Session- and topic-scoped counts are index-served and cheap, so keep them exact
+  // — losing precision there would show "1,000+" for common filters (most
+  // Regular Sessions carry 1,200–1,750 bills) when we can trivially count them.
+  const canCountExactly = Boolean(query.sessionFilter) || Boolean(query.topicFilter);
+  let countQ = canCountExactly
+    ? supabase.from('ky_bills').select('id', { count: 'exact', head: true })
+    : supabase.from('ky_bills').select('id').limit(BROWSE_COUNT_CAP + 1);
   countQ = applyChamberToQuery(countQ, chamber);
   if (query.topicFilter) {
     countQ = countQ.contains('topics', [query.topicFilter]);
   }
   if (query.sessionFilter) {
-    countQ = countQ.eq('session', query.sessionFilter);
+    countQ = eqBillSession(countQ, query.sessionFilter);
   }
 
   let rowQ = supabase
@@ -244,7 +263,7 @@ async function fetchKyBillsBrowsePageUncached(query: KyBillsBrowseQuery): Promis
     rowQ = rowQ.contains('topics', [query.topicFilter]);
   }
   if (query.sessionFilter) {
-    rowQ = rowQ.eq('session', query.sessionFilter);
+    rowQ = eqBillSession(rowQ, query.sessionFilter);
   }
 
   const from = (page - 1) * pageSize;
@@ -255,10 +274,20 @@ async function fetchKyBillsBrowsePageUncached(query: KyBillsBrowseQuery): Promis
   if (rowRes.error) throwBrowseQueryError(rowRes.error, query, 'rows');
 
   const bills = sortBrowseRows((rowRes.data ?? []) as KYBill[], query);
+  if (canCountExactly) {
+    return {
+      bills,
+      total: countRes.count ?? bills.length,
+      capped: false,
+    };
+  }
+  const countedIds = (countRes.data ?? []) as { id: string }[];
+  const capped = countedIds.length > BROWSE_COUNT_CAP;
+  const total = capped ? BROWSE_COUNT_CAP : countedIds.length;
   return {
     bills,
-    total: countRes.count ?? bills.length,
-    capped: false,
+    total,
+    capped,
   };
 }
 
