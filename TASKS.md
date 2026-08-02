@@ -32,7 +32,7 @@ _Active development only. Shipped work moves to Recently completed; deferred/rev
 
 - [ ] **Verify committee meetings beyond the live calendar window.** The LRC weekly calendar is the only upstream comparison for meetings and covers just the current week; the new corpus invariants prove internal consistency, not agreement with LRC. 146 upcoming and all Wayback/PDF-backfilled meetings have no upstream check. Needs a different source — committee profile pages or the interim calendar PDF.
 - [ ] **Stateful sampling rotation (`last_audited_at`).** Accuracy sampling is still memoryless (~0.18%/run); the active-window bias helps but gives no coverage guarantee. `ky_accuracy_findings` (migration 046) is the substrate for building it.
-- [ ] **Confirm `lrc-enrollment-actions` goes green.** The 404-vs-failure classification fix shipped in #216; the next Vercel cron run (`45 14 * * *` UTC) is the first to exercise it. If it stays red, the 11 errors were real rather than expected 404s and need investigating.
+- [x] **Confirm `lrc-enrollment-actions` goes green. ✅ Done 2026-08-02.** The 2026-08-01 14:46 UTC cron run recorded `status = success`, `error_message = null`, `items_synced = 0`, `consecutive_zero_syncs = 1` (against `last_nonzero_sync_at = 2026-07-31 14:46`). The 404-vs-failure classification fix from PR #216 is landing correctly — the previously-reported 11 errors were expected 404s. The one zero-yield run is fine: enrollments only appear during in-session weeks and this source carries no `maxZeroYieldHours` budget (`source-health.ts:67`).
 
 #### New follow-ups surfaced 2026-07-31 (found while fixing defects 1–3)
 
