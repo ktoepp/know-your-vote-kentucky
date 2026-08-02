@@ -283,18 +283,30 @@ export function BillsBrowse({
   ]);
 
   const loadMoreBills = useCallback(async () => {
-    if (loadingMore || bills.length >= browseTotal) return;
+    if (loadingMore) return;
+    // When capped, `browseTotal` is a lower bound (BROWSE_COUNT_CAP), so the
+    // usual `bills.length >= browseTotal` gate would stop pagination at the
+    // ceiling even when more rows exist upstream. Keep paging until the API
+    // returns fewer bills than a page — that's the real end of the data.
+    if (!browseCapped && bills.length >= browseTotal) return;
     setLoadingMore(true);
     try {
       const nextPage = Math.floor(bills.length / pageSize) + 1;
       const res = await fetch(`/api/bills/browse?${buildBrowseQuery(nextPage)}`);
       if (!res.ok) return;
       const json = (await res.json()) as { bills?: KYBill[] };
-      setBills((prev) => [...prev, ...(json.bills ?? [])]);
+      const nextBills = json.bills ?? [];
+      setBills((prev) => [...prev, ...nextBills]);
+      if (browseCapped && nextBills.length < pageSize) {
+        // We've drained the upstream results; drop the capped flag so the
+        // gate above (and the "1,000+" summary) reflect the true total.
+        setBrowseCapped(false);
+        setBrowseTotal(bills.length + nextBills.length);
+      }
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, bills.length, browseTotal, pageSize, buildBrowseQuery]);
+  }, [loadingMore, bills.length, browseTotal, browseCapped, pageSize, buildBrowseQuery]);
 
   const browsePagerResetKey = `${followsParam}|${chamberFilter}|${statusFilter}|${topicFilter}|${sessionFilter}|${sortBy}|${sortDir}|${pageSize}`;
 
@@ -353,20 +365,27 @@ export function BillsBrowse({
   const billsFoundSummary = useMemo(() => {
     const loaded = bills.length;
     const total = browseTotal;
-    const billsWord = total === 1 ? 'bill' : 'bills';
+    // `browseCapped` means `total` is a lower bound (BROWSE_COUNT_CAP); render
+    // "1,000+ bills" so we never display a count we know is not exact.
+    const totalLabel = browseCapped
+      ? `${total.toLocaleString()}+`
+      : total.toLocaleString();
+    // Word choice tracks the displayed number: "1 bill" only when we're sure
+    // it's exactly one, never when capped.
+    const billsWord = !browseCapped && total === 1 ? 'bill' : 'bills';
     if (!hasActiveClientFilters) {
       if (browseCapped && total > loaded) {
-        return `${total.toLocaleString()} ${billsWord} · Showing ${loaded.toLocaleString()} with the most recent activity`;
+        return `${totalLabel} ${billsWord} · Showing ${loaded.toLocaleString()} with the most recent activity`;
       }
-      return `${total.toLocaleString()} ${billsWord}`;
+      return `${totalLabel} ${billsWord}`;
     }
-    const verb = total === 1 ? 'matches' : 'match';
-    let s = `${total.toLocaleString()} ${billsWord} ${verb} your filters`;
+    const verb = !browseCapped && total === 1 ? 'matches' : 'match';
+    let s = `${totalLabel} ${billsWord} ${verb} your filters`;
     if (browseCapped) {
       s += ' · Based on the most recently updated bills in this view; more may match';
     }
     if (loaded < total) {
-      s += ` · Showing ${loaded.toLocaleString()} of ${total.toLocaleString()}`;
+      s += ` · Showing ${loaded.toLocaleString()} of ${totalLabel}`;
     }
     return s;
   }, [hasActiveClientFilters, browseTotal, bills.length, browseCapped]);
