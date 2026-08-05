@@ -213,16 +213,20 @@ export async function insertBillStatusHistoryRows(
   billUuid: string,
   items: Array<{ event_type: KyDigestEventType; payload: Record<string, unknown>; legiscan_change_hash: string | null }>,
 ): Promise<void> {
-  for (const item of items) {
-    const { error } = await db.from('ky_bill_status_history').insert({
-      bill_id: billUuid,
-      event_type: item.event_type,
-      event_payload: item.payload,
-      legiscan_change_hash: item.legiscan_change_hash,
+  const rows = items.map((item) => ({
+    bill_id: billUuid,
+    event_type: item.event_type,
+    event_payload: item.payload,
+    legiscan_change_hash: item.legiscan_change_hash,
+  }));
+  const { error } = await db
+    .from('ky_bill_status_history')
+    .upsert(rows, {
+      onConflict: 'bill_id,event_type,legiscan_change_hash',
+      ignoreDuplicates: true,
     });
-    if (error && error.code !== '23505') {
-      console.error('[ky-bill-status-history] insert:', error.message, item.event_type, billUuid);
-    }
+  if (error) {
+    console.error('[ky-bill-status-history] upsert:', error.message, billUuid);
   }
 }
 
