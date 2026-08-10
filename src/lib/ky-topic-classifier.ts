@@ -96,7 +96,13 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   'Local Government': ['county', 'city council', 'metro council', 'mayor', 'magistrate', 'county judge-executive', 'ordinance', 'municipal', 'annexation', 'fiscal court', 'planning commission', 'zoning board', 'louisville metro', 'lexington-fayette', 'special district', 'library district', 'area development district', 'area development districts'],
   Budget: ['budget', 'appropriation', 'spending', 'deficit', 'surplus', 'general fund', 'pension', 'bond'],
   Corrections: ['department of corrections', 'corrections officer', 'inmate', 'warden', 'reentry', 'halfway house', 'correctional facility', 'parole board'],
-  Elections: ['election administration', 'county clerk', 'poll worker', 'voting machine', 'canvass', 'secretary of state', 'election board', 'precinct', 'election official'],
+  // Bare 'county clerk' removed (2026-08-10): KY county clerks handle deeds, marriage licenses,
+  // vehicle registration, and general records — not just elections. The keyword mistagged
+  // records/document-management bills as "Elections" (accuracy-audit run 372fe76a, seed
+  // 3357422353: SB135 2022 RS, HB370 2010 RS, HB135 2023 RS, +2). Genuine election-admin bills
+  // still tag via 'election administration' / 'poll worker' / 'voting machine' / 'election
+  // official' / 'canvass' / 'precinct', or fall back to Voting Rights (election/ballot/voter).
+  Elections: ['election administration', 'poll worker', 'voting machine', 'canvass', 'secretary of state', 'election board', 'precinct', 'election official'],
   'Higher Education': ['higher education', 'postsecondary', 'kctcs', 'council on postsecondary', 'board of regents', 'state university', 'community and technical college'],
   'Veterans Affairs': ['veteran', 'veterans', 'military', 'national guard', 'gi bill', 'armed forces', 'servicemember', 'veterans affairs', 'veterans benefits'],
   'Alcohol & Cannabis': ['alcohol', 'liquor', 'distillery', 'brewery', 'wet-dry', 'cannabis', 'marijuana', 'medical marijuana', 'thc', 'delta-8'],
