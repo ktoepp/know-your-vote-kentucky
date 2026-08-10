@@ -60,6 +60,21 @@ type QueryBuilder = ReturnType<SupabaseClient['from']>;
 // PostgREST filter builders are returned by .select(); type them loosely.
 type FilteredQuery = ReturnType<QueryBuilder['select']>;
 
+export interface RotationOptions {
+  /**
+   * Scope namespace stored in `ky_accuracy_audit_marks.scope` (e.g. "bills",
+   * "materials.probe"). Two checkers over the same row keep independent
+   * rotation state, so a bill audited by the bills checker still gets a fresh
+   * turn when the materials checker draws.
+   */
+  scope: string;
+  /**
+   * When true (default), stamp the chosen keys with `now()` after selection so
+   * the next run sees them as recently audited and prefers older rows.
+   */
+  stamp?: boolean;
+}
+
 export interface SampleParams {
   table: string;
   /** Columns to fetch for the sampled rows. */
@@ -80,6 +95,15 @@ export interface SampleParams {
    * Omit to force a fresh scan.
    */
   cacheKey?: string;
+  /**
+   * Stateful rotation via `ky_accuracy_audit_marks` (migration 049): sort
+   * candidates by (last_audited_at ASC NULLS FIRST, hash ASC) instead of
+   * hash-only, so rows that have gone longest without a check go first and
+   * seeded randomness only breaks ties. Omit to preserve the pure-random
+   * behavior (used by callers that want per-run variability without coverage
+   * guarantees).
+   */
+  rotation?: RotationOptions;
 }
 
 /** PostgREST caps a single response; page the key scan to cover the whole table. */
@@ -142,10 +166,23 @@ export async function sampleTable<T>(db: SupabaseClient, p: SampleParams): Promi
   }
   if (keys.length === 0) return [];
 
-  // 2) Bottom-k by deterministic hash (tie-break on key for full determinism).
+  // 2) Bottom-k selection. Pure random path is hash-only; rotation path fetches
+  //    `last_audited_at` per candidate and sorts oldest-first (never-audited
+  //    counts as oldest via NULL → -Infinity), with the seeded hash as a
+  //    tiebreaker so ties still vary run to run.
+  const marks = p.rotation
+    ? await fetchAuditMarks(db, p.rotation.scope, keys)
+    : new Map<string, number>();
   const chosen = keys
-    .map((k) => ({ k, h: hashKey(p.seed, k) }))
-    .sort((a, b) => a.h - b.h || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0))
+    .map((k) => ({
+      k,
+      h: hashKey(p.seed, k),
+      ts: marks.get(k) ?? Number.NEGATIVE_INFINITY,
+    }))
+    .sort((a, b) => {
+      if (p.rotation && a.ts !== b.ts) return a.ts - b.ts;
+      return a.h - b.h || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0);
+    })
     .slice(0, p.limit)
     .map((x) => x.k);
 
@@ -168,7 +205,73 @@ export async function sampleTable<T>(db: SupabaseClient, p: SampleParams): Promi
   for (const r of (data ?? []) as Array<Record<string, unknown>>) {
     byKey.set(String(r[keyColumn]), r as T);
   }
-  return chosen.map((k) => byKey.get(k)).filter((r): r is T => r != null);
+  const results = chosen.map((k) => byKey.get(k)).filter((r): r is T => r != null);
+
+  // 4) Rotation stamping. Doing this on the SAMPLING call rather than after
+  //    the checker completes keeps stamps consistent even when a checker
+  //    partially fails — the row was still "shown" to the audit, so counting
+  //    it as covered for rotation purposes is honest. Failures are already
+  //    tracked separately in ky_accuracy_findings.
+  if (p.rotation && (p.rotation.stamp ?? true) && chosen.length > 0) {
+    await stampAuditMarks(db, p.rotation.scope, chosen);
+  }
+  return results;
+}
+
+/** How many `IN (...)` mark rows we're willing to send per PostgREST call. */
+const MARK_CHUNK = 500;
+
+async function fetchAuditMarks(
+  db: SupabaseClient,
+  scope: string,
+  keys: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (let i = 0; i < keys.length; i += MARK_CHUNK) {
+    const chunk = keys.slice(i, i + MARK_CHUNK);
+    const { data, error } = await db
+      .from('ky_accuracy_audit_marks')
+      .select('key, last_audited_at')
+      .eq('scope', scope)
+      .in('key', chunk);
+    if (error) {
+      // Missing table (migration 049 not yet applied) → degrade silently to
+      // pure-random behavior. Callers should NOT have to know.
+      const msg = String(error.message || '').toLowerCase();
+      if (msg.includes('ky_accuracy_audit_marks') || msg.includes('does not exist')) {
+        return new Map();
+      }
+      throw new Error(error.message);
+    }
+    for (const r of (data ?? []) as Array<{ key: string; last_audited_at: string }>) {
+      const t = Date.parse(r.last_audited_at);
+      if (Number.isFinite(t)) out.set(r.key, t);
+    }
+  }
+  return out;
+}
+
+async function stampAuditMarks(
+  db: SupabaseClient,
+  scope: string,
+  keys: string[],
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const rows = keys.map((key) => ({ scope, key, last_audited_at: nowIso }));
+  for (let i = 0; i < rows.length; i += MARK_CHUNK) {
+    const chunk = rows.slice(i, i + MARK_CHUNK);
+    const { error } = await db
+      .from('ky_accuracy_audit_marks')
+      .upsert(chunk, { onConflict: 'scope,key' });
+    if (error) {
+      // Silent degrade on missing-table (see fetchAuditMarks); other errors
+      // shouldn't break the audit — stamping is best-effort for coverage tracking.
+      const msg = String(error.message || '').toLowerCase();
+      if (msg.includes('ky_accuracy_audit_marks') || msg.includes('does not exist')) return;
+      console.warn('[audit-rotation] stamp failed:', error.message);
+      return;
+    }
+  }
 }
 
 /** {@link sampleTableSplit} parameters. */

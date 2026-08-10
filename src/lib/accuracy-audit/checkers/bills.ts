@@ -157,6 +157,11 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
         activeFilter: (q) => q.gte('last_action_date', activeCutoff),
         activeCacheKey: `legiscan_id_not_null|active>=${activeCutoff}`,
         activeShare: cfg.activeShare,
+        // Oldest-first rotation (migration 049): the seed still shuffles ties,
+        // but rows that have gone longest without a check take priority. Same
+        // scope for both halves of the split so an active-window pick still
+        // counts as coverage against the whole corpus's rotation.
+        rotation: { scope: 'bills' },
       },
       (r) => r.id,
     );
