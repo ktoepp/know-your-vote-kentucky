@@ -27,10 +27,14 @@ export type BillDigestLine = {
 export type DigestBillProgress = {
   /** Ordered stage labels for this bill type (e.g. Introduced / Passed House / …). */
   stageLabels: string[];
+  /** Compact stage labels for the per-segment caption row (e.g. Introduced / House / Senate / Law). */
+  shortStageLabels?: string[];
   /** 0-based furthest stage reached. */
   reachedIndex: number;
   /** vetoed / failed when the bill has stopped advancing, else null. */
   terminal: 'vetoed' | 'failed' | null;
+  /** Specific milestone caption (e.g. the last-action text) — overrides the generic stage-name caption. */
+  specificMilestone?: string;
 };
 
 export type BillDigestGroup = {
@@ -56,21 +60,29 @@ export type BillDigestGroup = {
  * final stage shows a red bar, and a caption names the current stage / terminal.
  */
 function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
-  const { stageLabels, reachedIndex, terminal } = progress;
+  const { stageLabels, shortStageLabels, reachedIndex, terminal, specificMilestone } = progress;
   const n = stageLabels.length;
   const last = n - 1;
   // Fully passed (enacted / adopted) reads green; still in progress reads blue.
   const fullyPassed = terminal === null && reachedIndex === last;
   const completeBg = fullyPassed ? '#16a34a' : '#1e40af';
   const completeCls = fullyPassed ? 'dg-seg-done' : 'dg-seg';
-  const caption =
+  const genericCaption =
     terminal === 'vetoed'
       ? 'Vetoed'
       : terminal === 'failed'
         ? 'Did not advance'
         : stageLabels[Math.max(0, reachedIndex)] ?? '';
+  // Prefer a specific milestone (the concrete event that moved the bill) when
+  // one was supplied, so the caption reads e.g. "Passed Senate 33–5" instead of
+  // the generic "Passed Senate".
+  const caption =
+    terminal === null && specificMilestone && specificMilestone.trim() ? specificMilestone.trim() : genericCaption;
   const captionColor = terminal === 'vetoed' ? '#dc2626' : fullyPassed ? '#15803d' : '#475569';
   const captionClass = terminal === 'vetoed' ? undefined : fullyPassed ? 'dg-done-text' : 'dg-muted';
+  // Short labels default to the full labels; caller passes shorter ones when
+  // the full label would crowd 4 segments across the email column.
+  const segLabels = shortStageLabels && shortStageLabels.length === n ? shortStageLabels : stageLabels;
   return (
     <>
       <table
@@ -82,7 +94,7 @@ function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
       >
         <tbody>
           <tr>
-            {stageLabels.map((label, i) => {
+            {stageLabels.map((_label, i) => {
               const blocked = terminal === 'vetoed' && i === last;
               const complete = i <= reachedIndex;
               const bg = blocked ? '#dc2626' : complete ? completeBg : '#e2e8f0';
@@ -99,6 +111,38 @@ function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
                   >
                     &nbsp;
                   </div>
+                </td>
+              );
+            })}
+          </tr>
+          {/* Per-stage labels — mirrors the site's detail-variant meter. Bold on the
+              current stage so the milestone reads immediately without hunting a caption. */}
+          <tr>
+            {segLabels.map((label, i) => {
+              const blocked = terminal === 'vetoed' && i === last;
+              const complete = i <= reachedIndex;
+              const isCurrent = !terminal && i === reachedIndex;
+              const color = blocked
+                ? '#dc2626'
+                : complete
+                  ? '#0f172a'
+                  : '#94a3b8';
+              return (
+                <td
+                  key={i}
+                  width={`${Math.round(100 / n)}%`}
+                  style={{
+                    padding: i === 0 ? '4px 3px 0 0' : i === last ? '4px 0 0 3px' : '4px 3px 0',
+                    fontSize: 11,
+                    lineHeight: 1.25,
+                    fontWeight: isCurrent ? 700 : 500,
+                    color,
+                    fontFamily:
+                      "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+                  }}
+                  className={complete && !blocked ? 'dg-ink' : blocked ? undefined : 'dg-muted'}
+                >
+                  {label}
                 </td>
               );
             })}

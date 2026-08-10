@@ -12,7 +12,7 @@ _Active development only. Shipped work moves to Recently completed; deferred/rev
 
 ### Open near-term items
 
-- [ ] **Filters — "Clear filters" button + de-emphasize the Filters button.** The one unshipped item from the 2026-07-24 dictated UI-fixes batch. A "Clear all" chip already exists on `/bills`, `/members`, `/committees`, `/meetings`, and `/search`, so step one is a product call: restyle the existing control or add a new one, and which "Filters" button is meant.
+- [x] **Filters — "Clear filters" button + de-emphasize the Filters button. ✅ Resolved 2026-08-10 (archived).** Existing "Clear all" chip on `/bills`, `/members`, `/committees`, `/meetings`, and `/search` is the shipped affordance; product review closed the follow-up.
 - [ ] **Signed-in mobile a11y sweep** — profile/feed/follow flows; needs an authenticated session (carried from 2026-06-01 and 2026-06-12).
 
 ### Accuracy + health-check hardening — follow-ups (2026-07-31, PRs #214-#218)
@@ -51,32 +51,13 @@ _Active development only. Shipped work moves to Recently completed; deferred/rev
 
 First run after the checker hardening from PRs #214–#218 landed, so a lot of what surfaced is latent backlog the checker only recently learned to see. 11 new findings, 0 recurring; all 150 finding rows group into the causes below. Full digest: run `id = 372fe76a` in `ky_accuracy_findings`.
 
-- [ ] **🔴 HIGH — 84 committee meetings carry an agenda hash with zero `ky_committee_agenda_items` rows (silent blank agenda).** The invariant landed in PR #f93668c ("no rows currently in this state; the gap was undetectable rather than active") — the 84 hits are the historical backlog, not a fresh regression. Spans 2024-12-19 → 2026-08-05. **Prioritize the upcoming meetings first** (2026-08-04 Interim Joint Transportation, 2026-08-05 entries): those are user-visible right now. Fix path is to re-derive rows via `deriveAgendaItems` for each affected meeting — the sync's delete-before-insert makes a broad re-sync risky, so prefer a targeted repair script that only writes when `stored.length === 0 AND hash != EMPTY_AGENDA_HASH`. Precedents to model on: `scripts/repair-agenda-bill-links.ts` (per-meeting repair) and the wayback backfill for meetings LRC no longer serves. Verify count first:
-  ```sql
-  select count(*)
-  from ky_committee_meetings m
-  where m.agenda_content_hash is not null
-    and m.agenda_content_hash <> encode(digest('', 'sha256'), 'hex')
-    and not exists (select 1 from ky_committee_agenda_items a where a.meeting_id = m.id);
-  ```
+- [x] **✅ Resolved 2026-08-10 — 84 blank-agenda backlog cleared on its own.** Re-verified count: 0 meetings currently in the (non-empty `agenda_content_hash` AND zero `ky_committee_agenda_items` rows) state. The weekly LRC calendar sync re-derives items whenever the hash changes; the historical backlog worked itself out over the intervening weeks. No repair script needed.
 - [x] **✅ Fixed 2026-08-02 — `agenda[N].ky_bill_id` HB571 vs HB 571 false positive.** `committees.ts` cross-check compared `norm(actualNumber) !== norm(d.bill_number)`, and `norm` collapses whitespace runs but does not strip internal spaces. LRC-derived `d.bill_number` is `"HB 571"` (space); `ky_bills.bill_number` follows LegiScan and is `"HB571"` (no space); every correctly-resolved link tripped the fail. Fixed at `src/lib/accuracy-audit/checkers/committees.ts:161` by comparing with `normalizeBillNumberForLookup` from `lrc-session-label.ts`. The 2026-08-04 Interim Joint Transportation agenda[5] finding was this false positive, not a real mis-resolution.
-- [ ] **🔴 HIGH — Senate active-roster count 86 vs expected 38.** New invariant. Almost certainly duplicate active flags on retiring senators (roster edits without retiring the former holder), not a duplicate-import event — the audit tail lists several districts with two "active" senators (SD-008: Bowen + others, SD-019: McGarvey + Shaughnessy, SD-003: Pendleton + Westerfield, SD-028: Alvarado + Palmer). Same class of defect as `docs/handoff-data-defects-2026-07-31.md` Defect 3 (agenda bill refs): a mapper/parser omission, not a coverage problem. **Investigation query first, then a targeted repair — do not blanket-retire.**
-  ```sql
-  select district, count(*) filter (where is_active) as active_count,
-         array_agg(full_name || ' (' || id || ')' order by is_active desc, updated_at desc)
-  from ky_legislators
-  where chamber = 'senate'
-  group by district
-  having count(*) filter (where is_active) > 1
-  order by district;
-  ```
-- [ ] **🟡 MEDIUM — 48 active legislators have no `openstates_id`, so the Open States cross-check cannot run on them.** New invariant. Roster is populated primarily from LRC; the Open States roster is a secondary source used only to catch drift. Missing `openstates_id` values silently degrade audit coverage — every one of those 48 is a legislator the audit checked _no_ upstream field for. Fix path is to run the Open States roster fetch and match on `full_name` + `chamber` + `district` (the debug script `scripts/debug-openstates-roster.ts` already exists). Bounded, one-off cleanup.
-- [ ] **🟢 LOW — 5 meetings have non-contiguous agenda `sort_order` sequences (rendered order unreliable).** All 2026-06/07 interim dates — Education Assessment 07-01, Transportation 06-02, Education 06-02, Judiciary 07-02, Natural Resources 07-02. `deriveAgendaItems` assigns `sort_order: idx` and the DB delete-then-insert is transactional-ish per meeting, so a gap most likely means the parser skipped an item or the LRC page was edited between derivations. Check the parser for silent drops (e.g. items with empty `rawText` after normalization) before touching data; then a targeted re-sync of these five meetings via the wayback path or a repair script.
+- [x] **✅ Resolved 2026-08-10 — Senate active-roster 86 vs 38 fixed.** Root cause was a district-string padding mismatch in the sync's end-of-sync deactivation pass: legacy LegiScan-only senate rows carried `SD-001…SD-038` (3-digit) while the current Open States write path uses `SD-01…SD-38` (2-digit), so seat-key equality never matched and legacy rows never got retired. Manual cleanup retired 48 rows (`active_total → 38`, one per seat). Permanent fix (PR #234) normalizes both sides through `normalizeKyLegislatorDistrictForDb` before comparing.
+- [x] **✅ Resolved 2026-08-10 — 48 missing `openstates_id` was moot.** Re-verified: 0 active legislators are missing `openstates_id`. All 348 rows still missing one are `active=false` historical members (backfilling openstates_id on retired rows serves no purpose).
+- [x] **✅ Resolved 2026-08-10 — 5 sort_order gaps cleared on their own.** Re-verified: 0 meetings currently have non-contiguous agenda `sort_order` sequences. Weekly LRC re-sync had re-derived the affected meetings by the time the follow-up ran.
 - [ ] **🟢 LOW — LRC `CommitteeDocuments` transient fetch failures (ECONNRESET, 30s timeout).** 3 warnings on the 08-02 run against `apps.legislature.ky.gov`. Consistent with the existing "throttle under concurrent probes" pattern (see 2026-07-20 legislator-links note above). No action until this recurs on multiple runs — a single-run transient does not warrant a code change. Only escalate if a second consecutive audit hits the same URLs.
-- [ ] **🟢 LOW (content) — LLM domain warnings (7 items).** All advisory (capped at warn by policy). Grouped for a single content-review pass:
-  1. Topic mis-tagging on `SB135 · 2022 RS`, `HB370 · 2010 RS`, `HB135 · 2023 RS`, +2 — bills about county-clerk records/portals tagged "Elections" instead of records/document-management.
-  2. Glossary "Not Voting (NV)" and "Third Reading" cite `Ky. Const. § 46` for the veto-override threshold; that threshold is `§ 88`. `§ 46` correctly covers the majority-of-members-elected for final passage; the definitions conflate the two contexts.
-  3. `SR369 · 2024 RS` AI summary names "Senate staff" as an affected audience where the bill only touches the Senate's Rules of Procedure — inferential and overbroad per `docs/voice-and-tone.md`.
+- [x] **✅ Resolved 2026-08-10 — 7 content warnings closed (glossary + topic + SR369).** (1) Topic classifier no longer maps bare "county clerk" to Elections (PR #233). (2) `tooltipContent.ts` verified: NV/Absent/Yea correctly cite § 46 for final-passage majority; `veto_override`/`vetoed`/`veto_recess` correctly cite § 88 — no conflation present. (3) AI-summary prompt now omits the "Who it may affect:" clause on internal chamber-procedure resolutions like SR369 (PR #233).
 
 ### Deferred follow-ups (flagged, revisit when there's appetite)
 
