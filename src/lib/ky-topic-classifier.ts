@@ -30,6 +30,14 @@ export const KY_TOPICS = [
   'Alcohol & Cannabis',
   'Gambling',
   'Transportation',
+  // Constitutional amendments — proposals to amend the Kentucky Constitution
+  // that must be ratified by voters at the next general election. Assigned by
+  // title shape (see isConstitutionalAmendment), not body keywords, because
+  // every KY constitutional amendment's description names "ballot" and
+  // "voters" (the ratification requirement, Ky. Const. § 256) — matching
+  // those against the Voting Rights keyword list mistagged HB475 2020 (a
+  // local-taxing-authority amendment) as Voting Rights.
+  'Constitutional Amendments',
   // Ceremonial resolutions — honors, congratulations, and in-memoriams. Assigned
   // by title shape (see isCeremonialResolution), not body keywords, so these
   // instruments are browsable/searchable as a category instead of collecting
@@ -113,6 +121,10 @@ const TOPIC_KEYWORDS: Record<KYTopicTag, string[]> = {
   // name in a vehicle bill). Bare 'bridge' deliberately NOT included here — it matched financial
   // "bridge loans"; genuine bridge bills are still surfaced via the LegiScan /bridge/ subject mapping.
   Transportation: ['road', 'highway', 'transit', 'transportation', 'motor vehicle', 'license plate', 'railroad', 'railway', 'vehicle registration', "driver's license", 'school bus', 'toll road', 'public transit', 'mass transit'],
+  // Detected structurally from the title (isConstitutionalAmendment), never from body
+  // keywords — the description's ratification boilerplate ("ballot question", "voters")
+  // is why keyword matching mistagged these bills as Voting Rights. Intentionally empty.
+  'Constitutional Amendments': [],
   // Detected structurally from the title (isCeremonialResolution), never from body
   // keywords — a keyword list here would false-tag substantive bills. Intentionally empty.
   'Honors & Memorials': [],
@@ -125,6 +137,59 @@ function escapeRegex(s: string): string {
 
 /** The `Honors & Memorials` tag for ceremonial resolutions. */
 const HONORS_MEMORIALS: KYTopicTag = 'Honors & Memorials';
+
+/** The `Constitutional Amendments` tag for bills proposing to amend the Ky. Constitution. */
+const CONSTITUTIONAL_AMENDMENTS: KYTopicTag = 'Constitutional Amendments';
+
+/**
+ * Bills proposing to amend the Kentucky Constitution. Detected by title shape
+ * because their descriptions always mention "ballot question", "voters", and
+ * "submission to voters" — those come from Ky. Const. § 256's ratification
+ * requirement, not the bill's subject matter, and matching them against the
+ * Voting Rights keyword list mistagged HB475 2020 (a local-taxing-authority
+ * amendment) as Voting Rights (accuracy-audit run ee50b461, LLM review).
+ *
+ * The classifier still runs the full keyword pass on the underlying subject,
+ * so an amendment about voting rights (HB420 2026, "relating to voting rights")
+ * still gets Voting Rights; only the ratification-clause hits are suppressed.
+ * See classifyTopics().
+ */
+const CONSTITUTIONAL_AMENDMENT_RE =
+  /\bproposing an amendment to (?:section|sections)\b[\s\S]*?\bconstitution of kentucky\b/i;
+
+export function isConstitutionalAmendment(title: string | null | undefined): boolean {
+  const t = (title ?? '').trim();
+  if (!t) return false;
+  return CONSTITUTIONAL_AMENDMENT_RE.test(t);
+}
+
+/**
+ * Voting Rights keywords that appear in every constitutional-amendment
+ * description as a byproduct of Ky. Const. § 256's ratification requirement.
+ * When classifying a constitutional amendment, hits on these words in the
+ * description alone (not the title's "relating to" clause) don't imply the
+ * bill is about voting rights; they're procedural boilerplate.
+ */
+const CONSTITUTIONAL_RATIFICATION_KEYWORDS = new Set([
+  'ballot',
+  'voter',
+  'voters',
+  'election',
+  'elections',
+  'voting',
+]);
+
+/**
+ * Memorial *designation* resolutions — e.g. "designating the … Memorial
+ * Overpasses in Jefferson County" (HJR42 2026). The base ceremonial detector
+ * excludes bare "designating" because plenty of designating resolutions are
+ * substantive (task forces, study bodies, official state symbols). But when
+ * "designating" pairs with "Memorial" (a highway, bridge, or overpass named in
+ * memory of someone), the resolution is dedicating a place to a person's
+ * memory — the same ceremonial category as an "in loving memory" resolution.
+ */
+const MEMORIAL_DESIGNATION_RE =
+  /^(?:a\s+(?:joint\s+|concurrent\s+)?resolution\s+)?designating\b[\s\S]*?\bmemorial\b/i;
 
 /**
  * Ceremonial resolutions — honoring/congratulating a person or group, or
@@ -152,7 +217,11 @@ export function isCeremonialResolution(title: string | null | undefined): boolea
   const t = (title ?? '').trim();
   if (!t) return false;
   if (SUBSTANTIVE_ACT_RE.test(t)) return false;
-  return CEREMONIAL_LEAD_RE.test(t) || IN_HONOR_OR_MEMORY_RE.test(t);
+  return (
+    CEREMONIAL_LEAD_RE.test(t) ||
+    IN_HONOR_OR_MEMORY_RE.test(t) ||
+    MEMORIAL_DESIGNATION_RE.test(t)
+  );
 }
 
 /**
@@ -193,13 +262,27 @@ export function classifyTopics(title: string, description: string): string[] {
   // describe the honoree, not a policy area the resolution addresses.
   if (isCeremonialResolution(title)) return [HONORS_MEMORIALS];
 
+  const isConstAmend = isConstitutionalAmendment(title);
   const text = stripBoilerplate(`${title} ${description}`);
   const hitsByTopic = new Map<KYTopicTag, number>();
 
-  for (const { topic, regex } of TOPIC_KEYWORD_REGEXES) {
-    if (regex.test(text)) {
-      hitsByTopic.set(topic, (hitsByTopic.get(topic) ?? 0) + 1);
+  for (const { topic, keyword, regex } of TOPIC_KEYWORD_REGEXES) {
+    if (!regex.test(text)) continue;
+    // Constitutional amendments: Voting Rights keywords that came from Ky.
+    // Const. § 256's ratification boilerplate (ballot, voters, election) don't
+    // signal a voting-rights bill. Only count a Voting Rights hit when the
+    // TITLE — where the "relating to" clause lives — also matches, i.e. the
+    // bill is genuinely about elections/voting (HB420 2026: "relating to
+    // voting rights"), not merely subject to voter ratification.
+    if (
+      isConstAmend &&
+      topic === 'Voting Rights' &&
+      CONSTITUTIONAL_RATIFICATION_KEYWORDS.has(keyword) &&
+      !regex.test(title)
+    ) {
+      continue;
     }
+    hitsByTopic.set(topic, (hitsByTopic.get(topic) ?? 0) + 1);
   }
 
   const scores = Array.from(hitsByTopic, ([topic, hits]) => ({ topic, hits }));
@@ -207,8 +290,16 @@ export function classifyTopics(title: string, description: string): string[] {
   // Sort by number of keyword hits descending
   scores.sort((a, b) => b.hits - a.hits);
 
-  // Return top matches (at least 1 hit), max 4 topics
+  // Return top matches (at least 1 hit), max 4 topics.
+  // Constitutional amendments always carry the structural tag on top of the
+  // subject matter (so a follower of "Constitutional Amendments" catches every
+  // proposed amendment regardless of what it amends), and the tag counts
+  // toward the cap.
   const matched = scores.slice(0, 4).map(s => s.topic);
+  if (isConstAmend && !matched.includes(CONSTITUTIONAL_AMENDMENTS)) {
+    if (matched.length >= 4) matched.pop();
+    matched.unshift(CONSTITUTIONAL_AMENDMENTS);
+  }
 
   return matched;
 }

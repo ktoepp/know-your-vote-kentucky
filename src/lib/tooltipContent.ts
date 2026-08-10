@@ -282,7 +282,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   senate: {
     category: 'legislative_bodies_and_people',
     title: "Kentucky Senate",
-    content: "One of the two chambers of the Kentucky General Assembly. It has 38 members, each representing a district across the state. Senators serve 4-year terms, with roughly half up for election every two years."
+    content: "One of the two chambers of the Kentucky General Assembly. It has 38 members, each representing a district across the state. Senators serve 4-year terms, staggered in two classes: odd-numbered districts elect in presidential-election years, even-numbered districts elect in midterm years."
   },
 
   committee: {
@@ -637,7 +637,7 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
   topic_labor: {
     category: 'subject_topics',
     title: "Labor",
-    content: "Wages, workplace safety, unemployment insurance, workers' compensation, collective bargaining, and employment standards."
+    content: "Wages, workplace safety, unemployment insurance, workers' compensation, and employment standards."
   },
   topic_housing: {
     category: 'subject_topics',
@@ -708,6 +708,11 @@ export const voteCountTooltips: Record<string, TooltipContent> = {
     category: 'subject_topics',
     title: "Gambling",
     content: "Horse racing, charitable gaming, lottery, sports betting, and historical horse racing (HHR) machines."
+  },
+  topic_constitutional_amendments: {
+    category: 'subject_topics',
+    title: "Constitutional Amendments",
+    content: "Bills proposing to amend the Kentucky Constitution. Any change requires 60% of the members elected to each chamber (Ky. Const. § 256) and then ratification by voters at the next general election."
   },
 };
 

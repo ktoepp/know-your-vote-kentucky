@@ -208,6 +208,10 @@ const TOPIC_TO_SUBJECT_PATTERNS: Record<KYTopicTag, SubjectPattern[]> = {
     /railroad|railway/i,
     /\btraffic\b/i,
   ],
+  // LegiScan tags every KY constitutional-amendment bill with the "Constitution,
+  // Ky." subject, so a subject-based follower catches proposed amendments even
+  // if the title-shape detector (isConstitutionalAmendment) ever misses.
+  'Constitutional Amendments': [/^constitution,\s*ky\./i],
   // No LegiScan subject bridges to this tag — ceremonial resolutions are detected
   // by title shape (ky-topic-classifier.isCeremonialResolution), and LegiScan does
   // not subject-code honor/memorial resolutions. Intentionally empty.
