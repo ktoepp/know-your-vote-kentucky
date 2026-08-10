@@ -404,10 +404,7 @@ export async function upsertLrcCalendarMeetings(
       }
     }
 
-    await db.from('ky_committee_agenda_items').delete().eq('meeting_id', meetingRecord.id);
-
     const agendaRows = deriveAgendaItems(meeting).map((d) => ({
-      meeting_id: meetingRecord.id,
       sort_order: d.sort_order,
       raw_text: d.raw_text,
       item_kind: d.item_kind,
@@ -417,18 +414,19 @@ export async function upsertLrcCalendarMeetings(
       depth: d.depth,
     }));
 
-    if (agendaRows.length > 0) {
-      const { error: aErr } = await db.from('ky_committee_agenda_items').insert(agendaRows);
-      if (aErr) {
-        // The delete above already ran, so a failed insert leaves the meeting
-        // with zero agenda rows *and* a valid content hash — silently empty on
-        // the committee page. Count it so the run reports `error` to
-        // ky_sources instead of `success`.
-        errors++;
-        logError(`Agenda insert failed (meeting ${meetingRecord.id}): ${aErr.message}`);
-      } else {
-        agendaSynced += agendaRows.length;
-      }
+    // Delete + insert in one Postgres transaction (migration 050). A failed
+    // insert used to leave a valid `agenda_content_hash` over zero agenda rows
+    // — silently empty on the committee page. The RPC rolls the delete back
+    // when the insert throws, preserving the previous agenda.
+    const { data: insertedCount, error: aErr } = await db.rpc(
+      'ky_replace_committee_agenda_items',
+      { p_meeting_id: meetingRecord.id, p_rows: agendaRows },
+    );
+    if (aErr) {
+      errors++;
+      logError(`Agenda replace failed (meeting ${meetingRecord.id}): ${aErr.message}`);
+    } else {
+      agendaSynced += (insertedCount as number | null) ?? 0;
     }
 
     const agendaUnchanged = priorMeeting?.agenda_content_hash === contentHash;
