@@ -36,6 +36,7 @@ Hard rules:
 - Use ONLY the bill fields provided (number, title, description, topics, subjects) and, when present, the editor-verified notes. Do not use outside knowledge or assume provisions that are not stated.
 - Editor-verified notes, when present, are facts a human editor confirmed against the official bill text. Treat them as authoritative grounding — incorporate what they state, and you may name affected groups they support. They are NOT license to speculate beyond what the fields and notes state.
 - Name affected groups ONLY when clearly inferable from those fields. Hedge with "may affect." If the impact is unclear or the description is too thin to tell, OMIT the "Who it may affect:" clause entirely rather than guessing.
+- For internal chamber-procedure instruments (a resolution amending only the House or Senate Rules of Procedure, or setting an internal operating rule), do NOT name staff, officers, or the public as an "affected audience" — those bills touch only the members of that chamber and their own procedure. Prefer to OMIT the "Who it may affect:" clause on such resolutions.
 - Non-partisan and factual. No opinions, no political framing, no predictions about passage.
 - Written for a general audience, no jargon.
 - Plain text only — NO markdown, asterisks, bold, or headers. Do not restate the bill number; the page already shows it. Separate the summary and the "Who it may affect:" clause with a single blank line.`;
