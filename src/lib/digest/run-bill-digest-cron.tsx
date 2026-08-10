@@ -467,12 +467,19 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           chamber: bill.chamber,
           session: bill.session,
         } as KYBill);
+        // The first event line (chronologically newest — evs is ordered desc by
+        // observed_at where the group is built) is the specific milestone that
+        // triggered this digest entry — feed it to the meter as the caption so
+        // it reads e.g. "Sent to Governor (Apr 3)" instead of just "Passed Senate".
+        const specificMilestone = lines[0]?.detail?.trim() || undefined;
         progress = {
           stageLabels: p.stages.map((s) => s.label),
+          shortStageLabels: p.stages.map((s) => s.shortLabel),
           reachedIndex: p.reachedIndex,
           // The email meter only distinguishes vetoed vs stopped; an adjourned-sine-die
           // bill renders like any other stopped bill.
           terminal: p.terminal === 'adjourned' ? 'failed' : p.terminal,
+          specificMilestone,
         };
       }
       const group: BillDigestGroup = {

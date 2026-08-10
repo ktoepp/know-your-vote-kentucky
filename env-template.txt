@@ -146,6 +146,13 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 #   SENTRY_PROJECT=know-your-vote-kentucky
 #
 # Or set these directly in Vercel → Project → Environment Variables (Build step only).
+#
+# Sentry-to-Slack bridge (POST /api/webhooks/sentry). Free-plan workaround for
+# Sentry's paid Slack integration: set up a Sentry Internal Integration with
+# webhook URL https://<host>/api/webhooks/sentry, "Alert Rule Action" enabled,
+# and paste its Client Secret here. The route posts formatted alerts to
+# SLACK_WEBHOOK_ERRORS.
+# SENTRY_WEBHOOK_SECRET=<Sentry Internal Integration client secret>
 
 # =============================================================================
 # OPTIONAL — PostHog (product analytics)
