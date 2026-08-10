@@ -1237,7 +1237,8 @@ function legiscanSessionPeopleMatchingLegislatorName(
   },
 ): LegiScanSessionPerson[] {
   if (leg.chamber !== 'house' && leg.chamber !== 'senate') return [];
-  const districtNorm = (leg.district || '').trim();
+  const districtNorm =
+    normalizeKyLegislatorDistrictForDb(leg.chamber, leg.district) || (leg.district || '').trim();
   if (!districtNorm) return [];
 
   const legName = normalizeSponsorNameForMatch(
@@ -1293,7 +1294,7 @@ async function reconcileKyLegislatorLegiscanIdsFromLatestSession(
     legiscan_id: number | null;
   }>) {
     if (leg.chamber !== 'house' && leg.chamber !== 'senate') continue;
-    const districtNorm = (leg.district || '').trim();
+    const districtNorm = normalizeKyLegislatorDistrictForDb(leg.chamber, leg.district) || (leg.district || '').trim();
     if (!districtNorm) continue;
 
     const legName = normalizeSponsorNameForMatch(
@@ -1301,7 +1302,7 @@ async function reconcileKyLegislatorLegiscanIdsFromLatestSession(
     );
     if (!legName) continue;
 
-    let matches = legiscanSessionPeopleMatchingLegislatorName(people, leg);
+    let matches = legiscanSessionPeopleMatchingLegislatorName(people, { ...leg, district: districtNorm });
     // Preferred vs legal names (e.g. Sarge/Michael Pollock, Max/George Wise) — unique seat is enough.
     if (matches.length !== 1) {
       const seatMatches = legiscanSessionPeopleAtSeat(people, leg.chamber, districtNorm);
@@ -1568,11 +1569,14 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
     // rows are predecessors or alias dupes (e.g. "Matthew Lehman" alongside
     // the canonical "Matt Lehman" with openstates_id). Conservative: only
     // deactivate at seats Open States covers; never at seats it doesn't.
+    // Normalize both sides through normalizeKyLegislatorDistrictForDb so
+    // legacy 3-digit senate strings (SD-001) match current 2-digit (SD-01).
     {
       const activeSeats = new Set<string>();
       for (const r of rows) {
         if (!r.openstates_id || !r.chamber || !r.district) continue;
-        activeSeats.add(`${r.chamber}|${r.district}`);
+        const norm = normalizeKyLegislatorDistrictForDb(r.chamber as 'house' | 'senate', r.district);
+        if (norm) activeSeats.add(`${r.chamber}|${norm}`);
       }
       if (activeSeats.size > 0) {
         const { data: legacyRows, error: legacyErr } = await db
@@ -1584,9 +1588,11 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
           logError(source, `Could not read LegiScan-only rows for cleanup: ${legacyErr.message}`);
         } else {
           const stale = (legacyRows || []).filter((r) => {
-            const ch = r.chamber as string | null;
+            const ch = r.chamber as 'house' | 'senate' | null;
             const d = r.district as string | null;
-            return Boolean(ch && d && activeSeats.has(`${ch}|${d}`));
+            if (!ch || !d) return false;
+            const norm = normalizeKyLegislatorDistrictForDb(ch, d);
+            return Boolean(norm && activeSeats.has(`${ch}|${norm}`));
           });
           const CHUNK = 100;
           for (let i = 0; i < stale.length; i += CHUNK) {
