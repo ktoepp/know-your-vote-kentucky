@@ -398,6 +398,51 @@ function isTransientLegiscanNetworkError(err: unknown): boolean {
 }
 
 /**
+ * True when `err` came from the Open States v3 client and looks like an upstream
+ * outage (HTTP 5xx / 429 / timeout) rather than a bug on our side. The client
+ * wraps the axios error into `Error("OpenStates API <status>: <body>. …")` so
+ * the original `response.status` / `code` are lost — detection has to work off
+ * the message text. Matches the accuracy-audit's `isTransientUpstreamError`
+ * shape (types.ts) so both surfaces classify the same 502 consistently.
+ */
+function isTransientOpenStatesError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message || '';
+  if (/openstates api\s+(?:429|5\d\d)\b/i.test(msg)) return true;
+  if (/openstates api\s+error\b/i.test(msg)) return true;
+  return /\b(?:timeout|timed?\s*out|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN)\b/i.test(
+    msg,
+  );
+}
+
+/**
+ * Mid-run handler for a transient Open States outage on the legislators sync.
+ * Mirrors {@link legiscanUnreachableSkipResult}: the OpenStates /people endpoint
+ * intermittently returns 502/503/504 from nginx (upstream we cannot fix), and
+ * recording `status='error'` on `ky_sources` red-pages source-health for a
+ * next-run-self-heal condition. Write `success` with the skip reason as a note
+ * (keeps last_sync_at fresh so the freshness check stays green) and return
+ * `skipped`. A persistent outage still surfaces: last_sync_at keeps advancing
+ * but items_synced stays 0, and the source's `maxZeroYieldHours` budget in
+ * source-health catches it — same policy as decisions.md § 2026-07-22.
+ */
+async function openStatesUnreachableSkipResult(
+  source: string,
+  err: unknown,
+  start: number,
+  options: SyncOptions,
+): Promise<SyncResult | null> {
+  if (!isTransientOpenStatesError(err)) return null;
+  const msg = err instanceof Error ? err.message : String(err);
+  const reason = `Open States unreachable (transient): ${msg}`;
+  log(source, `Skipped — ${reason}`);
+  if (!options.dryRun) {
+    await updateSourceStatus(source, 'success', 0, reason);
+  }
+  return { source, status: 'skipped', itemsSynced: 0, error: reason, duration: Date.now() - start };
+}
+
+/**
  * Mid-run handler for a transient LegiScan outage (timeout / network / gateway).
  * Mirrors {@link quotaHoldSkipResult}: an idle every-6h hash-gated sync shouldn't
  * red the workflow and page #errors when LegiScan is briefly unreachable — the
@@ -1577,6 +1622,8 @@ export async function syncKyLegislators(options: SyncOptions = {}): Promise<Sync
     await updateSourceStatus(source, 'success', synced);
     return { source, status: 'success', itemsSynced: synced, duration: Date.now() - start };
   } catch (err: any) {
+    const skipped = await openStatesUnreachableSkipResult(source, err, start, options);
+    if (skipped) return skipped;
     logError(source, err.message);
     await updateSourceStatus(source, 'error', 0, err.message);
     return { source, status: 'error', itemsSynced: 0, error: err.message, duration: Date.now() - start };
