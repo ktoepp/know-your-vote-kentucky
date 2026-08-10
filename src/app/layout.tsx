@@ -15,6 +15,7 @@ const instrumentSans = Instrument_Sans({
 });
 import Navigation from "./components/Navigation";
 import SiteFooter from "./components/SiteFooter";
+import TopProgressBar from "./components/TopProgressBar";
 import { TooltipProvider } from '@/lib/TooltipContext';
 import { UserProvider } from "./lib/UserContext";
 import { publicSiteOrigin } from '@/lib/site-canonical';
@@ -110,6 +111,9 @@ export default function RootLayout({
       </head>
       <body className="flex min-h-screen flex-col" suppressHydrationWarning>
         <a href="#main-content" className="skip-link">Skip to main content</a>
+        <Suspense fallback={null}>
+          <TopProgressBar />
+        </Suspense>
         <Suspense fallback={null}>
           <PostHogPageviewTracker />
         </Suspense>
