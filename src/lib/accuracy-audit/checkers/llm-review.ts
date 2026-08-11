@@ -13,6 +13,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { governmentTooltips, voteCountTooltips } from '../../tooltipContent';
 import { makeRng, sampleTable, seededShuffle } from '../sampling';
 import {
+  classifyCheckerError,
+  errorMessage,
+  outageResult,
   summarizeResult,
   type AuditConfig,
   type CheckerResult,
@@ -278,26 +281,40 @@ export async function checkLlm(db: SupabaseClient, cfg: AuditConfig): Promise<Ch
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   let checked = 0;
+  let upstreamFailures = 0;
+  let firstAnthropicError: unknown = null;
 
-  for (const pass of [reviewSummaries, reviewTopics] as const) {
+  // Each pass wrapped in the same catch shape so an Anthropic outage on any one
+  // of them counts uniformly and the fully-out case escalates to `outage`
+  // instead of leaving three "review pass failed" warns that read as drift.
+  const runPass = async (name: string, invoke: () => Promise<number>): Promise<void> => {
     try {
-      checked += await pass(db, cfg, client, findings);
+      checked += await invoke();
     } catch (e) {
+      const transient = classifyCheckerError(e) === 'upstream_outage';
+      if (transient) {
+        upstreamFailures += 1;
+        if (!firstAnthropicError) firstAnthropicError = e;
+      }
       findings.push({
-        severity: 'warn',
+        severity: transient ? 'warn' : 'fail',
         domain: 'llm',
-        message: `LLM review pass failed: ${e instanceof Error ? e.message : String(e)}`,
+        message: `${name} failed: ${errorMessage(e)}`,
       });
     }
-  }
+  };
 
-  try {
-    checked += await reviewGlossary(cfg, client, findings);
-  } catch (e) {
-    findings.push({
-      severity: 'warn',
-      domain: 'llm',
-      message: `glossary review failed: ${e instanceof Error ? e.message : String(e)}`,
+  const PASS_COUNT = 3;
+  await runPass('summary review', () => reviewSummaries(db, cfg, client, findings));
+  await runPass('topics review', () => reviewTopics(db, cfg, client, findings));
+  await runPass('glossary review', () => reviewGlossary(cfg, client, findings));
+
+  // Full Anthropic outage: every pass hit an upstream error and nothing was
+  // reviewed. Escalate as an outage rather than surface three identical warn
+  // findings that read like content drift.
+  if (checked === 0 && upstreamFailures >= PASS_COUNT) {
+    return outageResult('llm', 'Anthropic', firstAnthropicError ?? new Error('Anthropic unavailable'), started, {
+      findings,
     });
   }
 
@@ -308,5 +325,5 @@ export async function checkLlm(db: SupabaseClient, cfg: AuditConfig): Promise<Ch
     });
   }
 
-  return summarizeResult('llm', checked, findings, started);
+  return summarizeResult('llm', checked, findings, started, { upstreamFailures });
 }

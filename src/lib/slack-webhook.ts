@@ -523,7 +523,7 @@ export async function notifySyncExceptionSlack(params: {
 
 export async function notifyHealthCheckFailureSlack(details: string): Promise<void> {
   const clipped = details.length > 2000 ? `${details.slice(0, 2000)}…` : details;
-  await postToAlertsAndSupport(`*KY Vote health check failed*\n${clipped}`);
+  await postToAlertsAndSupport(`*KY Vote — health check failed*\n${clipped}`);
 }
 
 /**
@@ -553,7 +553,9 @@ export async function notifyTriageSlack(details: string): Promise<boolean> {
 
 export async function notifySourceHealthSlack(details: string): Promise<boolean> {
   const clipped = details.length > 2000 ? `${details.slice(0, 2000)}…` : details;
-  return postToAlertsAndSupport(`*KY Vote sync sources degraded*\n${clipped}`);
+  // Header wording is uniform across the accuracy-checker family
+  // ("KY Vote — <thing>") so a scanner can spot the source at a glance.
+  return postToAlertsAndSupport(`*KY Vote — sync sources degraded*\n${clipped}`);
 }
 
 /** Mask an email for an ops channel: keep first 2 chars of the local part + domain. */

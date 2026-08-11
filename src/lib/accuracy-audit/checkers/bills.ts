@@ -16,8 +16,10 @@ import { mapLegiScanBillStatus } from '../../map-legiscan-bill-status';
 import { sampleTableSplit } from '../sampling';
 import {
   diffFinding,
+  errorMessage,
   norm,
   summarizeResult,
+  terminalResultFrom,
   type AuditConfig,
   type CheckerResult,
   type Finding,
@@ -166,9 +168,9 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
       (r) => r.id,
     );
   } catch (e) {
-    return summarizeResult('bills', 0, findings, started, {
-      error: e instanceof Error ? e.message : String(e),
-    });
+    // The sample query is against our own DB; a failure here is a crash, not an
+    // upstream outage. Classify anyway so a transient PostgREST 5xx doesn't red-page.
+    return terminalResultFrom('bills', 'Supabase', e, started, { crashPrefix: 'sample query failed' });
   }
 
   if (rows.length === 0) {
@@ -193,7 +195,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
         severity: 'warn',
         domain: 'bills',
         entity: row.bill_number,
-        message: `LegiScan fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+        message: `LegiScan fetch failed: ${errorMessage(e)}`,
       });
       upstreamFailures += 1;
       continue;
