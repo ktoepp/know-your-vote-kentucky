@@ -21,15 +21,58 @@ import type { Finding } from './types';
  * Deliberately excludes `expected` / `actual`: a status that drifts from one
  * wrong value to another is still the same open issue, and including the values
  * would make every re-drift look new.
+ *
+ * Includes `session` so that HB100 in 2024 and HB100 in 2026 — the same human
+ * label pointing at different bills — do not collide in the recurrence map.
+ * Findings without a session (legislators, committees, materials, votes, glossary
+ * items) hash on an empty session component, so their fingerprints are stable
+ * both before and after this field was introduced.
  */
 export function findingFingerprint(f: Finding): string {
-  const payload = [f.domain, f.entity ?? '', f.field ?? '', f.message].join('|');
+  const payload = [f.domain, f.entity ?? '', f.field ?? '', f.message, f.session ?? ''].join('|');
   return createHash('sha256').update(payload).digest('hex').slice(0, 32);
 }
 
 export interface RecurrenceInfo {
   /** Fingerprints seen in an earlier run, mapped to their first-seen timestamp. */
   firstSeenByFingerprint: Map<string, string>;
+}
+
+/**
+ * Fingerprints an operator has explicitly accepted as noise. Populated from
+ * `ky_accuracy_dismissed_findings` (migration 052). Returns an empty set if
+ * the table doesn't exist yet — the audit degrades to reporting everything,
+ * which is the correct behavior when dismissals aren't configured.
+ */
+export async function fetchDismissedFingerprints(db: SupabaseClient): Promise<Set<string>> {
+  const out = new Set<string>();
+  try {
+    const { data, error } = await db
+      .from('ky_accuracy_dismissed_findings')
+      .select('fingerprint, expires_at');
+    if (error) {
+      const msg = String(error.message || '').toLowerCase();
+      // Migration not yet applied → treat as "no dismissals configured".
+      if (msg.includes('ky_accuracy_dismissed_findings') || msg.includes('does not exist')) {
+        return out;
+      }
+      throw new Error(error.message);
+    }
+    const now = Date.now();
+    for (const row of (data ?? []) as Array<{ fingerprint: string; expires_at: string | null }>) {
+      const exp = row.expires_at ? Date.parse(row.expires_at) : null;
+      if (exp != null && Number.isFinite(exp) && exp <= now) continue;
+      out.add(row.fingerprint);
+    }
+  } catch (e) {
+    // Never let dismissal lookup fail the audit — worst case we report a known
+    // noise finding this run, which is the pre-dismissal behavior.
+    console.error(
+      '[accuracy-audit] dismissed-findings lookup failed:',
+      e instanceof Error ? e.message : e,
+    );
+  }
+  return out;
 }
 
 /**
