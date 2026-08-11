@@ -8,6 +8,49 @@
  */
 import type { CheckerResult, Finding, Severity } from './types';
 
+/**
+ * Drop findings whose fingerprint has been dismissed. Re-derives per-domain
+ * counts (warnings/failures/passed) from the remaining findings so the report
+ * layer never accidentally re-surfaces a dismissed row via a stale count.
+ *
+ * Kept out of the individual checkers by design: dismissal is an operator
+ * decision about noise, not a signal the checker itself should be aware of.
+ * Applied once at the aggregation boundary in the orchestrator.
+ */
+export function applyDismissals(
+  results: CheckerResult[],
+  dismissed: Set<string>,
+  fingerprintOf: (f: Finding) => string,
+): { results: CheckerResult[]; dismissedCount: number } {
+  if (dismissed.size === 0) return { results, dismissedCount: 0 };
+  let dismissedCount = 0;
+  const out = results.map((r) => {
+    const kept: Finding[] = [];
+    for (const f of r.findings) {
+      if (dismissed.has(fingerprintOf(f))) {
+        dismissedCount += 1;
+        continue;
+      }
+      kept.push(f);
+    }
+    if (kept.length === r.findings.length) return r;
+    const failures = kept.filter((f) => f.severity === 'fail').length;
+    const warnings = kept.filter((f) => f.severity === 'warn').length;
+    // Passed is checked minus distinct flagged entities in the filtered set,
+    // symmetric with summarizeResult so counts stay honest after filtering.
+    const flagged = new Set<string>();
+    let anon = 0;
+    for (const f of kept) {
+      if (f.severity === 'info') continue;
+      if (f.entity) flagged.add(f.entity);
+      else anon += 1;
+    }
+    const passed = Math.max(0, r.checked - flagged.size - anon);
+    return { ...r, findings: kept, failures, warnings, passed };
+  });
+  return { results: out, dismissedCount };
+}
+
 export interface AuditSummary {
   results: CheckerResult[];
   checked: number;
@@ -133,18 +176,23 @@ function domainStatusLine(r: CheckerResult): string {
   return `• ${r.domain}: ${parts.join(', ')}`;
 }
 
-function findingLine(f: Finding): string {
+function findingLine(f: Finding, fingerprint?: string): string {
   const mark = f.severity === 'fail' ? 'FAIL' : f.severity === 'warn' ? 'WARN' : 'INFO';
   const where = [f.entity, f.field].filter(Boolean).join(' · ');
   const detail =
     f.expected != null || f.actual != null
       ? ` (expected: ${f.expected ?? '∅'} | stored: ${f.actual ?? '∅'})`
       : '';
-  return `[${mark}] ${where ? `${where}: ` : ''}${f.message}${detail}`;
+  // Fingerprint suffix — copy/paste into `npm run audit:dismiss add <fp> --reason=…`.
+  const fp = fingerprint ? `  [fp=${fingerprint}]` : '';
+  return `[${mark}] ${where ? `${where}: ` : ''}${f.message}${detail}${fp}`;
 }
 
 /** Human-readable console report (full findings). */
-export function formatConsoleReport(summary: AuditSummary): string {
+export function formatConsoleReport(
+  summary: AuditSummary,
+  opts: { fingerprintOf?: (f: Finding) => string } = {},
+): string {
   const lines: string[] = [];
   lines.push('KYVKY content accuracy audit');
   lines.push(
@@ -155,7 +203,7 @@ export function formatConsoleReport(summary: AuditSummary): string {
   for (const r of summary.results) {
     lines.push(domainStatusLine(r));
     for (const f of r.findings) {
-      lines.push(`    ${findingLine(f)}`);
+      lines.push(`    ${findingLine(f, opts.fingerprintOf?.(f))}`);
     }
   }
   return lines.join('\n');

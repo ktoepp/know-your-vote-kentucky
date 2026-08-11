@@ -23,6 +23,16 @@ export interface Finding {
   /** Value currently stored in Supabase. */
   actual?: string;
   url?: string;
+  /**
+   * Legislative session key, e.g. `"2026RS"`. Included in the fingerprint so
+   * `HB100 / 2024` and `HB100 / 2026` — the same human label pointing at
+   * different bills — are treated as distinct findings for recurrence. Left
+   * off the rendered digest label so the display stays scannable. Only bills
+   * checkers populate this today; other domains have globally-unique entity
+   * keys already (roll_call_id, legislator id, committee slug) so they don't
+   * collide across sessions.
+   */
+  session?: string;
 }
 
 export interface CheckerResult {
@@ -241,6 +251,7 @@ export function diffFinding(
   expected: string | null | undefined,
   actual: string | null | undefined,
   url?: string,
+  session?: string | null,
 ): Finding {
   const clip = (s: string | null | undefined) => {
     const t = (s ?? '').toString();
@@ -255,6 +266,7 @@ export function diffFinding(
     expected: clip(expected),
     actual: clip(actual),
     url,
+    ...(session ? { session } : {}),
   };
 }
 

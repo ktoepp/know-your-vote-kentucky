@@ -47,15 +47,21 @@ import { checkCommittees } from '../src/lib/accuracy-audit/checkers/committees';
 import { checkMaterials } from '../src/lib/accuracy-audit/checkers/materials';
 import { checkLlm } from '../src/lib/accuracy-audit/checkers/llm-review';
 import {
+  applyDismissals,
   formatConsoleReport,
   formatSlackReport,
   summarizeAudit,
 } from '../src/lib/accuracy-audit/report';
 import {
+  fetchDismissedFingerprints,
   fetchRecurrence,
   findingFingerprint,
   recordAuditRun,
 } from '../src/lib/accuracy-audit/history';
+import {
+  finalizeRotation,
+  pendingRotationScopes,
+} from '../src/lib/accuracy-audit/sampling';
 import { markSlackErrorNotified, notifyAccuracyAuditSlack } from '../src/lib/slack-webhook';
 
 function parseArgs(argv: string[]): {
@@ -207,10 +213,11 @@ async function main() {
     }
 
     const checker = CHECKERS[domain];
+    let result: CheckerResult;
     try {
-      results.push(await runWithDeadline(domain, () => checker(db, cfg)));
+      result = await runWithDeadline(domain, () => checker(db, cfg));
     } catch (e) {
-      results.push({
+      result = {
         domain,
         checked: 0,
         passed: 0,
@@ -219,11 +226,46 @@ async function main() {
         findings: [],
         durationMs: 0,
         error: e instanceof Error ? e.message : String(e),
-      });
+      };
+    }
+    results.push(result);
+
+    // Rotation stamps buffered by sampling.ts (`stamp: 'defer'`) commit only
+    // when the checker actually verified its sample. An outage / crash / skip
+    // discards them, so those rows keep their old `last_audited_at` and rise
+    // back to the top of the rotation next run. Scopes not belonging to this
+    // domain are left alone — a later domain will finalize them.
+    const succeeded = !result.error && !result.outage && !result.skipped;
+    for (const scope of pendingRotationScopes()) {
+      if (scope !== domain) continue;
+      try {
+        await finalizeRotation(db, scope, succeeded ? 'commit' : 'discard');
+      } catch (e) {
+        // Best-effort: never let rotation bookkeeping fail the run.
+        console.error(
+          `[accuracy-audit] rotation finalize failed for ${scope}:`,
+          e instanceof Error ? e.message : e,
+        );
+      }
     }
   }
 
-  const summary = summarizeAudit(results, startedAtMs, cfg.seed);
+  // Apply operator-accepted dismissals BEFORE summarizeAudit so counts, header
+  // state, and every downstream consumer (report, history write, triage) see
+  // the same filtered view. Silent degrade when the table doesn't exist yet.
+  const dismissed = await fetchDismissedFingerprints(db);
+  const { results: filteredResults, dismissedCount } = applyDismissals(
+    results,
+    dismissed,
+    findingFingerprint,
+  );
+  if (dismissedCount > 0) {
+    console.log(
+      `[accuracy-audit] suppressed ${dismissedCount} finding(s) matching ${dismissed.size} dismissed fingerprint(s)`,
+    );
+  }
+
+  const summary = summarizeAudit(filteredResults, startedAtMs, cfg.seed);
 
   // Recurrence must be read *before* this run's findings are written, or every
   // finding would look like it had been seen before (by itself).
@@ -253,7 +295,9 @@ async function main() {
   if (args.json) {
     console.log(JSON.stringify(summary, null, 2));
   } else {
-    console.log(formatConsoleReport(summary));
+    // Threaded fingerprintOf so console output includes the fingerprint an
+    // operator would copy into `npm run audit:dismiss add <fp> --reason=…`.
+    console.log(formatConsoleReport(summary, { fingerprintOf: findingFingerprint }));
     if (summary.hasHardFailures && !hasOperationalError) {
       console.log('\n(content findings reported to Slack; not failing the run)');
     }
