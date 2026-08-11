@@ -81,6 +81,15 @@ export interface CheckerResult {
   underCoverage?: boolean;
   /** Floor consulted for {@link underCoverage}. Rendered on the status line. */
   coverageFloor?: number;
+  /**
+   * Optional per-pass split of `checked` when the checker examines things in
+   * different units (materials examines committee pages AND link targets).
+   * The sum still lives in `checked` — pass-rate math and the outage ratio
+   * both depend on it — but the digest renders the breakdown instead of a
+   * single uninterpretable total, so a reader can tell how many committees
+   * vs how many links were examined.
+   */
+  checkedBreakdown?: Array<{ label: string; count: number }>;
 }
 
 export interface AuditConfig {
@@ -357,7 +366,13 @@ export function summarizeResult(
   extra: Partial<
     Pick<
       CheckerResult,
-      'skipped' | 'skipReason' | 'error' | 'outage' | 'outageSource' | 'upstreamFailures'
+      | 'skipped'
+      | 'skipReason'
+      | 'error'
+      | 'outage'
+      | 'outageSource'
+      | 'upstreamFailures'
+      | 'checkedBreakdown'
     >
   > = {},
 ): CheckerResult {
