@@ -19,8 +19,15 @@
  *           ACCURACY_LLM_SAMPLE, ACCURACY_SKIP_LLM, ACCURACY_LLM_MODEL,
  *           ACCURACY_LEGISCAN_QUOTA_STOP_PCT, ACCURACY_DOMAIN_TIMEOUT_MS.
  *
- * Exit: 0 for clean runs, content findings, AND expected skips (e.g. a LegiScan
- *       quota stop); 1 only when a checker crashes (an operational error).
+ * Exit: 0 for clean runs, content findings, expected skips (a LegiScan quota
+ *       stop), and upstream outages (LegiScan/Open States/LRC/Anthropic
+ *       unavailable — visible in the digest, but not our bug to page on).
+ *       Exit 1 ONLY when a checker crashes on something we can act on: a bug on
+ *       our side, or a source of truth returning something we cannot parse.
+ *
+ * Uniform error taxonomy: every checker routes caught errors through
+ * `types.ts` — `classifyCheckerError` / `outageResult` / `crashResult` — so the
+ * outage-vs-crash boundary is enforced once, not re-derived per checker.
  */
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
@@ -229,13 +236,14 @@ async function main() {
     firstSeenByFingerprint.get(findingFingerprint(f)) ?? null;
 
   // Operational problems — a checker actually *crashed* — fail the job and page
-  // #errors. A LegiScan quota stop is NOT an operational error: it is an expected,
-  // self-protective skip (the same reclassification applied to the sync pipeline,
-  // see decisions.md § 2026-06-27). It already surfaces as a `skipped` domain line
-  // in the status digest, so it needs no escalation — during interim, quota sits
-  // high every week and this otherwise red-paged #errors every Sunday for nothing.
-  // Content findings — even deterministic `fail`s — are reported to the status
-  // digest but do NOT fail CI either (see decisions.md).
+  // #errors. Everything else exits 0 and reports to the status digest only:
+  //   - LegiScan quota stop: expected, self-protective skip
+  //     (decisions.md § 2026-06-27).
+  //   - Upstream outage (LegiScan/Open States/LRC/Anthropic 5xx / timeout):
+  //     visible outage banner in the digest, not our bug to page on. Paging on
+  //     upstream hiccups trained us to skim past #errors.
+  //   - Content findings (even deterministic `fail`s): reported, do not fail CI
+  //     (decisions.md § 2026-06-03).
   const hasOperationalError = summary.hasOperationalError;
 
   if (!cfg.dryRun) {

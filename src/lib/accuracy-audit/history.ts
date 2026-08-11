@@ -88,6 +88,11 @@ export async function recordAuditRun(
         skipped: r.skipped ?? false,
         skipReason: r.skipReason ?? null,
         error: r.error ?? null,
+        // Outage state — triage-findings.ts reads these back so the LLM triage
+        // can distinguish "the source went down" from "the content is wrong".
+        outage: r.outage ?? false,
+        outageSource: r.outageSource ?? null,
+        upstreamFailures: r.upstreamFailures ?? 0,
       };
     }
 

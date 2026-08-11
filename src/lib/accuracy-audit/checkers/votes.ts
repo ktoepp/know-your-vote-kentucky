@@ -15,7 +15,9 @@ import {
 import { sampleTable } from '../sampling';
 import {
   diffFinding,
+  errorMessage,
   summarizeResult,
+  terminalResultFrom,
   type AuditConfig,
   type CheckerResult,
   type Finding,
@@ -61,9 +63,7 @@ export async function checkVotes(db: SupabaseClient, cfg: AuditConfig): Promise<
       filter: (q) => q.not('roll_call_id', 'is', null),
     });
   } catch (e) {
-    return summarizeResult('votes', 0, findings, started, {
-      error: e instanceof Error ? e.message : String(e),
-    });
+    return terminalResultFrom('votes', 'Supabase', e, started, { crashPrefix: 'sample query failed' });
   }
 
   if (rows.length === 0) {
@@ -98,7 +98,7 @@ export async function checkVotes(db: SupabaseClient, cfg: AuditConfig): Promise<
         severity: 'warn',
         domain: 'votes',
         entity: label,
-        message: `LegiScan getRollCall failed: ${e instanceof Error ? e.message : String(e)}`,
+        message: `LegiScan getRollCall failed: ${errorMessage(e)}`,
       });
       upstreamFailures += 1;
       continue;

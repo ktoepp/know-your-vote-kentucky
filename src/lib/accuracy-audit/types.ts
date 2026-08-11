@@ -37,15 +37,28 @@ export interface CheckerResult {
   /** True when the checker had nothing to do (e.g. no recent rows, missing key). */
   skipped?: boolean;
   skipReason?: string;
-  /** Checker-level crash; treated as a hard failure by the orchestrator. */
+  /**
+   * Checker-level crash — a bug on our side, or a source of truth returning
+   * something we cannot parse. Fails CI and escalates to #errors.
+   */
   error?: string;
+  /**
+   * Whole-checker upstream outage — the source of truth (LegiScan, Open States,
+   * LRC, Anthropic) was unreachable for this run. Reported visibly in the digest
+   * but does NOT fail CI: an outage we cannot control should not turn a green
+   * check red every time the upstream hiccups. Distinct from {@link error}
+   * (our bug) and {@link skipped} (nothing to do).
+   */
+  outage?: boolean;
+  /** Which upstream was out — displayed in the digest so operators know what to check. */
+  outageSource?: string;
   /**
    * Items whose upstream fetch failed outright (network, 5xx, quota mid-run).
    *
-   * These degrade to per-item `warn` findings, which meant a *total* upstream
-   * outage was indistinguishable from mild content drift: 40 warnings, `checked`
-   * of 0, exit 0, and a Slack header reading "warnings". Counting them lets the
-   * orchestrator escalate when a domain mostly failed to reach its source.
+   * Used by checkers that fan out many small fetches (bills, votes): a single
+   * hiccup shows as one `warn` and one `upstreamFailures++`; a total outage
+   * pushes the ratio past {@link UPSTREAM_OUTAGE_RATIO} and the report layer
+   * escalates the domain to `outage` instead of surfacing it as drift.
    */
   upstreamFailures?: number;
 }
@@ -245,13 +258,43 @@ export function diffFinding(
   };
 }
 
+/**
+ * Terminal disposition of a caught error.
+ *
+ * `upstream_outage` — a 5xx / 429 / gateway timeout / network failure on a
+ * source of truth we cannot control. Reported as `outage`, exits 0.
+ * `crash` — anything else (auth 4xx, schema drift, our own bug). Reported as
+ * `error`, exits 1, pages #errors.
+ *
+ * Every checker's catch block routes through this so the outage-vs-drift
+ * boundary is enforced in one place instead of five ad-hoc paths.
+ */
+export type CheckerErrorKind = 'upstream_outage' | 'crash';
+
+export function classifyCheckerError(e: unknown): CheckerErrorKind {
+  return isTransientUpstreamError(e) ? 'upstream_outage' : 'crash';
+}
+
+/**
+ * Message off a caught error. Uniform across every checker so the report layer
+ * can pattern-match "…transient" reasons consistently and clip them the same way.
+ */
+export function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 /** Derive counts from findings and finalize a {@link CheckerResult}. */
 export function summarizeResult(
   domain: string,
   checked: number,
   findings: Finding[],
   startedAtMs: number,
-  extra: Partial<Pick<CheckerResult, 'skipped' | 'skipReason' | 'error' | 'upstreamFailures'>> = {},
+  extra: Partial<
+    Pick<
+      CheckerResult,
+      'skipped' | 'skipReason' | 'error' | 'outage' | 'outageSource' | 'upstreamFailures'
+    >
+  > = {},
 ): CheckerResult {
   const failures = findings.filter((f) => f.severity === 'fail').length;
   const warnings = findings.filter((f) => f.severity === 'warn').length;
@@ -275,4 +318,57 @@ export function summarizeResult(
     durationMs: Date.now() - startedAtMs,
     ...extra,
   };
+}
+
+/**
+ * Terminal result for a checker whose upstream source of truth is unreachable.
+ *
+ * Any findings already gathered before the outage (e.g. corpus invariants that
+ * ran without upstream) are preserved so partial progress is not thrown away.
+ */
+export function outageResult(
+  domain: string,
+  source: string,
+  e: unknown,
+  startedAtMs: number,
+  opts: { checked?: number; findings?: Finding[] } = {},
+): CheckerResult {
+  return summarizeResult(domain, opts.checked ?? 0, opts.findings ?? [], startedAtMs, {
+    outage: true,
+    outageSource: source,
+    skipped: true,
+    skipReason: `${source} unavailable (transient): ${errorMessage(e)}`,
+  });
+}
+
+/** Terminal result for a checker that crashed on something that isn't a transient upstream failure. */
+export function crashResult(
+  domain: string,
+  e: unknown,
+  startedAtMs: number,
+  opts: { checked?: number; findings?: Finding[]; prefix?: string } = {},
+): CheckerResult {
+  const msg = opts.prefix ? `${opts.prefix}: ${errorMessage(e)}` : errorMessage(e);
+  return summarizeResult(domain, opts.checked ?? 0, opts.findings ?? [], startedAtMs, {
+    error: msg,
+  });
+}
+
+/**
+ * Route a caught error to the right terminal result.
+ *
+ * Convenience over the (classify → outageResult | crashResult) idiom so every
+ * catch site in the checkers looks identical.
+ */
+export function terminalResultFrom(
+  domain: string,
+  source: string,
+  e: unknown,
+  startedAtMs: number,
+  opts: { checked?: number; findings?: Finding[]; crashPrefix?: string } = {},
+): CheckerResult {
+  if (classifyCheckerError(e) === 'upstream_outage') {
+    return outageResult(domain, source, e, startedAtMs, opts);
+  }
+  return crashResult(domain, e, startedAtMs, { ...opts, prefix: opts.crashPrefix });
 }

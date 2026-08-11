@@ -14,16 +14,28 @@ export interface AuditSummary {
   passed: number;
   warnings: number;
   failures: number;
-  /** Checkers that crashed (result.error set). */
+  /**
+   * Checkers that crashed (`result.error` set) — a bug on our side or a source
+   * of truth returning something we cannot parse. These fail CI and page #errors.
+   */
   erroredDomains: string[];
   /**
-   * Domains where most items failed to reach their upstream source — an outage,
-   * not content drift. Escalated alongside crashes.
+   * Domains that could not reach their upstream source. Two paths in:
+   *   1. Whole-checker outage (`result.outage === true`) — the roster / calendar
+   *      / Anthropic pass never returned.
+   *   2. Per-item outage ratio — a fan-out checker (bills, votes, materials) hit
+   *      the upstream-failure threshold across its sample.
+   * Reported visibly in the digest but NOT escalated to #errors: we cannot fix
+   * an upstream outage from our side, and paging on it every hiccup trains
+   * operators to skim past a channel that should mean "act now".
    */
   upstreamOutageDomains: string[];
   /** True when any content `fail` finding occurred (reported, but does not fail CI). */
   hasHardFailures: boolean;
-  /** True when a checker crashed — an operational problem that DOES fail the run. */
+  /**
+   * True when a checker crashed. This is the only thing that fails the run and
+   * escalates to #errors — upstream outages surface in the digest and exit 0.
+   */
   hasOperationalError: boolean;
   /** Sampling seed used for this run (rerun with the same seed to reproduce). */
   seed: number;
@@ -49,15 +61,24 @@ export function summarizeAudit(results: CheckerResult[], startedAtMs: number, se
     passed += r.passed;
     warnings += r.warnings;
     failures += r.failures;
-    if (r.error) erroredDomains.push(r.domain);
+    if (r.error) {
+      erroredDomains.push(r.domain);
+      continue;
+    }
 
-    // A domain that failed to reach its source for most of its sample verified
-    // nothing, however calmly it reports. Previously this exited 0 with a
-    // "warnings" header and read exactly like mild drift.
+    // Whole-checker outage set by the checker itself (roster/calendar/Anthropic
+    // fetch failed once with a transient class).
+    if (r.outage) {
+      upstreamOutageDomains.push(r.domain);
+      continue;
+    }
+
+    // Fan-out outage: enough per-item upstream failures to say the domain
+    // verified nothing. Same threshold as before; the difference is what we do
+    // with it — we surface it, we don't page.
     const upstreamFailures = r.upstreamFailures ?? 0;
     const attempted = upstreamFailures + r.checked;
     if (
-      !r.error &&
       !r.skipped &&
       upstreamFailures >= UPSTREAM_OUTAGE_MIN_FAILURES &&
       attempted > 0 &&
@@ -76,7 +97,9 @@ export function summarizeAudit(results: CheckerResult[], startedAtMs: number, se
     erroredDomains,
     upstreamOutageDomains,
     hasHardFailures: failures > 0 || erroredDomains.length > 0,
-    hasOperationalError: erroredDomains.length > 0 || upstreamOutageDomains.length > 0,
+    // Crashes ONLY. An upstream outage is not an operational error we can act on
+    // — it exits 0 and posts a visible outage banner instead of turning CI red.
+    hasOperationalError: erroredDomains.length > 0,
     seed,
     startedAt: new Date(startedAtMs).toISOString(),
     durationMs: Date.now() - startedAtMs,
@@ -96,6 +119,12 @@ function clipReason(s: string, max = 140): string {
 
 function domainStatusLine(r: CheckerResult): string {
   if (r.error) return `• ${r.domain}: ERROR — ${clipReason(r.error)}`;
+  if (r.outage) {
+    // Outage-first phrasing so the operator sees "the source was out" before
+    // the reason. Reason is clipped so a 504 HTML body doesn't flood the digest.
+    const src = r.outageSource ?? 'upstream';
+    return `• ${r.domain}: upstream outage (${src}) — ${clipReason(r.skipReason ?? 'unavailable')}`;
+  }
   if (r.skipped) return `• ${r.domain}: skipped${r.skipReason ? ` — ${clipReason(r.skipReason)}` : ''}`;
   const parts = [`${r.checked} checked`, `${r.passed} ok`];
   if (r.upstreamFailures) parts.push(`${r.upstreamFailures} upstream fetch failure(s)`);
@@ -132,17 +161,23 @@ export function formatConsoleReport(summary: AuditSummary): string {
   return lines.join('\n');
 }
 
-/** Status word for the Slack header — bolded inline with the totals. */
+/**
+ * Status word for the Slack header — bolded inline with the totals.
+ *
+ * Order matters: an outage carries no content `fail`s (it produced nothing to
+ * diff), so it must be named ahead of "warnings" or the digest headlines as
+ * routine drift. Crashes take precedence over outages because a crash means
+ * something on our side broke — someone should look at it now.
+ */
 function slackStatusLabel(summary: AuditSummary): string {
-  // An upstream outage carries no `fail` findings — it produces warnings and a
-  // `checked` of 0 — so it must be named explicitly or it headlines as routine
-  // drift, which is exactly how it used to read.
-  if (summary.erroredDomains.length > 0) return 'operational error';
+  if (summary.erroredDomains.length > 0) {
+    return `operational error (${summary.erroredDomains.join(', ')})`;
+  }
   if (summary.upstreamOutageDomains.length > 0) {
     return `upstream outage (${summary.upstreamOutageDomains.join(', ')})`;
   }
-  if (summary.hasHardFailures) return 'failures';
-  if (summary.warnings > 0) return 'warnings';
+  if (summary.failures > 0) return 'content failures';
+  if (summary.warnings > 0) return 'content warnings';
   return 'all clear';
 }
 
@@ -285,12 +320,18 @@ export function formatSlackReport(
     '*KY Vote — content accuracy audit*',
     slackTotalsLine(summary),
   ];
+  // "new · recurring" only makes sense when there are groups to place on that
+  // axis. On clean runs / pure outages, the extra line is noise.
   if (opts.recurrence && allGroups.length > 0) {
     sections.push(`${newGroups} new · ${recurringGroups} recurring (grouped by cause)`);
   }
   sections.push('', summary.results.map(domainStatusLine).join('\n'));
 
   for (const r of summary.results) {
+    // Outaged / crashed domains: the status line above already says what happened.
+    // The per-item warns they produced ("LegiScan fetch failed") are noise here —
+    // they'd render as a group titled "fetch failed" that just repeats the outage.
+    if (r.outage || r.error) continue;
     const groups = groupFindings(
       r.findings.filter((f) => f.severity !== 'info'),
       opts.recurrence,

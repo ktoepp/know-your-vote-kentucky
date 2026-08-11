@@ -18,7 +18,9 @@ import {
 } from '../../lrc-committee-materials-parser';
 import { sampleTable } from '../sampling';
 import {
+  classifyCheckerError,
   diffFinding,
+  errorMessage,
   norm,
   summarizeResult,
   type AuditConfig,
@@ -213,7 +215,7 @@ async function checkMaterialsDiff(
   cfg: AuditConfig,
   findings: Finding[],
   legacyDuplicateUrls: Set<string>,
-): Promise<number> {
+): Promise<{ checked: number; upstreamFailures: number }> {
   // Seed-sample committees that have an LRC documents page.
   const committees = await sampleTable<CommitteeRow>(db, {
     table: 'ky_committees',
@@ -222,9 +224,10 @@ async function checkMaterialsDiff(
     limit: cfg.materialsCommitteeLimit,
     filter: (q) => q.not('lrc_rsn', 'is', null),
   });
-  if (committees.length === 0) return 0;
+  if (committees.length === 0) return { checked: 0, upstreamFailures: 0 };
 
   let processed = 0;
+  let upstreamFailures = 0;
 
   // Fetch the LRC pages concurrently. These are plain HTML GETs against a
   // different host than LegiScan and consume no API quota, so there was no
@@ -240,26 +243,40 @@ async function checkMaterialsDiff(
         headers: FETCH_HEADERS,
         validateStatus: (s) => s < 500,
       });
-      return { committee, url, html: res.status === 404 ? null : res.data, error: null as string | null };
+      return {
+        committee,
+        url,
+        html: res.status === 404 ? null : res.data,
+        error: null as unknown,
+        errorKind: null as ReturnType<typeof classifyCheckerError> | null,
+      };
     } catch (e) {
       return {
         committee,
         url,
         html: null,
-        error: e instanceof Error ? e.message : String(e),
+        error: e as unknown,
+        errorKind: classifyCheckerError(e),
       };
     }
   });
 
   const usable = fetched.filter(
-    (f): f is { committee: CommitteeRow; url: string; html: string; error: null } => {
+    (f): f is { committee: CommitteeRow; url: string; html: string; error: null; errorKind: null } => {
       if (!f) return false;
       if (f.error) {
+        // A transient LRC hiccup on one committee counts against the outage
+        // ratio (so a total outage escalates via the report layer) but still
+        // reports a per-committee warn so the operator can see which pages were
+        // reachable. A non-transient failure (parse error, unexpected 4xx) is a
+        // fail — we should look at it.
+        const transient = f.errorKind === 'upstream_outage';
+        if (transient) upstreamFailures += 1;
         findings.push({
-          severity: 'warn',
+          severity: transient ? 'warn' : 'fail',
           domain: 'materials',
           entity: f.committee.name,
-          message: `LRC documents fetch failed: ${f.error}`,
+          message: `LRC documents fetch failed: ${errorMessage(f.error)}`,
           url: f.url,
         });
         return false;
@@ -453,7 +470,7 @@ async function checkMaterialsDiff(
     }
   }
 
-  return processed;
+  return { checked: processed, upstreamFailures };
 }
 
 async function checkLinks(db: SupabaseClient, cfg: AuditConfig, findings: Finding[]): Promise<number> {
@@ -555,16 +572,24 @@ export async function checkMaterials(db: SupabaseClient, cfg: AuditConfig): Prom
   // would inflate `checked` while findings still collapse to one entity per committee,
   // making `passed/checked` read far better than reality — strictly worse.
   let checked = 0;
+  let upstreamFailures = 0;
   try {
     // Runs first: the reverse diff needs the duplicate set to exclude, and the
     // systemic finding should precede the per-committee ones in the report.
     const legacyDuplicateUrls = await checkLegacyDuplicateUrls(db, findings);
-    checked += await checkMaterialsDiff(db, cfg, findings, legacyDuplicateUrls);
+    const diff = await checkMaterialsDiff(db, cfg, findings, legacyDuplicateUrls);
+    checked += diff.checked;
+    upstreamFailures += diff.upstreamFailures;
   } catch (e) {
+    // A pass-level throw (not one committee fetch failing — the whole pass) that
+    // classifies as transient upstream still counts against the outage ratio;
+    // a non-transient throw is a real bug on our side.
+    const transient = classifyCheckerError(e) === 'upstream_outage';
+    if (transient) upstreamFailures += 1;
     findings.push({
-      severity: 'warn',
+      severity: transient ? 'warn' : 'fail',
       domain: 'materials',
-      message: `materials diff pass failed: ${e instanceof Error ? e.message : String(e)}`,
+      message: `materials diff pass failed: ${errorMessage(e)}`,
     });
   }
 
@@ -574,16 +599,16 @@ export async function checkMaterials(db: SupabaseClient, cfg: AuditConfig): Prom
     findings.push({
       severity: 'warn',
       domain: 'materials',
-      message: `link check pass failed: ${e instanceof Error ? e.message : String(e)}`,
+      message: `link check pass failed: ${errorMessage(e)}`,
     });
   }
 
-  if (checked === 0) {
+  if (checked === 0 && upstreamFailures === 0) {
     return summarizeResult('materials', 0, findings, started, {
       skipped: true,
       skipReason: 'no recently-active committee materials or links to probe',
     });
   }
 
-  return summarizeResult('materials', checked, findings, started);
+  return summarizeResult('materials', checked, findings, started, { upstreamFailures });
 }
