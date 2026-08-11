@@ -30,9 +30,13 @@ CREATE TABLE public.ky_accuracy_dismissed_findings (
   expires_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_ky_accuracy_dismissed_findings_active
-  ON public.ky_accuracy_dismissed_findings (fingerprint)
-  WHERE expires_at IS NULL OR expires_at > now();
+-- The primary key already indexes `fingerprint`, and `fetchDismissedFingerprints`
+-- reads the whole table each run (bounded at a few dozen rows in practice, since
+-- an operator only dismisses a fingerprint after a human review). A partial index
+-- WHERE expires_at IS NULL OR expires_at > now() would be more selective, but
+-- now() is STABLE, not IMMUTABLE, which Postgres refuses in an index predicate.
+-- Rather than freeze an anchor into the predicate, expiry is filtered in code
+-- (see fetchDismissedFingerprints) — cheaper than the index at this cardinality.
 
 ALTER TABLE public.ky_accuracy_dismissed_findings ENABLE ROW LEVEL SECURITY;
 -- No authenticated policies — service role only, same as
