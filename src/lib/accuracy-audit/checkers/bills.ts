@@ -16,8 +16,10 @@ import { mapLegiScanBillStatus } from '../../map-legiscan-bill-status';
 import { sampleTableSplit } from '../sampling';
 import {
   diffFinding,
+  errorMessage,
   norm,
   summarizeResult,
+  terminalResultFrom,
   type AuditConfig,
   type CheckerResult,
   type Finding,
@@ -27,6 +29,12 @@ interface BillRow {
   id: string;
   legiscan_id: number | null;
   bill_number: string;
+  /**
+   * Session label (e.g. `"2026RS"`). Stamped onto every finding so the
+   * fingerprint distinguishes HB100/2024 from HB100/2026 in the recurrence map.
+   * Not rendered on the digest label — it stays scannable.
+   */
+  session: string | null;
   title: string;
   status: string | null;
   last_action: string | null;
@@ -149,7 +157,8 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
       db,
       {
         table: 'ky_bills',
-        select: 'id, legiscan_id, bill_number, title, status, last_action, bill_text_url, sponsors',
+        select:
+          'id, legiscan_id, bill_number, session, title, status, last_action, bill_text_url, sponsors',
         seed: cfg.seed,
         limit: cfg.billsLimit,
         filter: (q) => q.not('legiscan_id', 'is', null),
@@ -161,14 +170,20 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
         // but rows that have gone longest without a check take priority. Same
         // scope for both halves of the split so an active-window pick still
         // counts as coverage against the whole corpus's rotation.
-        rotation: { scope: 'bills' },
+        //
+        // `stamp: 'defer'` — the sample here is only a *candidate list*. The
+        // orchestrator commits the rotation stamps after the checker returns,
+        // and only when the domain actually verified its sample. An outage
+        // week (LegiScan 5xx across the whole draw) now discards its stamps
+        // instead of shoving unverified rows to the back of the queue.
+        rotation: { scope: 'bills', stamp: 'defer' },
       },
       (r) => r.id,
     );
   } catch (e) {
-    return summarizeResult('bills', 0, findings, started, {
-      error: e instanceof Error ? e.message : String(e),
-    });
+    // The sample query is against our own DB; a failure here is a crash, not an
+    // upstream outage. Classify anyway so a transient PostgREST 5xx doesn't red-page.
+    return terminalResultFrom('bills', 'Supabase', e, started, { crashPrefix: 'sample query failed' });
   }
 
   if (rows.length === 0) {
@@ -185,22 +200,29 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
   for (const row of rows) {
     if (row.legiscan_id == null) continue;
 
+    // Every finding produced for this row carries `row.session` so the
+    // fingerprint distinguishes same-numbered bills across sessions. Wrapping
+    // the push at the row level keeps the individual finding call sites clean
+    // and prevents a new comparison from forgetting to attach it.
+    const sess = row.session ?? undefined;
+    const push = (f: Finding) => findings.push(sess ? { ...f, session: sess } : f);
+
     let bill;
     try {
       bill = await client.fetchBillDetail(row.legiscan_id);
     } catch (e) {
-      findings.push({
+      push({
         severity: 'warn',
         domain: 'bills',
         entity: row.bill_number,
-        message: `LegiScan fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+        message: `LegiScan fetch failed: ${errorMessage(e)}`,
       });
       upstreamFailures += 1;
       continue;
     }
 
     if (!bill) {
-      findings.push({
+      push({
         severity: 'fail',
         domain: 'bills',
         entity: row.bill_number,
@@ -212,11 +234,11 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
     checked += 1;
 
     if (norm(bill.number) && norm(bill.number) !== norm(row.bill_number)) {
-      findings.push(diffFinding('fail', 'bills', row.bill_number, 'bill_number', bill.number, row.bill_number));
+      push(diffFinding('fail', 'bills', row.bill_number, 'bill_number', bill.number, row.bill_number));
     }
 
     if (norm(bill.title) && norm(bill.title) !== norm(row.title)) {
-      findings.push(diffFinding('warn', 'bills', row.bill_number, 'title', bill.title, row.title));
+      push(diffFinding('warn', 'bills', row.bill_number, 'title', bill.title, row.title));
     }
 
     const lastAction = latestAction(bill);
@@ -228,7 +250,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
     );
     const statusMismatch = !!expectedStatus && norm(expectedStatus) !== norm(row.status);
     if (statusMismatch) {
-      findings.push(diffFinding('fail', 'bills', row.bill_number, 'status', expectedStatus, row.status));
+      push(diffFinding('fail', 'bills', row.bill_number, 'status', expectedStatus, row.status));
     }
 
     // last_action is reconstructed here from `getBill`'s history[], but the sync
@@ -239,13 +261,13 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
     // through the tolerant status mapper) is the reliable staleness signal; only
     // surface the last_action text as supporting context when status *also* diverged.
     if (statusMismatch && norm(lastAction.action) && norm(lastAction.action) !== norm(row.last_action)) {
-      findings.push(
+      push(
         diffFinding('warn', 'bills', row.bill_number, 'last_action', lastAction.action, row.last_action),
       );
     }
 
     if (bill.url && !row.bill_text_url) {
-      findings.push({
+      push({
         severity: 'warn',
         domain: 'bills',
         entity: row.bill_number,
@@ -254,7 +276,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
         expected: bill.url,
       });
     } else if (row.bill_text_url && !isAcceptableBillTextHost(row.bill_text_url)) {
-      findings.push({
+      push({
         severity: 'warn',
         domain: 'bills',
         entity: row.bill_number,
@@ -276,7 +298,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
       // bill token to check, so we stay quiet rather than guess.
       const matches = urlMatchesBillNumber(row.bill_text_url, row.bill_number);
       if (matches === false) {
-        findings.push({
+        push({
           severity: 'warn',
           domain: 'bills',
           entity: row.bill_number,
@@ -300,7 +322,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
         ]
           .filter(Boolean)
           .join(', ');
-        findings.push({
+        push({
           severity: 'warn',
           domain: 'bills',
           entity: row.bill_number,

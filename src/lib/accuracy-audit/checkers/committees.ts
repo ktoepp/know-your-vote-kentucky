@@ -34,10 +34,11 @@ import {
 } from '../../ky-lrc-calendar-sync';
 import { parseLegislativeCalendarHtml } from '../../lrc-legislative-calendar-parser';
 import {
+  crashResult,
   diffFinding,
-  isTransientUpstreamError,
   norm,
   summarizeResult,
+  terminalResultFrom,
   type AuditConfig,
   type CheckerResult,
   type Finding,
@@ -414,8 +415,9 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
   } catch (e) {
     // A query failure here is our own DB, not a flaky upstream — that is an
     // operational error and should page.
-    return summarizeResult('committees', 0, findings, started, {
-      error: `stored-corpus invariants failed: ${e instanceof Error ? e.message : String(e)}`,
+    return crashResult('committees', e, started, {
+      findings,
+      prefix: 'stored-corpus invariants failed',
     });
   }
 
@@ -428,20 +430,13 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
     });
     html = res.data;
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    // A transient LRC outage (5xx / gateway timeout / network blip) skips the
-    // live-calendar diff rather than red-paging #errors; the near-duplicate
-    // findings gathered above still report. A genuine failure (e.g. a 404 meaning
-    // the calendar URL moved) stays an operational error. Mirrors the per-committee
-    // LRC-fetch handling in the materials checker.
-    if (isTransientUpstreamError(e)) {
-      return summarizeResult('committees', invariantsChecked, findings, started, {
-        skipped: true,
-        skipReason: `LRC calendar unavailable (transient): ${msg}`,
-      });
-    }
-    return summarizeResult('committees', invariantsChecked, findings, started, {
-      error: `LRC calendar fetch failed: ${msg}`,
+    // A transient LRC outage skips the live-calendar diff; a genuine failure
+    // (e.g. a 404 meaning the calendar URL moved) stays an operational error.
+    // Any near-duplicate findings gathered above are preserved.
+    return terminalResultFrom('committees', 'LRC calendar', e, started, {
+      checked: invariantsChecked,
+      findings,
+      crashPrefix: 'LRC calendar fetch failed',
     });
   }
 
@@ -466,7 +461,7 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
       .select('id, lrc_rsn, committee_type')
       .in('lrc_rsn', rsns);
     if (error) {
-      return summarizeResult('committees', invariantsChecked, findings, started, { error: error.message });
+      return crashResult('committees', error, started, { checked: invariantsChecked, findings });
     }
     for (const c of committees ?? []) {
       committeeByKey.set(`${c.lrc_rsn}|${c.committee_type}`, c.id as string);
@@ -494,7 +489,7 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
       .gte('meeting_date', sortedDates[0]!)
       .lte('meeting_date', sortedDates[sortedDates.length - 1]!);
     if (error) {
-      return summarizeResult('committees', invariantsChecked, findings, started, { error: error.message });
+      return crashResult('committees', error, started, { checked: invariantsChecked, findings });
     }
     storedMeetings.push(...(data ?? []));
   }
@@ -593,7 +588,7 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
       .select('meeting_id, sort_order, raw_text, item_kind, bill_number, bill_session_label, ky_bill_id, depth')
       .in('meeting_id', matched.map((m) => m.meetingId));
     if (aErr) {
-      return summarizeResult('committees', invariantsChecked + checked, findings, started, { error: aErr.message });
+      return crashResult('committees', aErr, started, { checked: invariantsChecked + checked, findings });
     }
 
     const agendaByMeeting = new Map<string, StoredAgendaItem[]>();

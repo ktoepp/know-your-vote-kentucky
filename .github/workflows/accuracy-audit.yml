@@ -97,9 +97,9 @@ jobs:
           # A timeout-minutes overrun cancels the job (job.status == cancelled);
           # distinguish it from a hard failure so the alert points at the right cause.
           if [ "${JOB_STATUS:-}" = "cancelled" ]; then
-            HEADLINE="*KY Vote - content accuracy audit timed out or was cancelled*\\nLikely the timeout-minutes ceiling - check the run for where it stalled."
+            HEADLINE="*KY Vote — accuracy audit timed out or was cancelled*\\nLikely the timeout-minutes ceiling — check the run for where it stalled."
           else
-            HEADLINE="*KY Vote - content accuracy audit failed*"
+            HEADLINE="*KY Vote — accuracy audit failed*"
           fi
           curl -sS -X POST -H 'Content-Type: application/json' \
             -d "{\"text\":\"${HEADLINE}\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \

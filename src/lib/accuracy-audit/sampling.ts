@@ -69,10 +69,19 @@ export interface RotationOptions {
    */
   scope: string;
   /**
-   * When true (default), stamp the chosen keys with `now()` after selection so
-   * the next run sees them as recently audited and prefers older rows.
+   * `true` (default) — stamp immediately at selection time. Stamps land even
+   * when the checker later returns an outage, which pushes unverified rows to
+   * the back of the rotation and produces coverage debt across outage weeks.
+   *
+   * `'defer'` — buffer the intended stamps in a per-run pending map. The
+   * orchestrator calls {@link finalizeRotation} after the checker returns:
+   * `'commit'` if the domain actually verified its sample, `'discard'` on an
+   * outage / crash / skip. Restores rotation fairness across outage weeks.
+   *
+   * `false` — never stamp (used by tests and callers that want pure hash-only
+   * ordering without any rotation memory).
    */
-  stamp?: boolean;
+  stamp?: boolean | 'defer';
 }
 
 export interface SampleParams {
@@ -120,6 +129,50 @@ const keyScanCache = new Map<string, string[]>();
 /** Drop memoized key scans. Exposed for tests and long-lived callers. */
 export function clearKeyScanCache(): void {
   keyScanCache.clear();
+}
+
+/**
+ * Per-run buffer of rotation stamps waiting on a commit/discard decision.
+ *
+ * When a caller passes `rotation.stamp: 'defer'`, the sampled keys are
+ * accumulated here instead of being written eagerly. The orchestrator resolves
+ * each domain via {@link finalizeRotation} once it can tell whether the
+ * checker actually verified its sample (`'commit'`) or bailed on an outage or
+ * crash (`'discard'`). This restores rotation fairness across outage weeks —
+ * previously a LegiScan outage still stamped every unverified row, pushing
+ * them to the back of the queue as if they had been checked.
+ */
+const pendingRotationStamps = new Map<string, Set<string>>();
+
+function bufferRotationStamps(scope: string, keys: string[]): void {
+  const bucket = pendingRotationStamps.get(scope) ?? new Set<string>();
+  for (const k of keys) bucket.add(k);
+  pendingRotationStamps.set(scope, bucket);
+}
+
+/** Scopes with buffered stamps waiting on a commit or discard. */
+export function pendingRotationScopes(): string[] {
+  return [...pendingRotationStamps.keys()];
+}
+
+/**
+ * Commit (`'commit'`) or drop (`'discard'`) buffered rotation stamps for one
+ * scope. Safe to call for a scope that never buffered anything — a no-op.
+ */
+export async function finalizeRotation(
+  db: SupabaseClient,
+  scope: string,
+  disposition: 'commit' | 'discard',
+): Promise<void> {
+  const bucket = pendingRotationStamps.get(scope);
+  pendingRotationStamps.delete(scope);
+  if (!bucket || bucket.size === 0 || disposition === 'discard') return;
+  await stampAuditMarks(db, scope, [...bucket]);
+}
+
+/** Test hook: drop every buffered scope without stamping. */
+export function clearPendingRotationStamps(): void {
+  pendingRotationStamps.clear();
 }
 
 /**
@@ -207,13 +260,19 @@ export async function sampleTable<T>(db: SupabaseClient, p: SampleParams): Promi
   }
   const results = chosen.map((k) => byKey.get(k)).filter((r): r is T => r != null);
 
-  // 4) Rotation stamping. Doing this on the SAMPLING call rather than after
-  //    the checker completes keeps stamps consistent even when a checker
-  //    partially fails — the row was still "shown" to the audit, so counting
-  //    it as covered for rotation purposes is honest. Failures are already
-  //    tracked separately in ky_accuracy_findings.
-  if (p.rotation && (p.rotation.stamp ?? true) && chosen.length > 0) {
-    await stampAuditMarks(db, p.rotation.scope, chosen);
+  // 4) Rotation stamping. Three modes; see RotationOptions.stamp:
+  //    - immediate (default): write now. Simple, but an outage still stamps
+  //      the unverified rows, producing coverage debt across outage weeks.
+  //    - defer: buffer for the orchestrator to commit/discard once it knows
+  //      whether the checker actually verified its sample.
+  //    - false: never stamp (tests, pure hash-only callers).
+  if (p.rotation && chosen.length > 0) {
+    const mode = p.rotation.stamp ?? true;
+    if (mode === 'defer') {
+      bufferRotationStamps(p.rotation.scope, chosen);
+    } else if (mode === true) {
+      await stampAuditMarks(db, p.rotation.scope, chosen);
+    }
   }
   return results;
 }
