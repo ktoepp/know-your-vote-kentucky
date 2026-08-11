@@ -8,6 +8,7 @@
  * Gated by ACCURACY_SKIP_LLM and the presence of ANTHROPIC_API_KEY. Each pass is
  * a single batched call to keep token cost bounded by ACCURACY_LLM_SAMPLE.
  */
+import { createHash } from 'crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { governmentTooltips, voteCountTooltips } from '../../tooltipContent';
@@ -22,6 +23,42 @@ import {
   type Finding,
   type Severity,
 } from '../types';
+
+/**
+ * Per-run token accumulator. Passed by reference to each pass so budget
+ * enforcement and cost logging see the whole checker's spend.
+ */
+interface TokenLedger {
+  input: number;
+  output: number;
+  cacheHits: number;
+}
+
+/**
+ * Hard cap on Anthropic tokens across the entire llm checker. Above this the
+ * remaining passes short-circuit and a warn finding is emitted. Default sized
+ * against the current 3-pass × 8-sample layout: ~50k in / ~10k out per run has
+ * plenty of headroom, and a runaway (widened `activeDays`, larger `llmSample`,
+ * cache-cold glossary) trips the cap before it silently multiplies the bill.
+ * Overridable via `ACCURACY_LLM_MAX_TOTAL_TOKENS`; `0` disables the cap.
+ */
+const DEFAULT_LLM_TOKEN_BUDGET = 200_000;
+
+function llmTokenBudget(): number {
+  const raw = process.env.ACCURACY_LLM_MAX_TOTAL_TOKENS?.trim();
+  if (!raw) return DEFAULT_LLM_TOKEN_BUDGET;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_LLM_TOKEN_BUDGET;
+}
+
+function tokenSum(ledger: TokenLedger): number {
+  return ledger.input + ledger.output;
+}
+
+/** SHA-256 over normalized input; used as the cache key. */
+function contentHash(payload: unknown): string {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
 
 interface ReviewVerdict {
   key: string;
@@ -56,13 +93,22 @@ function extractJsonArray(text: string): unknown[] {
   }
 }
 
-async function callClaude(client: Anthropic, model: string, prompt: string): Promise<unknown[]> {
+async function callClaude(
+  client: Anthropic,
+  model: string,
+  prompt: string,
+  ledger: TokenLedger,
+): Promise<unknown[]> {
   const message = await client.messages.create({
     model,
     max_tokens: 2000,
     temperature: 0,
     messages: [{ role: 'user', content: prompt }],
   });
+  // Accumulate the actual usage before parsing so a mid-parse throw still
+  // records what the call cost.
+  ledger.input += message.usage?.input_tokens ?? 0;
+  ledger.output += message.usage?.output_tokens ?? 0;
   const part = message.content[0];
   if (!part || part.type !== 'text') return [];
   return extractJsonArray(part.text);
@@ -89,6 +135,7 @@ async function reviewSummaries(
   cfg: AuditConfig,
   client: Anthropic,
   findings: Finding[],
+  ledger: TokenLedger,
 ): Promise<number> {
   const data = await sampleTable<{
     bill_number: string;
@@ -141,7 +188,7 @@ Use severity "fail" for hallucinated facts, contradictions, or fabricated audien
 Bills:
 ${JSON.stringify(items, null, 2)}`;
 
-  const verdicts = (await callClaude(client, cfg.llmModel, prompt)) as ReviewVerdict[];
+  const verdicts = (await callClaude(client, cfg.llmModel, prompt, ledger)) as ReviewVerdict[];
   const byKey = new Map(verdicts.map((v) => [String(v.key), v]));
   for (const item of items) {
     const v = byKey.get(item.key);
@@ -164,6 +211,7 @@ async function reviewTopics(
   cfg: AuditConfig,
   client: Anthropic,
   findings: Finding[],
+  ledger: TokenLedger,
 ): Promise<number> {
   const data = await sampleTable<{
     bill_number: string;
@@ -210,7 +258,7 @@ Use severity "fail" for clearly wrong/irrelevant topics; "warn" for an obviously
 Bills:
 ${JSON.stringify(items, null, 2)}`;
 
-  const verdicts = (await callClaude(client, cfg.llmModel, prompt)) as ReviewVerdict[];
+  const verdicts = (await callClaude(client, cfg.llmModel, prompt, ledger)) as ReviewVerdict[];
   const byKey = new Map(verdicts.map((v) => [String(v.key), v]));
   for (const item of items) {
     const v = byKey.get(item.key);
@@ -228,19 +276,125 @@ ${JSON.stringify(items, null, 2)}`;
   return items.length;
 }
 
+interface GlossaryItem {
+  key: string;
+  title: string;
+  content: string;
+}
+
+/**
+ * Look up cached verdicts by (contentHash, model). Missing rows and a missing
+ * table both fall through to "no cache hit" so the caller can still call the
+ * model. Returns a map keyed by contentHash.
+ */
+async function loadGlossaryCache(
+  db: SupabaseClient,
+  model: string,
+  hashes: string[],
+): Promise<Map<string, ReviewVerdict>> {
+  const out = new Map<string, ReviewVerdict>();
+  if (hashes.length === 0) return out;
+  try {
+    const { data, error } = await db
+      .from('ky_accuracy_llm_cache')
+      .select('content_hash, verdict')
+      .eq('model', model)
+      .in('content_hash', hashes);
+    if (error) {
+      const msg = String(error.message || '').toLowerCase();
+      // Table absent (migration 053 not yet applied) → degrade to no cache.
+      if (msg.includes('ky_accuracy_llm_cache') || msg.includes('does not exist')) return out;
+      throw new Error(error.message);
+    }
+    for (const row of (data ?? []) as Array<{ content_hash: string; verdict: ReviewVerdict }>) {
+      out.set(row.content_hash, row.verdict);
+    }
+  } catch (e) {
+    console.error(
+      '[accuracy-audit] llm cache read failed:',
+      e instanceof Error ? e.message : e,
+    );
+  }
+  return out;
+}
+
+async function saveGlossaryCache(
+  db: SupabaseClient,
+  model: string,
+  entries: Array<{ contentHash: string; verdict: ReviewVerdict }>,
+): Promise<void> {
+  if (entries.length === 0) return;
+  try {
+    const { error } = await db.from('ky_accuracy_llm_cache').upsert(
+      entries.map((e) => ({
+        content_hash: e.contentHash,
+        model,
+        verdict: e.verdict,
+        cached_at: new Date().toISOString(),
+      })),
+      { onConflict: 'content_hash,model' },
+    );
+    if (error) {
+      const msg = String(error.message || '').toLowerCase();
+      if (msg.includes('ky_accuracy_llm_cache') || msg.includes('does not exist')) return;
+      throw new Error(error.message);
+    }
+  } catch (e) {
+    console.error(
+      '[accuracy-audit] llm cache write failed:',
+      e instanceof Error ? e.message : e,
+    );
+  }
+}
+
 async function reviewGlossary(
+  db: SupabaseClient,
   cfg: AuditConfig,
   client: Anthropic,
   findings: Finding[],
+  ledger: TokenLedger,
 ): Promise<number> {
   const entries = [...Object.entries(governmentTooltips), ...Object.entries(voteCountTooltips)].map(
     ([key, t]) => ({ key, title: t.title, content: clip(t.content, 600) }),
   );
   // Seed-shuffle so the sampled glossary terms vary per run (reproducible by seed).
-  const items = seededShuffle(entries, makeRng(cfg.seed ^ 0xc2b2ae35)).slice(0, cfg.llmSample);
+  const items: GlossaryItem[] = seededShuffle(entries, makeRng(cfg.seed ^ 0xc2b2ae35)).slice(
+    0,
+    cfg.llmSample,
+  );
   if (items.length === 0) return 0;
 
-  const prompt = `You are auditing civic glossary definitions for a Kentucky General Assembly transparency website. Kentucky has 100 House members and 38 Senators; a gubernatorial veto is overridden by a majority of the members elected to each chamber (51 House, 20 Senate) per Ky. Constitution § 88; there is no filibuster or cloture. Flag any definition that is factually incorrect or misleading for the Kentucky General Assembly (not the U.S. Congress).
+  // Cache key is per-entry (title + content), NOT per-batch: the batch differs
+  // every run because of the seed-shuffle, but a single glossary entry's text
+  // only changes when tooltipContent.ts is edited. Cached verdicts are keyed on
+  // (contentHash, model) so a model change invalidates them by design.
+  const itemHashes = items.map((item) => ({
+    item,
+    contentHash: contentHash({ title: item.title, content: item.content }),
+  }));
+  const cached = await loadGlossaryCache(
+    db,
+    cfg.llmModel,
+    itemHashes.map((i) => i.contentHash),
+  );
+
+  const verdictByKey = new Map<string, ReviewVerdict>();
+  const misses: Array<{ item: GlossaryItem; contentHash: string }> = [];
+  for (const entry of itemHashes) {
+    const hit = cached.get(entry.contentHash);
+    if (hit) {
+      verdictByKey.set(entry.item.key, hit);
+      ledger.cacheHits += 1;
+    } else {
+      misses.push(entry);
+    }
+  }
+
+  // Call Anthropic only for the entries whose text we've never scored under
+  // this model. Skipping the call entirely when everything hit avoids the
+  // 3-4kB glossary preamble being sent every week.
+  if (misses.length > 0) {
+    const prompt = `You are auditing civic glossary definitions for a Kentucky General Assembly transparency website. Kentucky has 100 House members and 38 Senators; a gubernatorial veto is overridden by a majority of the members elected to each chamber (51 House, 20 Senate) per Ky. Constitution § 88; there is no filibuster or cloture. Flag any definition that is factually incorrect or misleading for the Kentucky General Assembly (not the U.S. Congress).
 
 Return ONLY a JSON array, one object per entry:
 { "key": "<key>", "ok": true|false, "severity": "fail"|"warn"|"info", "issue": "<short reason, empty if ok>" }
@@ -248,12 +402,24 @@ Return ONLY a JSON array, one object per entry:
 Use severity "fail" for outright factual errors; "warn" for misleading or ambiguous wording; "info"/ok=true when accurate.
 
 Entries:
-${JSON.stringify(items, null, 2)}`;
+${JSON.stringify(misses.map((m) => m.item), null, 2)}`;
 
-  const verdicts = (await callClaude(client, cfg.llmModel, prompt)) as ReviewVerdict[];
-  const byKey = new Map(verdicts.map((v) => [String(v.key), v]));
+    const verdicts = (await callClaude(client, cfg.llmModel, prompt, ledger)) as ReviewVerdict[];
+    const freshByKey = new Map(verdicts.map((v) => [String(v.key), v]));
+
+    // Upsert every miss for which we got a verdict, so next run hits the cache.
+    const toCache: Array<{ contentHash: string; verdict: ReviewVerdict }> = [];
+    for (const miss of misses) {
+      const v = freshByKey.get(miss.item.key);
+      if (!v) continue;
+      verdictByKey.set(miss.item.key, v);
+      toCache.push({ contentHash: miss.contentHash, verdict: v });
+    }
+    await saveGlossaryCache(db, cfg.llmModel, toCache);
+  }
+
   for (const item of items) {
-    const v = byKey.get(item.key);
+    const v = verdictByKey.get(item.key);
     if (!v || v.ok === true) continue;
     const sev = normalizeSeverity(v.severity);
     if (sev === 'info') continue;
@@ -283,11 +449,31 @@ export async function checkLlm(db: SupabaseClient, cfg: AuditConfig): Promise<Ch
   let checked = 0;
   let upstreamFailures = 0;
   let firstAnthropicError: unknown = null;
+  const ledger: TokenLedger = { input: 0, output: 0, cacheHits: 0 };
+  const budget = llmTokenBudget();
 
   // Each pass wrapped in the same catch shape so an Anthropic outage on any one
   // of them counts uniformly and the fully-out case escalates to `outage`
   // instead of leaving three "review pass failed" warns that read as drift.
+  // The budget short-circuit runs BEFORE each pass — if a prior pass already
+  // blew through the token cap, we don't spend more before reporting.
+  let budgetTripped = false;
   const runPass = async (name: string, invoke: () => Promise<number>): Promise<void> => {
+    if (budget > 0 && tokenSum(ledger) >= budget) {
+      if (!budgetTripped) {
+        budgetTripped = true;
+        findings.push({
+          severity: 'warn',
+          domain: 'llm',
+          field: 'token_budget',
+          message:
+            `LLM token budget of ${budget} exhausted after prior passes ` +
+            `(input ${ledger.input}, output ${ledger.output}). ` +
+            'Remaining passes skipped for this run; raise `ACCURACY_LLM_MAX_TOTAL_TOKENS` or lower `ACCURACY_LLM_SAMPLE`.',
+        });
+      }
+      return;
+    }
     try {
       checked += await invoke();
     } catch (e) {
@@ -305,9 +491,17 @@ export async function checkLlm(db: SupabaseClient, cfg: AuditConfig): Promise<Ch
   };
 
   const PASS_COUNT = 3;
-  await runPass('summary review', () => reviewSummaries(db, cfg, client, findings));
-  await runPass('topics review', () => reviewTopics(db, cfg, client, findings));
-  await runPass('glossary review', () => reviewGlossary(cfg, client, findings));
+  await runPass('summary review', () => reviewSummaries(db, cfg, client, findings, ledger));
+  await runPass('topics review', () => reviewTopics(db, cfg, client, findings, ledger));
+  await runPass('glossary review', () => reviewGlossary(db, cfg, client, findings, ledger));
+
+  // Cost visibility. Logged even on outage / crash paths so a runaway is
+  // observable in the run log without having to enable a debug flag.
+  console.log(
+    `[accuracy-audit] llm tokens: input=${ledger.input} output=${ledger.output} ` +
+      `total=${tokenSum(ledger)}${budget > 0 ? ` (budget ${budget})` : ''} ` +
+      `glossaryCacheHits=${ledger.cacheHits}`,
+  );
 
   // Full Anthropic outage: every pass hit an upstream error and nothing was
   // reviewed. Escalate as an outage rather than surface three identical warn
