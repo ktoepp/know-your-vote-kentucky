@@ -76,9 +76,28 @@ export async function fetchDismissedFingerprints(db: SupabaseClient): Promise<Se
 }
 
 /**
+ * Default recurrence-lookback window. A finding first seen more than this many
+ * days ago no longer contributes to the "recurring for N days" label — practical
+ * usefulness of that label peaks in weeks, not years, and unbounded scans over
+ * `ky_accuracy_findings.fingerprint` grow linearly with retention. Overridable
+ * via `ACCURACY_RECURRENCE_LOOKBACK_DAYS`; `0` disables the bound (back-compat).
+ */
+const DEFAULT_RECURRENCE_LOOKBACK_DAYS = 365;
+
+function recurrenceLookbackDays(): number {
+  const raw = process.env.ACCURACY_RECURRENCE_LOOKBACK_DAYS?.trim();
+  if (!raw) return DEFAULT_RECURRENCE_LOOKBACK_DAYS;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_RECURRENCE_LOOKBACK_DAYS;
+}
+
+/**
  * Look up which of this run's fingerprints have been seen before, and when they
  * first appeared. Returns empty info when history is unavailable — the report
  * then simply omits the new/recurring split.
+ *
+ * Bounded by {@link DEFAULT_RECURRENCE_LOOKBACK_DAYS} so retention decisions
+ * (pruning old rows, adding a partition) don't have to touch this query.
  */
 export async function fetchRecurrence(
   db: SupabaseClient,
@@ -87,16 +106,24 @@ export async function fetchRecurrence(
   const firstSeenByFingerprint = new Map<string, string>();
   if (fingerprints.length === 0) return { firstSeenByFingerprint };
 
+  const lookbackDays = recurrenceLookbackDays();
+  const sinceIso =
+    lookbackDays > 0
+      ? new Date(Date.now() - lookbackDays * 86_400_000).toISOString()
+      : null;
+
   try {
     // Chunked so a large finding set cannot blow the URL length limit.
     const CHUNK = 100;
     for (let i = 0; i < fingerprints.length; i += CHUNK) {
       const chunk = fingerprints.slice(i, i + CHUNK);
-      const { data, error } = await db
+      let query = db
         .from('ky_accuracy_findings')
         .select('fingerprint, observed_at')
         .in('fingerprint', chunk)
         .order('observed_at', { ascending: true });
+      if (sinceIso) query = query.gte('observed_at', sinceIso);
+      const { data, error } = await query;
       if (error) throw new Error(error.message);
       for (const row of data ?? []) {
         const fp = row.fingerprint as string;
