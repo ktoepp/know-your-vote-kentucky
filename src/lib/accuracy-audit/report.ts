@@ -209,7 +209,15 @@ function domainStatusLine(r: CheckerResult): string {
     return `• ${r.domain}: upstream outage (${src}) — ${clipReason(r.skipReason ?? 'unavailable')}`;
   }
   if (r.skipped) return `• ${r.domain}: skipped${r.skipReason ? ` — ${clipReason(r.skipReason)}` : ''}`;
-  const parts = [`${r.checked} checked`, `${r.passed} ok`];
+  // Render the breakdown when present ("12 committee pages, 25 link targets")
+  // in place of the ambiguous single "37 checked" — materials mixes units by
+  // design (see the comment on materials.ts's return). The sum still drives
+  // pass-rate math; this changes display only.
+  const checkedText =
+    r.checkedBreakdown && r.checkedBreakdown.length > 0
+      ? r.checkedBreakdown.map((b) => `${b.count} ${b.label}`).join(', ')
+      : `${r.checked} checked`;
+  const parts = [checkedText, `${r.passed} ok`];
   if (r.upstreamFailures) parts.push(`${r.upstreamFailures} upstream fetch failure(s)`);
   if (r.failures > 0) parts.push(`${r.failures} fail`);
   if (r.warnings > 0) parts.push(`${r.warnings} warn`);

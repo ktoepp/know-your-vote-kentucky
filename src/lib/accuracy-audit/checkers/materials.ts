@@ -561,24 +561,24 @@ export async function checkMaterials(db: SupabaseClient, cfg: AuditConfig): Prom
   const started = Date.now();
   const findings: Finding[] = [];
 
-  // `checked` sums two different things — committee pages diffed, then link targets
-  // validated — which reads like a unit mix. It is left summed deliberately: the unit
-  // `summarizeResult` actually needs is "distinguishable entities examined", since it
-  // derives `passed` as checked minus the number of *distinct flagged entity labels*.
-  // Each committee page contributes exactly one entity (the committee name, used by
-  // every finding the diff pass emits, including the rolled-up reverse-diff one) and
-  // each link target exactly one (`material: …` / `bill text: …`), and the two label
-  // namespaces cannot collide. Re-basing the diff pass on materials-compared instead
-  // would inflate `checked` while findings still collapse to one entity per committee,
-  // making `passed/checked` read far better than reality — strictly worse.
-  let checked = 0;
+  // `checked` sums two different units — committee pages diffed, then link
+  // targets validated — because `summarizeResult` derives `passed` from
+  // distinct flagged entity labels, and the two label namespaces (`<committee
+  // name>` vs `material: …` / `bill text: …`) cannot collide. The sum keeps
+  // pass-rate math and outage-ratio math honest.
+  //
+  // The unit mix only misreads on the digest, where "37 checked" reads like
+  // 37 committees. `checkedBreakdown` carries the split so the status line can
+  // render "12 committee pages, 25 link targets" instead of the ambiguous sum.
+  let committeePages = 0;
+  let linkTargets = 0;
   let upstreamFailures = 0;
   try {
     // Runs first: the reverse diff needs the duplicate set to exclude, and the
     // systemic finding should precede the per-committee ones in the report.
     const legacyDuplicateUrls = await checkLegacyDuplicateUrls(db, findings);
     const diff = await checkMaterialsDiff(db, cfg, findings, legacyDuplicateUrls);
-    checked += diff.checked;
+    committeePages += diff.checked;
     upstreamFailures += diff.upstreamFailures;
   } catch (e) {
     // A pass-level throw (not one committee fetch failing — the whole pass) that
@@ -594,7 +594,7 @@ export async function checkMaterials(db: SupabaseClient, cfg: AuditConfig): Prom
   }
 
   try {
-    checked += await checkLinks(db, cfg, findings);
+    linkTargets += await checkLinks(db, cfg, findings);
   } catch (e) {
     findings.push({
       severity: 'warn',
@@ -603,6 +603,8 @@ export async function checkMaterials(db: SupabaseClient, cfg: AuditConfig): Prom
     });
   }
 
+  const checked = committeePages + linkTargets;
+
   if (checked === 0 && upstreamFailures === 0) {
     return summarizeResult('materials', 0, findings, started, {
       skipped: true,
@@ -610,5 +612,11 @@ export async function checkMaterials(db: SupabaseClient, cfg: AuditConfig): Prom
     });
   }
 
-  return summarizeResult('materials', checked, findings, started, { upstreamFailures });
+  return summarizeResult('materials', checked, findings, started, {
+    upstreamFailures,
+    checkedBreakdown: [
+      { label: 'committee pages', count: committeePages },
+      { label: 'link targets', count: linkTargets },
+    ],
+  });
 }

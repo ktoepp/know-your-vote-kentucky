@@ -2034,3 +2034,75 @@ Warm it is trivial; cold or under contention it blows past the 3 s anon `stateme
 
 - **`Legislator links — weekly sync + verify` run #22 (2026-08-10, scheduled) failed** on `Sync legislators from Open States`: OpenStates `/people` returned 504, 504, then 502 across all 3 retries. Same intermittent-upstream pattern documented in § 2026-07-22 and the 2026-08-05 TASKS.md note (OpenStates cold-endpoint 502/504s, self-healing, no code fix warranted). Vercel's 24h `get_runtime_errors` shows only this same signature (2 occurrences) plus the downstream `[health-check] 1 of 8 monitored sync sources are unhealthy` message it produces — one blip, not two issues.
 - **`accuracy-audit.yml` run #16's `bills` checker crashed** (`ERROR — TypeError: fetch failed`, 0 bills checked) — separate from the committees findings above, likely a network-level transient. Watching for recurrence on the next scheduled run (Sunday 08-16) before treating as more than a blip.
+
+---
+
+## 2026-08-11 — Accuracy checker: one error taxonomy, honest exit codes, dismissible findings
+
+Three PRs merged today (#241, #242, #243) reshape the accuracy-audit system so its runtime behavior matches what its header comments have long claimed. Captured here so the taxonomy does not get relitigated on the next change.
+
+### The taxonomy is now enforced in one place
+
+`src/lib/accuracy-audit/types.ts` owns:
+
+- `isTransientUpstreamError(e)` — HTTP 5xx / 429, gateway timeouts, common `ECONN*` codes, text-matched variants for clients that wrap the upstream status into a message.
+- `classifyCheckerError(e) → 'upstream_outage' | 'crash'`.
+- `outageResult` / `crashResult` / `terminalResultFrom` factories, used by every checker's terminal `catch` block.
+
+**Before:** legislators + committees had ad-hoc `if (isTransientUpstreamError)` blocks; bills + votes decayed to per-item `warn` findings and relied on the report layer's outage ratio; materials never counted `upstreamFailures` at all (a full LRC outage read as content drift); llm-review's Anthropic `catch` produced three warns indistinguishable from real drift. Same event on the same wire read differently depending on which checker saw it.
+
+**After:** every checker routes through the same helpers. Materials and llm-review now increment `upstreamFailures`, so a full LRC outage or a full Anthropic outage lands in the `upstream outage` header state instead of confusing the digest.
+
+### Exit-code contract, matched to the header comment
+
+`hasOperationalError` is **crashes only** (`erroredDomains.length > 0`). Upstream outages exit 0 with a visible outage banner; they are not our bug to page on, and paging on every hiccup trained us to skim past `#errors`. The header state machine now goes:
+
+`operational error` (crash) → `upstream outage` → `under-coverage` → `content failures` → `content warnings` → `all clear`
+
+Content `fail` findings still surface but do not fail CI, per § 2026-06-03.
+
+### Under-coverage as a first-class state (#243)
+
+A checker returning `checked = 0` with no error or outage used to headline `all clear` — exactly what a Supabase auth token silently returning an empty set would produce. `DEFAULT_COVERAGE_FLOORS` sizes a per-domain minimum against production totals (legislators 100 / 138 seats, bills 5 / 40, and so on); `applyCoverageFloors` annotates the result and the digest headlines `under-coverage (bills, votes)` between outage and content states. Overridable per domain via `ACCURACY_<DOMAIN>_MIN_CHECKED=0` to opt out.
+
+### Session-scoped fingerprint (#242)
+
+`findingFingerprint` hashes `(domain, entity, field, message, session)`. Bill numbers repeat every session — 17 different `HB142`s exist across 2010–2026 — so the old payload collided across sessions and labeled a fresh 2026 defect as "recurring for 300+ days." Only bills-domain findings populate `session` today; other domains have globally-unique entity keys (`roll_call_id`, `openstates_id`, committee slug) and hash on an empty session component, keeping their fingerprints stable across the change.
+
+Existing `ky_accuracy_findings` rows are not re-keyed. Bills-domain recurrence reads "new" for one cycle after the migration lands and then behaves correctly.
+
+### Deferred rotation stamps (#242)
+
+`sampling.ts` accepts `rotation.stamp: 'defer'`. Chosen keys buffer in a per-run map; the orchestrator calls `finalizeRotation(scope, 'commit' | 'discard')` after the checker's disposition is known. Commit on real success (`!error && !outage && !skipped`), discard on anything else, and **always discard in `--dry-run`**. An outage week no longer pushes unverified rows to the back of the queue, and repeated `npm run audit:accuracy:dry` no longer silently shifts stateful rotation.
+
+### Dismissed findings (#242)
+
+Migration 052 adds `ky_accuracy_dismissed_findings(fingerprint PK, reason, note, added_by, dismissed_at, expires_at)`. Filtered out at the aggregation boundary in the orchestrator, so the digest, the `ky_accuracy_findings` write, and the LLM triage payload all see the same view. `npm run audit:dismiss list | add | remove` from `scripts/dismiss-finding.ts` manages the table. Every finding now prints its fingerprint as `[fp=…]` in the console output so an operator can copy-paste.
+
+Expiry is filtered in code, not by the index — Postgres refuses `now()` in an index predicate (`42P17: functions in index predicate must be marked IMMUTABLE`) because `now()` is `STABLE`, not `IMMUTABLE`. Frozen anchor dates in the predicate would have been worse than the runtime filter at this cardinality.
+
+### Concurrency + dry-run hardening (#243)
+
+- `accuracy-audit.yml` gains `concurrency: accuracy-audit` with `cancel-in-progress: false`. Two overlapping runs used to interleave writes to `ky_accuracy_findings`, and each run's `fetchRecurrence` saw the other's fresh rows and mislabeled new findings as recurring.
+- `--dry-run` now forces `skipLlm = true` (so a preview does not spend Anthropic tokens) and forces rotation `discard`. Explicit CLI `--skip-llm` still wins if an operator specifically wants to debug the LLM pass in dry mode.
+
+### Triage boundary is enforced mechanically, not by norm (#241)
+
+`scripts/triage-findings.ts` reads `outage`, `outageSource`, `underCoverage`, `coverageFloor` from `domain_summary` and passes them to the model separately from findings. Findings belonging to outaged domains are filtered before the payload is built, so the model cannot advise on "drift" for a source that was down. Finding fields are whitespace-normalized and clipped to 240 chars before landing in the prompt — raw upstream HTML in `expected` / `actual` was reaching the model unfiltered. System prompt teaches the crash / outage / drift / advisory taxonomy and instructs the model to ignore imperative-looking finding text.
+
+### Notification wording is uniform
+
+`KY Vote — <thing>` header across the accuracy digest, triage follow-up, source-health, health-check failure, and the workflow fallback. Small change, but a scanner can spot the source at a glance.
+
+### Docs
+
+`docs/accuracy-audit.md` is the reference for the taxonomy, exit codes, sampling / rotation, fingerprinting, dismissed findings, notifications, triage boundary, how to add a new checker, and the `ACCURACY_*` env vars. Header comments in code remain authoritative for anything not covered there.
+
+### Still open
+
+- **Materials `checked` unit split** — the field currently sums committees-diffed and link-targets-probed; `passed/checked` reads uninterpretable. Addressed in the same PR that added this entry.
+- **LLM cost cap + glossary cache.** `activeDays` widening balloons cost silently. Glossary entries are re-sent every run.
+- **Retention on `ky_accuracy_findings`.** Fingerprint scans are already per-fingerprint full-history sorts. Fine now, slow at a year.
+- **Trend view.** `ky_accuracy_runs` is written weekly and read by nothing.
+- **Vercel monitoring digest routine** (formerly "System health check") narrowed to read-only Vercel MCP output; first exercise pending.
+- **Retired the daily kyvky.com spot-check routine** — the weekly audit covers all five of its domains with better fidelity, rotation, and history.
