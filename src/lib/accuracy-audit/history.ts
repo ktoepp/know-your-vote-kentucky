@@ -136,6 +136,11 @@ export async function recordAuditRun(
         outage: r.outage ?? false,
         outageSource: r.outageSource ?? null,
         upstreamFailures: r.upstreamFailures ?? 0,
+        // Under-coverage marks a domain whose checker "succeeded" but verified
+        // less than the configured floor — a silent Supabase-empty-set failure.
+        // Triage should not treat such a domain's findings as full coverage.
+        underCoverage: r.underCoverage ?? false,
+        coverageFloor: r.coverageFloor ?? null,
       };
     }
 

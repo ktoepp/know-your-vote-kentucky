@@ -25,6 +25,16 @@ on:
 permissions:
   contents: read
 
+# One audit at a time. Without this, a manual `workflow_dispatch` during the
+# Sunday cron would interleave writes to ky_accuracy_findings, and each run's
+# `fetchRecurrence` would see the other's fresh rows and mislabel new findings
+# as recurring. `cancel-in-progress: false` because a running audit shouldn't be
+# killed mid-way (its 45m ceiling already bounds it); the second attempt queues
+# and either fires after the first finishes or is superseded by a newer request.
+concurrency:
+  group: accuracy-audit
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 

@@ -9,6 +9,33 @@
 import type { CheckerResult, Finding, Severity } from './types';
 
 /**
+ * Annotate results where the checker ostensibly succeeded but verified fewer
+ * items than the floor. Silent "checked=0" runs used to read as "all clear";
+ * this makes them a distinct state. Applied AFTER dismissals so a domain
+ * whose only findings were dismissed doesn't get double-flagged for a lower
+ * "kept" count.
+ *
+ * Never touches domains that already have a stronger state (error / outage /
+ * skip). A crashed domain has already told us the checker didn't verify — no
+ * need to add "and it didn't verify much either".
+ */
+export function applyCoverageFloors(
+  results: CheckerResult[],
+  floors: Record<string, number>,
+): { results: CheckerResult[]; underCoverageDomains: string[] } {
+  const under: string[] = [];
+  const out = results.map((r) => {
+    if (r.error || r.outage || r.skipped) return r;
+    const floor = floors[r.domain] ?? 0;
+    if (floor <= 0) return r;
+    if (r.checked >= floor) return r;
+    under.push(r.domain);
+    return { ...r, underCoverage: true, coverageFloor: floor };
+  });
+  return { results: out, underCoverageDomains: under };
+}
+
+/**
  * Drop findings whose fingerprint has been dismissed. Re-derives per-domain
  * counts (warnings/failures/passed) from the remaining findings so the report
  * layer never accidentally re-surfaces a dismissed row via a stale count.
@@ -73,6 +100,12 @@ export interface AuditSummary {
    * operators to skim past a channel that should mean "act now".
    */
   upstreamOutageDomains: string[];
+  /**
+   * Domains that returned an ostensibly successful result but verified fewer
+   * items than the configured floor — the "Supabase auth token silently
+   * returned an empty set" failure mode. Reported visibly, exits 0.
+   */
+  underCoverageDomains: string[];
   /** True when any content `fail` finding occurred (reported, but does not fail CI). */
   hasHardFailures: boolean;
   /**
@@ -98,6 +131,7 @@ export function summarizeAudit(results: CheckerResult[], startedAtMs: number, se
   let failures = 0;
   const erroredDomains: string[] = [];
   const upstreamOutageDomains: string[] = [];
+  const underCoverageDomains: string[] = [];
 
   for (const r of results) {
     checked += r.checked;
@@ -128,7 +162,12 @@ export function summarizeAudit(results: CheckerResult[], startedAtMs: number, se
       upstreamFailures / attempted >= UPSTREAM_OUTAGE_RATIO
     ) {
       upstreamOutageDomains.push(r.domain);
+      continue;
     }
+
+    // Only reached when the checker succeeded outright — under-coverage lives
+    // here so it can't fire on a domain that already has a stronger state.
+    if (r.underCoverage) underCoverageDomains.push(r.domain);
   }
 
   return {
@@ -139,6 +178,7 @@ export function summarizeAudit(results: CheckerResult[], startedAtMs: number, se
     failures,
     erroredDomains,
     upstreamOutageDomains,
+    underCoverageDomains,
     hasHardFailures: failures > 0 || erroredDomains.length > 0,
     // Crashes ONLY. An upstream outage is not an operational error we can act on
     // — it exits 0 and posts a visible outage banner instead of turning CI red.
@@ -173,6 +213,12 @@ function domainStatusLine(r: CheckerResult): string {
   if (r.upstreamFailures) parts.push(`${r.upstreamFailures} upstream fetch failure(s)`);
   if (r.failures > 0) parts.push(`${r.failures} fail`);
   if (r.warnings > 0) parts.push(`${r.warnings} warn`);
+  // Under-coverage is a warning about the RUN itself, not the content — the
+  // domain succeeded but verified less than we expect. Called out on its own
+  // line so it isn't buried in the counts.
+  if (r.underCoverage) {
+    parts.push(`UNDER-COVERAGE (floor ${r.coverageFloor ?? '?'})`);
+  }
   return `• ${r.domain}: ${parts.join(', ')}`;
 }
 
@@ -223,6 +269,11 @@ function slackStatusLabel(summary: AuditSummary): string {
   }
   if (summary.upstreamOutageDomains.length > 0) {
     return `upstream outage (${summary.upstreamOutageDomains.join(', ')})`;
+  }
+  // Under-coverage before content-level states: it means "the run itself may
+  // not have verified enough", which changes how much weight the counts carry.
+  if (summary.underCoverageDomains.length > 0) {
+    return `under-coverage (${summary.underCoverageDomains.join(', ')})`;
   }
   if (summary.failures > 0) return 'content failures';
   if (summary.warnings > 0) return 'content warnings';
