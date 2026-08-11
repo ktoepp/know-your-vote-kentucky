@@ -8,7 +8,9 @@
  *   npx tsx scripts/accuracy-audit.ts
  *   npx tsx scripts/accuracy-audit.ts --domain=bills,votes
  *   npx tsx scripts/accuracy-audit.ts --no-llm
- *   npx tsx scripts/accuracy-audit.ts --dry-run        # run + print, never post to Slack
+ *   npx tsx scripts/accuracy-audit.ts --dry-run        # preview: no Slack, no
+ *                                                      # DB write, no LLM spend,
+ *                                                      # no rotation shift
  *   npx tsx scripts/accuracy-audit.ts --json           # machine-readable output
  *
  * Requires: SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL).
@@ -47,6 +49,7 @@ import { checkCommittees } from '../src/lib/accuracy-audit/checkers/committees';
 import { checkMaterials } from '../src/lib/accuracy-audit/checkers/materials';
 import { checkLlm } from '../src/lib/accuracy-audit/checkers/llm-review';
 import {
+  applyCoverageFloors,
   applyDismissals,
   formatConsoleReport,
   formatSlackReport,
@@ -233,13 +236,17 @@ async function main() {
     // Rotation stamps buffered by sampling.ts (`stamp: 'defer'`) commit only
     // when the checker actually verified its sample. An outage / crash / skip
     // discards them, so those rows keep their old `last_audited_at` and rise
-    // back to the top of the rotation next run. Scopes not belonging to this
-    // domain are left alone — a later domain will finalize them.
+    // back to the top of the rotation next run. A dry-run always discards —
+    // a preview should never shift stateful rotation, or repeated `npm run
+    // audit:accuracy:dry` would silently rotate the coverage queue.
+    // Scopes not belonging to this domain are left alone — a later domain will
+    // finalize them.
     const succeeded = !result.error && !result.outage && !result.skipped;
+    const disposition = cfg.dryRun ? 'discard' : succeeded ? 'commit' : 'discard';
     for (const scope of pendingRotationScopes()) {
       if (scope !== domain) continue;
       try {
-        await finalizeRotation(db, scope, succeeded ? 'commit' : 'discard');
+        await finalizeRotation(db, scope, disposition);
       } catch (e) {
         // Best-effort: never let rotation bookkeeping fail the run.
         console.error(
@@ -265,7 +272,20 @@ async function main() {
     );
   }
 
-  const summary = summarizeAudit(filteredResults, startedAtMs, cfg.seed);
+  // Under-coverage annotation. Applied after dismissals so the check uses the
+  // as-reported view. A domain that came back "checked=0, all_clear" because
+  // Supabase silently returned an empty set is now a distinct, visible state.
+  const { results: withFloors, underCoverageDomains } = applyCoverageFloors(
+    filteredResults,
+    cfg.coverageFloors,
+  );
+  if (underCoverageDomains.length > 0) {
+    console.log(
+      `[accuracy-audit] under-coverage: ${underCoverageDomains.join(', ')} (below configured ACCURACY_<DOMAIN>_MIN_CHECKED)`,
+    );
+  }
+
+  const summary = summarizeAudit(withFloors, startedAtMs, cfg.seed);
 
   // Recurrence must be read *before* this run's findings are written, or every
   // finding would look like it had been seen before (by itself).

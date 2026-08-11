@@ -71,6 +71,16 @@ export interface CheckerResult {
    * escalates the domain to `outage` instead of surfacing it as drift.
    */
   upstreamFailures?: number;
+  /**
+   * The domain ostensibly succeeded (no error, no outage, no skip) but verified
+   * fewer items than the configured floor. Silent "checked=0" runs used to be
+   * indistinguishable from clean ones — a Supabase auth token that quietly
+   * returned an empty set headlined "all clear". Reported visibly in the digest;
+   * exits 0 (it's a warning, not a crash).
+   */
+  underCoverage?: boolean;
+  /** Floor consulted for {@link underCoverage}. Rendered on the status line. */
+  coverageFloor?: number;
 }
 
 export interface AuditConfig {
@@ -117,6 +127,14 @@ export interface AuditConfig {
   domains: Set<string> | null;
   /** Seed for randomized sampling; reuse to reproduce a run's exact selection. */
   seed: number;
+  /**
+   * Per-domain lower bound on `CheckerResult.checked` before the domain is
+   * flagged `underCoverage`. Applied only when the checker ostensibly succeeded
+   * — an outage/crash/skip has its own signal and is not double-flagged.
+   * Defaults live in {@link DEFAULT_COVERAGE_FLOORS}; overridable via
+   * `ACCURACY_<DOMAIN>_MIN_CHECKED` env vars.
+   */
+  coverageFloors: Record<AuditDomain, number>;
 }
 
 export const ALL_DOMAINS = [
@@ -129,6 +147,27 @@ export const ALL_DOMAINS = [
 ] as const;
 
 export type AuditDomain = (typeof ALL_DOMAINS)[number];
+
+/**
+ * Minimum `checked` per domain before the run is flagged `underCoverage`.
+ *
+ * Sized against real production totals: sample-based checkers get a floor well
+ * below their configured limit so ordinary variance never trips it, and the
+ * whole-corpus checkers (legislators, committees) get a floor tied to something
+ * that can't legitimately be zero (100 House + 38 Senate = 138 active
+ * legislators, and the stored-corpus invariants alone touch every meeting).
+ *
+ * A floor of 0 opts the domain out. Individual values are overridable via env,
+ * e.g. `ACCURACY_BILLS_MIN_CHECKED=10`.
+ */
+export const DEFAULT_COVERAGE_FLOORS: Record<AuditDomain, number> = {
+  bills: 5,
+  votes: 2,
+  legislators: 100,
+  committees: 5,
+  materials: 3,
+  llm: 5,
+};
 
 function envInt(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
@@ -167,6 +206,14 @@ function resolveSeed(override?: number): number {
 
 /** Build an {@link AuditConfig} from `ACCURACY_*` env vars, applying CLI overrides. */
 export function buildAuditConfig(overrides: AuditConfigOverrides = {}): AuditConfig {
+  const dryRun = overrides.dryRun ?? false;
+  // Dry-run is a preview: never post, never persist, never spend on non-essentials.
+  // Anthropic tokens are the biggest discretionary cost in a run — a `npm run
+  // audit:accuracy:dry` shouldn't burn them just to eyeball the deterministic
+  // diff. Explicit CLI override still wins so an operator debugging the LLM
+  // pass can force it back on with `--dry-run` (they'd need to unset skipLlm
+  // via the env in that unusual case).
+  const skipLlm = overrides.skipLlm ?? (dryRun || envBool('ACCURACY_SKIP_LLM'));
   return {
     seed: resolveSeed(overrides.seed),
     activeDays: envInt('ACCURACY_ACTIVE_DAYS', envInt('ACCURACY_DAYS', 365)),
@@ -177,11 +224,17 @@ export function buildAuditConfig(overrides: AuditConfigOverrides = {}): AuditCon
     linkSampleLimit: envInt('ACCURACY_LINK_SAMPLE', 25),
     probeLinks: envBool('ACCURACY_PROBE_LINKS'),
     llmSample: envInt('ACCURACY_LLM_SAMPLE', 8),
-    skipLlm: overrides.skipLlm ?? envBool('ACCURACY_SKIP_LLM'),
+    skipLlm,
     llmModel: process.env.ACCURACY_LLM_MODEL?.trim() || KY_DEFAULT_ANTHROPIC_MODEL,
     legiscanQuotaStopPct: envInt('ACCURACY_LEGISCAN_QUOTA_STOP_PCT', 95),
-    dryRun: overrides.dryRun ?? false,
+    dryRun,
     domains: overrides.domains ?? null,
+    coverageFloors: Object.fromEntries(
+      ALL_DOMAINS.map((d) => [
+        d,
+        envInt(`ACCURACY_${d.toUpperCase()}_MIN_CHECKED`, DEFAULT_COVERAGE_FLOORS[d]),
+      ]),
+    ) as Record<AuditDomain, number>,
   };
 }
 
