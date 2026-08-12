@@ -50,8 +50,11 @@ const nextConfig: NextConfig = {
     ],
   },
   async redirects() {
-    const apex = 'https://kyvky.com';
-    const hostsToApex = [
+    // Canonical host is www (confirmed live: apex 301s to www, and page
+    // canonical/og:url both resolve to https://www.kyvky.com). Point alternate
+    // domains straight here so they don't chain alternate -> apex -> www.
+    const canonicalOrigin = 'https://www.kyvky.com';
+    const hostsToCanonical = [
       'knowyourvotekentucky.com',
       'www.knowyourvotekentucky.com',
       'knowyourvotekentucky.org',
@@ -60,10 +63,10 @@ const nextConfig: NextConfig = {
       'www.knowyourvoteky.com',
     ];
     return [
-      ...hostsToApex.map((host) => ({
+      ...hostsToCanonical.map((host) => ({
         source: '/:path*',
         has: [{ type: 'host' as const, value: host }],
-        destination: `${apex}/:path*`,
+        destination: `${canonicalOrigin}/:path*`,
         permanent: true,
       })),
       {
