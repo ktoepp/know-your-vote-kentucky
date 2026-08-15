@@ -69,7 +69,7 @@ function LandingFeatureCard({
 export function LandingFeatures({ currentSessionBillCount }: { currentSessionBillCount?: number }) {
   const billsBody =
     currentSessionBillCount && currentSessionBillCount > 0
-      ? `Browse and search ${currentSessionBillCount.toLocaleString()} bills & resolutions by topic`
+      ? `Browse and search ${currentSessionBillCount.toLocaleString('en-US')} bills & resolutions by topic`
       : undefined;
 
   return (
