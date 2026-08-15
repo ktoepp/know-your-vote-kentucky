@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Container, Divider, Link as MuiLink, Stack, Typography } from '@mui/material';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -54,6 +54,13 @@ const footerLegalLinks = [
 ];
 
 export default function SiteFooter() {
+  // Server-rendered year is UTC and can disagree with the browser's local year
+  // for a few hours around Jan 1; also, cached SSR HTML from a prior year would
+  // mismatch after rollover. Resolve on mount to keep hydration stable.
+  const [year, setYear] = useState<number | null>(null);
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
   return (
     <Box
       component="footer"
@@ -159,7 +166,7 @@ export default function SiteFooter() {
           }}
         >
           <Typography variant="caption" color="text.secondary">
-            © {new Date().getFullYear()} Know Your Vote Kentucky
+            © {year ?? ''} Know Your Vote Kentucky
           </Typography>
           <Typography variant="caption" color="text.disabled" aria-hidden>·</Typography>
           <Typography variant="caption" color="text.secondary">

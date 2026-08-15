@@ -1,7 +1,7 @@
 {
   "name": "know-your-vote-kentucky",
   "version": "0.1.1",
-  "description": "Kentucky General Assembly transparency app \u2014 bills, members, district map \u2014 Next.js 15, Supabase, LegiScan & Open States.",
+  "description": "Kentucky General Assembly transparency app — bills, members, district map — Next.js 15, Supabase, LegiScan & Open States.",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -92,6 +92,7 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^5.15.15",
     "@mui/material": "^5.15.15",
+    "@mui/material-nextjs": "^5.18.0",
     "@mui/system": "^5.15.15",
     "@sentry/nextjs": "^10.51.0",
     "@supabase/ssr": "^0.8.0",
