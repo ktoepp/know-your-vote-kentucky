@@ -90,11 +90,11 @@ SYNC_API_KEY=your_sync_api_key_here
 # Used by GET /api/cron/notify (Vercel Cron: 11:00 UTC daily — see vercel.json).
 # RESEND_API_KEY=re_xxxxxxxx
 # RESEND_FROM_EMAIL=alerts@kyvky.com
-# APP_PUBLIC_URL=https://kyvky.com
+# APP_PUBLIC_URL=https://www.kyvky.com
 # DIGEST_DRY_RUN=true
 #
 # Resend webhooks (bounce / complaint handling).
-# Resend dashboard → Webhooks → add endpoint https://kyvky.com/api/webhooks/resend
+# Resend dashboard → Webhooks → add endpoint https://www.kyvky.com/api/webhooks/resend
 # with events: email.delivered, email.bounced, email.complained, email.delivery_delayed.
 # Copy the "Signing Secret" (whsec_...) into RESEND_WEBHOOK_SECRET.
 # RESEND_WEBHOOK_SECRET=whsec_xxxxxxxx
@@ -103,7 +103,8 @@ SYNC_API_KEY=your_sync_api_key_here
 # OPTIONAL — Application Settings
 # =============================================================================
 NODE_ENV=development
-# Public site origin (sitemap.xml, robots.txt, metadata). Production: https://kyvky.com
+# Public site origin (sitemap.xml, robots.txt, metadata). Production: https://www.kyvky.com
+# Use the canonical www host, not the apex — the apex 301s to www.
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # =============================================================================
