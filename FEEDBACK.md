@@ -59,6 +59,17 @@
 - Action: operator follow-up — reply to Iva accepting the intros; track resulting feedback as new entries here.
 - Status: open
 
+### 2026-08-16 — PMF survey wave 1: the instrument is the finding, not the result  [#5]
+- Source: posthog:product-market-fit-pmf
+- Verbatim:
+  > New to your site.
+  > ~ The only open-text answer in the wave. The other eight respondents answered the multiple-choice questions and left the free-text box empty.
+- Theme: survey-instrumentation, retention, measurement
+- Artifact: docs/feedback/pmf-survey-2026-08-16.csv (9 rows, iteration 1, 2026-06-30 → 2026-08-10)
+- Summary: 371 unique visitors saw the popover; 9 responded (2.4%), 81 dismissed it (21.8%), 281 ignored it entirely (75.7%). Only 5 reached Q2 and 1 reached Q3. Three respondents answered "Never" to "How often do you use Know Your Vote Kentucky?" — the popover fires 5 seconds into a first visit, so Q1 is measuring "is this your first time here," not usage frequency. The classic PMF read (share answering "very disappointed") is 2 of 5 here, which is a denominator too small to report as anything. 5 of 9 responses came from Kentucky cities, 2 more from the Cincinnati border metro. The survey most often fired on the district map rather than a bill page.
+- Action: none yet — two instrument changes are the prerequisite for the wave-2 data being worth reading: (a) gate the popover on a return visit or a second pageview so Q1 stops collecting first-visit "Never" answers, and (b) shorten the wave to the questions that earn their place, since 4 of 9 respondents dropped after Q1. Deploying the Strategy §4 survey instrument as written would inherit the same first-visit problem. Do not cite wave-1 numbers externally except as instrumentation evidence with n shown.
+- Status: triaged
+
 ---
 
 ## In progress
