@@ -173,7 +173,7 @@ These feed `/admin/sync-status` (requires `ADMIN_TOKEN`).
 
 Vercel project. Set `CRON_SECRET` (16+ random chars) — Vercel Cron invokes `/api/sync?source=…` with `Authorization: Bearer <CRON_SECRET>`. Manual operator runs can use `SYNC_API_KEY` instead. At least one of the two must be configured.
 
-Canonical origin is `https://kyvky.com` (`NEXT_PUBLIC_APP_URL` / `APP_PUBLIC_URL`). `next.config.ts` 308-redirects `www.kyvky.com` and legacy hosts.
+Canonical origin is `https://www.kyvky.com` (`NEXT_PUBLIC_APP_URL` / `APP_PUBLIC_URL`, and the `DEFAULT_SITE_ORIGIN` fallback in `src/lib/site-canonical.ts`). The apex 301s to `www`, and `next.config.ts` redirects the legacy hosts (`knowyourvotekentucky.com/.org`, `knowyourvoteky.com`) straight to `www` so nothing chains through the apex. Do not set either env var to the apex — it costs a redirect hop, drops auth-token URL fragments, and breaks webhook POSTs.
 
 See **[docs/launch-checklist.md](./docs/launch-checklist.md)** for the operator launch checklist (Resend DKIM, Sentry alerts, inbox routing, legal review, email-client QA, Vercel env cleanup, regression cadence).
 
