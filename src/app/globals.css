@@ -124,6 +124,19 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: inherit;
 }
 
+/* Outlined MUI fields already draw their own focus indicator: on focus the
+   notched `fieldset` border goes 1px neutral -> 2px primary around the whole
+   control, adornments included. The global ring above additionally outlined the
+   bare `<input>` inside it, which sits narrower than the fieldset, so every
+   focused text field and Select rendered TWO concentric blue rings (visible on
+   the nav search and the /search bar). Keep the fieldset ring — it encloses the
+   full control — and drop the redundant inner one. Scoped to `.MuiOutlinedInput-root`
+   so standard/filled variants, whose only affordance is the underline, keep the
+   global ring. */
+.MuiOutlinedInput-root .MuiInputBase-input:focus-visible {
+  outline: none;
+}
+
 /* Skip link */
 .skip-link {
   position: absolute;
