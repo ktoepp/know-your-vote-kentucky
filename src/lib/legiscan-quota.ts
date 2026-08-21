@@ -57,7 +57,8 @@ export type LegiscanQuotaGuardResult = {
 
 /**
  * Thrown by `KyLegiScanClient.request()` when monthly quota is at/above the sync hold threshold.
- * Caught upstream by sync callers (mark the run skipped) and by bill-detail render (fall back to DB).
+ * Caught upstream by sync callers, which mark the run skipped. The bill-detail render path no
+ * longer touches LegiScan at all (decisions.md § 2026-06-26), so nothing on the read path catches this.
  */
 export class LegiscanQuotaHoldError extends Error {
   readonly summary: LegiscanQuotaSummary | null;

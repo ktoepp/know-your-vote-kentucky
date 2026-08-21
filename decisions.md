@@ -2106,3 +2106,61 @@ Expiry is filtered in code, not by the index — Postgres refuses `now()` in an 
 - **Trend view.** `ky_accuracy_runs` is written weekly and read by nothing.
 - **Vercel monitoring digest routine** (formerly "System health check") narrowed to read-only Vercel MCP output; first exercise pending.
 - **Retired the daily kyvky.com spot-check routine** — the weekly audit covers all five of its domains with better fidelity, rotation, and history.
+
+---
+
+## 2026-08-21 — LegiScan Push vs Pull: stay on Pull; the "97% ceiling" was a pre-fix read-path artifact
+
+Triggered by LegiScan's 2026-08-18 reply to the nonprofit-pricing email (Notion → Strategic Hub → Drafts to Send, draft 1). Their answer moved four things: no NPO discount on the API line; published Pull pricing (2-state 100k = $1,100/yr, 5-state = $1,400/yr); overage is a hard reset, not billing; and **Push exists** — full replication of the subscribed states refreshed every 4h, which in their words makes "the Pull interface largely irrelevant." They also reframed the free cap: the Public limit is set at *3x a typical single-state use case*, so maxing it out off-peak on one state means "query spend is not optimized," not that the state has outgrown the tier. Push pricing was not quoted; that is the standing follow-up.
+
+**Decision: do not re-establish a push/pull workflow, and do not price Push yet.** The premise the whole question rests on is stale.
+
+### The number that drove this was already fixed two months before the email went out
+
+`ky_sync_state.legiscan_query_counter` holds the real monthly series:
+
+| Month | Queries | % of 30,000 |
+|---|---:|---:|
+| 2026-04 | 917 | 3.1% |
+| 2026-05 | 17,265 | 57.6% |
+| 2026-06 | **29,164** | **97.2%** |
+| 2026-07 | 5,443 | 18.1% |
+| 2026-08 (through 08-21) | 750 | 2.5% |
+
+June's 29,164 is the number quoted in the funder budget, in the pricing email, and on three Notion strategy pages. It is not a baseline — it is the last month before [§ 2026-06-26 — Bill detail rendered entirely from the DB](#2026-06-26--bill-detail-rendered-entirely-from-the-db-no-live-legiscan-on-the-read-path) shipped. Until that fix, the bill-detail **read path** issued up to 12 `getRollCall` calls per bill on every cache miss, so quota scaled with **page traffic**, not with legislative activity. That is why May and June — both interim months, when the General Assembly was producing almost nothing — were the two most expensive months on record.
+
+Post-fix the read path makes zero LegiScan calls. July ran 5,443 and August is tracking ~1,100/month. **Steady-state pull spend is 2–18% of the free cap, not 97%.**
+
+This also means the pricing email's framing was accurate about the *mechanism* ("usage is driven by a sync job polling for status changes rather than by visitor traffic") but had it backwards for the month it cited: June's spend was overwhelmingly visitor-traffic-driven. LegiScan diagnosed an optimization problem from the outside; we had already found and fixed it from the inside, seven weeks earlier.
+
+### The Pull loop already implements what their Crash Course prescribes
+
+Checked line by line against `docs/reference/legiscan/LegiScan-API-Crash-Course.txt`:
+
+- **Work Loop** — `syncKyBillsByHash` polls `getMasterListRaw`, compares `change_hash` against the stored value, and spends a `getBill` only on changed/new bills. Idle runs cost ~2 calls.
+- **Hashes** — used on both axes: `change_hash`/`bill_id` for bills, `dataset_hash`/`session_id` for archives (`legiscan-dataset-weekly.yml` skips unchanged sessions at zero download cost).
+- **Datasets** — `sync-ky-dataset.ts` already pulls whole-session ZIPs at ~1 call per session; [§ 2026-07-31](#) established the cost lesson (re-importing a session from the dataset is ~13 calls vs ~6,944 for the equivalent per-bill backfill).
+- **Local caching** — in-process response cache plus a 7d `getSessionList` cache in `ky_sync_state`.
+- **Quota guard** — `checkLegiscanQuotaForSync` holds all callers at 95%, and the client is the single chokepoint.
+
+There is no obvious optimization left on the table that Push would buy us. What Push buys is *replication*, and we do not want a replica: we want a small, purpose-shaped subset (KY bills, votes, people, committees) upserted into a schema built for this product's read patterns. Adopting Push means standing up and maintaining their full SQL schema plus the turnkey client, for a corpus we deliberately do not store.
+
+### Where Push would actually earn its price
+
+Not on Kentucky. The case to re-open is **two states at session peak**, which is the one load we have never observed post-fix:
+
+- Every month in the counter is either pre-fix or interim. The 2027 Regular Session (Jan–mid-Apr) is the first honest test of the current architecture under session load.
+- Rough sizing for one state at session peak: ~150 `getMasterListRaw` + one `getBill` per bill-change event (a few hundred a day on busy days) + votes + the weekly audit ≈ **8,000–15,000/month**. Comfortable alone; **16,000–30,000 for two states**, which is the first number in this whole exercise that actually approaches the cap.
+- So the sequence is: instrument → observe one real session → *then* decide, with the WV decision as the trigger rather than a stale percentage.
+
+### Trade-offs accepted
+
+- **Freshness stays at ~4.8h** (4× 6-hourly GH Actions + the 05:00 UTC Vercel cron), versus Push's 4h. Effectively a wash, and neither is same-hour.
+- **We stay exposed to a per-bill `getBill` fan-out** during a high-activity session. Mitigated, not eliminated, by moving the weekly reconcile onto the Dataset path (below) — the deferred idea from [§ 2026-06-26 quota-guard](#2026-06-26--legiscan-quota-guard-moved-into-the-client--edge-triggered-slack-alerts), now worth doing on its merits rather than as insurance.
+- **We defer a vendor conversation** that is already open and warm. Accepted: asking for Push pricing now would be asking against a number we have just disproved.
+
+### Loose end worth closing regardless
+
+LegiScan said they hold **no API keys registered to `kyvky.com`** and cannot see our usage. Whatever key `LEGISCAN_API_KEY` carries sits under some other account or domain. That is worth resolving before any paid tier is discussed — and their Housekeeping rules make it sharper than a billing nicety: *"Creating multiple Public API service keys is prohibited and will result in suspended access."* Identify the account the key belongs to before registering anything new.
+
+**Revisit if:** the 2027 session pushes a single Kentucky month past ~20,000 queries; or the second state is committed and instrumented session data projects two states over ~25,000; or LegiScan changes the Public tier. Not before.
