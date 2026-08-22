@@ -10,6 +10,7 @@ import { Resend } from 'resend';
 import { getAuthedUser } from '@/lib/supabase/route-auth';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { WelcomeEmail } from '@/lib/email/welcome-email';
+import { emailLogoSrc } from '@/lib/email/brand';
 import { publicSiteOrigin } from '@/lib/site-canonical';
 
 export const runtime = 'nodejs';
@@ -87,6 +88,9 @@ export async function POST(request: NextRequest) {
       profileHref={`${origin}/profile`}
       preferencesHref={`${origin}/profile#notifications`}
       districtMapHref={`${origin}/members/map`}
+      aboutHref={`${origin}/about`}
+      logoSrc={emailLogoSrc(origin)}
+      homeHref={origin}
       privacyHref={`${origin}/privacy`}
       termsHref={`${origin}/terms`}
     />

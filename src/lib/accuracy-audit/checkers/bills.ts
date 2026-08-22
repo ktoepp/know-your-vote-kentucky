@@ -43,7 +43,7 @@ interface BillRow {
 }
 
 /**
- * KYVKY intentionally stores the official KY legislature record URL (e.g.
+ * KYvKY intentionally stores the official KY legislature record URL (e.g.
  * apps.legislature.ky.gov / lrc.ky.gov), which differs from LegiScan's own
  * `bill.url` (a legiscan.com page). So we don't compare for string equality —
  * we only confirm a usable URL is stored and its host is one we trust.
@@ -287,7 +287,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
     } else if (row.bill_text_url) {
       // A full value comparison against upstream is NOT possible here: `getBill`
       // exposes only legiscan.com-hosted links (`bill.url`, `texts[].url`), while
-      // KYVKY deliberately stores the official KY legislature record page. The
+      // KYvKY deliberately stores the official KY legislature record page. The
       // doc_id in texts[] identifies a LegiScan text document, not anything present
       // in the stored URL, so there is nothing to equate.
       //

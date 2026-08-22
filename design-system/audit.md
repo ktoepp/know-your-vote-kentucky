@@ -1,6 +1,6 @@
 # Design System v1.1 — Audit
 
-Accessibility, functionality, and ICP evaluation of the KYVKY design system,
+Accessibility, functionality, and ICP evaluation of the KYvKY design system,
 plus the v1.1 status of each finding. Companion to
 [`guidelines.md`](./guidelines.md) and [`cleanup.md`](./cleanup.md).
 

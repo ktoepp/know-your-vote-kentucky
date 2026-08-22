@@ -4,7 +4,7 @@ This guide governs **all user-facing copy** — the site, emails, and any future
 
 ## Who we are
 
-Know Your Vote Kentucky (KYVKY) is a free, independent, non-partisan civic reference for Kentucky residents. The voice should signal three things at all times: **trustworthy, neutral, and accessible.** We are closer to a reliable government tracking service than to a startup.
+Know Your Vote Kentucky (KYvKY) is a free, independent, non-partisan civic reference for Kentucky residents. The voice should signal three things at all times: **trustworthy, neutral, and accessible.** We are closer to a reliable government tracking service than to a startup.
 
 ## Principles
 
@@ -49,6 +49,29 @@ The **marketing surface** (home/landing hero, the About intro) may be *a little*
 
 **Counts.** "141 members," not "141 people."
 
+**Brand stylization.** **KYvKY**, lowercase v, everywhere the short form appears: user-facing copy, code comments, internal audit output, and docs. `structured-data.ts` (`alternateName`) and `llms.txt` already declared it, but the all-caps form had spread to four user-facing strings and ~33 other places; all were converted 2026-08-22. The only intentional exceptions are the `KYVKY_POSTAL_ADDRESS` constant (an identifier, not prose) and historical `decisions.md` / `TASKS.md` entries, which are append-only records. Full name "Know Your Vote Kentucky" on first use in a formal context; the short form is fine thereafter.
+
+**No em dashes.** Katie's call, 2026-08-22. Use a colon when the second half explains the first ("when it moves: committee action, floor votes"), a comma for a light aside ("LegiScan, synced daily during session"), or a full stop when the clause can stand alone ("We send factual updates only. No AI-generated summaries in digest emails."). Applied to `/about` and the welcome email in full on 2026-08-22, including copy that predated the change. **Not yet swept sitewide** — the digest email, glossary, banners, and browse surfaces still carry them, and the digest specs in this guide still quote em-dashed strings. Sweep those before treating this rule as fully enforced.
+
+---
+
+## Email branding
+
+Every outbound email opens with the same header: the KYvKY wordmark, linked to the site home, rendered by `EmailBrandHeader` in `src/lib/email/brand.tsx`. Do not hand-roll a logo block in a new template; import that one so all sends stay identical.
+
+**The asset is a PNG on purpose.** `/branding/Logo-03.png`, built into an absolute URL by `emailLogoSrc(origin)`. The newer `logo-white.svg` and `logo-wordmark-white.svg` are web-only: Gmail strips SVG, so an SVG logo means no logo for most recipients.
+
+**The logo sits on a white plate.** The wordmark is blue artwork on transparency, so on a dark background it loses nearly all contrast, and there is no dark-mode logo variant in a format email can use. Rather than swapping assets by media query (which Gmail ignores anyway), the mark sits on an explicit white background that stays white in either theme. In light mode it reads as a quiet card; in dark mode it is what keeps the brand visible.
+
+**Dark mode is a first-class requirement, not a nicety.** Templates carry the `kv-` classes from `EMAIL_DARK_MODE_CSS` on every element whose colour is hardcoded. Two traps, both of which shipped as real bugs before being caught in review on 2026-08-22:
+
+1. **`<Body style={...} className="...">` does not put both on one element.** react-email renders the class onto `<body>` but pushes the inline background onto an inner `<td>`. Theming only the class recolours a layer nobody sees, leaving light text on a light surface. The `.kv-bg > table > tbody > tr > td` selector exists for this and must not be "simplified" away.
+2. **React escapes `>` inside `<style>`.** A child combinator written as a text child becomes `&gt;`, which invalidates the entire selector list, including the valid selectors grouped with it. Emit email CSS with `<style dangerouslySetInnerHTML={{ __html: CSS }} />`.
+
+When adding copy to a template, check every new style constant that hardcodes a colour has a matching `kv-` class. The founder-note heading shipped without one and was invisible in dark mode until the render was actually looked at.
+
+There is one prefix, `kv-`, shared by every template. The digest layers five progress-meter tokens (`kv-seg`, `kv-track`, and friends) on top, defined in its own file because nothing else renders a meter, and concatenates the two strings. A new template importing `EMAIL_DARK_MODE_CSS` gets the whole base set.
+
 ---
 
 ## Email touchpoints
@@ -67,7 +90,7 @@ Triggered once, after first email verification.
 > Know Your Vote Kentucky sends a digest when bills you follow change status. You will only receive email when there is an update to report.
 
 **Card: Follow bills**
-> Select **Follow** on any bill page to track it. You will receive digest updates when it moves — committee action, floor votes, sent to governor, signed, or vetoed.
+> Select **Follow** on any bill page to track it. You will receive digest updates when it moves: committee action, floor votes, sent to governor, signed, or vetoed.
 > CTA: Browse bills →
 
 **Card: Find your legislators**
@@ -75,8 +98,28 @@ Triggered once, after first email verification.
 > CTA: Find my legislators →
 
 **Card: Set digest preferences**
-> Choose daily or weekly delivery and select which event types to include. You can also follow topics by subject area — automated tagging, so following a specific bill stays the most reliable way to track it.
+> Choose daily or weekly delivery and select which event types to include. You can also follow topics by subject area. Tagging is automated, so following a specific bill stays the most reliable way to track it.
 > CTA: Notification preferences →
+
+**Note: A note from the founder** (added 2026-08-22). A signed note between the last card and the footer, set off by a rule rather than a card border so it reads as an aside, not a fourth feature. **This copy is Katie's own and was written by her.** Treat it as authored text: fix a typo or a factual error, but do not rewrite it toward the house register, and do not shorten it for balance.
+> **Thank you for signing up!**
+>
+> I'm Katie Toepp, a designer and self-taught developer in Kentucky, and I believe more than anything that knowledge is power. I built KYvKY because our legislative record is public, but hard to use.
+> I wanted to better understand the bills I was hearing about in the media. But I kept hitting a wall: either a paywall, or an outdated interface that assumed I already understood the legislative process. I wanted following my state's legislation to be as easy as following friends on a feed.
+> KYvKY will always be free and non-partisan, and will never sell data. Right now it's a passion project, and I'm working to fund and grow it.
+> Replies to this email reach me. If something on the site looks wrong, I'd like to know.
+> Thanks again for using KYvKY and getting involved in the civic process.
+> CTA: More about the project →
+
+**Contractions are the point.** Katie's copy pass on 2026-08-22 accepted contractions throughout this note ("I'm," "it's," "I'd") and cut the padding that made it read formal. The rest of the product keeps its uncontracted reference register; this block does not. It is a person talking, so it contracts like one.
+
+**The greeting is its own line, and the exclamation point is deliberate.** "Thank you for signing up!" sits on a line of its own above the body, not folded into the first paragraph. This is the one sanctioned exception to the **Warmth through anticipation, not enthusiasm** principle: the note is a person speaking, and a person thanking you for signing up sounds like one. The exception covers this greeting only. It does not license exclamation points anywhere else in the product.
+
+"Signing up" and not "using KYvKY" in the greeting, because the email fires at verification, before the reader has used anything. The sign-off still says "using KYvKY," which is correct there: by then it is a send-off, not a claim about what they have already done.
+
+The reply claim is literally true: every transactional send sets `Reply-To: katie@kyvky.com`. Do not add it to any surface where that stops being the case.
+
+The funding sentence must stay in the **seeking** tense. Per the Notion wording rules, never name a sponsor or write "our fiscal sponsor" until an agreement is signed. When one is, this line changes here, on `/about`, and in the design-system specimen together.
 
 **Footer:**
 > This is a one-time setup email. Manage your account at {profileUrl}.
@@ -91,7 +134,7 @@ Sent daily or weekly based on user preference, only when there are events to rep
 
 **Preview text:** describes only what the digest contains, joined with "and" when both parts are present: `{n} bill(s) with new activity` / `{n} committee update(s)` / `3 bills with new activity and 2 committee updates`.
 
-**Header:** the KYVKY logo (`/branding/Logo-03.png`, linked to the site home) above the heading.
+**Header:** the shared `EmailBrandHeader` (see Email branding below).
 
 **Heading:** matches the subject's base: `Kentucky bill digest` / `Kentucky committee digest`.
 
@@ -143,6 +186,33 @@ One-click, no login. Rendered as a minimal HTML page.
 **Server error (500):**
 - Title: `Something went wrong`
 - Body: `Your preference could not be saved. Please try again, or update your digest settings from your profile page.`
+
+---
+
+## First person: when the project speaks as a person
+
+Most copy is the project speaking, and the project says **"we"** — or, better, nothing at all ("Topic tags are automated," not "we automate topic tags"). Two places are deliberate exceptions, both added 2026-08-22:
+
+- the **"Who builds it"** section on `/about`
+- the **"A note from the founder"** note in the welcome email
+
+In those two blocks the voice is Katie's, first person singular. They exist because a solo, unfunded, non-partisan civic tool has to answer *who is behind this and what do they want* before a stranger will trust it — and answering plainly is the same Honest sourcing move as admitting that topic tags mislabel bills.
+
+Rules for the personal register:
+
+**Claims stay checkable.** Every sentence is something a skeptical reader could verify: solo build, running since February 2026, free, no advertising, no data sold, open source, roughly $1,000 a year in infrastructure. Nothing about impact, importance, or how anyone should feel.
+
+**Never claim effect.** No causal claims about turnout, participation, or legislative outcomes — that is a non-partisanship risk before it is an accuracy one.
+
+**Money is stated the way it is true.** "Infrastructure costs about $1,000 a year; the work behind it has been contributed rather than paid." Never "the project runs on $1,000 a year" — that quietly prices the labor at zero.
+
+**The AI-build disclosure is soft, not a headline.** "Directing AI tools along the way" — a clause inside a sentence about building the thing. "Vibe-coded" is fine in a press conversation and wrong on the site.
+
+**Note the funding, do not make the ask.** *Settled 2026-08-22, Katie's call, after two passes.* This guide first banned funding language from product copy; that was overruled, then narrowed. The landing point: product copy may **state the funding situation** and may not **solicit**. "Right now it is a passion project, and I am working to fund and grow it" is a status note a reader can take or leave. "I am currently seeking sponsorship for grant funding that will add expertise and make the project scalable and sustainable" reads as a pitch and was pulled for that reason, even though every word of it was true. The distinction is whether the sentence asks the reader for something. Solicitation, sponsor names, dollar targets, and donate links live in outreach, not in the product. When a sponsor is signed, revisit this line here, on `/about`, and in the design-system specimen together.
+
+**Motive is stated once, plainly, and never repeated.** "I built the tool I wanted to have." No origin-story escalation.
+
+**Still no partisanship, and still no editorializing about legislation.** The personal register loosens the *distance*, not the neutrality. "Kentucky's legislative record is public and still hard to use" describes the artifact. Anything about who made it hard would be a position.
 
 ---
 

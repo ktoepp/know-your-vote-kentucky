@@ -18,7 +18,7 @@ sync → search → display.
 The governing constraint is `docs/voice-and-tone.md`: **non-partisan, always** and
 **honest sourcing**. The rule for names is therefore **attribute, never adopt** — we
 show a name and (for official ones) where it comes from; we never let a loaded media
-nickname read as KYVKY's own characterization of a bill.
+nickname read as KYvKY's own characterization of a bill.
 
 ### Two classes of name
 

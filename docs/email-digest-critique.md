@@ -148,7 +148,7 @@ Two independent reviewers re-examined the revised digest: one adversarial pass o
 ## Fixed in the follow-up commit
 
 1. **Overflow link promised what the destination can't show (high).** The first fix pointed "see all recent activity" at `/profile#activity`, but the activity feed only covers *followed* bills and committees — never topic-matched bills — and the code comment claimed otherwise. Reworded to "**Your profile** lists recent activity for bills and committees you follow": names the profile (so the login prompt is unsurprising), claims only what the feed covers, and moves the URL off sentence-final punctuation in the plain-text part.
-2. **Footer sourcing claim became false.** "Status lines quote the legislative record as written" was untrue for label-fallback lines ("Floor action"), constructed hearing lines, and every committee line. Now: "Bill status lines quote the legislature's official action text where available," plus an explicit explanation that parenthetical dates are when KYVKY recorded each update (also resolving the "recorded" / "legislative record" word collision).
+2. **Footer sourcing claim became false.** "Status lines quote the legislative record as written" was untrue for label-fallback lines ("Floor action"), constructed hearing lines, and every committee line. Now: "Bill status lines quote the legislature's official action text where available," plus an explicit explanation that parenthetical dates are when KYvKY recorded each update (also resolving the "recorded" / "legislative record" word collision).
 3. **Committee updates bypassed the cap and overflow count.** Committee events now have their own cap (10) and the remainder feeds the shared overflow line.
 4. **Committee lines rendered newest-first** while bill lines read oldest-first. Now sorted ascending like bills.
 5. **Bill dedupe collapsed distinct same-label events.** Three "New cosponsor" events days apart deduped to one. Key now includes the recorded date.
@@ -168,7 +168,7 @@ Two independent reviewers re-examined the revised digest: one adversarial pass o
 - **Committee event ids logged.** New `committee_event_ids` column (migration 041) written by the cron; digest history expands and displays committee updates, so committee-only digests no longer appear empty.
 - **Gmail dark mode** targeted via `[data-ogsc]`/`[data-ogsb]` selectors alongside the `prefers-color-scheme` block.
 - **Subject carries counts:** `Kentucky bill digest — Jul 16: 3 bills, 2 committee updates` (short date retained so threading clients keep each day distinct).
-- **KYVKY logo header** added, linked to the site home.
+- **KYvKY logo header** added, linked to the site home.
 
 ## Known limitations (deliberate, documented)
 

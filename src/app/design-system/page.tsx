@@ -630,7 +630,7 @@ function SecOverview() {
       title="Design system"
       lede={
         <>
-          A living reference for the tokens and patterns behind KYVKY. This companion renders the
+          A living reference for the tokens and patterns behind KYvKY. This companion renders the
           v1.1 spec — the source of truth stays in <Mono>guidelines.md</Mono>, mirrored in{' '}
           <Mono>globals.css</Mono>, <Mono>theme.ts</Mono>, and <Mono>tailwind.config.js</Mono>.
         </>
@@ -2457,7 +2457,7 @@ function SecEmail() {
           </p>
           {emcard(
             'Follow bills',
-            "Select Follow on any bill page to track it. You'll receive digest updates when it moves — committee action, floor votes, sent to governor, signed, or vetoed.",
+            "Select Follow on any bill page to track it. You will receive digest updates when it moves: committee action, floor votes, sent to governor, signed, or vetoed.",
             'Browse bills →',
           )}
           {emcard(
@@ -2470,6 +2470,36 @@ function SecEmail() {
             'Choose daily or weekly delivery and which event types to include.',
             'Notification preferences →',
           )}
+          <div style={{ borderTop: `1px solid ${C.borderLight}`, marginTop: 20, paddingTop: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.textPrimary, marginBottom: 6 }}>
+              A note from the founder
+            </div>
+            <p style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, margin: '0 0 12px' }}>
+              Thank you for signing up!
+            </p>
+            <p style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, margin: '0 0 8px' }}>
+              I&apos;m Katie Toepp, a designer and self-taught developer in Kentucky, and I believe
+              more than anything that knowledge is power. I built KYvKY because our legislative record
+              is public, but hard to use.
+            </p>
+            <p style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, margin: '0 0 8px' }}>
+              I wanted to better understand the bills I was hearing about in the media. But I kept
+              hitting a wall: either a paywall, or an outdated interface that assumed I already
+              understood the legislative process. I wanted following my state&apos;s legislation to be
+              as easy as following friends on a feed.
+            </p>
+            <p style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, margin: '0 0 8px' }}>
+              KYvKY will always be free and non-partisan, and will never sell data. Right now
+              it&apos;s a passion project, and I&apos;m working to fund and grow it.
+            </p>
+            <p style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, margin: '0 0 8px' }}>
+              Replies to this email reach me. If something on the site looks wrong, I&apos;d like to know.
+            </p>
+            <p style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, margin: '0 0 8px' }}>
+              Thanks again for using KYvKY and getting involved in the civic process.
+            </p>
+            <div style={{ fontSize: 13, color: C.primary }}>More about the project →</div>
+          </div>
         </>,
       )}
       <H2

@@ -107,9 +107,9 @@ Sidebar: **Current Rule Settings** mirrors active rules; **View Bill By Bill Num
 
 ---
 
-## KYVKY mapping (do not clone; align features)
+## KYvKY mapping (do not clone; align features)
 
-| Bill Watch | KYVKY today / planned |
+| Bill Watch | KYvKY today / planned |
 |------------|----------------------|
 | Track by bill number | **Follow** on bill detail + `ky_bill_follows`; **Track another bill** on profile |
 | Default alert checkboxes | **`/profile#notifications`** — grouped Committee & interim / Floor & passage |

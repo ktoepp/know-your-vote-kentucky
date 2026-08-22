@@ -26,18 +26,18 @@ Main app tabs (from premium help): Home | Search for Bills | New Bill Notificati
 - Add to **watch list** via checkbox on search results (not only “Track This Bill” on detail)  
 - Email when **status changes** on watched bills  
 
-**KYVKY:** Follow on card + digest; optional bulk follow from browse later.
+**KYvKY:** Follow on card + digest; optional bulk follow from browse later.
 
 ## User Guide (FAQ themes)
 
 - Account: register, login, password, email, delete  
 - Search, watch list add/remove, **custom reports** on watched bills  
 
-**KYVKY:** Profile export (`GET /api/me/export` backlog) approximates “reports”; digest history partial.
+**KYvKY:** Profile export (`GET /api/me/export` backlog) approximates “reports”; digest history partial.
 
 ## Search for Bills (criteria)
 
-| Criterion | KYVKY today |
+| Criterion | KYvKY today |
 |-----------|-------------|
 | Bill number | `/bills/[id]`, search, `?` quick lookup |
 | Sponsor | Search + member sponsored bills |
@@ -52,13 +52,13 @@ Results show: number, short title, **most recent status**.
 - Monitors legislative DB for movement on watched bills  
 - **Daily email summaries** of prior-day changes (aggregate)  
 
-**KYVKY:** Daily digest cron (`/api/cron/notify`) — same product pattern, different copy and richer bill cards.
+**KYvKY:** Daily digest cron (`/api/cron/notify`) — same product pattern, different copy and richer bill cards.
 
 ## Status glossary (Bill Watch labels)
 
-User-facing status phrases from help — map to KYVKY browse buckets / digest events:
+User-facing status phrases from help — map to KYvKY browse buckets / digest events:
 
-| Bill Watch status | KYVKY direction |
+| Bill Watch status | KYvKY direction |
 |-------------------|-----------------|
 | Prefiled | `prefiled` / LegiScan draft |
 | Introduced | `introduced` |
@@ -75,17 +75,17 @@ Use plain language on bill detail; avoid copying Bill Watch wording exactly.
 
 Terms called out: Amendment, Act, Bill, Committee, Resolution, Sponsor.
 
-**KYVKY:** `tooltipContent.ts` + bill detail tooltips already cover many; link glossary from `/legislature/resources`.
+**KYvKY:** `tooltipContent.ts` + bill detail tooltips already cover many; link glossary from `/legislature/resources`.
 
 ## Contact
 
 Legislative Research Commission (Frankfort) — address, phone, support email.
 
-**KYVKY:** Link to LRC PIO / public info; our contact is `katie@kyvky.com` for product issues.
+**KYvKY:** Link to LRC PIO / public info; our contact is `katie@kyvky.com` for product issues.
 
 ## UX notes (long page vs modern help)
 
-| Bill Watch | KYVKY |
+| Bill Watch | KYvKY |
 |------------|--------|
 | One long scroll, blue bars | Short in-app help or docs canvas; anchor nav |
 | Separate Status + Definitions sections | Tooltips on status chips + link to resources |

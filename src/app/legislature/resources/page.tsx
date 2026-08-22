@@ -36,7 +36,7 @@ const EXTERNAL_RESOURCES = [
   {
     title: 'Kentucky Bill Watch',
     description:
-      'Official state bill tracking and email alerts (Kentucky.gov account). KYVKY adds an open calendar UI plus optional digest alerts when you turn on hearing alerts in your notification preferences.',
+      'Official state bill tracking and email alerts (Kentucky.gov account). KYvKY adds an open calendar UI plus optional digest alerts when you turn on hearing alerts in your notification preferences.',
     href: 'https://www.kentucky.gov/services/pages/billwatch.aspx',
   },
   {
@@ -108,7 +108,7 @@ export default function LegislatureResourcesPage() {
         </List>
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
-          Browse committees and meetings in KYVKY:{' '}
+          Browse committees and meetings in KYvKY:{' '}
           <Link href="/committees">Committees</Link>
           {' · '}
           <Link href="/meetings">Meetings</Link>

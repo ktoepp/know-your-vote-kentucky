@@ -1,5 +1,5 @@
 /**
- * Shared types + config for the KYVKY content-accuracy audit.
+ * Shared types + config for the KYvKY content-accuracy audit.
  *
  * Each checker re-fetches a primary source (LegiScan, Open States, LRC HTML)
  * and diffs it against what is stored in Supabase, returning a {@link CheckerResult}.
