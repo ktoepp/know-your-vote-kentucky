@@ -6,7 +6,7 @@ Related: [follow-bills.md](./follow-bills.md), [TASKS.md](../../TASKS.md), [deci
 
 ## Problem
 
-Kentucky lawmaking continues outside the regular session: interim joint committees, statutory committees, capital oversight, and agendas that reference bills from prior sessions. KYVKY today covers bills (LegiScan), legislators (Open States), and per-bill `committee_name`, but not **scheduled meetings**, **agendas**, or a **committee directory** tied to LRC.
+Kentucky lawmaking continues outside the regular session: interim joint committees, statutory committees, capital oversight, and agendas that reference bills from prior sessions. KYvKY today covers bills (LegiScan), legislators (Open States), and per-bill `committee_name`, but not **scheduled meetings**, **agendas**, or a **committee directory** tied to LRC.
 
 ## Product scope
 
@@ -75,7 +75,7 @@ Reference pack: [`docs/reference/bill-watch/`](../reference/bill-watch/README.md
 - Help: [Premium Bill Watch — Bill Tracking](https://secure.kentucky.gov/billwatch/help/PremiumBillWatchHelp.htm#billtrack)
 - Alert types to respect: **Agenda**, Introduction, **Committee**, Enrolled, Floor, **Pre-Filed**, **Interim** (see mapping in `bill-tracking.md`)
 
-KYVKY should exceed Bill Watch with:
+KYvKY should exceed Bill Watch with:
 
 - Modern browse/search, district map, vote history
 - **One** activity surface (followed bills + hearings), not three legacy columns

@@ -17,6 +17,7 @@ import { render } from 'react-email';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { WelcomeEmail } from '../src/lib/email/welcome-email';
+import { emailLogoSrc } from '../src/lib/email/brand';
 import { publicSiteOrigin } from '../src/lib/site-canonical';
 
 type Args = {
@@ -83,6 +84,9 @@ async function main() {
       profileHref={`${origin}/profile`}
       preferencesHref={`${origin}/profile#notifications`}
       districtMapHref={`${origin}/members/map`}
+      aboutHref={`${origin}/about`}
+      logoSrc={emailLogoSrc(origin)}
+      homeHref={origin}
       privacyHref={`${origin}/privacy`}
       termsHref={`${origin}/terms`}
     />

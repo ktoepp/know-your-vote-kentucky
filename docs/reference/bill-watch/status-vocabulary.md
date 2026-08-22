@@ -1,4 +1,4 @@
-# Bill Watch status labels → KYVKY mapping
+# Bill Watch status labels → KYvKY mapping
 
 Sources:
 
@@ -40,7 +40,7 @@ Practical implications for copy and code:
 
 ## Alert types (settings checkboxes)
 
-| Bill Watch alert | KYVKY |
+| Bill Watch alert | KYvKY |
 |------------------|--------|
 | Agenda Alerts | `hearing_scheduled` + LRC calendar |
 | Introduction Actions | `introduced` |

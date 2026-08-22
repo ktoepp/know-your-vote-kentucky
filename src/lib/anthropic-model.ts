@@ -1,5 +1,5 @@
 /**
- * Canonical default Anthropic model for all KYVKY LLM calls.
+ * Canonical default Anthropic model for all KYvKY LLM calls.
  *
  * Previously the model id was duplicated across `ky-content-generation`,
  * `ky-intelligence`, `ky-topic-classifier`, and the accuracy audit — and had

@@ -10,6 +10,7 @@ import {
   type BillDigestSection,
   type DigestBillProgress,
 } from '@/lib/email/bill-digest-email';
+import { emailLogoSrc } from '@/lib/email/brand';
 import { getBillProgress } from '@/lib/ky-bill-progress';
 import type { KYBill } from '@/types/kentucky';
 import {
@@ -569,7 +570,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
     const emailEl = (
       <BillDigestEmail
         previewText={previewText}
-        logoSrc={`${origin}/branding/Logo-03.png`}
+        logoSrc={emailLogoSrc(origin)}
         homeHref={origin}
         heading={heading}
         introText={introText}

@@ -248,7 +248,7 @@ export function formatConsoleReport(
   opts: { fingerprintOf?: (f: Finding) => string } = {},
 ): string {
   const lines: string[] = [];
-  lines.push('KYVKY content accuracy audit');
+  lines.push('KYvKY content accuracy audit');
   lines.push(
     `checked=${summary.checked} ok=${summary.passed} fail=${summary.failures} warn=${summary.warnings} ` +
       `seed=${summary.seed} (${(summary.durationMs / 1000).toFixed(1)}s)`,

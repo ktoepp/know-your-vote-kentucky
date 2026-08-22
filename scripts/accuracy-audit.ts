@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * KYVKY content accuracy audit — runs deterministic source diffs (LegiScan,
+ * KYvKY content accuracy audit — runs deterministic source diffs (LegiScan,
  * Open States, LRC) plus an Anthropic LLM pass over fuzzy content, then posts a
  * report to Slack.
  *

@@ -11,6 +11,7 @@ import {
   Text,
 } from 'react-email';
 import * as React from 'react';
+import { EMAIL_DARK_MODE_CSS, EmailBrandHeader } from '@/lib/email/brand';
 
 export type BillDigestLine = {
   detail: string;
@@ -66,7 +67,7 @@ function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
   // Fully passed (enacted / adopted) reads green; still in progress reads blue.
   const fullyPassed = terminal === null && reachedIndex === last;
   const completeBg = fullyPassed ? '#16a34a' : '#1e40af';
-  const completeCls = fullyPassed ? 'dg-seg-done' : 'dg-seg';
+  const completeCls = fullyPassed ? 'kv-seg-done' : 'kv-seg';
   const genericCaption =
     terminal === 'vetoed'
       ? 'Vetoed'
@@ -79,7 +80,7 @@ function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
   const caption =
     terminal === null && specificMilestone && specificMilestone.trim() ? specificMilestone.trim() : genericCaption;
   const captionColor = terminal === 'vetoed' ? '#dc2626' : fullyPassed ? '#15803d' : '#475569';
-  const captionClass = terminal === 'vetoed' ? undefined : fullyPassed ? 'dg-done-text' : 'dg-muted';
+  const captionClass = terminal === 'vetoed' ? undefined : fullyPassed ? 'kv-done-text' : 'kv-muted';
   // Short labels default to the full labels; caller passes shorter ones when
   // the full label would crowd 4 segments across the email column.
   const segLabels = shortStageLabels && shortStageLabels.length === n ? shortStageLabels : stageLabels;
@@ -98,7 +99,7 @@ function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
               const blocked = terminal === 'vetoed' && i === last;
               const complete = i <= reachedIndex;
               const bg = blocked ? '#dc2626' : complete ? completeBg : '#e2e8f0';
-              const cls = blocked ? 'dg-seg-veto' : complete ? completeCls : 'dg-track';
+              const cls = blocked ? 'kv-seg-veto' : complete ? completeCls : 'kv-track';
               return (
                 <td
                   key={i}
@@ -140,7 +141,7 @@ function DigestProgressMeter({ progress }: { progress: DigestBillProgress }) {
                     fontFamily:
                       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
                   }}
-                  className={complete && !blocked ? 'dg-ink' : blocked ? undefined : 'dg-muted'}
+                  className={complete && !blocked ? 'kv-ink' : blocked ? undefined : 'kv-muted'}
                 >
                   {label}
                 </td>
@@ -178,34 +179,35 @@ export function joinWithAnd(items: string[]): string {
  * and stamp those attributes on recolored elements instead. Clients that
  * support neither keep the inline light palette.
  */
-const darkModeStyles = `
+/**
+ * Progress-meter tokens, layered on top of the shared email dark-mode rules.
+ *
+ * These five are digest-only (no other template renders a meter), so they stay
+ * here rather than in `brand.tsx`. They use the same `kv-` family so a template
+ * only ever has one prefix to reason about. Same two-selector pattern as the
+ * base set: media query for clients that honour `prefers-color-scheme`,
+ * `[data-ogsb]` / `[data-ogsc]` for Outlook.com.
+ */
+const progressDarkModeStyles = `
   @media (prefers-color-scheme: dark) {
-    .dg-bg { background-color: #0f172a !important; }
-    .dg-ink { color: #e2e8f0 !important; }
-    .dg-muted { color: #94a3b8 !important; }
-    .dg-link { color: #93c5fd !important; }
-    .dg-border { border-color: #334155 !important; }
-    .dg-seg { background-color: #60a5fa !important; }
-    .dg-seg-done { background-color: #4ade80 !important; }
-    .dg-done-text { color: #4ade80 !important; }
-    .dg-track { background-color: #334155 !important; }
-    .dg-seg-veto { background-color: #f87171 !important; }
+    .kv-seg { background-color: #60a5fa !important; }
+    .kv-seg-done { background-color: #4ade80 !important; }
+    .kv-done-text { color: #4ade80 !important; }
+    .kv-track { background-color: #334155 !important; }
+    .kv-seg-veto { background-color: #f87171 !important; }
   }
-  [data-ogsb] .dg-bg { background-color: #0f172a !important; }
-  [data-ogsc] .dg-ink { color: #e2e8f0 !important; }
-  [data-ogsc] .dg-muted { color: #94a3b8 !important; }
-  [data-ogsc] .dg-link { color: #93c5fd !important; }
-  [data-ogsc] .dg-border { border-color: #334155 !important; }
-  [data-ogsb] .dg-seg { background-color: #60a5fa !important; }
-  [data-ogsb] .dg-seg-done { background-color: #4ade80 !important; }
-  [data-ogsc] .dg-done-text { color: #4ade80 !important; }
-  [data-ogsb] .dg-track { background-color: #334155 !important; }
-  [data-ogsb] .dg-seg-veto { background-color: #f87171 !important; }
+  [data-ogsb] .kv-seg { background-color: #60a5fa !important; }
+  [data-ogsb] .kv-seg-done { background-color: #4ade80 !important; }
+  [data-ogsc] .kv-done-text { color: #4ade80 !important; }
+  [data-ogsb] .kv-track { background-color: #334155 !important; }
+  [data-ogsb] .kv-seg-veto { background-color: #f87171 !important; }
 `;
+
+const darkModeStyles = `${EMAIL_DARK_MODE_CSS}${progressDarkModeStyles}`;
 
 export function BillDigestEmail(props: {
   previewText: string;
-  /** Absolute URL of the KYVKY logo (email clients need a hosted image). */
+  /** Absolute URL of the KYvKY logo (email clients need a hosted image). */
   logoSrc: string;
   /** Where the logo links (site home). */
   homeHref: string;
@@ -259,27 +261,19 @@ export function BillDigestEmail(props: {
   return (
     <Html>
       <Head>
-        <style>{darkModeStyles}</style>
+        <style dangerouslySetInnerHTML={{ __html: darkModeStyles }} />
       </Head>
       <Preview>{previewText}</Preview>
-      <Body style={main} className="dg-bg">
+      <Body style={main} className="kv-bg">
         <Container style={container}>
-          <Link href={homeHref} style={{ display: 'block', marginBottom: 16 }}>
-            <Img
-              src={logoSrc}
-              alt="Know Your Vote Kentucky"
-              width={220}
-              height={53}
-              style={{ display: 'block' }}
-            />
-          </Link>
-          <Heading style={h1} className="dg-ink">{heading}</Heading>
-          <Text style={muted} className="dg-muted">{introText}</Text>
+          <EmailBrandHeader logoSrc={logoSrc} homeHref={homeHref} />
+          <Heading style={h1} className="kv-ink">{heading}</Heading>
+          <Text style={muted} className="kv-muted">{introText}</Text>
           {sections.map((section) => (
             <Section key={section.heading} style={{ marginTop: 24 }}>
-              <Text style={sectionHeading} className="dg-muted">{section.heading}</Text>
+              <Text style={sectionHeading} className="kv-muted">{section.heading}</Text>
               {section.groups.map((g) => (
-                <Section key={g.billHref} style={billBlock} className="dg-border">
+                <Section key={g.billHref} style={billBlock} className="kv-border">
                   {/* Progress meter at the top of the block. */}
                   {g.progress && <DigestProgressMeter progress={g.progress} />}
                   {/* One anchor per group: the blue number signals the link, the
@@ -287,27 +281,27 @@ export function BillDigestEmail(props: {
                       part prints the URL once instead of twice. */}
                   <Link href={g.billHref} style={groupLink}>
                     {g.billNumber && (
-                      <strong style={numberText} className="dg-link">{g.billNumber}</strong>
+                      <strong style={numberText} className="kv-link">{g.billNumber}</strong>
                     )}
                     {g.billNumber && g.shortTitle && (
-                      <span style={shortTitleText} className="dg-ink"> — {g.shortTitle}</span>
+                      <span style={shortTitleText} className="kv-ink"> — {g.shortTitle}</span>
                     )}
                     {g.billNumber && (g.billTitle || g.shortTitle) && <br />}
                     {g.billTitle && (
-                      <span style={titleText} className="dg-ink">{g.billTitle}</span>
+                      <span style={titleText} className="kv-ink">{g.billTitle}</span>
                     )}
                   </Link>
                   {g.alsoCalled && g.alsoCalled.length > 0 && (
-                    <Text style={topicNote} className="dg-muted">
+                    <Text style={topicNote} className="kv-muted">
                       Also called: {g.alsoCalled.join(' · ')}
                     </Text>
                   )}
                   {g.matchedTopics && g.matchedTopics.length > 0 && (
-                    <Text style={topicNote} className="dg-muted">
+                    <Text style={topicNote} className="kv-muted">
                       Matches your{' '}
                       {g.matchedTopics.map((t, i, arr) => (
                         <React.Fragment key={t}>
-                          <Link href={topicBrowseHref(t)} style={topicLink} className="dg-muted">{t}</Link>
+                          <Link href={topicBrowseHref(t)} style={topicLink} className="kv-muted">{t}</Link>
                           {i < arr.length - 2 ? ', ' : i === arr.length - 2 ? (arr.length > 2 ? ', and ' : ' and ') : ''}
                         </React.Fragment>
                       ))}{' '}
@@ -315,9 +309,9 @@ export function BillDigestEmail(props: {
                     </Text>
                   )}
                   {g.lines.map((line, i) => (
-                    <Text key={i} style={lineText} className="dg-ink">
+                    <Text key={i} style={lineText} className="kv-ink">
                       {line.detail}{' '}
-                      <span style={mutedSm} className="dg-muted">(recorded&nbsp;{line.observedAt})</span>
+                      <span style={mutedSm} className="kv-muted">(recorded&nbsp;{line.observedAt})</span>
                     </Text>
                   ))}
                 </Section>
@@ -325,16 +319,16 @@ export function BillDigestEmail(props: {
             </Section>
           ))}
           {moreCount > 0 && (
-            <Text style={{ marginTop: 16 }} className="dg-ink">
+            <Text style={{ marginTop: 16 }} className="kv-ink">
               {moreCount} more update{moreCount === 1 ? '' : 's'} not shown.{' '}
-              <Link href={moreHref} style={inlineLink} className="dg-link">Your profile</Link>{' '}
+              <Link href={moreHref} style={inlineLink} className="kv-link">Your profile</Link>{' '}
               lists recent activity for bills and committees you follow.
               {overflowTopics && overflowTopics.length > 0 && (
                 <>
                   {' '}Bills matching your topics are in the bill browser:{' '}
                   {overflowTopics.map((t, i, arr) => (
                     <React.Fragment key={t}>
-                      <Link href={topicBrowseHref(t)} style={inlineLink} className="dg-link">{t}</Link>
+                      <Link href={topicBrowseHref(t)} style={inlineLink} className="kv-link">{t}</Link>
                       {i < arr.length - 1 ? ' · ' : ''}
                     </React.Fragment>
                   ))}
@@ -342,25 +336,25 @@ export function BillDigestEmail(props: {
               )}
             </Text>
           )}
-          <Section style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #e2e8f0' }} className="dg-border">
-            <Text style={footerText} className="dg-muted">
+          <Section style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #e2e8f0' }} className="kv-border">
+            <Text style={footerText} className="kv-muted">
               You&rsquo;re getting this because you follow bills, topics, or committees on Know Your Vote Kentucky.
             </Text>
-            <Text style={footerText} className="dg-muted">
+            <Text style={footerText} className="kv-muted">
               Bill status lines quote the legislature&rsquo;s official action text where available — the{' '}
-              <Link href={glossaryHref} style={inlineLink} className="dg-link">glossary</Link> explains the terms.
+              <Link href={glossaryHref} style={inlineLink} className="kv-link">glossary</Link> explains the terms.
               Dates in parentheses show when Know Your Vote Kentucky recorded each update, which can lag the action itself.
             </Text>
-            <Text style={footerLinks} className="dg-muted">
-              <Link href={preferencesHref} style={inlineLink} className="dg-link">Change digest settings</Link>
+            <Text style={footerLinks} className="kv-muted">
+              <Link href={preferencesHref} style={inlineLink} className="kv-link">Change digest settings</Link>
               {' · '}
-              <Link href={unsubscribeHref} style={inlineLink} className="dg-link">Unsubscribe</Link>
+              <Link href={unsubscribeHref} style={inlineLink} className="kv-link">Unsubscribe</Link>
               {' · '}
-              <Link href={privacyHref} style={inlineLink} className="dg-link">Privacy</Link>
+              <Link href={privacyHref} style={inlineLink} className="kv-link">Privacy</Link>
               {' · '}
-              <Link href={termsHref} style={inlineLink} className="dg-link">Terms</Link>
+              <Link href={termsHref} style={inlineLink} className="kv-link">Terms</Link>
             </Text>
-            <Text style={{ ...footerText, margin: '6px 0 0' }} className="dg-muted">
+            <Text style={{ ...footerText, margin: '6px 0 0' }} className="kv-muted">
               Know Your Vote Kentucky · {postalAddress}
             </Text>
           </Section>

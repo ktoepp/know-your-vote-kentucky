@@ -13,7 +13,7 @@ Official product (Kentucky.gov account): [Bill Watch](https://www.kentucky.gov/s
 
 | Doc | Contents |
 |-----|----------|
-| [bill-tracking.md](./bill-tracking.md) | Tabs, alert types, email subjects, KYVKY mapping |
+| [bill-tracking.md](./bill-tracking.md) | Tabs, alert types, email subjects, KYvKY mapping |
 | [help-long-form.md](./help-long-form.md) | Long scroll help: Tips, Status glossary, daily email |
 | [status-vocabulary.md](./status-vocabulary.md) | Bill Watch status labels → digest / browse |
 | [premium-help-excerpt.md](./premium-help-excerpt.md) | Offline archive of premium help page |
@@ -30,7 +30,7 @@ We are **not** cloning Bill Watch. Goals:
 - **Replace** rules wizard with modern `/bills` filters + saved URLs / profile prefs  
 - **Avoid** Kentucky.gov-only auth and premium split for basic email  
 
-## KYVKY direction
+## KYvKY direction
 
 See [committee-calendar spec](../../specs/committee-calendar.md) and digest events in `src/lib/ky-notification-preferences.ts`.
 
