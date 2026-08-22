@@ -127,11 +127,18 @@ export const EXTERNAL_LINK_ICON_SX = { fontSize: ICON_REM.nav } as const;
  * bill cards, member cards, and detail surfaces.
  */
 export const CHIP = {
-  /** Card-level chip (topic, chamber, status) — 0.875rem / 600, standard label padding */
+  /**
+   * Card-level chip (topic, chamber, status) — 0.875rem / 600. Height/padding
+   * match the sitewide `size="small"` chip pass (2026-08-22, `MuiChip` theme
+   * override) so a bill card's chamber/status chips read at the same scale
+   * as the topic/search chips elsewhere on the page instead of looking
+   * noticeably smaller.
+   */
   standard: {
     fontSize: '0.875rem',
     fontWeight: 600,
-    '& .MuiChip-label': { px: 1.1 },
+    height: 36,
+    '& .MuiChip-label': { px: 1.75 },
   },
   /** Compact badge (sponsor role, governor, inline status) — 0.7rem / 700, 22px tall */
   compact: {
