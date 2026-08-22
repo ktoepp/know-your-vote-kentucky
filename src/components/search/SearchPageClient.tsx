@@ -767,30 +767,30 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                         setQuery(s.subject_name);
                         pushSearchUrl(s.subject_name);
                       }}
-                      sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
+                      sx={{ cursor: 'pointer' }}
                     />
                   ))}
                 {!suggestionsLoading && subjectSuggestions.length === 0 && (
                   <>
                     <Chip
-                      label="Try: education"
+                      label="education"
                       size="small"
                       variant="outlined"
                       onClick={() => {
                         setQuery('education');
                         pushSearchUrl('education');
                       }}
-                      sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
+                      sx={{ cursor: 'pointer' }}
                     />
                     <Chip
-                      label="Try: Medicaid"
+                      label="Medicaid"
                       size="small"
                       variant="outlined"
                       onClick={() => {
                         setQuery('Medicaid');
                         pushSearchUrl('Medicaid');
                       }}
-                      sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
+                      sx={{ cursor: 'pointer' }}
                     />
                   </>
                 )}
@@ -802,7 +802,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                     setQuery('23');
                     pushSearchUrl('23');
                   }}
-                  sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
+                  sx={{ cursor: 'pointer' }}
                 />
                 <Chip
                   label="HB 1"
@@ -812,7 +812,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                     setQuery('HB 1');
                     pushSearchUrl('HB 1');
                   }}
-                  sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
+                  sx={{ cursor: 'pointer' }}
                 />
               </Box>
             </Box>
