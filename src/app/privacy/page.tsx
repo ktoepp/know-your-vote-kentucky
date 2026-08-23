@@ -18,7 +18,7 @@ export default function PrivacyPage() {
         Privacy policy
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Last updated {LAST_UPDATED}. Plain language; no legal jargon. If something here is unclear,
+        Last updated {LAST_UPDATED}. Plain language, no legal jargon. If something here is unclear,
         email <MuiLink href="mailto:katie@kyvky.com">katie@kyvky.com</MuiLink>.
       </Typography>
 

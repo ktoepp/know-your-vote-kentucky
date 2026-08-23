@@ -206,7 +206,7 @@ Rules for the personal register:
 
 **Never claim effect.** No causal claims about turnout, participation, or legislative outcomes — that is a non-partisanship risk before it is an accuracy one.
 
-**Money is stated the way it is true.** "Infrastructure costs about $1,000 a year; the work behind it has been contributed rather than paid." Never "the project runs on $1,000 a year" — that quietly prices the labor at zero.
+**Money is stated the way it is true.** "Infrastructure costs about $1,000 a year to run, and the work behind it has been contributed rather than paid." Never "the project runs on $1,000 a year" — that quietly prices the labor at zero.
 
 **The AI-build disclosure is soft, not a headline.** "Directing AI tools along the way" — a clause inside a sentence about building the thing. "Vibe-coded" is fine in a press conversation and wrong on the site.
 

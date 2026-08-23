@@ -53,7 +53,7 @@ export default function TermsPage() {
           </Typography>
           <Typography component="ul" variant="body2" color="text.secondary" sx={{ pl: 3 }}>
             <li>You&rsquo;re responsible for keeping your password safe.</li>
-            <li>One account per real person; don&rsquo;t share credentials.</li>
+            <li>One account per real person. Don&rsquo;t share credentials.</li>
             <li>Use a real email so you can recover access and receive digests.</li>
           </Typography>
         </section>
@@ -63,7 +63,7 @@ export default function TermsPage() {
             Acceptable use
           </Typography>
           <Typography component="ul" variant="body2" color="text.secondary" sx={{ pl: 3 }}>
-            <li>Don&rsquo;t scrape the site or hammer the API; use the official LRC and LegiScan APIs for bulk data.</li>
+            <li>Don&rsquo;t scrape the site or hammer the API. Use the official LRC and LegiScan APIs for bulk data.</li>
             <li>Don&rsquo;t attempt to impersonate other users, legislators, or staff.</li>
             <li>Don&rsquo;t use the site to harass legislators or other users.</li>
             <li>Don&rsquo;t reverse-engineer, probe for vulnerabilities, or attempt to disrupt the service. Responsible vulnerability reports to <MuiLink href="mailto:katie@kyvky.com">katie@kyvky.com</MuiLink> are welcome.</li>

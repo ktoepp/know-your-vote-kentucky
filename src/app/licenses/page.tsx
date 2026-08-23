@@ -63,7 +63,7 @@ export default function LicensesPage() {
             </li>
             <li>
               <strong>U.S. Census / LRC.</strong> District boundaries and official Kentucky legislative references
-              where cited; use official sources for legal boundary questions.
+              where cited. Use official sources for legal boundary questions.
             </li>
           </ul>
         </Typography>

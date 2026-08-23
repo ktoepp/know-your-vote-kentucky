@@ -60,7 +60,7 @@ export default function AboutPage() {
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, mb: 2 }}>
           KYvKY will always be free and non-partisan, and will never sell data. It carries no
-          advertising, and the code is open source. Infrastructure costs about $1,000 a year to run;
+          advertising, and the code is open source. Infrastructure costs about $1,000 a year to run, and
           the work behind it has been contributed rather than paid. Right now it&apos;s a passion
           project, and I&apos;m working to fund and grow it.
         </Typography>

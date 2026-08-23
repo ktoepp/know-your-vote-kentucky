@@ -34,7 +34,7 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: '3. Readings and floor vote',
-    body: 'The Kentucky Constitution requires three readings in each chamber on separate days before final passage. After the readings the full chamber debates, may amend, and votes. Most bills need at least two-fifths of the members elected and a majority of those voting; appropriation and revenue bills need a majority of all members elected.',
+    body: 'The Kentucky Constitution requires three readings in each chamber on separate days before final passage. After the readings the full chamber debates, may amend, and votes. Most bills need at least two-fifths of the members elected and a majority of those voting. Appropriation and revenue bills need a majority of all members elected.',
   },
   {
     title: '4. The second chamber',

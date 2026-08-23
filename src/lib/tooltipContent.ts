@@ -72,13 +72,13 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   hjr: {
     category: 'bill_types',
     title: "House Joint Resolution (HJR)",
-    content: "A formal action that requires approval from both the House and Senate. Commonly used for interim study requests, adjourning the session, ratifying federal constitutional amendments, or making official statements. Joint resolutions that have the force of law must be presented to the Governor; purely procedural ones (such as adjournment) do not (Ky. Const. § 56)."
+    content: "A formal action that requires approval from both the House and Senate. Commonly used for interim study requests, adjourning the session, ratifying federal constitutional amendments, or making official statements. Joint resolutions that have the force of law must be presented to the Governor. Purely procedural ones (such as adjournment) do not (Ky. Const. § 56)."
   },
 
   sjr: {
     category: 'bill_types',
     title: "Senate Joint Resolution (SJR)",
-    content: "A formal action requiring approval from both the Senate and House. Commonly used for interim study requests, adjourning the session, ratifying federal constitutional amendments, or making official statements. Joint resolutions that have the force of law must be presented to the Governor; purely procedural ones (such as adjournment) do not (Ky. Const. § 56). Introduced in the Senate."
+    content: "A formal action requiring approval from both the Senate and House. Commonly used for interim study requests, adjourning the session, ratifying federal constitutional amendments, or making official statements. Joint resolutions that have the force of law must be presented to the Governor. Purely procedural ones (such as adjournment) do not (Ky. Const. § 56). Introduced in the Senate."
   },
 
   hcr: {
