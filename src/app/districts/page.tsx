@@ -23,7 +23,7 @@ const DESCRIPTION =
   'All 100 Kentucky House districts and 38 Senate districts, each with its current member, a district map, and recently sponsored bills.';
 
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Kentucky legislative districts — House and Senate',
+  title: 'Kentucky legislative districts: House and Senate',
   description: DESCRIPTION,
   path: '/districts',
 });

@@ -69,8 +69,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   const session = getCivicDataSessionName();
   return buildPageMetadata({
-    title: `Kentucky ${kyTopicPhrase(tag)} bills — ${session}`,
-    description: `Kentucky General Assembly bills tagged ${tag} in the ${session} — status, sponsors, and recent activity. ${KY_TOPIC_TAGGING_DISCLOSURE}`,
+    title: `Kentucky ${kyTopicPhrase(tag)} bills: ${session}`,
+    description: `Kentucky General Assembly bills tagged ${tag} in the ${session}, with status, sponsors, and recent activity. ${KY_TOPIC_TAGGING_DISCLOSURE}`,
     path: kyTopicPath(tag),
   });
 }

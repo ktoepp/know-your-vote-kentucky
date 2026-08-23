@@ -176,8 +176,8 @@ export function ProfileDigestHistorySection({ mockEntries }: Props = {}) {
             No digests sent yet
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420 }}>
-            Once a bill you follow has activity — committee action, floor votes, signed or
-            vetoed — we&apos;ll email you a digest and list it here.
+            Once a bill you follow has activity, such as committee action, floor votes, or
+            signed or vetoed, we&apos;ll email you a digest and list it here.
           </Typography>
         </Box>
       ) : (

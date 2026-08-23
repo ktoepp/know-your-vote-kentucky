@@ -101,7 +101,7 @@ export function BillTopicMatchHint({ billId, topics, legiScanSubjects }: Props) 
         variant="outlined"
         sx={{ borderRadius: 2 }}
       >
-        You follow the <strong>{topicList}</strong> {noun} — updates on this bill are included in
+        You follow the <strong>{topicList}</strong> {noun}, so updates on this bill are included in
         your digest email.
       </Alert>
     </Box>

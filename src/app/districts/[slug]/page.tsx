@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     leg ? `, currently represented by ${leg.name}` : ''
   }. District map, contact information, and recently sponsored bills.`;
   return buildPageMetadata({
-    title: `${displayName} — ${roleNoun}, map, and bills`,
+    title: `${displayName}: ${roleNoun}, map, and bills`,
     description,
     path: kyDistrictPath(districtRef),
     // The committed district thumbnail doubles as a per-district OG card.

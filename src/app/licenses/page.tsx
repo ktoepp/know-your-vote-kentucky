@@ -43,26 +43,26 @@ export default function LicensesPage() {
         <Typography variant="body2" color="text.secondary" component="div">
           <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
             <li>
-              <strong>LegiScan</strong> — Bill text, sponsors, and roll calls where synced; use subject to your LegiScan
+              <strong>LegiScan.</strong> Bill text, sponsors, and roll calls where synced. Use subject to your LegiScan
               API and product terms.
             </li>
             <li>
-              <strong>Plural (Open States)</strong> — Legislator and metadata sources via{' '}
+              <strong>Plural (Open States).</strong> Legislator and metadata sources via{' '}
               <MuiLink href="https://v3.openstates.org/" target="_blank" rel="noopener noreferrer">
                 API v3
               </MuiLink>
               , subject to Plural Policy / Open States terms and your API agreement.
             </li>
             <li>
-              <strong>Mapbox</strong> — Map tiles and geocoding where enabled; use subject to the Mapbox Terms of
+              <strong>Mapbox.</strong> Map tiles and geocoding where enabled. Use subject to the Mapbox Terms of
               Service.
             </li>
             <li>
-              <strong>OpenStreetMap</strong> — Underlying open map data; © OpenStreetMap contributors, ODbL where
+              <strong>OpenStreetMap.</strong> Underlying open map data. © OpenStreetMap contributors, ODbL where
               applicable.
             </li>
             <li>
-              <strong>U.S. Census / LRC</strong> — District boundaries and official Kentucky legislative references
+              <strong>U.S. Census / LRC.</strong> District boundaries and official Kentucky legislative references
               where cited; use official sources for legal boundary questions.
             </li>
           </ul>

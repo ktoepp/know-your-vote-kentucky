@@ -617,12 +617,12 @@ function SecOverview() {
     </div>
   );
   const inside: [string, string][] = [
-    ['Foundations', 'Color, type scale, spacing, radius & elevation — the tokens of record.'],
+    ['Foundations', 'Color, type scale, spacing, radius & elevation: the tokens of record.'],
     ['Components', 'Buttons, forms, chips, feedback, and the new tabs / pagination / modal / tooltip specs.'],
     ['Domain', 'Bill card + progress meter, member and committee cards.'],
     ['Patterns', 'Navigation, marketing hero, and the welcome / digest emails.'],
     ['Standards', 'The AA accessibility floor and the non-partisan voice guide.'],
-    ['Refinements', 'Proposed token, spacing, and hierarchy improvements — flagged, not yet shipped.'],
+    ['Refinements', 'Proposed token, spacing, and hierarchy improvements, flagged but not yet shipped.'],
   ];
   return (
     <Page
@@ -631,7 +631,7 @@ function SecOverview() {
       lede={
         <>
           A living reference for the tokens and patterns behind KYvKY. This companion renders the
-          v1.1 spec — the source of truth stays in <Mono>guidelines.md</Mono>, mirrored in{' '}
+          v1.1 spec. The source of truth stays in <Mono>guidelines.md</Mono>, mirrored in{' '}
           <Mono>globals.css</Mono>, <Mono>theme.ts</Mono>, and <Mono>tailwind.config.js</Mono>.
         </>
       }
@@ -643,7 +643,7 @@ function SecOverview() {
           {kpi('3', 'radius steps · 8 / 24 / full')}
         </div>
       </Card>
-      <H2 sub="The product reads as one trustworthy, neutral, accessible civic reference — closer to a reliable government tracking service than to a startup.">
+      <H2 sub="The product reads as one trustworthy, neutral, accessible civic reference, closer to a reliable government tracking service than to a startup.">
         Principles
       </H2>
       <div
@@ -657,7 +657,7 @@ function SecOverview() {
         {principle(
           '1',
           'Legible over decorative',
-          'Dense legislative data — 1,400+ bills a session — has to scan. Whitespace, hierarchy, and restraint beat ornament.',
+          'Dense legislative data, 1,400+ bills a session, has to scan. Whitespace, hierarchy, and restraint beat ornament.',
         )}
         {principle(
           '2',
@@ -713,7 +713,7 @@ function SecColor({ copied, onCopy }: { copied: string | null; onCopy: (v: strin
         sub={
           <>
             One blue carries brand, links, active nav, and the focus ring. There is no separate{' '}
-            <Mono>--info</Mono> hue — it aliases <Mono>--primary</Mono> on purpose.
+            <Mono>--info</Mono> hue. It aliases <Mono>--primary</Mono> on purpose.
           </>
         }
       >
@@ -737,7 +737,7 @@ function SecColor({ copied, onCopy }: { copied: string | null; onCopy: (v: strin
           </>
         }
       >
-        Neutrals — slate ramp
+        Neutrals: slate ramp
       </H2>
       <SwatchGrid
         copied={copied}
@@ -777,7 +777,7 @@ function SecColor({ copied, onCopy }: { copied: string | null; onCopy: (v: strin
         ]}
       />
       <H2
-        sub="Approved refinement — the badge border tints were three loose hexes; they're now first-class tokens so the tint family stays one system."
+        sub="Approved refinement. The badge border tints were three loose hexes. They're now first-class tokens so the tint family stays one system."
       >
         Semantic borders
         <NewTag />
@@ -791,7 +791,7 @@ function SecColor({ copied, onCopy }: { copied: string | null; onCopy: (v: strin
           ['--error-border', '#FECACA', 'error badge outline'],
         ]}
       />
-      <H2 sub="Party hues are deliberately distinct from brand blue and error red so a badge never reads as editorial alignment. The D / R / I letter carries the meaning — color is secondary.">
+      <H2 sub="Party hues are deliberately distinct from brand blue and error red so a badge never reads as editorial alignment. The D / R / I letter carries the meaning, and color is secondary.">
         Chamber &amp; party
       </H2>
       <SwatchGrid
@@ -863,18 +863,18 @@ function SecType() {
               Aa
             </div>
             <div style={{ fontWeight: 600, fontSize: 14 }}>
-              Aesthet Nova <span style={{ fontWeight: 400, color: C.textTertiary }}>— display / headings</span>
+              Aesthet Nova <span style={{ fontWeight: 400, color: C.textTertiary }}>· display / headings</span>
             </div>
             <div style={{ fontSize: 12.5, color: C.textTertiary, marginTop: 4, lineHeight: 1.5 }}>
               Serif, weight 500. Served via Typekit; a size-adjusted Georgia fallback prevents layout
-              shift. Licensing is still open (decision #1) — Georgia is the shipping fallback and is
+              shift. Licensing is still open (decision #1). Georgia is the shipping fallback and is
               what you see rendered here.
             </div>
           </div>
           <div>
             <div style={{ fontSize: 44, fontWeight: 600, lineHeight: 1, marginBottom: 8 }}>Aa</div>
             <div style={{ fontWeight: 600, fontSize: 14 }}>
-              Instrument Sans <span style={{ fontWeight: 400, color: C.textTertiary }}>— UI / body</span>
+              Instrument Sans <span style={{ fontWeight: 400, color: C.textTertiary }}>· UI / body</span>
             </div>
             <div style={{ fontSize: 12.5, color: C.textTertiary, marginTop: 4, lineHeight: 1.5 }}>
               Weights 400 / 500 / 600. Default for all interface and body text. JetBrains Mono is
@@ -954,7 +954,7 @@ function SecSpace() {
         <Card>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Content width</div>
           <div style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.55 }}>
-            Max <Mono>1200px</Mono> — MUI <Mono>Container maxWidth=&quot;lg&quot;</Mono>.
+            Max <Mono>1200px</Mono>, via MUI <Mono>Container maxWidth=&quot;lg&quot;</Mono>.
           </div>
         </Card>
         <Card>
@@ -1022,9 +1022,9 @@ function SecRadius() {
     <Page
       kicker="Foundations"
       title="Radius & elevation"
-      lede="Eight-pixel controls, 24px cards, full pills. Elevation stays flat — a hairline border separates."
+      lede="Eight-pixel controls, 24px cards, full pills. Elevation stays flat, and a hairline border separates."
     >
-      <H2 sub="Three deliberate steps — no accidental drift.">Radius</H2>
+      <H2 sub="Three deliberate steps, no accidental drift.">Radius</H2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
         {r(
           'buttons, inputs, chips-as-rect, alerts',
@@ -1090,7 +1090,7 @@ function SecButtons() {
       </div>
       <H2>Rules</H2>
       <Callout style={{ padding: '16px 18px', fontSize: 13.5, lineHeight: 1.7 }}>
-        · Sentence case labels — <em>Browse bills</em>, never <em>BROWSE BILLS</em> or <em>Explore Bills</em>.
+        · Sentence case labels: <em>Browse bills</em>, never <em>BROWSE BILLS</em> or <em>Explore Bills</em>.
         <br />· 8px radius · 44px minimum height (touch target) · no drop shadow.
         <br />· CTAs name the destination: <em>Browse bills →</em>, not <em>Start following today →</em>.
         <br />· Exactly one contained (primary) button per view.
@@ -1158,15 +1158,15 @@ function SecForms() {
       lede={
         <>
           Labelled fields, a 2px focus ring, and validation that always pairs color with words and an
-          icon. Device-neutral copy — <em>select</em>, never <em>tap</em>.
+          icon. Device-neutral copy: <em>select</em>, never <em>tap</em>.
         </>
       }
     >
-      <H2 sub="Every input has a visible label. Select a field to see the focus ring; error and success pair color with text and an icon — never color alone.">
+      <H2 sub="Every input has a visible label. Select a field to see the focus ring. Error and success pair color with text and an icon, never color alone.">
         Text inputs
       </H2>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <Example caption="editable — try typing">
+        <Example caption="editable, try typing">
           <div style={{ marginBottom: 18 }}>
             <label style={fieldLabel}>Email address</label>
             <input className="ds-input" type="email" placeholder="you@example.com" style={INPUT_BASE} />
@@ -1251,7 +1251,7 @@ function SecForms() {
           </div>
         </Example>
       </div>
-      <H2 sub="Real, working controls — toggle the checkboxes, pick a delivery cadence, flip the switch.">
+      <H2 sub="Real, working controls: toggle the checkboxes, pick a delivery cadence, flip the switch.">
         Choice controls
       </H2>
       <Example caption="checkbox · radio · toggle">
@@ -1307,7 +1307,7 @@ function SecChips() {
     <Page
       kicker="Components"
       title="Chips & badges"
-      lede="Pill tags for topics, chamber, party, and status. Status hue is load-bearing; party leans on the letter, not the color."
+      lede="Pill tags for topics, chamber, party, and status. Status hue is load-bearing. Party leans on the letter, not the color."
     >
       <H2 sub="Neutral pills for subject tags and metadata. Automated tagging, so they never over-claim.">
         Topic &amp; meta
@@ -1346,7 +1346,7 @@ function SecChips() {
           </div>
         </Example>
       </div>
-      <H2 sub="Status keeps its semantic hue — never wiped to gray. Tint + dark text for inline badges; solid + white for standalone markers.">
+      <H2 sub="Status keeps its semantic hue, never wiped to gray. Tint + dark text for inline badges, solid + white for standalone markers.">
         Status
       </H2>
       <Example caption="status badges">
@@ -1432,9 +1432,9 @@ function SecFeedback() {
     <Page
       kicker="Components"
       title="Feedback & loading"
-      lede="Skeletons, spinner, progress, toasts, and empty states — quiet, reduced-motion aware, never the only signal for an error."
+      lede="Skeletons, spinner, progress, toasts, and empty states: quiet, reduced-motion aware, never the only signal for an error."
     >
-      <H2 sub="Skeletons match the real element's box; a spinner covers indeterminate waits over ~400ms. Both freeze under reduced motion.">
+      <H2 sub="Skeletons match the real element's box. A spinner covers indeterminate waits over ~400ms. Both freeze under reduced motion.">
         Loading
       </H2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
@@ -1511,7 +1511,7 @@ function SecTabs() {
     <Page
       kicker="Components · proposed"
       title="Tabs"
-      lede="A single row of underline tabs for switching views within a page — the bill detail is the canonical home. Not yet in the spec; the contract below is a proposal."
+      lede="A single row of underline tabs for switching views within a page. The bill detail is the canonical home. Not yet in the spec, so the contract below is a proposal."
     >
       <H2
         sub={
@@ -1523,7 +1523,7 @@ function SecTabs() {
       >
         Underline tabs
       </H2>
-      <Example caption="tabs — interactive">
+      <Example caption="tabs, interactive">
         <div role="tablist" style={{ display: 'flex', gap: 24, borderBottom: `1px solid ${C.borderLight}` }}>
           {tabs.map(([k, txt]) => {
             const active = tab === k;
@@ -1602,10 +1602,10 @@ function SecPagination() {
         </>
       }
     >
-      <H2 sub="For the dense browse surfaces. Current page is the one contained button; neighbors are outlined. Select a number to move it.">
+      <H2 sub="For the dense browse surfaces. Current page is the one contained button. Neighbors are outlined. Select a number to move it.">
         Numbered pagination
       </H2>
-      <Example caption="pagination — interactive">
+      <Example caption="pagination, interactive">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {pbtn('‹ Prev', null, true)}
           {pbtn('1', 1)}
@@ -1621,7 +1621,7 @@ function SecPagination() {
         sub={
           <>
             The lighter-weight alternative already used across card grids. Copy is just{' '}
-            <em>Load more</em> — context says what.
+            <em>Load more</em>, because context says what.
           </>
         }
       >
@@ -1648,7 +1648,7 @@ function SecTable() {
     <Page
       kicker="Components · proposed"
       title="Data table"
-      lede="A dense, sortable table archetype for the power-user browse surfaces — paired with numbered pagination."
+      lede="A dense, sortable table archetype for the power-user browse surfaces, paired with numbered pagination."
     >
       <Callout>
         <strong>Not yet in the spec.</strong> The dense-table archetype is an open decision (#4) and
@@ -1665,7 +1665,7 @@ function SecModal() {
     <Page
       kicker="Components · proposed"
       title="Modal & sheet"
-      lede="Reserved for confirmation and focused tasks — unsubscribe confirm, digest settings. Everything else stays on the page."
+      lede="Reserved for confirmation and focused tasks: unsubscribe confirm, digest settings. Everything else stays on the page."
     >
       <H2
         sub={
@@ -1677,7 +1677,7 @@ function SecModal() {
       >
         Dialog
       </H2>
-      <Example caption="modal — interactive" style={{ position: 'relative' }}>
+      <Example caption="modal, interactive" style={{ position: 'relative' }}>
         <button
           onClick={() => setOpen(true)}
           style={{
@@ -1800,7 +1800,7 @@ function SecTooltip() {
       title="Tooltip"
       lede="Soft light surface, 8px radius. Carries the plain-language definitions that make legislative jargon legible to a first-timer."
     >
-      <H2 sub="The primary warmth mechanism for newcomers — status chips and the progress meter share one tooltip surface that explains a term in plain language.">
+      <H2 sub="The primary warmth mechanism for newcomers. Status chips and the progress meter share one tooltip surface that explains a term in plain language.">
         Educational tooltip
       </H2>
       <Example caption="tooltip surface + trigger">
@@ -1847,7 +1847,7 @@ function SecTooltip() {
       <Callout style={{ marginTop: 16 }}>
         Opens on hover <em>and</em> keyboard focus, dismissible with Esc,{' '}
         <span style={{ fontFamily: FS, fontWeight: 600 }}>aria-describedby</span> links trigger to tip.
-        Content defines a term — it never advises.
+        Content defines a term. It never advises.
       </Callout>
     </Page>
   );
@@ -2037,8 +2037,8 @@ function SecBillcard() {
           ]}
         />
       </div>
-      <H2 sub="Fills to the furthest stage reached. In-progress reads blue; enacted reads green; a vetoed bill shows the final segment blocked — red + 45° hatch + icon + the word, never color alone.">
-        Progress meter — states
+      <H2 sub="Fills to the furthest stage reached. In-progress reads blue, enacted reads green, and a vetoed bill shows the final segment blocked: red + 45° hatch + icon + the word, never color alone.">
+        Progress meter states
       </H2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Example caption="in progress · passed one chamber">
@@ -2075,7 +2075,7 @@ function SecBillcard() {
       <H2
         sub={
           <>
-            Wording follows <Mono>ky-bill-progress.ts</Mono> — do not &quot;correct&quot; without checking
+            Wording follows <Mono>ky-bill-progress.ts</Mono>. Do not &quot;correct&quot; without checking
             it.
           </>
         }
@@ -2101,9 +2101,9 @@ function SecBillcard() {
           <div style={{ padding: '11px 16px' }}>Labels</div>
         </div>
         {[
-          ['Bill / joint resolution — HB, SB, HJR, SJR', '4', 'Introduced → Passed {origin} → Passed {second} → Became law'],
-          ['Concurrent resolution — HCR, SCR', '3', 'Introduced → Passed {origin} → Adopted by both chambers'],
-          ['Simple resolution — HR, SR', '2', 'Introduced → Adopted by {chamber}'],
+          ['Bill / joint resolution: HB, SB, HJR, SJR', '4', 'Introduced → Passed {origin} → Passed {second} → Became law'],
+          ['Concurrent resolution: HCR, SCR', '3', 'Introduced → Passed {origin} → Adopted by both chambers'],
+          ['Simple resolution: HR, SR', '2', 'Introduced → Adopted by {chamber}'],
         ].map((row, i) => (
           <div key={row[0]} style={{ display: 'grid', gridTemplateColumns: '1.4fr .5fr 2fr', borderBottom: i < 2 ? `1px solid ${C.borderLight}` : undefined }}>
             <div style={{ padding: '12px 16px', fontWeight: 500 }}>{row[0]}</div>
@@ -2113,7 +2113,7 @@ function SecBillcard() {
         ))}
       </div>
       <Callout style={{ marginTop: 14 }}>
-        <strong>&quot;Became law&quot;, not &quot;Signed&quot;</strong> — a bill is enacted whether signed, unsigned
+        <strong>&quot;Became law&quot;, not &quot;Signed&quot;</strong>. A bill is enacted whether signed, unsigned
         after 10 days, or overridden after veto. Concurrent resolutions are <em>adopted</em>, never
         signed.
       </Callout>
@@ -2201,7 +2201,7 @@ function SecMember() {
     <Page
       kicker="Domain"
       title="Member card"
-      lede="141 members, one tile. Party is signalled by chip and label first, color second — so the roster never reads as an endorsement."
+      lede="141 members, one tile. Party is signalled by chip and label first, color second, so the roster never reads as an endorsement."
     >
       <div
         style={{
@@ -2215,10 +2215,10 @@ function SecMember() {
         }}
       >
         <strong>Updated · approved refinement.</strong> Photo-first avatar: the photo carries
-        identity and party moves to a thin ring + the chip below — so party color is present but no
+        identity and party moves to a thin ring + the chip below, so party color is present but no
         longer the loudest element on the card.
       </div>
-      <H2 sub="The roster and &quot;Find my legislators&quot; tile. A thin party-colored ring frames the photo; the D / R / I chip and party label carry the meaning.">
+      <H2 sub="The roster and &quot;Find my legislators&quot; tile. A thin party-colored ring frames the photo. The D / R / I chip and party label carry the meaning.">
         Member card
       </H2>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -2226,7 +2226,7 @@ function SecMember() {
         {mcard(C.partyR, 'Sen. James Coleman', 'Republican', C.partyR, 'Senate', C.chamberSenate, '18', 'Chairs Appropriations & Revenue · 4 committees')}
       </div>
       <H2 sub="Photo present → neutral image inside a party ring (left). No photo → initials on the party fill (right). The party chip is always shown either way.">
-        Avatar — photo-first, initials fallback
+        Avatar: photo-first, initials fallback
       </H2>
       <div style={{ display: 'flex', gap: 26, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -2245,7 +2245,7 @@ function SecMember() {
       <Callout style={{ marginTop: 16 }}>
         Feature name is <strong>Find my legislators</strong> everywhere in UI; in prose,{' '}
         <em>your House and Senate representatives</em>. &quot;District map&quot; only names the tool, never the
-        button. Profile data <em>may lag updates</em> — stated plainly, per honest sourcing.
+        button. Profile data <em>may lag updates</em>, stated plainly, per honest sourcing.
       </Callout>
     </Page>
   );
@@ -2286,21 +2286,21 @@ function SecCommittee() {
       title="Committee card"
       lede="Committees, their next meeting, and the change lines that drive the digest. Calendar data shown as fact, never as a claim beyond what synced."
     >
-      <H2 sub="Chamber, membership, and the next scheduled meeting from the calendar sync — surfaced as a fact, with its own follow control.">
+      <H2 sub="Chamber, membership, and the next scheduled meeting from the calendar sync, surfaced as a fact, with its own follow control.">
         Committee card
       </H2>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {ccard('House Education', 'House', C.chamberHouse, '19', 'Tuesday, February 4 · 10:00 AM ET', 'Capitol Annex, Room 129')}
         {ccard('Senate Appropriations & Revenue', 'Senate', C.chamberSenate, '13', 'Thursday, February 6 · 1:00 PM ET', 'Capitol Annex, Room 154')}
       </div>
-      <H2 sub="How committee updates read in the digest — a parallel colon pattern, one line per change.">
+      <H2 sub="How committee updates read in the digest: a parallel colon pattern, one line per change.">
         Calendar change lines
       </H2>
       <Example caption="meeting update lines">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13.5 }}>
           <div>
             <strong style={{ color: C.success }}>New meeting:</strong>{' '}
-            <span style={{ color: C.textSecondary }}>Tuesday, February 4 — 10:00 AM ET, Capitol Annex Room 129</span>
+            <span style={{ color: C.textSecondary }}>Tuesday, February 4, 10:00 AM ET, Capitol Annex Room 129</span>
           </div>
           <div>
             <strong style={{ color: C.warning }}>Agenda updated:</strong>{' '}
@@ -2313,8 +2313,8 @@ function SecCommittee() {
         </div>
       </Example>
       <Callout style={{ marginTop: 16 }}>
-        Repeated updates to one meeting are de-duplicated; <em>Agenda updated</em> is suppressed when
-        the same meeting&apos;s <em>New meeting</em> line is already present. Expand acronyms on first use —
+        Repeated updates to one meeting are de-duplicated, and <em>Agenda updated</em> is suppressed when
+        the same meeting&apos;s <em>New meeting</em> line is already present. Expand acronyms on first use, for example
         Legislative Research Commission (LRC).
       </Callout>
     </Page>
@@ -2385,7 +2385,7 @@ function SecNav() {
         </div>
       </div>
       <Callout style={{ marginTop: 16 }}>
-        Nouns as labels — <em>Bills</em>, not <em>Explore Bills</em>. Auth verbs are fixed:{' '}
+        Nouns as labels: <em>Bills</em>, not <em>Explore Bills</em>. Auth verbs are fixed:{' '}
         <strong>Log in</strong> (never &quot;Sign in&quot;) and <strong>Sign up</strong>. The color logo sits on
         light surfaces only.
       </Callout>
@@ -2533,7 +2533,7 @@ function SecEmail() {
             <a style={{ color: C.primary, fontWeight: 600 }}>House Education</a>
             <br />
             <span>
-              <strong>New meeting:</strong> Tuesday, February 4 — 10:00 AM ET, Capitol Annex Room 129
+              <strong>New meeting:</strong> Tuesday, February 4, 10:00 AM ET, Capitol Annex Room 129
             </span>
           </div>
         </>,
@@ -2583,11 +2583,11 @@ function SecA11y() {
       <H2 sub="AA is where the system starts, not where it stretches to.">The floor</H2>
       <div style={{ background: '#fff', border: `1px solid ${C.borderLight}`, borderRadius: 12, padding: '4px 20px 12px' }}>
         {check('Text contrast ≥ 4.5:1', 'WCAG 1.4.3', 'Every §2 semantic pairing. --text-muted is non-text only.')}
-        {check('Focus ring — 2px --primary, 2px offset', '2.4.7', ':focus-visible in globals.css; widens to 3px under prefers-contrast: high.')}
+        {check('Focus ring: 2px --primary, 2px offset', '2.4.7', ':focus-visible in globals.css. Widens to 3px under prefers-contrast: high.')}
         {check('Touch targets ≥ 44px', '2.5.5', 'Button / IconButton / Select / TextField floors in theme.ts.')}
-        {check('Status never by color alone', '1.4.1', 'Meter vetoed = red + hatch + block icon + word; party = D/R/I letter.')}
-        {check('Skip link + one h1 + no skipped levels', '2.4.1 / 1.3.1', 'Skip link to #main-content; modals portal in so it stays reachable.')}
-        {check('Reduced motion & forced colors honored', '2.3.3 / 1.4.12', 'Global media queries neutralize animation; gradient text falls back to CanvasText.')}
+        {check('Status never by color alone', '1.4.1', 'Meter vetoed = red + hatch + block icon + word. Party = D/R/I letter.')}
+        {check('Skip link + one h1 + no skipped levels', '2.4.1 / 1.3.1', 'Skip link to #main-content. Modals portal in so it stays reachable.')}
+        {check('Reduced motion & forced colors honored', '2.3.3 / 1.4.12', 'Global media queries neutralize animation. Gradient text falls back to CanvasText.')}
       </div>
     </Page>
   );
@@ -2618,22 +2618,22 @@ function SecVoice() {
       title="Voice & tone"
       lede="One voice across site and email. Neutral by default, a little warmer only on the marketing surface, never partisan anywhere."
     >
-      <H2 sub="Trustworthy, neutral, accessible — closer to a reliable government tracking service than to a startup.">
+      <H2 sub="Trustworthy, neutral, accessible, closer to a reliable government tracking service than to a startup.">
         Principles
       </H2>
       <div style={{ background: '#fff', border: `1px solid ${C.borderLight}`, borderRadius: 12, padding: '4px 20px 14px' }}>
         {principle('Neutral and informational', 'State what happened or what a person can do. No enthusiasm, no adjectives that talk up the product.')}
         {principle('Non-partisan, always', 'Never characterize legislation as good or bad. Describe what a bill does and where it is, never what someone should think.')}
-        {principle('Honest sourcing', 'Show where data comes from and where it lags — plainly, on purpose. A deliberate trust signal, not a disclaimer to minimize.')}
+        {principle('Honest sourcing', 'Show where data comes from and where it lags, plainly and on purpose. A deliberate trust signal, not a disclaimer to minimize.')}
         {principle('Warmth through anticipation', "Answer a newcomer's confusion before they hit it. Never warmth through exclamation points or hype.")}
         {principle('Device-neutral', '“Select,” never “tap,” “click,” or “press.”')}
       </div>
       <H2>Conventions</H2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
-        {conv('Headings', 'Sentence-case nouns — “Bills,” not “Explore Bills.”')}
+        {conv('Headings', 'Sentence-case nouns: “Bills,” not “Explore Bills.”')}
         {conv('The district map', '“Find my legislators” as the label; “your representatives” in prose.')}
         {conv('Auth verbs', '“Log in” (never “Sign in”) and “Sign up,” consistently.')}
-        {conv('Counts & acronyms', '“141 members,” not “141 people.” Expand acronyms on first use — LRC.')}
+        {conv('Counts & acronyms', '“141 members,” not “141 people.” Expand acronyms on first use, for example LRC.')}
       </div>
       <H2>What to avoid</H2>
       <div style={{ background: '#fff', border: `1px solid ${C.borderLight}`, borderRadius: 12, overflow: 'hidden' }}>
@@ -2641,10 +2641,10 @@ function SecVoice() {
           <div style={{ padding: '11px 14px' }}>Avoid</div>
           <div style={{ padding: '11px 14px' }}>Reason</div>
         </div>
-        {avoid('Stay informed / Never miss a vote', 'Characterizes value; implies urgency')}
-        {avoid('Any take on whether a bill is good or bad', 'Editorializing; breaks non-partisanship')}
+        {avoid('Stay informed / Never miss a vote', 'Characterizes value, implies urgency')}
+        {avoid('Any take on whether a bill is good or bad', 'Editorializing, breaks non-partisanship')}
         {avoid('Tap / click / press', 'Device-specific')}
-        {avoid('Explore Bills', "Marketing register; a reference tool browses, it doesn't hype")}
+        {avoid('Explore Bills', "Marketing register. A reference tool browses, it doesn't hype")}
         {avoid('KY as a stand-in for Kentucky', 'Abbreviation inconsistent with the full name')}
       </div>
     </Page>
@@ -2662,9 +2662,9 @@ function SecMap() {
     <Page
       kicker="Domain"
       title="District map"
-      lede="A Kentucky map with a member's district highlighted — the same geometry and palette as the live explorer, rendered without a Mapbox request."
+      lede="A Kentucky map with a member's district highlighted, using the same geometry and palette as the live explorer, rendered without a Mapbox request."
     >
-      <H2 sub="Built from the same committed district GeoJSON the live explorer uses — no Mapbox request. The member's district is highlighted at a darker value than its neighbors.">
+      <H2 sub="Built from the same committed district GeoJSON the live explorer uses, with no Mapbox request. The member's district is highlighted at a darker value than its neighbors.">
         Statewide district map
       </H2>
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 20, alignItems: 'start' }}>

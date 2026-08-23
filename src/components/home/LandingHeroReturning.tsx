@@ -48,7 +48,7 @@ export function LandingHeroReturning() {
             textShadow: '0 1px 4px rgba(0, 0, 0, 0.55)',
           }}
         >
-          Pick up where you left off — your feed, bills you follow, or browse the full legislature.
+          Pick up where you left off: your feed, bills you follow, or browse the full legislature.
         </Typography>
         <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" useFlexGap>
           <Button

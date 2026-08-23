@@ -46,7 +46,7 @@ export default function DevBillSummaryPreview() {
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
       <Typography variant="h5" fontWeight={700} gutterBottom>
-        AI summary section — preview
+        AI summary section preview
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Dev-only. Renders the bill-detail summary card (beta) with real dry-run output: an
@@ -57,7 +57,7 @@ export default function DevBillSummaryPreview() {
         {SAMPLES.map((s) => (
           <Box key={s.billNumber}>
             <Typography variant="overline" color="text.secondary">
-              {s.billNumber} — {s.title}
+              {s.billNumber}: {s.title}
             </Typography>
             <MuiCard sx={{ mt: 0.5, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
               <MuiCardContent>

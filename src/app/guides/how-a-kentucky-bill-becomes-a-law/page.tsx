@@ -10,7 +10,7 @@ import { buildPageMetadata } from '@/lib/seo';
 const PATH = '/guides/how-a-kentucky-bill-becomes-a-law';
 const TITLE = 'How a bill becomes a law in Kentucky';
 const DESCRIPTION =
-  "The steps a bill takes through the Kentucky General Assembly — introduction, committee, three readings, floor votes, the second chamber, and the governor's signature or veto.";
+  "The steps a bill takes through the Kentucky General Assembly: introduction, committee, three readings, floor votes, the second chamber, and the governor's signature or veto.";
 const DATE_MODIFIED = '2026-07-18';
 
 export const metadata: Metadata = buildPageMetadata({
@@ -26,7 +26,7 @@ export const revalidate = 3600;
 const STEPS: { title: string; body: string }[] = [
   {
     title: '1. Introduction',
-    body: 'A House or Senate member files the bill in their own chamber. Bills that raise revenue must start in the House of Representatives. Each bill receives a number — HB for House bills, SB for Senate bills.',
+    body: 'A House or Senate member files the bill in their own chamber. Bills that raise revenue must start in the House of Representatives. Each bill receives a number: HB for House bills, SB for Senate bills.',
   },
   {
     title: '2. Committee',
@@ -38,7 +38,7 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: '4. The second chamber',
-    body: 'A bill that passes one chamber repeats the process in the other — committee, readings, and a floor vote. If the second chamber changes the bill, the first chamber must concur, or the two chambers negotiate a shared version in a conference committee.',
+    body: 'A bill that passes one chamber repeats the process in the other: committee, readings, and a floor vote. If the second chamber changes the bill, the first chamber must concur, or the two chambers negotiate a shared version in a conference committee.',
   },
   {
     title: '5. The governor',
@@ -46,7 +46,7 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: '6. Veto override',
-    body: 'The General Assembly can override a veto with a majority of the members elected in each chamber — 51 votes in the House and 20 in the Senate. This is a simple majority, unlike the two-thirds required in the U.S. Congress.',
+    body: 'The General Assembly can override a veto with a majority of the members elected in each chamber, meaning 51 votes in the House and 20 in the Senate. This is a simple majority, unlike the two-thirds required in the U.S. Congress.',
   },
 ];
 
@@ -76,8 +76,8 @@ export default function BillBecomesLawGuidePage() {
         {TITLE}
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        The Kentucky General Assembly — the 100-member House of Representatives and the 38-member
-        Senate — writes state law. The rules and procedures differ from the U.S. Congress. The{' '}
+        The Kentucky General Assembly, made up of the 100-member House of Representatives and the
+        38-member Senate, writes state law. The rules and procedures differ from the U.S. Congress. The{' '}
         <MuiLink component={NextLink} href="/glossary" underline="hover">
           glossary
         </MuiLink>{' '}

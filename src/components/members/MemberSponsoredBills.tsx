@@ -186,7 +186,7 @@ export function MemberSponsoredBills({
               ))}
             </Select>
           </FormControl>
-          <Tooltip title={sortDir === 'desc' ? 'Descending — switch to ascending' : 'Ascending — switch to descending'}>
+          <Tooltip title={sortDir === 'desc' ? 'Descending. Select to sort ascending.' : 'Ascending. Select to sort descending.'}>
             <IconButton
               size="small"
               aria-label={sortDir === 'desc' ? 'Sort descending' : 'Sort ascending'}

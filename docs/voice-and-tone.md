@@ -51,7 +51,9 @@ The **marketing surface** (home/landing hero, the About intro) may be *a little*
 
 **Brand stylization.** **KYvKY**, lowercase v, everywhere the short form appears: user-facing copy, code comments, internal audit output, and docs. `structured-data.ts` (`alternateName`) and `llms.txt` already declared it, but the all-caps form had spread to four user-facing strings and ~33 other places; all were converted 2026-08-22. The only intentional exceptions are the `KYVKY_POSTAL_ADDRESS` constant (an identifier, not prose) and historical `decisions.md` / `TASKS.md` entries, which are append-only records. Full name "Know Your Vote Kentucky" on first use in a formal context; the short form is fine thereafter.
 
-**No em dashes.** Katie's call, 2026-08-22. Use a colon when the second half explains the first ("when it moves: committee action, floor votes"), a comma for a light aside ("LegiScan, synced daily during session"), or a full stop when the clause can stand alone ("We send factual updates only. No AI-generated summaries in digest emails."). Applied to `/about` and the welcome email in full on 2026-08-22, including copy that predated the change. **Not yet swept sitewide** — the digest email, glossary, banners, and browse surfaces still carry them, and the digest specs in this guide still quote em-dashed strings. Sweep those before treating this rule as fully enforced.
+**No em dashes and no semicolons.** Em dashes were Katie's call, 2026-08-22. Semicolons were added 2026-08-23 for the same reason: both now read as AI-generated writing, and screeners are being trained on them as a tell. Use a colon when the second half explains the first ("when it moves: committee action, floor votes"), a comma for a light aside ("LegiScan, synced daily during session"), or a full stop when the clause can stand alone ("We send factual updates only. No AI-generated summaries in digest emails."). For a list whose items already contain commas, prefer restructuring or a colon over a semicolon.
+
+**Swept sitewide 2026-08-23.** Every externally visible surface is clear: all public pages and guides, page titles and meta descriptions, JSON-LD, the glossary and tooltip definitions, the bill digest and welcome emails, `llms.txt`, and the publicly linked design-system reference. The AI bill-summary system prompt in `ky-content-generation.ts` now carries the rule too, so newly generated summaries comply at the source. Deliberately **out of scope**: source-code comments, operator-only surfaces (`/admin`), internal Slack alerts and sync logs, and the accuracy-audit reports. The one em dash left in `ky-content-generation.ts` is the legacy failure sentinel, kept so summaries persisted before the sweep are still recognized as failures rather than rendered as real content.
 
 ---
 
@@ -130,7 +132,7 @@ The funding sentence must stay in the **seeking** tense. Per the Notion wording 
 
 Sent daily or weekly based on user preference, only when there are events to report.
 
-**Subject:** `Kentucky bill digest — {Mon D}: {counts}` (e.g., `Kentucky bill digest — May 13: 3 bills, 2 committee updates`). The inbox column already shows the date, so the subject's variable slot carries the counts; the short date keeps each day's subject distinct so threading clients don't collapse digests. A digest with no bill sections uses `Kentucky committee digest — {Mon D}: {n} updates` — the subject never names content the email doesn't contain.
+**Subject:** `Kentucky bill digest, {Mon D}: {counts}` (e.g., `Kentucky bill digest, May 13: 3 bills, 2 committee updates`). The inbox column already shows the date, so the subject's variable slot carries the counts; the short date keeps each day's subject distinct so threading clients don't collapse digests. A digest with no bill sections uses `Kentucky committee digest, {Mon D}: {n} updates` — the subject never names content the email doesn't contain.
 
 **Preview text:** describes only what the digest contains, joined with "and" when both parts are present: `{n} bill(s) with new activity` / `{n} committee update(s)` / `3 bills with new activity and 2 committee updates`.
 
@@ -143,7 +145,7 @@ Sent daily or weekly based on user preference, only when there are events to rep
 **Structure — grouped by reason.** Updates are split into up to three sections so the reader sees *why* each item is included. A section is shown only when it has content:
 - `Bills you follow` — bills the user follows individually.
 - `Topics you follow` — bills matched by a followed topic. Each such bill is annotated with the matched topic(s): `Matches your {topic} topic` / `Matches your {topicA} and {topicB} topics` (serial "and", Oxford comma for three or more). Each topic name links to the bills browse filtered by that topic (`/bills?topic={t}`).
-- `Committees you follow` — one block per committee, one line per calendar change, in a parallel colon pattern: `New meeting: {weekday, month day} — {time and location}` / `Agenda updated: …` / `Meeting cancelled: …`. Repeated updates to the same meeting are de-duplicated, and `Agenda updated` is suppressed when the same meeting's `New meeting` line is already in the digest (it would carry no new information). Committee updates have their own cap; the remainder counts toward the overflow line.
+- `Committees you follow` — one block per committee, one line per calendar change, in a parallel colon pattern: `New meeting: {weekday, month day}, {time and location}` / `Agenda updated: …` / `Meeting cancelled: …`. Repeated updates to the same meeting are de-duplicated, and `Agenda updated` is suppressed when the same meeting's `New meeting` line is already in the digest (it would carry no new information). Committee updates have their own cap; the remainder counts toward the overflow line.
 
 A bill the user both follows and matches by topic appears once, under `Bills you follow`.
 
@@ -157,7 +159,7 @@ A bill the user both follows and matches by topic appears once, under `Bills you
 
 **Footer:**
 > You're getting this because you follow bills, topics, or committees on Know Your Vote Kentucky.
-> Bill status lines quote the legislature's official action text where available — the [glossary] explains the terms. Dates in parentheses show when Know Your Vote Kentucky recorded each update, which can lag the action itself.
+> Bill status lines quote the legislature's official action text where available. The [glossary] explains the terms. Dates in parentheses show when Know Your Vote Kentucky recorded each update, which can lag the action itself.
 > [Change digest settings] · [Unsubscribe] · [Privacy] · [Terms]
 > Know Your Vote Kentucky · PO Box 133, Bardstown, Kentucky 40004
 

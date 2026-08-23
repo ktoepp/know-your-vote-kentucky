@@ -31,7 +31,7 @@ export function formatCalendarHearingLastAction(args: {
     args.timeAndLocation?.trim() || null,
     args.agendaLine?.trim() || null,
   ].filter(Boolean);
-  return parts.join(' — ');
+  return parts.join(' · ');
 }
 
 /**

@@ -87,7 +87,7 @@ export const KY_SESSIONS: KYSessionRecord[] = [
     start: '2021-09-07',
     end: '2021-09-09',
     type: 'special',
-    subject: 'COVID-19 response — state of emergency, school flexibility, and federal relief funds.',
+    subject: 'COVID-19 response: state of emergency, school flexibility, and federal relief funds.',
   },
   { name: '2021 Regular Session', start: '2021-01-05', end: '2021-03-30', type: 'regular' },
   { name: '2020 Regular Session', start: '2020-01-07', end: '2020-04-15', type: 'regular' },
@@ -125,7 +125,7 @@ export const KY_SESSIONS: KYSessionRecord[] = [
     start: '2010-05-24',
     end: '2010-05-29',
     type: 'special',
-    subject: 'State budget — enacted the FY2010–2012 budget after the regular session adjourned without one.',
+    subject: 'State budget: enacted the FY2010–2012 budget after the regular session adjourned without one.',
   },
   { name: '2010 Regular Session', start: '2010-01-05', end: '2010-04-15', type: 'regular' },
 ];
@@ -294,11 +294,11 @@ export function getCivicDataSessionName(asOf: Date = new Date()): string {
 export const SESSION_TYPE_DESCRIPTIONS: Record<KYSessionType, string> = {
   regular:
     'A regular session convenes each January under the Kentucky Constitution. ' +
-    'In even-numbered years the General Assembly meets for up to 60 legislative days and must adjourn by April 15 — ' +
-    'these are the budget sessions. In odd-numbered years it meets for up to 30 legislative days, adjourning by March 30. ' +
+    'In even-numbered years the General Assembly meets for up to 60 legislative days and must adjourn by April 15. ' +
+    'These are the budget sessions. In odd-numbered years it meets for up to 30 legislative days, adjourning by March 30. ' +
     'Most bills can only be introduced and passed during this window.',
   special:
-    'A special session is called by the Governor — or by petition of 3/5 of the members of each chamber — ' +
+    'A special session is called by the Governor, or by petition of 3/5 of the members of each chamber, ' +
     'outside the regular annual schedule. Business is limited to topics specified in the call. ' +
     'Special sessions are typically brief and focused on urgent or time-sensitive matters.',
 };

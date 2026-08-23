@@ -35,7 +35,7 @@ export default function PrivacyPage() {
             <li>Display name, if you set one.</li>
             <li>The bills and topics you follow, and your notification preferences.</li>
             <li>
-              Email delivery events from our mail provider (Resend) — for each digest we receive
+              Email delivery events from our mail provider (Resend). For each digest we receive
               callbacks like &ldquo;delivered,&rdquo; &ldquo;bounced,&rdquo; and &ldquo;complained.&rdquo;
               We use these to suppress mail to addresses that hard-bounce or mark us as spam, which
               protects deliverability for everyone.
@@ -68,18 +68,18 @@ export default function PrivacyPage() {
           </Typography>
           <Typography component="ul" variant="body2" color="text.secondary" sx={{ pl: 3 }}>
             <li>
-              <strong>Supabase</strong> — managed Postgres + auth provider that stores your account
+              <strong>Supabase.</strong> Managed Postgres and auth provider that stores your account
               and follows.
             </li>
             <li>
-              <strong>Resend</strong> — sends our emails and reports back delivery / bounce events.
+              <strong>Resend.</strong> Sends our emails and reports back delivery and bounce events.
               Resend uses Amazon SES under the hood.
             </li>
             <li>
-              <strong>Vercel</strong> — hosts the site and serves the cron job that builds digests.
+              <strong>Vercel.</strong> Hosts the site and serves the cron job that builds digests.
             </li>
             <li>
-              <strong>Sentry</strong> — error monitoring on server failures (no personal content
+              <strong>Sentry.</strong> Error monitoring on server failures (no personal content
               from emails is sent to Sentry).
             </li>
           </Typography>
@@ -111,7 +111,7 @@ export default function PrivacyPage() {
               <MuiLink component={Link} href="/profile">your profile</MuiLink>.
             </li>
             <li>
-              Select <em>Unsubscribe from digests</em> at the bottom of any digest email — turns
+              Select <em>Unsubscribe from digests</em> at the bottom of any digest email. This turns
               digests off immediately, no login needed.
             </li>
             <li>

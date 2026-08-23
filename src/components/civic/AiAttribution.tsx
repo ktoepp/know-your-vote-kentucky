@@ -95,7 +95,7 @@ export function AiGeneratedBlock({
   return (
     <Box>
       <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 0.75, letterSpacing: '0.08em' }}>
-        AI-generated — always verify with primary sources
+        AI-generated. Always verify with primary sources
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
         <Typography variant="subtitle1" fontWeight={700}>

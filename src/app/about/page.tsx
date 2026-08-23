@@ -113,7 +113,7 @@ export default function AboutPage() {
           <ListItem disableGutters>
             <ListItemText
               primary="District boundaries"
-              secondary="Public boundary data maintained in this project; address lookup via Mapbox."
+              secondary="Public boundary data maintained in this project. Address lookup via Mapbox."
             />
           </ListItem>
         </List>
