@@ -26,7 +26,7 @@ import {
 } from '@mui/material';
 import { GaChamberFilterBar } from '@/components/civic/GaChamberFilterBar';
 import { gaChamberFilterLabel } from '@/lib/ky-committee-display';
-import { Cancel, Search, ArrowForward, InfoOutlined, Groups, Gavel, Tune } from '@mui/icons-material';
+import { Cancel, Search, ArrowForward, Groups, Gavel, Tune } from '@mui/icons-material';
 import ListSubheader from '@mui/material/ListSubheader';
 import { supabase } from '@/app/lib/supabaseClient';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
@@ -512,6 +512,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
       <Container maxWidth="lg" sx={{ pt: 0, pb: 4 }}>
         {/* Search bar + filters — no surface chrome (flat on the page background). */}
         <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <TextField
             fullWidth
             autoFocus={!qFromUrl}
@@ -519,29 +520,28 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             inputProps={{ 'aria-label': 'Search bills, members, and committees' }}
+            sx={{ flex: '1 1 320px' }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: 'primary.main', opacity: 0.92 }} aria-hidden />
-                </InputAdornment>
-              ),
-              endAdornment: (
-                <InputAdornment position="end">
                   <Tooltip
                     arrow
                     enterTouchDelay={0}
                     leaveTouchDelay={5000}
                     title="Search bills (HB 23), members (by name or district), and committees at once. Bill numbers work with or without spaces or dashes (HB23, HB 23, HB-23); a bare number (23) finds every bill type with that number."
                   >
-                    <IconButton aria-label="Search tips" size="small" sx={{ mr: 0.5 }}>
-                      <InfoOutlined fontSize="small" />
+                    <IconButton aria-label="Search tips" size="small" edge="start" sx={{ mr: 0.5 }}>
+                      <Search sx={{ color: 'primary.main', opacity: 0.92 }} />
                     </IconButton>
                   </Tooltip>
-                  <Button type="submit" variant="contained" disabled={loading}>Search</Button>
                 </InputAdornment>
               ),
             }}
           />
+          <Button type="submit" variant="contained" disabled={loading} sx={{ height: 44 }}>
+            Search
+          </Button>
+          </Box>
 
           {/* Category tabs — keep the input position fixed; scope results below. */}
           {searched && (
@@ -556,10 +556,18 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 aria-label="Filter results by type"
                 sx={{ flexWrap: 'wrap' }}
               >
-                <ToggleButton value="all">All ({totalResults >= SEARCH_FETCH_LIMIT ? `${SEARCH_FETCH_LIMIT}+` : totalResults})</ToggleButton>
-                <ToggleButton value="bills">Bills ({billCount >= SEARCH_FETCH_LIMIT ? `${SEARCH_FETCH_LIMIT}+` : billCount})</ToggleButton>
-                <ToggleButton value="members">Members ({memberCount})</ToggleButton>
-                <ToggleButton value="committees">Committees ({committeeCount})</ToggleButton>
+                <ToggleButton value="all">
+                  All <Box component="span" sx={{ opacity: 0.65, ml: 0.5 }}>({totalResults >= SEARCH_FETCH_LIMIT ? `${SEARCH_FETCH_LIMIT}+` : totalResults})</Box>
+                </ToggleButton>
+                <ToggleButton value="bills">
+                  Bills <Box component="span" sx={{ opacity: 0.65, ml: 0.5 }}>({billCount >= SEARCH_FETCH_LIMIT ? `${SEARCH_FETCH_LIMIT}+` : billCount})</Box>
+                </ToggleButton>
+                <ToggleButton value="members">
+                  Members <Box component="span" sx={{ opacity: 0.65, ml: 0.5 }}>({memberCount})</Box>
+                </ToggleButton>
+                <ToggleButton value="committees">
+                  Committees <Box component="span" sx={{ opacity: 0.65, ml: 0.5 }}>({committeeCount})</Box>
+                </ToggleButton>
               </ToggleButtonGroup>
             </Box>
           )}
@@ -759,7 +767,12 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                   subjectSuggestions.map((s) => (
                     <Chip
                       key={s.subject_name}
-                      label={`${s.subject_name} (${s.bill_count})`}
+                      label={
+                        <>
+                          {s.subject_name}{' '}
+                          <Box component="span" sx={{ opacity: 0.65 }}>({s.bill_count})</Box>
+                        </>
+                      }
                       size="small"
                       color="primary"
                       variant="outlined"
@@ -767,53 +780,33 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                         setQuery(s.subject_name);
                         pushSearchUrl(s.subject_name);
                       }}
-                      sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
+                      sx={{ cursor: 'pointer' }}
                     />
                   ))}
                 {!suggestionsLoading && subjectSuggestions.length === 0 && (
                   <>
                     <Chip
-                      label="Try: education"
+                      label="education"
                       size="small"
                       variant="outlined"
                       onClick={() => {
                         setQuery('education');
                         pushSearchUrl('education');
                       }}
-                      sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
+                      sx={{ cursor: 'pointer' }}
                     />
                     <Chip
-                      label="Try: Medicaid"
+                      label="Medicaid"
                       size="small"
                       variant="outlined"
                       onClick={() => {
                         setQuery('Medicaid');
                         pushSearchUrl('Medicaid');
                       }}
-                      sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
+                      sx={{ cursor: 'pointer' }}
                     />
                   </>
                 )}
-                <Chip
-                  label='Bill number: 23'
-                  size="small"
-                  variant="outlined"
-                  onClick={() => {
-                    setQuery('23');
-                    pushSearchUrl('23');
-                  }}
-                  sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
-                />
-                <Chip
-                  label="HB 1"
-                  size="small"
-                  variant="outlined"
-                  onClick={() => {
-                    setQuery('HB 1');
-                    pushSearchUrl('HB 1');
-                  }}
-                  sx={{ cursor: 'pointer', '&.MuiChip-sizeSmall': { height: { xs: 44, sm: 20 } } }}
-                />
               </Box>
             </Box>
           )}

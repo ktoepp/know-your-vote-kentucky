@@ -232,10 +232,15 @@ export const lightTheme = createTheme({
           fontSize: '0.75rem',
           fontWeight: 600,
           height: 24,
-          '&.MuiChip-sizeSmall': { fontSize: '0.7rem',    height: 20 },
+          // Small chips carry most of the site's clickable topic/filter/search
+          // chips (see `size="small"` call sites across bills/search/members
+          // browse) — sized up 2026-08-22 so they read as inviting tap targets
+          // rather than dense labels, not just a legibility bump.
+          '&.MuiChip-sizeSmall': { fontSize: '0.875rem',  height: 36 },
           '&.MuiChip-sizeLarge': { fontSize: '0.875rem',  height: 32 },
         },
         label: { color: 'inherit' },
+        labelSmall: { paddingLeft: 14, paddingRight: 14 },
         /**
          * Default outlined chip: slate border, primary text. Non-default color
          * (success/error/warning/info) yields to MUI's built-in outlinedSuccess
@@ -250,6 +255,22 @@ export const lightTheme = createTheme({
             borderColor: slate[200],
             color: props.theme.palette.text.primary,
             backgroundColor: 'transparent',
+          };
+        },
+        /**
+         * Filled + primary (the "selected chip" state on topic/filter rows):
+         * a soft tint rather than a solid button-blue fill, so an active chip
+         * reads as "selected" next to its outlined siblings instead of as a
+         * CTA button. Other filled colors (success/error/…) keep MUI's default.
+         */
+        filled: (props: any) => {
+          const colorName: string | undefined = props.ownerState?.color;
+          if (colorName !== 'primary') return {};
+          return {
+            backgroundColor: '#DBEAFE',
+            color: civicPaletteTokens.primary.dark,
+            '&:hover': { backgroundColor: '#BFDBFE' },
+            '&:focus': { backgroundColor: '#BFDBFE' },
           };
         },
       },

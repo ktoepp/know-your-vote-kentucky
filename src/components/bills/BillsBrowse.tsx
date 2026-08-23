@@ -421,6 +421,41 @@ export function BillsBrowse({
               sx={{ fontWeight: 500, borderRadius: '16px' }}
             />
           ))}
+          {/*
+           * These two aren't in KY_TOPICS (the classifier taxonomy the Topic
+           * dropdown/chips above filter against), so they route to a keyword
+           * search instead of `?topic=` — a `?topic=` value with no matching
+           * bill.topics entry would silently return zero results.
+           */}
+          <Chip
+            label="Women's health"
+            size="small"
+            clickable
+            variant="outlined"
+            component={Link}
+            href="/search?q=women%27s+health"
+            sx={{ fontWeight: 500, borderRadius: '16px' }}
+          />
+          <Chip
+            label="Data centers"
+            size="small"
+            clickable
+            variant="outlined"
+            component={Link}
+            href="/search?q=data+centers"
+            sx={{ fontWeight: 500, borderRadius: '16px' }}
+          />
+          {!topicFilter && (
+            <Chip
+              label="more →"
+              size="small"
+              clickable
+              variant="outlined"
+              component={Link}
+              href="/bills/topics"
+              sx={{ fontWeight: 500, borderRadius: '16px' }}
+            />
+          )}
           {topicFilter && !LANDING_TOPICS.some((t) => t.topic === topicFilter) && (
             <Chip
               label={topicFilter}
@@ -432,10 +467,8 @@ export function BillsBrowse({
               sx={{ fontWeight: 500, borderRadius: '16px' }}
             />
           )}
-          {topicFilter ? (
+          {topicFilter && (
             <Chip label="All topics" size="small" clickable variant="outlined" onClick={() => setTopicInUrl('')} sx={{ fontWeight: 500, borderRadius: '16px' }} />
-          ) : (
-            <Chip label="more →" size="small" clickable variant="outlined" component={Link} href={browseBaseHref} sx={{ fontWeight: 500, borderRadius: '16px' }} />
           )}
         </Box>
 

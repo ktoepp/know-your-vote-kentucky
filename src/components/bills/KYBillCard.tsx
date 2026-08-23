@@ -160,7 +160,7 @@ export function KYBillCard({ bill, legislators, followedBillIds }: KYBillCardPro
                     }}
                     title={s.name}
                     sx={{
-                      ...legislatorAvatarSx(compact ? 'inlineDense' : 'inline'),
+                      ...legislatorAvatarSx(compact ? 'inlineDense' : 'compact'),
                       cursor: 'pointer',
                       border: '1px solid',
                       borderColor: 'divider',
