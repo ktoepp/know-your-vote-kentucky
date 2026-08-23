@@ -4,9 +4,9 @@ import { fetchKyMembersBrowseRoster } from '@/lib/ky-legislator-roster-server';
 import { buildPageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Kentucky state legislators — House and Senate members',
+  title: 'Kentucky state legislators: House and Senate members',
   description:
-    'Roster of current Kentucky General Assembly members — state representatives and senators — with party, district, contact information, committees, and sponsored bills.',
+    'Roster of current Kentucky General Assembly members, both state representatives and senators, with party, district, contact information, committees, and sponsored bills.',
   path: '/members',
 });
 

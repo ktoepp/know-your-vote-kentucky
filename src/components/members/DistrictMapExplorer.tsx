@@ -994,7 +994,7 @@ export default function DistrictMapExplorer() {
                 Search your address above, or select anywhere on the map to find your House and Senate districts and representatives.
               </Typography>
               <Typography variant="caption" color="text.tertiary" display="block" sx={{ mt: 1.5 }}>
-                Every Kentucky address has two state legislators — a House member (100 districts) and a senator (38 districts).
+                Every Kentucky address has two state legislators: a House member (100 districts) and a senator (38 districts).
               </Typography>
             </Paper>
           ) : !selectedHouseName && !selectedSenateName ? (
@@ -1030,7 +1030,7 @@ export default function DistrictMapExplorer() {
           {isHoverPreview ? (
             <Box sx={{ opacity: 0.65, transition: 'opacity 0.15s ease' }}>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                Hover preview — click to select
+                Hover preview. Click to select.
               </Typography>
               {displayHouseLeg && (
                 <Box key={displayHouseLeg.id}>
@@ -1075,7 +1075,7 @@ export default function DistrictMapExplorer() {
                 page (synced from the LRC calendar).
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                More official channels — KET livestreams, Bill Watch, and capitol phone numbers — are on{' '}
+                More official channels, including KET livestreams, Bill Watch, and capitol phone numbers, are on{' '}
                 <MuiLink component={NextLink} href="/legislature/resources" fontWeight={600}>
                   Frankfort resources
                 </MuiLink>

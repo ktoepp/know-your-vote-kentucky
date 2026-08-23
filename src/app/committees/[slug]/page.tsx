@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   const name = normalizeKyGaDisplayName(committee.name);
   return buildPageMetadata({
-    title: `${name} — Kentucky General Assembly committee`,
+    title: `${name}: Kentucky General Assembly committee`,
     description: `Scheduled meetings and agendas for ${name} from the Kentucky LRC legislative calendar.`,
     path: `/committees/${slug}`,
     ogType: 'article',

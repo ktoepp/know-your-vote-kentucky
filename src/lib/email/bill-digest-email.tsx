@@ -284,7 +284,7 @@ export function BillDigestEmail(props: {
                       <strong style={numberText} className="kv-link">{g.billNumber}</strong>
                     )}
                     {g.billNumber && g.shortTitle && (
-                      <span style={shortTitleText} className="kv-ink"> — {g.shortTitle}</span>
+                      <span style={shortTitleText} className="kv-ink">: {g.shortTitle}</span>
                     )}
                     {g.billNumber && (g.billTitle || g.shortTitle) && <br />}
                     {g.billTitle && (
@@ -341,7 +341,7 @@ export function BillDigestEmail(props: {
               You&rsquo;re getting this because you follow bills, topics, or committees on Know Your Vote Kentucky.
             </Text>
             <Text style={footerText} className="kv-muted">
-              Bill status lines quote the legislature&rsquo;s official action text where available — the{' '}
+              Bill status lines quote the legislature&rsquo;s official action text where available. The{' '}
               <Link href={glossaryHref} style={inlineLink} className="kv-link">glossary</Link> explains the terms.
               Dates in parentheses show when Know Your Vote Kentucky recorded each update, which can lag the action itself.
             </Text>

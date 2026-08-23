@@ -71,7 +71,7 @@ export function buildBillJsonLd(bill: KYBill, path: string): JsonLdNode {
   const description =
     bill.description?.trim() ||
     bill.ai_summary?.trim() ||
-    `Kentucky ${bill.bill_number} — ${bill.title}`;
+    `Kentucky ${bill.bill_number}: ${bill.title}`;
   const rawSponsors: unknown = bill.sponsors;
   const sponsors = (Array.isArray(rawSponsors) ? rawSponsors : [])
     .map((s) => (typeof s === 'string' ? s : (s as { name?: string })?.name))
@@ -80,7 +80,7 @@ export function buildBillJsonLd(bill: KYBill, path: string): JsonLdNode {
   const node: JsonLdNode = {
     '@context': 'https://schema.org',
     '@type': 'Legislation',
-    name: `${bill.bill_number} — ${bill.title}`,
+    name: `${bill.bill_number}: ${bill.title}`,
     headline: bill.title,
     description: description.slice(0, 5000),
     url: absoluteUrl(path),
@@ -113,7 +113,7 @@ export function buildLegislatorJsonLd(leg: KYLegislator, path: string): JsonLdNo
     undefined;
   const sameAs: string[] = [];
   if (leg.ballotpedia) sameAs.push(leg.ballotpedia);
-  const description = [role, district, 'Kentucky General Assembly'].filter(Boolean).join(' — ');
+  const description = [role, district, 'Kentucky General Assembly'].filter(Boolean).join(', ');
   const node: JsonLdNode = {
     '@context': 'https://schema.org',
     '@type': 'Person',
@@ -302,7 +302,7 @@ export function buildTopicCollectionJsonLd(opts: {
       itemListElement: opts.bills.map((b, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        name: `${b.bill_number} — ${b.title}`,
+        name: `${b.bill_number}: ${b.title}`,
         url: absoluteUrl(b.path),
       })),
     },

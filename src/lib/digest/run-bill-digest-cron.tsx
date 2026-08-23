@@ -338,7 +338,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           const committeeSlug = String(payload.committee_slug ?? ev.committee_id);
           const meetingDate = String(payload.meeting_date ?? '');
           const timeAndLocation = payload.time_and_location ? String(payload.time_and_location) : null;
-          const locSuffix = timeAndLocation ? ` — ${timeAndLocation}` : '';
+          const locSuffix = timeAndLocation ? `, ${timeAndLocation}` : '';
           const friendlyDate = meetingDate ? formatMeetingDate(meetingDate) : 'date not listed';
 
           if (
@@ -564,7 +564,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           : `${committeeUpdateCount} update${committeeUpdateCount === 1 ? '' : 's'}`,
       );
     }
-    const subject = `${heading} — ${formatDigestDateShort(now)}: ${subjectCounts.join(', ')}`;
+    const subject = `${heading}, ${formatDigestDateShort(now)}: ${subjectCounts.join(', ')}`;
 
     const needsHtml = renderPreview || !(dryRun || !resend);
     const emailEl = (

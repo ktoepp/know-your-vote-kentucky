@@ -98,7 +98,7 @@ export function HomeCuratedBillList({ title, caption, bills, line, emptyMessage,
                 views > 0 ? `${views.toLocaleString()} view${views === 1 ? '' : 's'}` : 'No views yet';
               const secondary =
                 line === 'status'
-                  ? formatBillLabelText(billStatusChipLabel(bill.status) || bill.status || '') || '—'
+                  ? formatBillLabelText(billStatusChipLabel(bill.status) || bill.status || '') || 'Status unavailable'
                   : line === 'viewCount'
                   ? viewLine
                   : null;
