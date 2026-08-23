@@ -80,7 +80,7 @@ export default function ComingSoonPage({
             sx={{
               fontWeight: 700,
               mb: 2,
-              background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',

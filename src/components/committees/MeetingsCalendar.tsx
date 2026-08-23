@@ -51,7 +51,7 @@ const CHAMBER_DOT_COLOR: Record<string, string> = {
 };
 
 function chamberDotColor(chamber: string | null | undefined): string {
-  return CHAMBER_DOT_COLOR[String(chamber ?? '').toLowerCase()] ?? '#94A3B8';
+  return CHAMBER_DOT_COLOR[String(chamber ?? '').toLowerCase()] ?? 'var(--text-muted)';
 }
 
 /** Session-derived decoration for a single calendar day. */
@@ -314,7 +314,7 @@ export function MeetingsCalendar({
                   flexShrink: 0,
                   bgcolor:
                     m.status === 'cancelled' ? 'transparent' : chamberDotColor(m.ky_committees?.chamber),
-                  border: m.status === 'cancelled' ? '1px solid #94A3B8' : 'none',
+                  border: m.status === 'cancelled' ? '1px solid var(--text-muted)' : 'none',
                 }}
               />
             ))}
@@ -522,7 +522,7 @@ function CalendarLegend() {
       <LegendDot color="var(--chamber-house)" label="House" />
       <LegendDot color="var(--chamber-senate)" label="Senate" />
       <LegendDot color="var(--primary)" label="Joint" />
-      <LegendDot color="#94A3B8" label="Cancelled" hollow />
+      <LegendDot color="var(--text-muted)" label="Cancelled" hollow />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
         <HowToVote aria-hidden sx={{ fontSize: '0.9rem', color: 'var(--warning)' }} />
         <Typography variant="caption" color="text.secondary">

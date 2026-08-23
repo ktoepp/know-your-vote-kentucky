@@ -110,8 +110,9 @@ export default function TopProgressBar() {
         style={{
           width: `${progress}%`,
           height: '100%',
-          background: 'linear-gradient(90deg, #0b3d91 0%, #1e88e5 60%, #4fc3f7 100%)',
-          boxShadow: '0 0 12px rgba(30,136,229,0.85), 0 0 4px rgba(30,136,229,0.7)',
+          background: 'linear-gradient(90deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%)',
+          // rgba mirrors --primary-light (#2563EB) — box-shadow color can't reference a CSS var for alpha blending here.
+          boxShadow: '0 0 12px rgba(37,99,235,0.85), 0 0 4px rgba(37,99,235,0.7)',
           transition: 'width 300ms cubic-bezier(0.2, 0.8, 0.2, 1)',
         }}
       />
