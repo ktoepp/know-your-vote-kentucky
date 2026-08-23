@@ -384,6 +384,14 @@ Second batch the same day as the six items above, from a rapid-fire pain-point s
 - Primary-sponsor avatar height on `KYBillCard.tsx` — was `legislatorAvatarSx('inline')` (40px) against a 3-line text block (label/name/district) roughly 56px tall, so the portrait looked short and misaligned. Swapped to `'compact'` (56px) for the single-sponsor case only (the multi-sponsor stacked-avatar case still uses `'inlineDense'`, which has no role line to match against).
 - The dead "more →" chip on `/bills` — previously `component={Link} href={browseBaseHref}`, i.e. a no-op link to the same page/filters. Now points at `/bills/topics`, which is a fully-built 22-topic index page (`src/app/bills/topics/page.tsx`) that already existed but had no discoverable entry point from the browse page.
 
+**Follow-up round, same day (`SearchPageClient.tsx`, `ui-tokens.ts`):**
+- Removed the "Bill number: 23" / "HB 1" suggested-search chips — felt out of place next to the subject-based suggestions.
+- Dimmed the count portion of chip/tab labels on `/search` (`opacity: 0.65` span around the `(N)` in the category `ToggleButton`s and subject-suggestion chip labels) so counts read as secondary metadata instead of full-color text competing with the label.
+- Search bar layout: Search button moved out of the `TextField`'s `endAdornment` into a sibling `Button` outside the input box; the info tooltip moved from a separate `InfoOutlined` end-icon onto the search icon itself (now an `IconButton`), dropping one icon from the row.
+- Extended the chip-size pass to `CHIP.standard` in `src/lib/ui-tokens.ts` (height 24 → 36, label padding to match) — this is what `ChamberChip`/`BillStatusMetaChip` use at their default `size="medium"`, so chamber/status chips on bill, member, and committee cards now match the page-level topic/filter chips instead of reading smaller by contrast.
+
+Both rounds merged via [PR #252](https://github.com/ktoepp/know-your-vote-kentucky/pull/252).
+
 ### Owner wishlist, filed 2026-08-23 (recorded, not scoped)
 
 Filed while debugging a separate PostHog question. Recorded in parallel in the Notion **Wishlist & Roadmap** page ("Product surface & UX — wave 3").
