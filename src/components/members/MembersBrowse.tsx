@@ -112,7 +112,7 @@ function ChamberJumpTile({ chamber, count }: { chamber: 'house' | 'senate'; coun
     <Box
       component="a"
       href={`#${targetId}`}
-      aria-label={`Jump to the ${label} list — ${countLabel}`}
+      aria-label={`Jump to the ${label} list, ${countLabel}`}
       sx={{
         ...baseSx,
         color: 'inherit',

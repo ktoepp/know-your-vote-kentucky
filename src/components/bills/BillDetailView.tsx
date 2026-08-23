@@ -126,7 +126,7 @@ const TEXT_TYPE_LABELS: Record<string, string> = {
   Amended: 'Amended',
   Engrossed: 'Engrossed (passed one chamber)',
   Enrolled: 'Enrolled (passed both chambers)',
-  Chaptered: 'Enacted — Acts chapter (final law)',
+  Chaptered: 'Enacted: Acts chapter (final law)',
   Draft: 'Draft',
 };
 

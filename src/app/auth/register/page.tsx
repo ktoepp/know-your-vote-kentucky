@@ -124,7 +124,7 @@ export default function RegisterPage() {
   return (
     <AuthPaperLayout
       title="Create account"
-      subtitle="Use your email to register. You can browse right away; we will send a link to verify your address."
+      subtitle="Use your email to register. You can browse right away. We will send a link to verify your address."
     >
       <Box component="form" onSubmit={handleRegister}>
         <Stack spacing={2}>

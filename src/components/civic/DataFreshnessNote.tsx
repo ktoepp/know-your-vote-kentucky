@@ -87,7 +87,7 @@ export default function DataFreshnessNote({
       {staleHours !== null && (
         <WarningAmber
           fontSize="small"
-          aria-label={`${source ? `${source} data` : 'Data'} may be out of date; last synced ${staleHours} hours ago`}
+          aria-label={`${source ? `${source} data` : 'Data'} may be out of date. Last synced ${staleHours} hours ago`}
           sx={{ color: iconColor, mt: '1px' }}
         />
       )}

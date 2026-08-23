@@ -130,7 +130,7 @@ export function DistrictDetailView({
               <Box component="li" key={bill.id}>
                 <Typography variant="body2">
                   <MuiLink component={NextLink} href={kyBillPath(bill)} underline="hover">
-                    {formatKyBillNumberDisplay(bill.bill_number)} — {bill.title}
+                    {formatKyBillNumberDisplay(bill.bill_number)}: {bill.title}
                   </MuiLink>
                 </Typography>
                 {(bill.last_action_date || bill.status) && (

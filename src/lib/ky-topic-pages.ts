@@ -84,7 +84,7 @@ export const KY_TOPIC_INTROS: Record<KYTopicTag, string> = {
   'Constitutional Amendments':
     'Bills tagged Constitutional Amendments propose changes to the Kentucky Constitution, which take effect only if ratified by voters at the next general election.',
   'Honors & Memorials':
-    'Resolutions tagged Honors & Memorials are ceremonial — honoring or congratulating a person or group, or adjourning in memory of a Kentuckian who has died.',
+    'Resolutions tagged Honors & Memorials are ceremonial, honoring or congratulating a person or group, or adjourning in memory of a Kentuckian who has died.',
 };
 
 /** Voice-and-tone mandated disclosure — shown wherever automated tags drive a list. */

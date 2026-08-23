@@ -198,7 +198,7 @@ export function ProfileActivitySection() {
         </Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        Recent updates and upcoming hearings for bills you follow — one timeline instead of separate alert columns.
+        Recent updates and upcoming hearings for bills you follow, in one timeline instead of separate alert columns.
       </Typography>
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }} role="group" aria-label="Activity filter">

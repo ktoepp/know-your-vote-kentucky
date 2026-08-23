@@ -167,7 +167,7 @@ export const MemberCard = React.memo(function MemberCard({
                   display="block"
                   sx={{ mt: 0.5, pl: `calc(${ICON_REM.nav} + 10px)` }}
                 >
-                  From our last update — may be outdated if this person no longer holds this office.
+                  From our last update. May be outdated if this person no longer holds this office.
                 </Typography>
               )}
             </Box>
@@ -184,7 +184,7 @@ export const MemberCard = React.memo(function MemberCard({
             >
               <Email sx={{ fontSize: ICON_REM.nav, color: 'text.disabled', flexShrink: 0, mt: 0.2 }} aria-hidden />
               <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.45 }}>
-                Capitol contact is not shown for former members — the official LRC directory lists whoever currently holds
+                Capitol contact is not shown for former members. The official LRC directory lists whoever currently holds
                 this seat.
               </Typography>
             </Box>
@@ -265,7 +265,7 @@ export const MemberCard = React.memo(function MemberCard({
                 </Typography>
                 {isFormerMember && (
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                    From our last update — may no longer be current.
+                    From our last update. May no longer be current.
                   </Typography>
                 )}
               </Box>
@@ -294,7 +294,7 @@ export const MemberCard = React.memo(function MemberCard({
               title={
                 tooltipsEnabled
                   ? isFormerMember
-                    ? 'Ballotpedia often covers former officeholders; verify dates and current roles on official sources when needed.'
+                    ? 'Ballotpedia often covers former officeholders. Verify dates and current roles on official sources when needed.'
                     : 'Ballotpedia is a nonpartisan encyclopedia of American politics. Profiles include background, campaign history, and voting record.'
                   : ''
               }

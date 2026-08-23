@@ -49,11 +49,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   let description: string;
   if (isChamberMember) {
     const roleNoun = leg.chamber === 'house' ? 'Representative' : 'Senator';
-    title = `${leg.name} — Kentucky State ${roleNoun}${districtNum ? `, District ${districtNum}` : ''}`;
+    title = `${leg.name}: Kentucky State ${roleNoun}${districtNum ? `, District ${districtNum}` : ''}`;
     const party = formatPartyLabel(leg.party);
     description = `${leg.name}${party ? ` (${party})` : ''}${districtLabel ? `, ${districtLabel}` : ''}, Kentucky General Assembly. Committee assignments, sponsored bills, contact information, and voting record.`;
   } else {
-    title = `${leg.name} — ${role}, Kentucky`;
+    title = `${leg.name}: ${role}, Kentucky`;
     description = `${leg.name}, ${role}, Commonwealth of Kentucky. Contact information and official links.`;
   }
   // Canonicalize alias slugs (legacy name variants, pre-042 URLs) to the member's stored slug.

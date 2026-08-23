@@ -63,11 +63,11 @@ export function CommitteeMaterialsSection({
         </Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Documents posted by the Legislative Research Commission (LRC) for past committee meetings —
+        Documents posted by the Legislative Research Commission (LRC) for past committee meetings:
         agendas, minutes, presentations, and supporting exhibits. Files open on LRC.{' '}
         {committeeProfileUrl ? (
           <>
-            Links may become unavailable after a session ends — if a document can&rsquo;t be opened,
+            Links may become unavailable after a session ends. If a document can&rsquo;t be opened,
             try the{' '}
             <MuiLink href={committeeProfileUrl} target="_blank" rel="noopener noreferrer">
               LRC committee profile
@@ -135,7 +135,7 @@ export function CommitteeMaterialsSection({
                           label="Link unavailable"
                           variant="outlined"
                           color="default"
-                          title="This document is no longer hosted on LRC — try the committee's LRC profile."
+                          title="This document is no longer hosted on LRC. Try the committee's LRC profile."
                           sx={{ flexShrink: 0, height: 'auto', '& .MuiChip-label': { py: 0.25 } }}
                         />
                       </Typography>

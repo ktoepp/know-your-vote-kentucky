@@ -194,7 +194,7 @@ export function KentuckyDistrictLocatorMap({
       )}
       {showCaption && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 1.5, pb: 1 }}>
-          {districtLabel} — select to explore the district map
+          {districtLabel}. Select to explore the district map.
         </Typography>
       )}
     </>
@@ -221,7 +221,7 @@ export function KentuckyDistrictLocatorMap({
     <Box
       component={Link}
       href={`/members/map?chamber=${chamber}&district=${districtNumber}`}
-      aria-label={`Map of Kentucky highlighting ${districtLabel} — open the interactive district map`}
+      aria-label={`Map of Kentucky highlighting ${districtLabel}. Select to open the interactive district map.`}
       sx={{
         ...frameSx,
         textDecoration: 'none',

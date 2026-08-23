@@ -69,9 +69,9 @@ const ALL_VIEW_PREVIEW = 6;
 
 /** Plain-language copy (F1): what happened + what to do, no Postgres vocabulary. */
 const SEARCH_TIMEOUT_COPY =
-  'Search took too long. Try fewer or more specific words — or browse by topic.';
+  'Search took too long. Try fewer or more specific words, or browse by topic.';
 const SEARCH_FAILED_COPY =
-  'Search hit a problem on our end. Try again in a moment — or browse by topic.';
+  'Search hit a problem on our end. Try again in a moment, or browse by topic.';
 
 /** Postgres statement timeout (57014) or our own client-side withTimeout. */
 function isSearchTimeoutError(message: string): boolean {

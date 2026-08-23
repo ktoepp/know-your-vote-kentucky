@@ -382,7 +382,7 @@ export function BillsBrowse({
     const verb = !browseCapped && total === 1 ? 'matches' : 'match';
     let s = `${totalLabel} ${billsWord} ${verb} your filters`;
     if (browseCapped) {
-      s += ' · Based on the most recently updated bills in this view; more may match';
+      s += ' · Based on the most recently updated bills in this view. More may match';
     }
     if (loaded < total) {
       s += ` · Showing ${loaded.toLocaleString()} of ${totalLabel}`;
@@ -566,7 +566,7 @@ export function BillsBrowse({
                   ))}
                 </Select>
               </FormControl>
-              <Tooltip title={sortDir === 'desc' ? 'Descending — switch to ascending' : 'Ascending — switch to descending'}>
+              <Tooltip title={sortDir === 'desc' ? 'Descending. Select to sort ascending.' : 'Ascending. Select to sort descending.'}>
                 <IconButton
                   size="small"
                   aria-label={sortDir === 'desc' ? 'Sort descending' : 'Sort ascending'}

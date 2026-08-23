@@ -49,7 +49,7 @@ export const KY_DIGEST_EVENT_LABELS: Record<KyDigestEventType, string> = {
 export const KY_DIGEST_EVENT_DESCRIPTIONS: Record<KyDigestEventType, string> = {
   introduced: 'Bill is newly introduced in a chamber.',
   committee_action: 'Referred, reported, or amended in committee (LegiScan).',
-  hearing_scheduled: 'Listed on an upcoming LRC committee agenda — see Meetings.',
+  hearing_scheduled: 'Listed on an upcoming LRC committee agenda. See Meetings.',
   committee_meeting_scheduled: 'A new meeting is added to the calendar for a committee you follow.',
   committee_agenda_updated: 'Agenda for a meeting on a committee you follow changed.',
   committee_meeting_cancelled: 'A previously scheduled meeting was removed from the calendar.',
@@ -74,7 +74,7 @@ export const KY_DIGEST_EVENT_GROUPS: {
   {
     id: 'committee_interim',
     title: 'Committee & interim',
-    description: 'Hearings and committee steps — includes Bill Watch “Agenda” and interim activity.',
+    description: 'Hearings and committee steps. Includes Bill Watch “Agenda” and interim activity.',
     types: [
       'committee_action',
       'hearing_scheduled',
