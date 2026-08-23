@@ -390,7 +390,7 @@ Second batch the same day as the six items above, from a rapid-fire pain-point s
 - Search bar layout: Search button moved out of the `TextField`'s `endAdornment` into a sibling `Button` outside the input box; the info tooltip moved from a separate `InfoOutlined` end-icon onto the search icon itself (now an `IconButton`), dropping one icon from the row.
 - Extended the chip-size pass to `CHIP.standard` in `src/lib/ui-tokens.ts` (height 24 → 36, label padding to match) — this is what `ChamberChip`/`BillStatusMetaChip` use at their default `size="medium"`, so chamber/status chips on bill, member, and committee cards now match the page-level topic/filter chips instead of reading smaller by contrast.
 
-Both rounds are on [PR #252](https://github.com/ktoepp/know-your-vote-kentucky/pull/252), not yet merged.
+Both rounds merged via [PR #252](https://github.com/ktoepp/know-your-vote-kentucky/pull/252).
 
 ### `/members` page redesign — replace governor's-office photos with search/filter tiles
 
