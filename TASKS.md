@@ -392,6 +392,12 @@ Second batch the same day as the six items above, from a rapid-fire pain-point s
 
 Both rounds merged via [PR #252](https://github.com/ktoepp/know-your-vote-kentucky/pull/252).
 
+### Owner wishlist, filed 2026-08-23 (recorded, not scoped)
+
+Filed while debugging a separate PostHog question. Recorded in parallel in the Notion **Wishlist & Roadmap** page ("Product surface & UX — wave 3").
+
+- [ ] **Suggested-search chips aren't a distinguishable PostHog action.** The `/search` page's suggestion chips (`SearchPageClient.tsx`, `subjectSuggestions.map`, ~line 767) just call `setQuery()` + `pushSearchUrl()`, re-entering the normal `/search?q=` flow — so a chip click fires the exact same `search_performed` event (`src/lib/analytics.ts:80`) as a manually typed search, with nothing distinguishing the two. Can't tell from PostHog whether the suggestion feature is actually driving searches. `trackSearchResultClicked` already carries a `source` field for this kind of provenance (`'nav_bar' | 'search_page' | 'command_palette'`); `search_performed` could get the same treatment — a `source: 'typed' | 'suggested_chip' | 'url'` property, or a dedicated `search_suggestion_clicked` event fired before the navigation. PostHog event wiring, small.
+
 ### `/members` page redesign — replace governor's-office photos with search/filter tiles
 
 Note-to-self, 2026-07-18: the three photos of the governor's office on `/members` should be replaced with tiles that let a visitor search the House and Senate sides. Those tiles become anchor links down to the senators/representatives listed below on the same page. Later pass: fill in real search filters (chamber, party, district, name), and backfill as many members as possible so search/filter coverage is complete.
