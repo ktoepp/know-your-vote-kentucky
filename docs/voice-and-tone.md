@@ -55,6 +55,8 @@ The **marketing surface** (home/landing hero, the About intro) may be *a little*
 
 **Swept sitewide 2026-08-23.** Every externally visible surface is clear: all public pages and guides, page titles and meta descriptions, JSON-LD, the glossary and tooltip definitions, the bill digest and welcome emails, `llms.txt`, and the publicly linked design-system reference. The AI bill-summary system prompt in `ky-content-generation.ts` now carries the rule too, so newly generated summaries comply at the source. Deliberately **out of scope**: source-code comments, operator-only surfaces (`/admin`), internal Slack alerts and sync logs, and the accuracy-audit reports. The one em dash left in `ky-content-generation.ts` is the legacy failure sentinel, kept so summaries persisted before the sweep are still recognized as failures rather than rendered as real content.
 
+**How to check this rule.** Scan the *built* output, not source strings: strip tags and scripts from `.next/server/app/**/*.html` and search the visible text plus the `title` / `aria-label` / `alt` / `placeholder` attributes. A source-literal scan misses three whole classes and did so on the first pass: raw JSX text between tags, semicolons whose preceding character is punctuation rather than a letter (`(HB-23); a bare number`), and copy that only renders conditionally or inside a hover tooltip. Anchor the search on the semicolon itself, never on the character before it, and remember that tag-stripping inserts a space where a tag was.
+
 ---
 
 ## Email branding

@@ -116,7 +116,7 @@ export default function PrivacyPage() {
             </li>
             <li>
               Delete your account from{' '}
-              <MuiLink component={Link} href="/profile">your profile</MuiLink>; we remove your
+              <MuiLink component={Link} href="/profile">your profile</MuiLink>. We remove your
               profile, follows, preferences, and mail log.
             </li>
             <li>

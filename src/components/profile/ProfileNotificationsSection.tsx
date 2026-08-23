@@ -367,7 +367,7 @@ export function ProfileNotificationsSection() {
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           Get digest items when bills tagged with these topics change. Individual bill follows are the most reliable
-          way to track a specific bill; topic tags are automated and can miss or mislabel some bills.
+          way to track a specific bill. Topic tags are automated and can miss or mislabel some bills.
         </Typography>
         <Box
           sx={{
