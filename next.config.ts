@@ -50,25 +50,19 @@ const nextConfig: NextConfig = {
     ],
   },
   async redirects() {
-    // Canonical host is www (confirmed live: apex 301s to www, and page
-    // canonical/og:url both resolve to https://www.kyvky.com). Point alternate
-    // domains straight here so they don't chain alternate -> apex -> www.
-    const canonicalOrigin = 'https://www.kyvky.com';
-    const hostsToCanonical = [
-      'knowyourvotekentucky.com',
-      'www.knowyourvotekentucky.com',
-      'knowyourvotekentucky.org',
-      'www.knowyourvotekentucky.org',
-      'knowyourvoteky.com',
-      'www.knowyourvoteky.com',
-    ];
+    /**
+     * Canonical host is https://www.kyvky.com (apex 307s to it at the Vercel edge).
+     *
+     * The alternate domains — knowyourvotekentucky.com/.org, knowyourvoteky.com and
+     * their www hosts — are deliberately NOT host-matched here: requests for them
+     * never reach this table. The .com pairs are redirected to www.kyvky.com by the
+     * Vercel project's domain settings, and the .org pair is forwarded by Hostinger
+     * before it ever touches Vercel. A `has: [{ type: 'host' }]` rule for any of them
+     * is dead code, so changing a destination here would silently fix nothing.
+     * (The .org forwarding currently drops the path — that is a Hostinger-side fix;
+     * see TASKS.md.)
+     */
     return [
-      ...hostsToCanonical.map((host) => ({
-        source: '/:path*',
-        has: [{ type: 'host' as const, value: host }],
-        destination: `${canonicalOrigin}/:path*`,
-        permanent: true,
-      })),
       {
         source: '/ordinances',
         destination: '/',
