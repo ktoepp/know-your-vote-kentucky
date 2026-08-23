@@ -667,7 +667,7 @@ function SecOverview() {
         {principle(
           '3',
           'Accessible by default',
-          'WCAG 2.1 AA is the floor. Every text pairing ≥4.5:1; every control has a visible focus ring and a 44px target.',
+          'WCAG 2.1 AA is the floor. Every text pairing ≥4.5:1, and every control has a visible focus ring and a 44px target.',
         )}
         {principle(
           '4',
@@ -866,7 +866,7 @@ function SecType() {
               Aesthet Nova <span style={{ fontWeight: 400, color: C.textTertiary }}>· display / headings</span>
             </div>
             <div style={{ fontSize: 12.5, color: C.textTertiary, marginTop: 4, lineHeight: 1.5 }}>
-              Serif, weight 500. Served via Typekit; a size-adjusted Georgia fallback prevents layout
+              Serif, weight 500. Served via Typekit, and a size-adjusted Georgia fallback prevents layout
               shift. Licensing is still open (decision #1). Georgia is the shipping fallback and is
               what you see rendered here.
             </div>
@@ -1042,7 +1042,7 @@ function SecRadius() {
           <div style={{ width: 110, height: 30, background: C.bgTertiary, border: `1px solid ${C.borderLight}`, borderRadius: 9999 }} />,
         )}
       </div>
-      <H2 sub="Flat by default. Borders separate; shadow signals interactivity only. Cards default to elevation 0 + a 1px border.">
+      <H2 sub="Flat by default. Borders separate, and shadow signals interactivity only. Cards default to elevation 0 + a 1px border.">
         Elevation
       </H2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
@@ -2506,7 +2506,7 @@ function SecEmail() {
         sub={
           <>
             Sent only when there are events to report, grouped by <em>why</em> each item is included.
-            Each bill block is one link; action lines quote the legislature&apos;s recorded text.
+            Each bill block is one link. Action lines quote the legislature&apos;s recorded text.
           </>
         }
       >

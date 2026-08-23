@@ -528,7 +528,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                     arrow
                     enterTouchDelay={0}
                     leaveTouchDelay={5000}
-                    title="Search bills (HB 23), members (by name or district), and committees at once. Bill numbers work with or without spaces or dashes (HB23, HB 23, HB-23); a bare number (23) finds every bill type with that number."
+                    title="Search bills (HB 23), members (by name or district), and committees at once. Bill numbers work with or without spaces or dashes (HB23, HB 23, HB-23). A bare number (23) finds every bill type with that number."
                   >
                     <IconButton aria-label="Search tips" size="small" edge="start" sx={{ mr: 0.5 }}>
                       <Search sx={{ color: 'primary.main', opacity: 0.92 }} />
@@ -880,7 +880,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 560, mx: 'auto' }}>
                   We searched bills, members, and committees. Bill numbers accept spaces and punctuation (for example
                   HB 23, HB23, HB-23). You can filter bills by chamber, status, time, or committee above
-                  {hasActiveBillFilters ? '; those selections may narrow results sharply' : ''}.
+                  {hasActiveBillFilters ? ', and those selections may narrow results sharply' : ''}.
                 </Typography>
                 {isDigitsOnlyBillSearchQuery(query) && (
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, maxWidth: 560, mx: 'auto' }}>
