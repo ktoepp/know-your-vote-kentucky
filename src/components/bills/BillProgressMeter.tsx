@@ -160,7 +160,7 @@ export function BillProgressMeter({ bill, variant = 'card' }: BillProgressMeterP
           </Box>
           {terminal === 'adjourned' && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              Adjourned sine die — pending when the session ended, so it did not pass.
+              Adjourned sine die. The bill was pending when the session ended, so it did not pass.
             </Typography>
           )}
           {terminal === 'failed' && (

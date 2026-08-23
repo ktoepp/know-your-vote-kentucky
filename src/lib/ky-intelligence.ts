@@ -80,7 +80,7 @@ export function scoreRelevance(item: ScoredItem): RelevanceScore {
   // Session deadline pressure for bills
   if ('session' in item && (item as KYBill).status?.toLowerCase().includes('committee')) {
     factors.urgency += 10;
-    reasoning.push('Bill in committee — may face session deadline');
+    reasoning.push('Bill in committee, may face session deadline');
     tags.push('in-committee');
   }
 
@@ -118,7 +118,7 @@ export function classifyIntelligence(score: number): 'breaking' | 'significant' 
 /** AI-generated "why this matters" blurb */
 export async function generateWhyItMatters(item: any): Promise<string> {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return 'Impact analysis not available — API key not configured.';
+    return 'Impact analysis not available. API key not configured.';
   }
   try {
     const anthropic = new Anthropic();

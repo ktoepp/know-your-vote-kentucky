@@ -22,7 +22,7 @@ export const revalidate = 3600;
 
 function guideDescription(): string {
   const latest = KY_SESSIONS[0];
-  return `When the Kentucky General Assembly meets — 60-day even-year sessions, 30-day odd-year sessions, the ${latest ? latest.name : 'current session'} calendar, veto recess, and the interim.`;
+  return `When the Kentucky General Assembly meets: 60-day even-year sessions, 30-day odd-year sessions, the ${latest ? latest.name : 'current session'} calendar, veto recess, and the interim.`;
 }
 
 export function generateMetadata(): Metadata {
@@ -146,7 +146,7 @@ export default function SessionsGuidePage() {
         <Typography variant="body1" color="text.secondary">
           Near the end of a session, the chambers recess for about ten days while the governor
           considers passed bills. The General Assembly then reconvenes for its final days, when it
-          can vote to override vetoes before adjourning sine die — the formal end of the session.
+          can vote to override vetoes before adjourning sine die, the formal end of the session.
         </Typography>
       </Box>
 

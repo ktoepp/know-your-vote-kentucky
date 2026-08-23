@@ -15,7 +15,7 @@ import { buildPageMetadata } from '@/lib/seo';
 export const metadata: Metadata = buildPageMetadata({
   title: 'Kentucky legislative glossary',
   description:
-    'Plain-English definitions of the legislative terms used across Know Your Vote Kentucky — bill types, status stages, committee terminology, voting procedures, and more.',
+    'Plain-English definitions of the legislative terms used across Know Your Vote Kentucky: bill types, status stages, committee terminology, voting procedures, and more.',
   path: '/glossary',
 });
 
@@ -62,7 +62,7 @@ export default function GlossaryPage() {
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4, lineHeight: 1.7 }}>
         Plain-English definitions of the terms you&apos;ll see across Know Your Vote Kentucky.
-        Everything here is specific to the <strong>Kentucky General Assembly</strong> — the
+        Everything here is specific to the <strong>Kentucky General Assembly</strong>, whose
         rules and procedures differ from the U.S. Congress. For the process the terms describe,
         see{' '}
         <Link href="/guides/how-a-kentucky-bill-becomes-a-law" style={{ textDecoration: 'underline' }}>

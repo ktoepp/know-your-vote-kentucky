@@ -488,7 +488,7 @@ export function getKyBillNextAction(bill: {
 
   if (st.includes('enrolled') || action.includes('enrolled')) {
     return {
-      body: 'Delivery to the governor for signature, veto, or line-item veto; then enrollment if signed.',
+      body: 'Delivery to the governor for signature, veto, or line-item veto, then enrollment if signed.',
     };
   }
 

@@ -152,7 +152,7 @@ export function ProfileFollowedBillsSection() {
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420 }}>
             Select <strong>Follow</strong> on any bill page to add it here. We&apos;ll email you a
-            digest when it changes status — committee action, floor votes, sent to governor,
+            digest when it changes status: committee action, floor votes, sent to governor,
             signed, vetoed.
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap', justifyContent: 'center' }}>

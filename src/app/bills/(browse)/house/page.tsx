@@ -7,7 +7,7 @@ import { buildPageMetadata } from '@/lib/seo';
 export function generateMetadata(): Metadata {
   const session = getCivicDataSessionName();
   return buildPageMetadata({
-    title: `Kentucky House bills — ${session}`,
+    title: `Kentucky House bills: ${session}`,
     description: `Bills introduced in the Kentucky House of Representatives during the ${session}, with status, sponsors, and votes.`,
     path: '/bills/house',
   });

@@ -30,7 +30,7 @@ const siteOrigin = publicSiteOrigin();
 // `buildPageMetadata` (src/lib/seo.ts); `metadataBase` absolutizes those paths.
 export const metadata: Metadata = {
   title: {
-    default: 'Know Your Vote Kentucky — Kentucky bill tracking and legislator lookup',
+    default: 'Know Your Vote Kentucky: Kentucky bill tracking and legislator lookup',
     template: '%s | Know Your Vote Kentucky',
   },
   description:

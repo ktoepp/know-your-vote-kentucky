@@ -60,7 +60,7 @@ export default function FindYourLegislatorGuidePage() {
             .
           </Typography>
           <Typography component="li" variant="body1">
-            Enter your street address or ZIP code. A street address is more precise — district
+            Enter your street address or ZIP code. A street address is more precise, because district
             lines can split a ZIP code.
           </Typography>
           <Typography component="li" variant="body1">
@@ -80,8 +80,8 @@ export default function FindYourLegislatorGuidePage() {
           <MuiLink component={NextLink} href="/districts" underline="hover">
             Districts
           </MuiLink>{' '}
-          page, each with its current member, a district map, and recent bills. The full roster —
-          House, Senate, and statewide officials — is on the{' '}
+          page, each with its current member, a district map, and recent bills. The full roster,
+          covering House, Senate, and statewide officials, is on the{' '}
           <MuiLink component={NextLink} href="/members" underline="hover">
             Members
           </MuiLink>{' '}
@@ -95,8 +95,8 @@ export default function FindYourLegislatorGuidePage() {
         </Typography>
         <Typography variant="body1" color="text.secondary">
           This site covers the Kentucky General Assembly, which meets in Frankfort and writes state
-          law. If you are looking for your federal representatives — Kentucky&apos;s members of the
-          U.S. House and its two U.S. senators — use the official lookup at{' '}
+          law. If you are looking for your federal representatives, meaning Kentucky&apos;s members of the
+          U.S. House and its two U.S. senators, use the official lookup at{' '}
           <MuiLink
             href="https://www.congress.gov/members/find-your-member"
             target="_blank"

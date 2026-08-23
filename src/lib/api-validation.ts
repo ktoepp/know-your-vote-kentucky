@@ -65,7 +65,7 @@ export function parseEnum<T extends string>(
   if (raw === null || raw === undefined || raw === '') {
     if (opts.allowNull) return null;
     throw new ValidationError(
-      `Missing required value; expected one of: ${allowed.join(', ')}`,
+      `Missing required value. Expected one of: ${allowed.join(', ')}`,
     );
   }
   if (!(allowed as readonly string[]).includes(raw)) {

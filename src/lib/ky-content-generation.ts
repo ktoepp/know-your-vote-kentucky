@@ -20,7 +20,7 @@ let client: Anthropic | null = null;
 function getClient(): Anthropic | null {
   if (client) return client;
   if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('[KY-Content] ANTHROPIC_API_KEY not set — returning placeholder summaries');
+    console.warn('[KY-Content] ANTHROPIC_API_KEY not set, returning placeholder summaries');
     return null;
   }
   client = new Anthropic();
@@ -34,13 +34,14 @@ Generate plain-language summaries with this shape:
 
 Hard rules:
 - Use ONLY the bill fields provided (number, title, description, topics, subjects) and, when present, the editor-verified notes. Do not use outside knowledge or assume provisions that are not stated.
-- Editor-verified notes, when present, are facts a human editor confirmed against the official bill text. Treat them as authoritative grounding — incorporate what they state, and you may name affected groups they support. They are NOT license to speculate beyond what the fields and notes state.
-- Name affected groups ONLY when they would be DIRECTLY changed by the bill's operative provisions — a new duty, right, penalty, benefit, or eligibility rule that touches them. Adjacent audiences (people who happen to be in the same policy area, downstream beneficiaries, general "public") are NOT directly affected and must be OMITTED. Examples: a SNAP data-sharing directive between processors and USDA does NOT directly affect SNAP recipients; a Higher-Education-Mental-Health-Day recognition does NOT affect campus staff; a criminal-offense bill DOES affect the people whose conduct is now criminalized.
+- Editor-verified notes, when present, are facts a human editor confirmed against the official bill text. Treat them as authoritative grounding: incorporate what they state, and you may name affected groups they support. They are NOT license to speculate beyond what the fields and notes state.
+- Name affected groups ONLY when they would be DIRECTLY changed by the bill's operative provisions, meaning a new duty, right, penalty, benefit, or eligibility rule that touches them. Adjacent audiences (people who happen to be in the same policy area, downstream beneficiaries, general "public") are NOT directly affected and must be OMITTED. Examples: a SNAP data-sharing directive between processors and USDA does NOT directly affect SNAP recipients. A Higher-Education-Mental-Health-Day recognition does NOT affect campus staff. A criminal-offense bill DOES affect the people whose conduct is now criminalized.
 - Hedge with "may affect." If the impact is unclear or the description is too thin to tell, OMIT the "Who it may affect:" clause entirely rather than guessing.
-- For internal chamber-procedure instruments (a resolution amending only the House or Senate Rules of Procedure, or setting an internal operating rule), do NOT name staff, officers, or the public as an "affected audience" — those bills touch only the members of that chamber and their own procedure. Prefer to OMIT the "Who it may affect:" clause on such resolutions.
+- For internal chamber-procedure instruments (a resolution amending only the House or Senate Rules of Procedure, or setting an internal operating rule), do NOT name staff, officers, or the public as an "affected audience". Those bills touch only the members of that chamber and their own procedure. Prefer to OMIT the "Who it may affect:" clause on such resolutions.
 - Non-partisan and factual. No opinions, no political framing, no predictions about passage.
 - Written for a general audience, no jargon.
-- Plain text only — NO markdown, asterisks, bold, or headers. Do not restate the bill number; the page already shows it. Separate the summary and the "Who it may affect:" clause with a single blank line.`;
+- NEVER use an em dash (—) or a semicolon (;). Use a colon when the second half explains the first, a comma for a light aside, or a full stop when the clause can stand alone.
+- Plain text only. NO markdown, asterisks, bold, or headers. Do not restate the bill number, because the page already shows it. Separate the summary and the "Who it may affect:" clause with a single blank line.`;
 
 /**
  * Sentinel strings returned by generateSummary when no genuine summary was produced
@@ -48,10 +49,13 @@ Hard rules:
  * summaries (the backfill) must treat these as "skip", never write them as real content.
  */
 export const SUMMARY_UNAVAILABLE_SENTINELS = [
-  'AI summary not available — API key not configured.',
+  'AI summary not available. API key not configured.',
   'Summary unavailable.',
   'Summary temporarily unavailable due to high demand. Please try again shortly.',
   'Summary could not be generated at this time.',
+  // Legacy em-dashed sentinel, kept so summaries persisted before the 2026-08-23
+  // copy sweep are still recognized as failures rather than rendered as content.
+  'AI summary not available — API key not configured.',
 ] as const;
 
 /** True when `text` is a genuine generated summary (non-empty and not a failure sentinel). */
@@ -77,7 +81,7 @@ async function generateSummary(prompt: string): Promise<string> {
     return block.type === 'text' ? block.text.trim() : SUMMARY_UNAVAILABLE_SENTINELS[1];
   } catch (err: any) {
     if (err?.status === 429) {
-      console.warn('[KY-Content] Rate limited — returning placeholder');
+      console.warn('[KY-Content] Rate limited, returning placeholder');
       return SUMMARY_UNAVAILABLE_SENTINELS[2];
     }
     console.error('[KY-Content] Error generating summary:', err?.message ?? err);

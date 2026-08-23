@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const spacedNumber = formatKyBillNumberSpaced(bill.bill_number) || bill.bill_number;
   const year = kyBillSessionYear(bill.session);
   const catchline = kyBillSeoCatchline(bill.title);
-  const title = `Kentucky ${spacedNumber}${year ? ` (${year})` : ''}${catchline ? ` — ${catchline}` : ''}`;
+  const title = `Kentucky ${spacedNumber}${year ? ` (${year})` : ''}${catchline ? `: ${catchline}` : ''}`;
   const body =
     bill.description?.trim() ||
     bill.ai_summary?.trim() ||

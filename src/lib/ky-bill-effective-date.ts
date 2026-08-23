@@ -121,7 +121,7 @@ export function getKyEnactedBillEffectiveDateNotice(params: {
       dateIso: null,
       headline: 'Effective date: set within the act',
       detail:
-        'This act specifies its own effective date(s) for some or all of its sections instead of following the standard 90-day rule (Ky. Constitution § 55) — see the act text for the exact dates.',
+        'This act specifies its own effective date(s) for some or all of its sections instead of following the standard 90-day rule (Ky. Constitution § 55). See the act text for the exact dates.',
     };
   }
 

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { buildPageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = buildPageMetadata({
-  title: 'Find my legislators — look up your Kentucky House and Senate districts',
+  title: 'Find my legislators: look up your Kentucky House and Senate districts',
   description:
     'Enter your address or ZIP code to find your Kentucky House and Senate districts and see your state representatives for the current session.',
   path: '/members/map',

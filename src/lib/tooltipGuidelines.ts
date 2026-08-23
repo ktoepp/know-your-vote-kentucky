@@ -50,7 +50,7 @@ export const tooltipExamples = {
     {
       term: "adjourned sine die",
       context: "In a session status banner",
-      tooltip: "The legislative session has officially ended; any unpassed bills are dead until next session..."
+      tooltip: "The legislative session has officially ended. Any unpassed bills are dead until next session..."
     }
   ],
   

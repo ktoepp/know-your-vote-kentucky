@@ -8,7 +8,7 @@ import { buildPageMetadata } from '@/lib/seo';
 const PATH = '/guides/track-a-kentucky-bill';
 const TITLE = 'How to track a Kentucky bill';
 const DESCRIPTION =
-  'Follow a Kentucky General Assembly bill and receive email updates when its status changes — committee action, floor votes, and action by the governor. Free account required.';
+  'Follow a Kentucky General Assembly bill and receive email updates when its status changes: committee action, floor votes, and action by the governor. Free account required.';
 const DATE_MODIFIED = '2026-07-18';
 
 export const metadata: Metadata = buildPageMetadata({
@@ -54,7 +54,7 @@ export default function TrackABillGuidePage() {
           <MuiLink component={NextLink} href="/search" underline="hover">
             Search
           </MuiLink>{' '}
-          by bill number or keyword — bill numbers work with or without spaces (HB 23, HB23) — or
+          by bill number or keyword. Bill numbers work with or without spaces (HB 23, HB23). Or
           browse the{' '}
           <MuiLink component={NextLink} href="/bills" underline="hover">
             Bills
@@ -74,7 +74,7 @@ export default function TrackABillGuidePage() {
         <Typography variant="body1" color="text.secondary">
           Each bill page shows the official title, sponsors, current status, the full action
           history, recorded votes, and links to the bill text. Status lines quote the
-          legislature&apos;s official action text where available — the{' '}
+          legislature&apos;s official action text where available. The{' '}
           <MuiLink component={NextLink} href="/glossary" underline="hover">
             glossary
           </MuiLink>{' '}
@@ -94,14 +94,14 @@ export default function TrackABillGuidePage() {
             or{' '}
             <MuiLink component={NextLink} href="/auth/register" underline="hover">
               sign up
-            </MuiLink>{' '}
-            — accounts are free.
+            </MuiLink>
+            . Accounts are free.
           </Typography>
           <Typography component="li" variant="body1">
             Select <strong>Follow</strong> on the bill page.
           </Typography>
           <Typography component="li" variant="body1">
-            You will receive digest updates when the bill moves — committee action, floor votes,
+            You will receive digest updates when the bill moves: committee action, floor votes,
             sent to governor, signed, or vetoed. Choose daily or weekly delivery and which event
             types to include in your notification preferences.
           </Typography>
@@ -117,7 +117,7 @@ export default function TrackABillGuidePage() {
           <MuiLink component={NextLink} href="/bills/topics" underline="hover">
             topics
           </MuiLink>{' '}
-          by subject area — topic tags are automated and can miss or mislabel some bills, so
+          by subject area. Topic tags are automated and can miss or mislabel some bills, so
           following a specific bill stays the most reliable way to track it. Following a{' '}
           <MuiLink component={NextLink} href="/committees" underline="hover">
             committee

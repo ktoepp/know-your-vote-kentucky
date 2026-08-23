@@ -34,7 +34,7 @@ export function HomeSearchSection() {
         Search the General Assembly
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 2, maxWidth: 620 }}>
-        Find bills, members, and committees in one place — by number (HB 23), topic, name, or district.
+        Find bills, members, and committees in one place, by number (HB 23), topic, name, or district.
       </Typography>
       <Box
         component="form"

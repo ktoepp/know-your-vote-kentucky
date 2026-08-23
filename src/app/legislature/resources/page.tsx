@@ -20,7 +20,7 @@ import { buildPageMetadata } from '@/lib/seo';
 const EXTERNAL_RESOURCES = [
   {
     title: 'LRC Legislative Calendar',
-    description: 'Official weekly schedule — committee times, rooms, and agenda text.',
+    description: 'Official weekly schedule: committee times, rooms, and agenda text.',
     href: LRC_LEGISLATIVE_CALENDAR_URL,
   },
   {
@@ -40,7 +40,7 @@ const EXTERNAL_RESOURCES = [
     href: 'https://www.kentucky.gov/services/pages/billwatch.aspx',
   },
   {
-    title: 'KRC — 2026 General Assembly hub',
+    title: 'KRC 2026 General Assembly hub',
     description: 'Civic resource index from the Kentucky Resources Council.',
     href: 'https://kyrc.org/2026-kentucky-general-assembly/',
   },
@@ -54,7 +54,7 @@ const EXTERNAL_RESOURCES = [
 export const metadata = buildPageMetadata({
   title: 'Frankfort resources',
   description:
-    'Neutral index of official Kentucky General Assembly sources — LRC calendar, committees, KET, and Bill Watch.',
+    'Neutral index of official Kentucky General Assembly sources: LRC calendar, committees, KET, and Bill Watch.',
   path: '/legislature/resources',
 });
 

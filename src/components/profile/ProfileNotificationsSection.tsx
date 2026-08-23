@@ -264,7 +264,7 @@ export function ProfileNotificationsSection() {
         </Typography>
         <Typography variant="body2" color="text.secondary">
           {isMajorMilestonesOnly(eventTypes)
-            ? 'Major milestones — introduction, committee action, floor votes, passage, governor action, signed or vetoed, and dead bills.'
+            ? 'Major milestones: introduction, committee action, floor votes, passage, governor action, signed or vetoed, and dead bills.'
             : `${eventSummaryLabel(eventTypes)} selected. Open advanced options below to review or change.`}
         </Typography>
         {topicFilters.length > 0 && (
@@ -295,7 +295,7 @@ export function ProfileNotificationsSection() {
       <Collapse in={advancedOpen}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Fine-tune which legislative events trigger a digest line. Committee calendar alerts apply when you follow
-          committees on their detail pages. Topic alerts match automated bill tags — following a specific bill stays
+          committees on their detail pages. Topic alerts match automated bill tags. Following a specific bill stays
           the most reliable way to track it.
         </Typography>
 

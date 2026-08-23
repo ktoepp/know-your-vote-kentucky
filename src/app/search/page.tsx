@@ -8,7 +8,7 @@ import { buildPageMetadata } from '@/lib/seo';
 export const metadata: Metadata = buildPageMetadata({
   title: 'Search Kentucky bills, members, and committees',
   description:
-    'Search the Kentucky General Assembly in one place — bills by number, title, or topic; members by name or district; and committees.',
+    'Search the Kentucky General Assembly in one place: bills by number, title, or topic, members by name or district, and committees.',
   path: '/search',
 });
 

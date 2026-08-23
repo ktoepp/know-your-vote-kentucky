@@ -6,7 +6,7 @@ import { buildBreadcrumbJsonLd, buildCollectionPageJsonLd } from '@/lib/structur
 import { buildPageMetadata } from '@/lib/seo';
 
 const DESCRIPTION =
-  'Short factual guides to the Kentucky General Assembly — finding your state legislators, tracking a bill, how a bill becomes a law, and when the legislature meets.';
+  'Short factual guides to the Kentucky General Assembly: finding your state legislators, tracking a bill, how a bill becomes a law, and when the legislature meets.';
 
 export const metadata: Metadata = buildPageMetadata({
   title: 'Guides to the Kentucky legislature',
