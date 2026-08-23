@@ -14,6 +14,7 @@ _Active development only. Shipped work moves to Recently completed; deferred/rev
 
 - [x] **Filters — "Clear filters" button + de-emphasize the Filters button. ✅ Resolved 2026-08-10 (archived).** Existing "Clear all" chip on `/bills`, `/members`, `/committees`, `/meetings`, and `/search` is the shipped affordance; product review closed the follow-up.
 - [ ] **Signed-in mobile a11y sweep** — profile/feed/follow flows; needs an authenticated session (carried from 2026-06-01 and 2026-06-12).
+- [ ] **`.org` alternate domains drop the path on redirect (2026-08-22).** `knowyourvotekentucky.org` and `www.knowyourvotekentucky.org` are forwarded by Hostinger (`server: hcdn`), not Vercel: `https://knowyourvotekentucky.org/bills` 301s to `https://kyvky.com` with the path stripped, then apex 307s to www — so the visitor lands on the homepage after two hops. The four `.com` alternates are fine (single 308 straight to `https://www.kyvky.com`, path intact) because they're redirected in the Vercel project's domain settings. Fix is one of: change the Hostinger forward to preserve the path and target `https://www.kyvky.com` directly, or add the two `.org` domains to the Vercel project so its edge redirect handles them. Not fixable in `next.config.ts` — those hosts never reach the Next.js redirect table (see the comment there).
 
 ### LegiScan Pull architecture — post-vendor-feedback follow-ups (2026-08-21)
 
