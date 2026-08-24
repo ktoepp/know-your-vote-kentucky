@@ -2331,3 +2331,45 @@ against the real gateway. The URL sizes come from the real supabase-js query
 builder with a stubbed transport. The 2026-08-30 audit run is the confirmation
 to watch — `bills` should report a non-zero `checked` and
 `ky_accuracy_audit_marks` should stop being empty.
+
+---
+
+## 2026-08-25 — The dataset-path freshness guard skipped 100% of the bills sample; rotation credited rows nobody checked
+
+Follow-up verification of [PR #261](https://github.com/ktoepp/know-your-vote-kentucky/pull/261), run against the live LegiScan dataset list and production `ky_bills` rather than against fixtures. #261's own "Not verified live" caveat was the right call — both defects below are ones the offline tests could not have caught, and the first would have reproduced the exact symptom #261 set out to fix.
+
+### 1. `isRowNewerThanSnapshot` was fed a write timestamp, not an event date
+
+The freshness guard exists for a real reason: a dataset is a weekly snapshot, our sync is 6-hourly, and judging a genuinely-fresher row against a staler reference invents drift. But the bills checker passed it **`updated_from_legiscan_at`**, which records when we last *wrote* the row — not when the bill last changed.
+
+Those are not the same thing, because `ky-legiscan-dataset-import.ts` is hash-gated **per dataset, not per row**: when a session's `dataset_hash` moves, it upserts every bill in that session and stamps `updated_from_legiscan_at = now()` on all of them, changed or not. The 2026-08-01 `--force` re-import (the `nv_count` mapper fix) therefore stamped the entire corpus with one timestamp.
+
+Measured, not modelled:
+
+| | |
+|---|---|
+| Bills with `legiscan_id` | 22,547 |
+| Stamped `2026-08-01`, all sessions | **22,547 (100%)** |
+| Stamped since | 0 |
+| Newest `dataset_date` LegiScan offers (2026 RS) | **2026-07-12** |
+| Sessions where every row reads "fresher than snapshot" | **25 / 25** |
+
+Every row's write timestamp postdates every available snapshot, so the guard would have skipped the entire sample and the 2026-08-30 run would again have reported `bills … checked: 0` — a *third* distinct cause for the same symptom, and one the per-domain reporting would again have rendered as a normal week with one red domain.
+
+**Fix:** compare `last_action_date` — an event date — which is what the votes checker was already doing correctly with the roll-call date. On the current corpus this skips 0 of 22,547 while still firing for its actual purpose (action dated after the snapshot). The same-day boundary is preserved.
+
+**The general rule this is an instance of:** a write timestamp on a row that gets rewritten unconditionally carries no information about whether its *content* changed. Any freshness comparison needs a field that moves only when the underlying fact moves. `updated_from_legiscan_at` is still correct for "when did we last touch this row"; it was never a content-change signal.
+
+### 2. The split sampler stamped 30 rows a run it never handed to the checker
+
+`sampleTableSplit` deliberately over-draws the corpus half (`+ active.length`) so that de-duplicating against the active half still fills `limit`. The surplus rows are discarded — but `sampleTable` had already buffered a rotation stamp for every *chosen* key, so the discards were committed as audited. At the shipped defaults (limit 40, `activeShare` 0.75) that is **70 stamps for 40 rows actually checked: 30 rows a run credited without being looked at**, each then waiting a full ~22.5k-row cycle for another turn.
+
+This predates #261 — it arrived with rotation in PR #237 — but has never manifested, because the checker was dead for that entire window and `ky_accuracy_audit_marks` is still empty (verified: 0 rows). The first working run is when it would have started corrupting the rotation, which makes now the moment to fix it.
+
+**Fix, two parts:** `sampleTable` stamps only keys it actually returned a row for (not every key it selected), and `sampleTableSplit` releases the stamps for surplus rows it drops. Verified end to end through the real sampler with a stubbed transport: 40 returned, 40 stamped, 0 stamped-but-unchecked.
+
+**Why `releaseRotationStamp` didn't already cover this:** #261 added it for rows the *checker* skips, at row granularity. This leak is upstream of the checker — the rows never reach it — so nothing was there to call the release.
+
+### Confirmed healthy
+
+Migration 055 is applied (`ky_analyze_read_path_tables` present, `ky_bills` reloptions at `autovacuum_analyze_scale_factor=0.02`, `last_analyze` non-null). Migration **054** is *also* applied — `ky_increment_counter_multi` exists — which TASKS.md still listed as an outstanding operator step; corrected there. The votes checker's freshness guard needed no change: it compares the roll-call date, which is already an event date.

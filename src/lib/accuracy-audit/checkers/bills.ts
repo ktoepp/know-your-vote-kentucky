@@ -13,10 +13,10 @@
  * now free in quota terms.
  *
  * Two cases the per-bill path did not have, both skips rather than findings:
- * a session whose dataset could not be loaded, and a row synced more recently
- * than the dataset snapshot (see `isRowNewerThanSnapshot` — the snapshot is
- * weekly, our sync is 6-hourly, so the reference can legitimately be the older
- * side and judging against it would invent drift).
+ * a session whose dataset could not be loaded, and a bill whose latest action
+ * postdates the dataset snapshot (see `isRowNewerThanSnapshot` — the snapshot
+ * is weekly, our sync is 6-hourly, so the reference can legitimately be the
+ * older side and judging against it would invent drift).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { type LegiScanBillDetail, type LegiScanHistoryEntry } from '../../ky-legiscan-client';
@@ -42,8 +42,12 @@ interface BillRow {
   legiscan_id: number | null;
   /** Which dataset covers this bill. Null rows can't be checked and are skipped. */
   legiscan_session_id: number | null;
-  /** Last sync from LegiScan; compared against the dataset snapshot date. */
-  updated_from_legiscan_at: string | null;
+  /**
+   * Date of the bill's most recent legislative action, compared against the
+   * dataset snapshot date by the freshness guard. Must be an *event* date, not
+   * a sync-write timestamp — see `isRowNewerThanSnapshot`.
+   */
+  last_action_date: string | null;
   bill_number: string;
   /**
    * Session label (e.g. `"2026RS"`). Stamped onto every finding so the
@@ -174,7 +178,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
       {
         table: 'ky_bills',
         select:
-          'id, legiscan_id, legiscan_session_id, updated_from_legiscan_at, bill_number, session, title, status, last_action, bill_text_url, sponsors',
+          'id, legiscan_id, legiscan_session_id, last_action_date, bill_number, session, title, status, last_action, bill_text_url, sponsors',
         seed: cfg.seed,
         limit: cfg.billsLimit,
         filter: (q) => q.not('legiscan_id', 'is', null),
@@ -257,9 +261,13 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
       continue;
     }
 
-    // Our row is fresher than the snapshot, so any difference is the
-    // reference lagging, not our data drifting.
-    if (isRowNewerThanSnapshot(corpus, row.legiscan_session_id, row.updated_from_legiscan_at)) {
+    // The bill saw action after the snapshot was cut, so any difference is the
+    // reference lagging, not our data drifting. Compared on `last_action_date`
+    // (an event date) rather than `updated_from_legiscan_at` (a write
+    // timestamp) — the dataset import rewrites every row in a session whether
+    // or not it changed, so the write timestamp said "fresher than the
+    // snapshot" for all 22,547 rows and this guard skipped the entire sample.
+    if (isRowNewerThanSnapshot(corpus, row.legiscan_session_id, row.last_action_date)) {
       skippedFresherThanSnapshot += 1;
       releaseRotationStamp('bills', row.id);
       continue;
