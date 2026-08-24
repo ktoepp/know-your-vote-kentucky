@@ -6,7 +6,12 @@
  */
 import axios, { AxiosInstance } from 'axios';
 import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
-import { LegiscanQuotaHoldError, checkLegiscanQuotaForSync } from './legiscan-quota';
+import {
+  LegiscanQuotaHoldError,
+  checkLegiscanQuotaForSync,
+  normalizeLegiscanOp,
+} from './legiscan-quota';
+import { currentLegiscanCaller } from './legiscan-caller';
 
 export interface LegiScanSession { session_id: number; state_id: number; year_start: number; year_end: number; session_name: string; special: number; }
 export interface LegiScanBillSummary { bill_id: number; number: string; title: string; description: string; state: string; session_id: number; status: number; status_desc: string; last_action: string; last_action_date: string; url: string; }
@@ -151,7 +156,7 @@ export class KyLegiScanClient {
     for (let i = 1; i <= MAX_RETRIES; i++) {
       try {
         const r = await this.client.get('/', { params: { key: this.apiKey, ...params } });
-        void this.incrementQueryCounter();
+        void this.incrementQueryCounter(params.op);
         if (r.data?.status === 'ERROR') throw new Error(`LegiScan: ${r.data.alert?.message || 'unknown error'}`);
         this.cache.set(ck, { data: r.data, ts: Date.now() });
         return r.data as T;
@@ -171,13 +176,27 @@ export class KyLegiScanClient {
     return d.toISOString().slice(0, 7);
   }
 
-  private async incrementQueryCounter(): Promise<void> {
+  /**
+   * Records one billable LegiScan query in three buckets of the same payload:
+   * `YYYY-MM` (the month total, which is what the quota guard and the admin
+   * page read), `YYYY-MM:op`, and `YYYY-MM:op@caller`.
+   *
+   * The month total is deliberately still its own bucket rather than a sum over
+   * the breakdown, so the guard keeps working on rows written before this and
+   * can't drift if an op ever slips through untagged.
+   */
+  private async incrementQueryCounter(op?: string): Promise<void> {
     try {
       if (!supabaseAdmin) return;
       const month = KyLegiScanClient.monthKey();
-      const { error } = await supabaseAdmin.rpc('ky_increment_counter', {
+      const buckets = [month];
+      const opKey = normalizeLegiscanOp(op);
+      if (opKey) {
+        buckets.push(`${month}:${opKey}`, `${month}:${opKey}@${currentLegiscanCaller()}`);
+      }
+      const { error } = await supabaseAdmin.rpc('ky_increment_counter_multi', {
         counter_key: LEGISCAN_QUERY_COUNTER_KEY,
-        bucket_key: month,
+        bucket_keys: buckets,
       });
       if (error) throw error;
     } catch (err: any) {

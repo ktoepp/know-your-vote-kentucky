@@ -4,6 +4,7 @@
  * Fetches data from all Kentucky civic data sources and upserts into Supabase.
  * Supports dry-run mode, per-source sync, and status tracking via ky_sources table.
  */
+import { withLegiscanCaller } from './legiscan-caller';
 import {
   getKyLegiScanClient,
   getKyOpenStatesClient,
@@ -954,6 +955,10 @@ async function syncKyBillsByHash(
 }
 
 export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult> {
+  return withLegiscanCaller('sync-bills', () => runBillsSync(options));
+}
+
+async function runBillsSync(options: SyncOptions): Promise<SyncResult> {
   const start = Date.now();
   const source = 'bills';
   log(source, 'Starting bills sync from LegiScan');
@@ -1332,6 +1337,10 @@ async function reconcileKyLegislatorLegiscanIdsFromLatestSession(
 }
 
 export async function syncKyLegislators(options: SyncOptions = {}): Promise<SyncResult> {
+  return withLegiscanCaller('sync-legislators', () => runLegislatorsSync(options));
+}
+
+async function runLegislatorsSync(options: SyncOptions): Promise<SyncResult> {
   const start = Date.now();
   const source = 'legislators';
   log(source, 'Starting legislators sync from Open States');
@@ -1657,6 +1666,10 @@ function legislatorRowNeedsBioEnrichment(leg: {
  * Quota cost: 1 query per legislator processed.
  */
 export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<SyncResult> {
+  return withLegiscanCaller('sync-legislator-bios', () => runLegislatorBiosSync(options));
+}
+
+async function runLegislatorBiosSync(options: SyncOptions): Promise<SyncResult> {
   const start = Date.now();
   const source = 'legislator-bios';
   log(source, 'Starting legislator bio enrichment from LegiScan');
@@ -1747,6 +1760,10 @@ export async function syncKyLegislatorBios(options: SyncOptions = {}): Promise<S
 
 // --- Votes (LegiScan) ---
 export async function syncKyVotes(options: SyncOptions = {}): Promise<SyncResult> {
+  return withLegiscanCaller('sync-votes', () => runVotesSync(options));
+}
+
+async function runVotesSync(options: SyncOptions): Promise<SyncResult> {
   const start = Date.now();
   const source = 'votes';
   const billLimit = options.limit ?? 5;

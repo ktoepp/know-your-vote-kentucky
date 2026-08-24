@@ -214,6 +214,9 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # SLACK_LEGISCAN_QUOTA_ALERT_PCT=90 — also posts SLACK_WEBHOOK_ERRORS when monthly usage crosses this %.
 # LEGISCAN_MONTHLY_QUERY_LIMIT=30000 — label for quota math (match your LegiScan plan).
 # LEGISCAN_SYNC_QUOTA_STOP_PCT=95 — skip LegiScan sync calls at/above this monthly usage % (defaults to ACCURACY_LEGISCAN_QUOTA_STOP_PCT).
+# LEGISCAN_CALLER=<slug> — tags this process's LegiScan calls in the quota breakdown (`month:op@caller`).
+#   The sync pipeline, accuracy audit and dataset reconcile tag themselves; set this for ad-hoc
+#   backfill scripts so their spend isn't recorded as `untagged`. Lowercase a-z0-9-, 32 chars.
 # Smoke-test webhooks: npm run slack:smoke-test — or GET /api/cron/slack-test with Bearer auth.
 #
 # GitHub → Slack (commits / PRs / merges): add repo secret SLACK_WEBHOOK_GITHUB (Incoming Webhook URL).

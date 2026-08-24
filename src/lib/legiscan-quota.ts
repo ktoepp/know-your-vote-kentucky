@@ -5,6 +5,98 @@ import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 
 export const LEGISCAN_QUERY_COUNTER_KEY = 'legiscan_query_counter';
 
+/**
+ * Bucket keys in the counter payload, since migration 054 / 2026-08-24:
+ *
+ *   "2026-08"                        month total (authoritative — the guard reads this)
+ *   "2026-08:getBill"                per-operation
+ *   "2026-08:getBill@accuracy-audit" per-operation, per-caller
+ *
+ * Months recorded before that only have the first form, so any reader has to
+ * treat a missing breakdown as "not instrumented yet", not as zero.
+ */
+export type LegiscanUsageBucket = {
+  month: string;
+  /** null on a plain month-total bucket. */
+  op: string | null;
+  /** null unless the bucket carries an `@caller` suffix. */
+  caller: string | null;
+};
+
+/** LegiScan operation names are alphanumeric (`getBill`, `getRollCall`, …). */
+export function normalizeLegiscanOp(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const op = raw.replace(/[^A-Za-z0-9]/g, '').slice(0, 32);
+  return op || null;
+}
+
+export function parseLegiscanUsageBucket(key: string): LegiscanUsageBucket | null {
+  const m = /^(\d{4}-\d{2})(?::([^@]+)(?:@(.+))?)?$/.exec(key);
+  if (!m) return null;
+  return { month: m[1], op: m[2] ?? null, caller: m[3] ?? null };
+}
+
+export type LegiscanOpUsage = {
+  op: string;
+  count: number;
+  /** Descending by count. `untagged` means no caller tag was in scope. */
+  byCaller: { caller: string; count: number }[];
+};
+
+export type LegiscanMonthUsage = {
+  month: string;
+  /** The month-total bucket, not a sum of `byOp`. */
+  total: number;
+  /** Descending by count; empty for a month recorded before instrumentation. */
+  byOp: LegiscanOpUsage[];
+  /**
+   * Calls counted in the month total but carrying no per-op bucket. Non-zero
+   * means part of the month predates instrumentation, or an op key was dropped.
+   */
+  unattributed: number;
+};
+
+/** Breaks one month of a `legiscan_query_counter` payload into op/caller detail. */
+export function summarizeLegiscanMonthUsage(
+  payload: Record<string, unknown> | null | undefined,
+  month: string,
+): LegiscanMonthUsage {
+  const rows = payload ?? {};
+  const total = Number(rows[month] ?? 0) || 0;
+  const byOp = new Map<string, { count: number; callers: Map<string, number> }>();
+
+  for (const [key, value] of Object.entries(rows)) {
+    const parsed = parseLegiscanUsageBucket(key);
+    if (!parsed || parsed.month !== month || !parsed.op) continue;
+    const count = Number(value) || 0;
+    let entry = byOp.get(parsed.op);
+    if (!entry) {
+      entry = { count: 0, callers: new Map() };
+      byOp.set(parsed.op, entry);
+    }
+    // `month:op` carries the op total; `month:op@caller` splits that same total,
+    // so only the former is added to `count` (else every call counts twice).
+    if (parsed.caller) {
+      entry.callers.set(parsed.caller, (entry.callers.get(parsed.caller) ?? 0) + count);
+    } else {
+      entry.count += count;
+    }
+  }
+
+  const ops: LegiscanOpUsage[] = [...byOp.entries()]
+    .map(([op, entry]) => ({
+      op,
+      count: entry.count,
+      byCaller: [...entry.callers.entries()]
+        .map(([caller, count]) => ({ caller, count }))
+        .sort((a, b) => b.count - a.count || a.caller.localeCompare(b.caller)),
+    }))
+    .sort((a, b) => b.count - a.count || a.op.localeCompare(b.op));
+
+  const attributed = ops.reduce((sum, o) => sum + o.count, 0);
+  return { month, total, byOp: ops, unattributed: Math.max(0, total - attributed) };
+}
+
 export function legiscanPublicMonthlyLimit(): number {
   const raw = process.env.LEGISCAN_MONTHLY_QUERY_LIMIT?.trim();
   const n = raw ? parseInt(raw, 10) : NaN;

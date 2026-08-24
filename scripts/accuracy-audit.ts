@@ -44,6 +44,7 @@ import {
 } from '../src/lib/accuracy-audit/types';
 import { checkBills } from '../src/lib/accuracy-audit/checkers/bills';
 import { checkVotes } from '../src/lib/accuracy-audit/checkers/votes';
+import { withLegiscanCaller } from '../src/lib/legiscan-caller';
 import { checkLegislators } from '../src/lib/accuracy-audit/checkers/legislators';
 import { checkCommittees } from '../src/lib/accuracy-audit/checkers/committees';
 import { checkMaterials } from '../src/lib/accuracy-audit/checkers/materials';
@@ -344,7 +345,7 @@ async function main() {
   process.exit(hasOperationalError ? 1 : 0);
 }
 
-main().catch((e) => {
+withLegiscanCaller('accuracy-audit', main).catch((e) => {
   console.error(e);
   process.exit(1);
 });
