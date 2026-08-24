@@ -434,21 +434,36 @@ export async function sampleTableSplit<T>(
 
   // The corpus draw is deliberately over-sized (`+ active.length`) so that
   // de-duplicating against the active half still leaves enough rows to fill
-  // `limit`. The surplus rows are discarded here — and under rotation they were
-  // already stamped by `sampleTable`, so without this they would be recorded as
-  // audited despite never reaching the checker. At the shipped defaults
-  // (limit 40, activeShare 0.75) that was 30 of 70 stamps per run: three
-  // quarters of the corpus rotation was crediting rows nobody looked at.
+  // `limit`. Track the surplus it sheds — under rotation those rows carry a
+  // stamp that has to be given back (see below).
   const seen = new Set(active.map(keyOf));
   const out = [...active];
+  const dropped: string[] = [];
   for (const row of corpus) {
     const k = keyOf(row);
     if (out.length >= p.limit || seen.has(k)) {
-      if (p.rotation) releaseRotationStamp(p.rotation.scope, k);
+      dropped.push(k);
       continue;
     }
     seen.add(k);
     out.push(row);
+  }
+
+  // Release the stamps for corpus rows that did not make it into the result.
+  // `sampleTable` stamped everything it drew, so without this the surplus is
+  // recorded as audited despite never reaching the checker — at the shipped
+  // defaults (limit 40, activeShare 0.75) that was 30 of 70 stamps a run,
+  // three quarters of the corpus rotation crediting rows nobody looked at.
+  //
+  // Filtered against the *returned* keys, not just the drop reason: a key can
+  // be drawn by both halves, in which case it is dropped here as a duplicate
+  // yet still returned via the active half. Releasing on the drop alone would
+  // un-credit a row the checker does see.
+  if (p.rotation && dropped.length > 0) {
+    const returned = new Set(out.map(keyOf));
+    for (const k of dropped) {
+      if (!returned.has(k)) releaseRotationStamp(p.rotation.scope, k);
+    }
   }
   return out;
 }
