@@ -170,6 +170,23 @@ export async function finalizeRotation(
   await stampAuditMarks(db, scope, [...bucket]);
 }
 
+/**
+ * Drop one row's buffered stamp because the checker could not actually verify
+ * it — the row was sampled but no reference data covered it.
+ *
+ * The dataset-backed checkers (2026-08-24) introduced rows that are sampled and
+ * then skipped: their session fell outside the per-run dataset cap, or the
+ * download failed. Under the old per-bill path every sampled row was fetched,
+ * so committing the whole bucket was right. Now it is not — an unverified row
+ * stamped as audited goes to the back of the oldest-first queue and waits a
+ * full cycle for another chance, which is exactly the failure mode `stamp:
+ * 'defer'` exists to prevent. Same reasoning as the outage case, at row
+ * granularity instead of run granularity.
+ */
+export function releaseRotationStamp(scope: string, key: string): void {
+  pendingRotationStamps.get(scope)?.delete(key);
+}
+
 /** Test hook: drop every buffered scope without stamping. */
 export function clearPendingRotationStamps(): void {
   pendingRotationStamps.clear();
