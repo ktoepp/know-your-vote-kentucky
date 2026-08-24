@@ -2274,3 +2274,60 @@ The `bills` and `votes` checkers each spent one LegiScan query per sampled row: 
 **A bug this change introduced in the rotation, caught before merge.** `finalizeRotation` stamps every buffered row when a checker succeeds. That was correct while every sampled row was actually fetched. It is not correct now that rows can be sampled and then skipped — an unverified row stamped as audited goes to the back of the oldest-first queue and waits a full cycle, which is the exact failure `stamp: 'defer'` was built to prevent (see § 2026-07-31). `releaseRotationStamp(scope, key)` gives back a single row's turn, and the bills checker calls it on both skip paths. The votes checker does not use rotation at all, so it needs nothing.
 
 **What is not covered.** This session had no `LEGISCAN_API_KEY` or Supabase service key, so the audit was never run end to end. The corpus loader is covered by 20 assertions against a real adm-zip round-trip — indexing, cross-checker caching, cost accounting, a session missing from the dataset list, a `getDataset` throw not sinking its neighbours, failed sessions not retried, and six freshness-guard cases — plus 12 on the session ranking. That is not the same as a live run. The first Sunday `accuracy-audit.yml` run after merge is the real verification, and the thing to watch is the per-checker log line reporting sessions loaded and queries spent.
+
+## 2026-08-24 — The bills accuracy checker had been dead for three weeks
+
+Found while checking whether the "stateful sampling rotation" task in TASKS.md
+was stale. It was not stale, and it was not open either: rotation shipped
+2026-08-10 in PR #237, and it broke the checker it shipped for.
+
+**The evidence.** `ky_accuracy_audit_marks` was completely empty in production,
+two weeks after the feature that writes it went live. `ky_accuracy_runs` says
+why: the `bills` domain recorded `sample query failed: TypeError: fetch failed`
+with `checked: 0` on every run since — 2026-08-10, 08-16 and 08-23. The run
+before rotation shipped, 08-09, checked 40. Bills is the only checker with
+`rotation` configured, and it was the only one failing; votes, materials,
+committees and legislators were green throughout.
+
+The 2026-08-11 health-check note saw the first failure and said to "watch the
+next Sunday run (08-16) for recurrence before treating it as more than a blip."
+It recurred on 08-16 and again on 08-23. Nobody closed the loop, and because
+the audit reports per-domain rather than failing the run, three weeks of zero
+bill verification looked like a normal week with one red domain.
+
+**The cause.** `fetchAuditMarks` filtered by the candidate list:
+`.in('key', chunk)` over the sampler's keys, 500 at a time. `ky_bills` offers
+22,547 candidates, so a run issued 46 requests whose URLs were ~19.6 KB each
+(measured on the real query builder, not estimated). That is past the
+request-line limit in front of PostgREST, and undici reports the rejection as
+the bare `TypeError: fetch failed` that made this look like a network blip
+rather than a payload we were constructing.
+
+**The fix inverts the query.** Read the marks *for the scope* and let the
+caller intersect, instead of asking about every candidate. The request becomes
+constant-size — 136 bytes, a 144x reduction — and the growth moves to the
+response, bounded by rows actually audited (~40 a week) rather than by corpus
+size. Paged at 500 so that stays bounded too.
+
+**Why the sampling is unaffected.** The marks map is now a superset of the
+candidates rather than an exact match, and the selection reads it as
+`marks.get(k) ?? -Infinity` per candidate, so extra entries cannot change a
+result. Verified behaviourally rather than by argument: driving the real
+`sampleTable` through a stubbed transport, recently-audited rows still lose to
+never-audited ones, and when only two rows are left unaudited those are exactly
+the two returned.
+
+**Two things worth keeping.** First, an empty table is a symptom: a feature that
+writes state and has written none is broken until proven otherwise, and that
+question is cheaper to ask than any log search. Second, "watch it next week" is
+only a plan if something actually watches — this recurred twice under a note
+that had already predicted it. A domain that reports `checked: 0` for two
+consecutive runs should page rather than wait for someone to re-read
+`domain_summary`.
+
+Not verified live: this session had no Supabase service key, and the sandbox
+proxy blocks `*.supabase.co`, so the HTTP round trip was never exercised
+against the real gateway. The URL sizes come from the real supabase-js query
+builder with a stubbed transport. The 2026-08-30 audit run is the confirmation
+to watch — `bills` should report a non-zero `checked` and
+`ky_accuracy_audit_marks` should stop being empty.
