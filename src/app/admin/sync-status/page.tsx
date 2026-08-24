@@ -7,6 +7,7 @@ import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
+import { summarizeLegiscanMonthUsage } from '@/lib/legiscan-quota';
 import {
   evaluateSourceHealth,
   fetchSourceRows,
@@ -110,6 +111,9 @@ export default async function SyncStatusPage() {
   // LegiScan quota
   const monthKey = currentMonthKey();
   const legiscanUsed = legiscanPayload?.[monthKey] ?? null;
+  // Per-operation buckets exist only for months recorded after migration 054
+  // (2026-08-24); an empty breakdown means not-instrumented, not zero usage.
+  const legiscanUsage = summarizeLegiscanMonthUsage(legiscanPayload, monthKey);
   const legiscanTotal = 30000;
   const legiscanPct = legiscanUsed != null ? (legiscanUsed / legiscanTotal) * 100 : 0;
   const progressColor: 'primary' | 'warning' | 'error' =
@@ -164,6 +168,44 @@ export default async function SyncStatusPage() {
                   color={progressColor}
                   sx={{ height: 10, borderRadius: 1 }}
                 />
+                {legiscanUsage.byOp.length > 0 ? (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      By operation
+                    </Typography>
+                    <Stack spacing={0.5}>
+                      {legiscanUsage.byOp.map((op) => (
+                        <Box key={op.op}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                            <Typography variant="body2">{op.op}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {op.count.toLocaleString()}
+                            </Typography>
+                          </Box>
+                          {op.byCaller.length > 0 && (
+                            <Typography variant="caption" color="text.secondary">
+                              {op.byCaller.map((c) => `${c.caller} ${c.count.toLocaleString()}`).join(' · ')}
+                            </Typography>
+                          )}
+                        </Box>
+                      ))}
+                      {legiscanUsage.unattributed > 0 && (
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            unattributed
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {legiscanUsage.unattributed.toLocaleString()}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Stack>
+                  </Box>
+                ) : (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                    No per-operation breakdown for this month — instrumentation starts 2026-08-24.
+                  </Typography>
+                )}
               </>
             ) : (
               <Typography variant="body1" color="text.secondary">

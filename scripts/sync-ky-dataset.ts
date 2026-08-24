@@ -26,6 +26,7 @@
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { getKyLegiScanClient } from '../src/lib/ky-data-sources';
+import { withLegiscanCaller } from '../src/lib/legiscan-caller';
 import type { LegiScanDatasetListEntry } from '../src/lib/ky-legiscan-client';
 import {
   buildBillRow,
@@ -303,7 +304,7 @@ async function main() {
   process.exit(failures.length > 0 ? 1 : 0);
 }
 
-main().catch(async (err) => {
+withLegiscanCaller('dataset-sync', main).catch(async (err) => {
   const msg = err instanceof Error ? err.message : String(err);
   console.error(`[sync:dataset] Fatal: ${msg}`);
   await notifySyncExceptionSlack({ error: err, source: SOURCE, dryRun: DRY_RUN, isVercelCron: false, fromCli: true })
