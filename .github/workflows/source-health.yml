@@ -65,6 +65,22 @@ jobs:
         run: |
           npm run health:sources ${{ inputs.strict && '-- --strict' || '' }}
 
+      # Time-based floor on planner statistics (migration 055). Autoanalyze is
+      # volume-triggered, so a table below its churn threshold keeps stale stats
+      # indefinitely — ky_bills went three weeks between autoanalyzes during the
+      # 2026 interim. This runs regardless of the health verdict above, because
+      # stale stats are not a source-health breach and should not be skipped
+      # when one is found. Advisory: a failure here must not fail the run or
+      # mask the health result, so it is continue-on-error.
+      - name: Refresh planner statistics
+        if: always()
+        continue-on-error: true
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run db:analyze
+
       # Advisory triage of any breach the step above found. Runs only on
       # success: a failed evaluation has nothing to interpret, and the fallback
       # step below already reports that case.

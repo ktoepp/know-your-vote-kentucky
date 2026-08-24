@@ -36,6 +36,7 @@ import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { legiscanPersonUrl, normalizeBallotpediaHref } from '../src/lib/external-legislative-links';
 import { normalizeHttpsUrl, type LegislatorExternalLink } from '../src/lib/legislator-link-normalize';
 import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
+import { makeHostGateRouter, type HostLimit } from '../src/lib/host-rate-gate';
 import { isLegiscanQuotaHoldError } from '../src/lib/legiscan-quota';
 import {
   markSlackErrorNotified,
@@ -44,6 +45,20 @@ import {
 
 const TIMEOUT_MS = 18_000;
 const CONCURRENCY = 6;
+/**
+ * Per-host caps layered under the global pool.
+ *
+ * `legislature.ky.gov` throttles under the full 6-way burst: run #18 (2026-07-20)
+ * came back with 79 `lrc_profile_url` probes at HTTP 503 / status-0. Those are
+ * classified as transient skips rather than failures (the `202f383` fix), which
+ * is correct but means a throttled run silently verifies nothing for that host.
+ * Capping LRC at 2 in flight, with a floor on the gap between request starts,
+ * keeps coverage instead of trading it for speed. Other hosts are unaffected —
+ * they still run at the global limit.
+ */
+const HOST_LIMITS: Record<string, HostLimit> = {
+  'legislature.ky.gov': { concurrency: 2, minSpacingMs: 400 },
+};
 /** Max probe attempts (initial + retries) for a URL that comes back transient (5xx/status-0). */
 const MAX_PROBE_ATTEMPTS = 3;
 /** Exponential-backoff base between transient retries; jitter added on top. */
@@ -289,7 +304,14 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  * burst so we don't provoke the host's rate limiter in the first place. Definitive
  * results (2xx/3xx, 404, …) return immediately — only transient signals retry.
  */
+const gateForUrl = makeHostGateRouter(HOST_LIMITS);
+
 async function probeUrl(url: string): Promise<ProbeResult> {
+  const gate = gateForUrl(url);
+  return gate ? gate(() => probeUrlUngated(url)) : probeUrlUngated(url);
+}
+
+async function probeUrlUngated(url: string): Promise<ProbeResult> {
   await sleep(Math.floor(Math.random() * PROBE_JITTER_MS));
   let result = await probeOnce(url);
   for (
