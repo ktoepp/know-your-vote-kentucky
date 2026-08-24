@@ -1,22 +1,34 @@
 /**
- * Bills accuracy checker — a seeded random sample of `ky_bills` vs LegiScan
- * `getBill`.
+ * Bills accuracy checker — a seeded random sample of `ky_bills` vs the LegiScan
+ * bulk dataset for the sessions that sample lands in.
  *
  * Diffs bill_number, title, status (recomputed via the same mapper the sync uses),
  * last_action, bill_text_url, and sponsor identity (people_id set). Bounded by
  * ACCURACY_BILLS_LIMIT; the sampled rows vary per run (reproducible via seed).
+ *
+ * The reference used to be one `getBill` per sampled row — 40 quota points to
+ * check 40 bills. It is now the session dataset, which costs one point per
+ * session however many rows are drawn from it, so the sample size and the
+ * quota bill are no longer the same number. Raising ACCURACY_BILLS_LIMIT is
+ * now free in quota terms.
+ *
+ * Two cases the per-bill path did not have, both skips rather than findings:
+ * a session whose dataset could not be loaded, and a row synced more recently
+ * than the dataset snapshot (see `isRowNewerThanSnapshot` — the snapshot is
+ * weekly, our sync is 6-hourly, so the reference can legitimately be the older
+ * side and judging against it would invent drift).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { type LegiScanBillDetail, type LegiScanHistoryEntry } from '../../ky-legiscan-client';
 import {
-  getKyLegiScanClient,
-  type LegiScanBillDetail,
-  type LegiScanHistoryEntry,
-} from '../../ky-legiscan-client';
+  isRowNewerThanSnapshot,
+  loadDatasetCorpus,
+  rankSessionsByRowCount,
+} from '../legiscan-dataset-corpus';
 import { mapLegiScanBillStatus } from '../../map-legiscan-bill-status';
-import { sampleTableSplit } from '../sampling';
+import { releaseRotationStamp, sampleTableSplit } from '../sampling';
 import {
   diffFinding,
-  errorMessage,
   norm,
   summarizeResult,
   terminalResultFrom,
@@ -28,6 +40,10 @@ import {
 interface BillRow {
   id: string;
   legiscan_id: number | null;
+  /** Which dataset covers this bill. Null rows can't be checked and are skipped. */
+  legiscan_session_id: number | null;
+  /** Last sync from LegiScan; compared against the dataset snapshot date. */
+  updated_from_legiscan_at: string | null;
   bill_number: string;
   /**
    * Session label (e.g. `"2026RS"`). Stamped onto every finding so the
@@ -158,7 +174,7 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
       {
         table: 'ky_bills',
         select:
-          'id, legiscan_id, bill_number, session, title, status, last_action, bill_text_url, sponsors',
+          'id, legiscan_id, legiscan_session_id, updated_from_legiscan_at, bill_number, session, title, status, last_action, bill_text_url, sponsors',
         seed: cfg.seed,
         limit: cfg.billsLimit,
         filter: (q) => q.not('legiscan_id', 'is', null),
@@ -193,9 +209,29 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
     });
   }
 
-  const client = getKyLegiScanClient();
+  // One dataset per session, not one call per row — capped, because the
+  // sample's historical half spans up to 12 of the 25 sessions and an uncapped
+  // run would pull a dozen full-session ZIPs for a handful of rows each.
+  // Sessions covering the most sampled rows win.
+  const sessionsToLoad = rankSessionsByRowCount(
+    rows.map((r) => r.legiscan_session_id),
+    cfg.datasetSessionLimit,
+  );
+  let corpus;
+  try {
+    corpus = await loadDatasetCorpus(sessionsToLoad);
+  } catch (e) {
+    // Losing the dataset list means there is no reference at all. Classify as
+    // an upstream failure rather than returning zero findings, which would
+    // read as "everything checked out".
+    return terminalResultFrom('bills', 'LegiScan', e, started, { crashPrefix: 'dataset list failed' });
+  }
+
+  const unavailableSessions = new Map(corpus.sessionsUnavailable.map((u) => [u.sessionId, u.reason]));
   let checked = 0;
   let upstreamFailures = 0;
+  let skippedUncovered = 0;
+  let skippedFresherThanSnapshot = 0;
 
   for (const row of rows) {
     if (row.legiscan_id == null) continue;
@@ -207,26 +243,38 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
     const sess = row.session ?? undefined;
     const push = (f: Finding) => findings.push(sess ? { ...f, session: sess } : f);
 
-    let bill;
-    try {
-      bill = await client.fetchBillDetail(row.legiscan_id);
-    } catch (e) {
-      push({
-        severity: 'warn',
-        domain: 'bills',
-        entity: row.bill_number,
-        message: `LegiScan fetch failed: ${errorMessage(e)}`,
-      });
-      upstreamFailures += 1;
+    // No dataset covering this row: either its session fell outside the cap or
+    // the download failed. Either way there is nothing to compare against, so
+    // it is a skip, not a finding — the bill is not wrong, we have no reference.
+    // Only a genuine load *failure* counts as an upstream failure; falling
+    // outside the cap is our own budgeting, not an upstream problem.
+    const sessionId = row.legiscan_session_id;
+    if (sessionId == null || !corpus.snapshotDateBySession.has(sessionId)) {
+      skippedUncovered += 1;
+      if (sessionId != null && unavailableSessions.has(sessionId)) upstreamFailures += 1;
+      // Unverified: give the row its turn back rather than stamping it audited.
+      releaseRotationStamp('bills', row.id);
       continue;
     }
 
+    // Our row is fresher than the snapshot, so any difference is the
+    // reference lagging, not our data drifting.
+    if (isRowNewerThanSnapshot(corpus, row.legiscan_session_id, row.updated_from_legiscan_at)) {
+      skippedFresherThanSnapshot += 1;
+      releaseRotationStamp('bills', row.id);
+      continue;
+    }
+
+    const bill = corpus.billsByLegiscanId.get(row.legiscan_id) as LegiScanBillDetail | undefined;
+
     if (!bill) {
+      // The session's dataset loaded and this bill_id is not in it — that is a
+      // real discrepancy, same as getBill returning nothing.
       push({
         severity: 'fail',
         domain: 'bills',
         entity: row.bill_number,
-        message: `LegiScan returned no bill for legiscan_id ${row.legiscan_id}`,
+        message: `LegiScan dataset for session ${row.legiscan_session_id} contains no bill with legiscan_id ${row.legiscan_id}`,
       });
       continue;
     }
@@ -334,6 +382,13 @@ export async function checkBills(db: SupabaseClient, cfg: AuditConfig): Promise<
       }
     }
   }
+
+  console.log(
+    `[audit:bills] ${checked} checked from ${corpus.sessionsLoaded.length} session dataset(s), ` +
+      `${corpus.quotaCost} LegiScan quer${corpus.quotaCost === 1 ? 'y' : 'ies'} spent` +
+      (skippedUncovered ? `, ${skippedUncovered} skipped (no dataset covering row)` : '') +
+      (skippedFresherThanSnapshot ? `, ${skippedFresherThanSnapshot} skipped (row newer than snapshot)` : ''),
+  );
 
   return summarizeResult('bills', checked, findings, started, { upstreamFailures });
 }

@@ -2260,3 +2260,74 @@ Verification for this pass, since the digest is a live send and the previous two
 **Readouts, since instrumentation nobody reads is not instrumentation.** `npm run check:legiscan-quota` prints the per-op breakdown with caller splits (and takes an optional month argument), and `/admin/sync-status` shows the same under the quota bar. Both say "no breakdown for this month" rather than "0" when the month predates today.
 
 What this does not do: it is not retroactive. June, July and August-to-date stay single integers, so the first month with a full breakdown is September 2026, and the first genuinely interesting one is the 2027 Regular Session — the load this architecture has never been observed under ([§ 2026-08-21](#2026-08-21--legiscan-push-vs-pull-stay-on-pull-the-97-ceiling-was-a-pre-fix-read-path-artifact)).
+
+## 2026-08-24 — Accuracy audit reconciles against the bulk dataset, not per-bill calls
+
+The `bills` and `votes` checkers each spent one LegiScan query per sampled row: 40 `getBill` + 15 `getRollCall` = 55 a week, to verify 0.18% of a 22,547-bill corpus. The bulk dataset ships a whole session's bills, history and roll calls for one query, so the same verification can cost a handful of queries regardless of sample size. TASKS.md had this filed as due on its own merits now that interim has ended.
+
+**Why it is a swap and not a rewrite.** `fetchBillDetail` returns `d.bill` and `fetchRollCall` returns `vd.roll_call` — raw LegiScan objects. `parseDatasetZip` collects exactly those two shapes out of the ZIP. Field-level confirmation rather than assumption: every field the bills checker reads (`number`, `title`, `status`, `history`, `sponsors`, `last_action`, `last_action_date`, `url`) and every field the votes checker reads (`yea`, `nay`, `nv`, `absent`) is also read by `buildBillRow` / `buildVoteRow` from dataset payloads — code that has been writing correct production rows for months. `nv` is specifically the field the 2026-07-31 mapper bug was about, which is direct evidence dataset roll calls carry it.
+
+**The cap, because the first cost estimate was wrong.** The initial claim was "2 or 3 queries". Checking the real distribution killed it: the 365-day active window is a single session (2026 RS, 1,737 bills), but the sample's historical half draws across all 25 sessions, so an uncapped 40-row sample could pull ~12 full-session ZIPs — a dozen downloads and a lot of memory to verify a handful of rows each. `ACCURACY_DATASET_SESSIONS` (default 4) bounds it, ranked by how many sampled rows each session covers, ties to the newer session. Measured on a representative sample: **5 queries covering 32/40 rows, against 40 queries covering 40/40.** Roughly 11x cheaper across both checkers for 80% per-run row coverage, with the oldest-first rotation returning the rest. The useful second-order effect is that sample size and quota cost are now independent variables, so `ACCURACY_BILLS_LIMIT` can be raised for free.
+
+**Freshness is the real cost, and it is handled explicitly.** A dataset is a weekly snapshot; our sync is 6-hourly. Comparing a fresher row against a staler reference manufactures drift that does not exist. For bills, `isRowNewerThanSnapshot` skips any row whose `updated_from_legiscan_at` is past the snapshot's day-end. For votes there is no `updated_at` column, but a recorded roll call is immutable — the real failure mode is a roll call too *new* for the snapshot, so a miss is only a finding when the vote predates the snapshot date. Both are skips, not findings: no reference is not the same as a discrepancy.
+
+**A bug this change introduced in the rotation, caught before merge.** `finalizeRotation` stamps every buffered row when a checker succeeds. That was correct while every sampled row was actually fetched. It is not correct now that rows can be sampled and then skipped — an unverified row stamped as audited goes to the back of the oldest-first queue and waits a full cycle, which is the exact failure `stamp: 'defer'` was built to prevent (see § 2026-07-31). `releaseRotationStamp(scope, key)` gives back a single row's turn, and the bills checker calls it on both skip paths. The votes checker does not use rotation at all, so it needs nothing.
+
+**What is not covered.** This session had no `LEGISCAN_API_KEY` or Supabase service key, so the audit was never run end to end. The corpus loader is covered by 20 assertions against a real adm-zip round-trip — indexing, cross-checker caching, cost accounting, a session missing from the dataset list, a `getDataset` throw not sinking its neighbours, failed sessions not retried, and six freshness-guard cases — plus 12 on the session ranking. That is not the same as a live run. The first Sunday `accuracy-audit.yml` run after merge is the real verification, and the thing to watch is the per-checker log line reporting sessions loaded and queries spent.
+
+## 2026-08-24 — The bills accuracy checker had been dead for three weeks
+
+Found while checking whether the "stateful sampling rotation" task in TASKS.md
+was stale. It was not stale, and it was not open either: rotation shipped
+2026-08-10 in PR #237, and it broke the checker it shipped for.
+
+**The evidence.** `ky_accuracy_audit_marks` was completely empty in production,
+two weeks after the feature that writes it went live. `ky_accuracy_runs` says
+why: the `bills` domain recorded `sample query failed: TypeError: fetch failed`
+with `checked: 0` on every run since — 2026-08-10, 08-16 and 08-23. The run
+before rotation shipped, 08-09, checked 40. Bills is the only checker with
+`rotation` configured, and it was the only one failing; votes, materials,
+committees and legislators were green throughout.
+
+The 2026-08-11 health-check note saw the first failure and said to "watch the
+next Sunday run (08-16) for recurrence before treating it as more than a blip."
+It recurred on 08-16 and again on 08-23. Nobody closed the loop, and because
+the audit reports per-domain rather than failing the run, three weeks of zero
+bill verification looked like a normal week with one red domain.
+
+**The cause.** `fetchAuditMarks` filtered by the candidate list:
+`.in('key', chunk)` over the sampler's keys, 500 at a time. `ky_bills` offers
+22,547 candidates, so a run issued 46 requests whose URLs were ~19.6 KB each
+(measured on the real query builder, not estimated). That is past the
+request-line limit in front of PostgREST, and undici reports the rejection as
+the bare `TypeError: fetch failed` that made this look like a network blip
+rather than a payload we were constructing.
+
+**The fix inverts the query.** Read the marks *for the scope* and let the
+caller intersect, instead of asking about every candidate. The request becomes
+constant-size — 136 bytes, a 144x reduction — and the growth moves to the
+response, bounded by rows actually audited (~40 a week) rather than by corpus
+size. Paged at 500 so that stays bounded too.
+
+**Why the sampling is unaffected.** The marks map is now a superset of the
+candidates rather than an exact match, and the selection reads it as
+`marks.get(k) ?? -Infinity` per candidate, so extra entries cannot change a
+result. Verified behaviourally rather than by argument: driving the real
+`sampleTable` through a stubbed transport, recently-audited rows still lose to
+never-audited ones, and when only two rows are left unaudited those are exactly
+the two returned.
+
+**Two things worth keeping.** First, an empty table is a symptom: a feature that
+writes state and has written none is broken until proven otherwise, and that
+question is cheaper to ask than any log search. Second, "watch it next week" is
+only a plan if something actually watches — this recurred twice under a note
+that had already predicted it. A domain that reports `checked: 0` for two
+consecutive runs should page rather than wait for someone to re-read
+`domain_summary`.
+
+Not verified live: this session had no Supabase service key, and the sandbox
+proxy blocks `*.supabase.co`, so the HTTP round trip was never exercised
+against the real gateway. The URL sizes come from the real supabase-js query
+builder with a stubbed transport. The 2026-08-30 audit run is the confirmation
+to watch — `bills` should report a non-zero `checked` and
+`ky_accuracy_audit_marks` should stop being empty.

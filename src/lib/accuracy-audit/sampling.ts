@@ -170,6 +170,23 @@ export async function finalizeRotation(
   await stampAuditMarks(db, scope, [...bucket]);
 }
 
+/**
+ * Drop one row's buffered stamp because the checker could not actually verify
+ * it — the row was sampled but no reference data covered it.
+ *
+ * The dataset-backed checkers (2026-08-24) introduced rows that are sampled and
+ * then skipped: their session fell outside the per-run dataset cap, or the
+ * download failed. Under the old per-bill path every sampled row was fetched,
+ * so committing the whole bucket was right. Now it is not — an unverified row
+ * stamped as audited goes to the back of the oldest-first queue and waits a
+ * full cycle for another chance, which is exactly the failure mode `stamp:
+ * 'defer'` exists to prevent. Same reasoning as the outage case, at row
+ * granularity instead of run granularity.
+ */
+export function releaseRotationStamp(scope: string, key: string): void {
+  pendingRotationStamps.get(scope)?.delete(key);
+}
+
 /** Test hook: drop every buffered scope without stamping. */
 export function clearPendingRotationStamps(): void {
   pendingRotationStamps.clear();
@@ -224,7 +241,7 @@ export async function sampleTable<T>(db: SupabaseClient, p: SampleParams): Promi
   //    counts as oldest via NULL → -Infinity), with the seeded hash as a
   //    tiebreaker so ties still vary run to run.
   const marks = p.rotation
-    ? await fetchAuditMarks(db, p.rotation.scope, keys)
+    ? await fetchAuditMarks(db, p.rotation.scope)
     : new Map<string, number>();
   const chosen = keys
     .map((k) => ({
@@ -277,22 +294,38 @@ export async function sampleTable<T>(db: SupabaseClient, p: SampleParams): Promi
   return results;
 }
 
-/** How many `IN (...)` mark rows we're willing to send per PostgREST call. */
+/** Rows per page when reading or writing marks. */
 const MARK_CHUNK = 500;
 
-async function fetchAuditMarks(
-  db: SupabaseClient,
-  scope: string,
-  keys: string[],
-): Promise<Map<string, number>> {
+/**
+ * Every mark recorded for one scope, keyed by row key.
+ *
+ * This used to filter by the candidate list — `.in('key', chunk)` over the
+ * sampler's keys, 500 at a time. That is what broke the bills checker for
+ * three weeks (runs 2026-08-10, 08-16, 08-23 all recorded
+ * `sample query failed: TypeError: fetch failed`, `checked: 0`). `ky_bills`
+ * offers 22,547 candidates, so each chunk built an ~18.6 KB request URL and a
+ * run issued 46 of them; that comfortably exceeds the request-line limit in
+ * front of PostgREST, and undici surfaces the rejection as the bare
+ * `TypeError: fetch failed` seen in `ky_accuracy_runs.domain_summary`. Bills
+ * was the only checker with `rotation` configured, which is why it was the
+ * only one failing, and why `ky_accuracy_audit_marks` was still empty.
+ *
+ * Reading the scope instead of the candidates inverts the size relationship:
+ * the request is now constant-size and the *response* grows, bounded by rows
+ * actually audited (~40 a week) rather than by corpus size. Paged so it stays
+ * bounded regardless. The caller intersects against its candidate list, which
+ * it had to do anyway.
+ */
+async function fetchAuditMarks(db: SupabaseClient, scope: string): Promise<Map<string, number>> {
   const out = new Map<string, number>();
-  for (let i = 0; i < keys.length; i += MARK_CHUNK) {
-    const chunk = keys.slice(i, i + MARK_CHUNK);
+  for (let from = 0; ; from += MARK_CHUNK) {
     const { data, error } = await db
       .from('ky_accuracy_audit_marks')
       .select('key, last_audited_at')
       .eq('scope', scope)
-      .in('key', chunk);
+      .order('key', { ascending: true })
+      .range(from, from + MARK_CHUNK - 1);
     if (error) {
       // Missing table (migration 049 not yet applied) → degrade silently to
       // pure-random behavior. Callers should NOT have to know.
@@ -302,12 +335,13 @@ async function fetchAuditMarks(
       }
       throw new Error(error.message);
     }
-    for (const r of (data ?? []) as Array<{ key: string; last_audited_at: string }>) {
+    const rows = (data ?? []) as Array<{ key: string; last_audited_at: string }>;
+    for (const r of rows) {
       const t = Date.parse(r.last_audited_at);
       if (Number.isFinite(t)) out.set(r.key, t);
     }
+    if (rows.length < MARK_CHUNK) return out;
   }
-  return out;
 }
 
 async function stampAuditMarks(

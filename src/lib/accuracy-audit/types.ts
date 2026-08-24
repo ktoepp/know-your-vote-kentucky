@@ -110,6 +110,14 @@ export interface AuditConfig {
   activeShare: number;
   /** Max bills re-fetched from LegiScan per run. */
   billsLimit: number;
+  /**
+   * Max LegiScan session datasets downloaded per run (bills + votes share the
+   * cache, so this is a whole-run budget, not per checker). Each is one quota
+   * point and one full-session ZIP in memory, and covers every row in that
+   * session — so this bounds cost and memory while the sample size no longer
+   * does. Rows in sessions beyond the cap are skipped, not judged.
+   */
+  datasetSessionLimit: number;
   /** Max roll calls re-fetched from LegiScan per run. */
   votesLimit: number;
   /** Max committees re-scraped for materials per run. */
@@ -228,6 +236,7 @@ export function buildAuditConfig(overrides: AuditConfigOverrides = {}): AuditCon
     activeDays: envInt('ACCURACY_ACTIVE_DAYS', envInt('ACCURACY_DAYS', 365)),
     activeShare: envFloat('ACCURACY_ACTIVE_SHARE', 0.75),
     billsLimit: envInt('ACCURACY_BILLS_LIMIT', 40),
+    datasetSessionLimit: envInt('ACCURACY_DATASET_SESSIONS', 4),
     votesLimit: envInt('ACCURACY_VOTES_LIMIT', 15),
     materialsCommitteeLimit: envInt('ACCURACY_MATERIALS_COMMITTEE_LIMIT', 12),
     linkSampleLimit: envInt('ACCURACY_LINK_SAMPLE', 25),

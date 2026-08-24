@@ -35,6 +35,7 @@
     "audit:accuracy": "tsx scripts/accuracy-audit.ts",
     "audit:accuracy:dry": "tsx scripts/accuracy-audit.ts --dry-run",
     "health:sources": "tsx scripts/check-source-health.ts",
+    "db:analyze": "tsx scripts/analyze-read-path-tables.ts",
     "health:sources:json": "tsx scripts/check-source-health.ts --json",
     "triage:findings": "tsx scripts/triage-findings.ts",
     "triage:findings:dry": "tsx scripts/triage-findings.ts --dry-run",
