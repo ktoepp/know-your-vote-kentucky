@@ -283,12 +283,20 @@ export async function sampleTable<T>(db: SupabaseClient, p: SampleParams): Promi
   //    - defer: buffer for the orchestrator to commit/discard once it knows
   //      whether the checker actually verified its sample.
   //    - false: never stamp (tests, pure hash-only callers).
-  if (p.rotation && chosen.length > 0) {
-    const mode = p.rotation.stamp ?? true;
-    if (mode === 'defer') {
-      bufferRotationStamps(p.rotation.scope, chosen);
-    } else if (mode === true) {
-      await stampAuditMarks(db, p.rotation.scope, chosen);
+  //
+  //    Stamp the keys we actually returned a row for, not every key we chose.
+  //    `chosen` is the selection; a key can drop out between selection and here
+  //    when the row fetch doesn't return it. Stamping those would mark a row
+  //    audited that the checker never saw.
+  if (p.rotation) {
+    const returnedKeys = chosen.filter((k) => byKey.has(k));
+    if (returnedKeys.length > 0) {
+      const mode = p.rotation.stamp ?? true;
+      if (mode === 'defer') {
+        bufferRotationStamps(p.rotation.scope, returnedKeys);
+      } else if (mode === true) {
+        await stampAuditMarks(db, p.rotation.scope, returnedKeys);
+      }
     }
   }
   return results;
@@ -424,14 +432,38 @@ export async function sampleTableSplit<T>(
     seed: p.seed ^ 0x7f4a7c15,
   });
 
+  // The corpus draw is deliberately over-sized (`+ active.length`) so that
+  // de-duplicating against the active half still leaves enough rows to fill
+  // `limit`. Track the surplus it sheds — under rotation those rows carry a
+  // stamp that has to be given back (see below).
   const seen = new Set(active.map(keyOf));
   const out = [...active];
+  const dropped: string[] = [];
   for (const row of corpus) {
-    if (out.length >= p.limit) break;
     const k = keyOf(row);
-    if (seen.has(k)) continue;
+    if (out.length >= p.limit || seen.has(k)) {
+      dropped.push(k);
+      continue;
+    }
     seen.add(k);
     out.push(row);
+  }
+
+  // Release the stamps for corpus rows that did not make it into the result.
+  // `sampleTable` stamped everything it drew, so without this the surplus is
+  // recorded as audited despite never reaching the checker — at the shipped
+  // defaults (limit 40, activeShare 0.75) that was 30 of 70 stamps a run,
+  // three quarters of the corpus rotation crediting rows nobody looked at.
+  //
+  // Filtered against the *returned* keys, not just the drop reason: a key can
+  // be drawn by both halves, in which case it is dropped here as a duplicate
+  // yet still returned via the active half. Releasing on the drop alone would
+  // un-credit a row the checker does see.
+  if (p.rotation && dropped.length > 0) {
+    const returned = new Set(out.map(keyOf));
+    for (const k of dropped) {
+      if (!returned.has(k)) releaseRotationStamp(p.rotation.scope, k);
+    }
   }
   return out;
 }

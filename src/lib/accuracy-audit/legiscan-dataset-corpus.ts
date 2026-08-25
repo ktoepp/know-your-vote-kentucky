@@ -197,24 +197,35 @@ export async function loadDatasetCorpus(
 }
 
 /**
- * True when our row was synced from LegiScan after the snapshot was cut, which
- * makes the snapshot the stale side of the comparison. Such a row is not
+ * True when our row records legislative action *after* the snapshot was cut,
+ * which makes the snapshot the stale side of the comparison. Such a row is not
  * evidence of drift and must not be judged against this corpus.
  *
- * Unknown sync time is treated as "not newer": rows predating the
- * `updated_from_legiscan_at` column still get checked, matching the old
- * per-bill behaviour rather than silently dropping out of the audit.
+ * The argument must be an **event** date — when something happened to the bill
+ * — not a sync-write timestamp. That distinction is the whole guard.
+ * `updated_from_legiscan_at`, which this took until 2026-08-24, records when we
+ * last *wrote* the row, and the dataset import rewrites every row in a session
+ * unconditionally (it is hash-gated per dataset, not per row). So every bill in
+ * the corpus carried the timestamp of the last full import — 2026-08-01 for all
+ * 22,547 of them — while the newest snapshot LegiScan offers is dated
+ * 2026-07-12. Every row read as "fresher than the snapshot" and the bills
+ * checker skipped 100% of its sample. Passing `last_action_date` instead
+ * matches what the votes checker already does with the roll-call date, and
+ * measures the thing the guard is actually about.
+ *
+ * Unknown action date is treated as "not newer": the row still gets checked,
+ * rather than silently dropping out of the audit.
  */
 export function isRowNewerThanSnapshot(
   corpus: DatasetCorpus,
   sessionId: number | null | undefined,
-  updatedFromLegiscanAt: string | null | undefined,
+  rowEventDate: string | null | undefined,
 ): boolean {
-  if (!updatedFromLegiscanAt || sessionId == null) return false;
+  if (!rowEventDate || sessionId == null) return false;
   const snapshot = corpus.snapshotDateBySession.get(sessionId);
   if (!snapshot) return false;
-  const rowTime = Date.parse(updatedFromLegiscanAt);
-  // dataset_date is a day stamp; compare against its end so a row synced
+  const rowTime = Date.parse(rowEventDate);
+  // dataset_date is a day stamp; compare against its end so an action dated
   // earlier the same day is not mistaken for one that outran the snapshot.
   const snapshotEnd = Date.parse(`${snapshot}T23:59:59Z`);
   if (!Number.isFinite(rowTime) || !Number.isFinite(snapshotEnd)) return false;
