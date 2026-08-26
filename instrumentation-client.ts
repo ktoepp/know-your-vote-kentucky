@@ -39,6 +39,41 @@ const isPreviewDeploy = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview";
 const BENIGN_VIEW_TRANSITION_ERROR =
   /Skipping view transition because document visibility|view transition was skipped because document visibility|Transition was aborted because of invalid state/i;
 
+/**
+ * Errors thrown by scripts we do not ship.
+ *
+ * Mobile in-app browsers (Facebook/Instagram/Bing webviews), iOS content blockers and
+ * desktop extensions inject their own JavaScript into the page. When that code throws,
+ * the browser still fires our `window.onerror`, so PostHog and Sentry open an issue
+ * against *our* app for a crash in code we cannot read, reproduce or patch. Because the
+ * injected script is not a document resource, its stack frames carry no filename at all
+ * — every frame is `{ function, lineno, colno }` with nothing to attribute it to.
+ *
+ * Anything thrown by our own bundle is attributable: every frame names a
+ * `/_next/static/chunks/*.js` file (or the document, for the one inline Typekit loader).
+ * So "the stack has frames, but not one of them names a source" is a reliable marker for
+ * third-party injection, and dropping those keeps the crash signal actionable.
+ *
+ * Deliberately narrow: exceptions with *no* frames at all (e.g. a `SyntaxError` from an
+ * old browser failing to parse our bundle — a real, if unfixable, signal) are kept.
+ */
+type StackFrameLike = { filename?: string; source?: string };
+type ExceptionLike = {
+  type?: string;
+  value?: string;
+  stacktrace?: { frames?: StackFrameLike[] } | null;
+};
+
+const hasNoAttributableSource = (ex: ExceptionLike | undefined): boolean => {
+  const frames = ex?.stacktrace?.frames ?? [];
+  if (frames.length === 0) return false;
+  return frames.every((f) => !(f?.filename || f?.source || "").trim());
+};
+
+/** True when every exception in the chain came from an unattributable (injected) script. */
+const isInjectedThirdPartyError = (exceptions: ExceptionLike[]): boolean =>
+  exceptions.length > 0 && exceptions.every(hasNoAttributableSource);
+
 if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || posthogInDev)) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
@@ -56,9 +91,8 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
     // Drop benign view-transition-skipped noise (see BENIGN_VIEW_TRANSITION_ERROR).
     before_send: (event) => {
       if (event?.event === "$exception") {
-        const exceptions = (event.properties?.["$exception_list"] as
-          | Array<{ type?: string; value?: string }>
-          | undefined) ?? [];
+        const exceptions =
+          (event.properties?.["$exception_list"] as ExceptionLike[] | undefined) ?? [];
         const topLevelMessage = String(event.properties?.["$exception_message"] ?? "");
         const isBenign =
           BENIGN_VIEW_TRANSITION_ERROR.test(topLevelMessage) ||
@@ -68,6 +102,8 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
               BENIGN_VIEW_TRANSITION_ERROR.test(ex?.type ?? ""),
           );
         if (isBenign) return null;
+        // Injected in-app-browser / extension scripts (see isInjectedThirdPartyError).
+        if (isInjectedThirdPartyError(exceptions)) return null;
       }
       return event;
     },
@@ -100,6 +136,15 @@ async function loadAndInitSentry() {
       // Same rationale as PostHog's before_send above: it only fires on hidden
       // tabs, so it's non-actionable and shouldn't open a Sentry issue.
       ignoreErrors: [BENIGN_VIEW_TRANSITION_ERROR],
+
+      // Same rationale as PostHog's before_send: a crash inside an injected in-app-browser
+      // or extension script is not our bug and cannot be acted on (see
+      // isInjectedThirdPartyError). Kept in sync so the two backends agree on what counts
+      // as a real crash.
+      beforeSend: (event) => {
+        const exceptions = (event.exception?.values ?? []) as ExceptionLike[];
+        return isInjectedThirdPartyError(exceptions) ? null : event;
+      },
 
       sendDefaultPii: true,
 
