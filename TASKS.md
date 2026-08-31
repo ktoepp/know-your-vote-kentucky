@@ -399,6 +399,23 @@ Filed while debugging a separate PostHog question. Recorded in parallel in the N
 
 - [ ] **Suggested-search chips aren't a distinguishable PostHog action.** The `/search` page's suggestion chips (`SearchPageClient.tsx`, `subjectSuggestions.map`, ~line 767) just call `setQuery()` + `pushSearchUrl()`, re-entering the normal `/search?q=` flow — so a chip click fires the exact same `search_performed` event (`src/lib/analytics.ts:80`) as a manually typed search, with nothing distinguishing the two. Can't tell from PostHog whether the suggestion feature is actually driving searches. `trackSearchResultClicked` already carries a `source` field for this kind of provenance (`'nav_bar' | 'search_page' | 'command_palette'`); `search_performed` could get the same treatment — a `source: 'typed' | 'suggested_chip' | 'url'` property, or a dedicated `search_suggestion_clicked` event fired before the navigation. PostHog event wiring, small.
 
+### Owner wishlist, filed 2026-08-31 (recorded, not scoped)
+
+Feedback from SFG: the site should present as **kyvky.org**, not **kyvky.com**, to build trust in the platform as a nonpartisan civic org rather than a commercial-looking `.com`. Katie confirms the org already owns `kyvky.org` and its spelled-out variants (`knowyourvotekentucky.org` etc. — same family as the existing `knowyourvotekentucky.org` alternate already tracked above under "Open near-term items", which currently just forwards to `.com`).
+
+This is **not** a DNS relabel — `kyvky.com` is the load-bearing identity threaded through the backend, not just the domain bar:
+
+- **Hardcoded canonical/user-agent strings**, all currently `https://kyvky.com`: `src/lib/ky-lrc-calendar-sync.ts:32`, `ky-lrc-committee-materials-sync.ts:22`, `ky-lrc-enrollment-actions-sync.ts:26`, `ky-lrc-popular-names-sync.ts:27`, `src/app/api/lrc/bill-link-status/route.ts:7` — these are the `User-Agent` headers this app presents to `apps.legislature.ky.gov` when scraping; LRC could plausibly rate-limit or block on UA/referrer if it changes ungracefully mid-scrape.
+- **Email identity** — `alerts@kyvky.com` sender, `katie@kyvky.com` reply-to (`CLAUDE.md`), Resend domain verification (SPF/DKIM) is presumably configured against `kyvky.com`; a `.org` sender needs its own DKIM/SPF setup and warm-up, not a find-and-replace.
+- **Canonical app URL** — `APP_PUBLIC_URL` / `NEXT_PUBLIC_APP_URL` = `https://www.kyvky.com` (TASKS.md "Ops / env" above) is load-bearing for the Resend webhook (`/api/webhooks/resend`) and OAuth/auth redirect allow-lists in Supabase — both break silently on a mismatched host, not loudly.
+- **CAN-SPAM mailing address** stays `PO Box 133, Bardstown, Kentucky 40004` regardless (unaffected, noting only so it isn't conflated with the domain question).
+- **SEO** — `kyvky.com` is the indexed, backlinked domain; a rebrand needs a redirect strategy that preserves link equity (301s path-preserving, not the `.org`-alternates bug already open above), plus `structured-data.ts` canonical URLs, sitemap, and `llms.txt`.
+- **Third-party surfaces** likely pointing at `.com`: Vercel project domains, Supabase auth site URL + redirect allow-list, any social/Ballotpedia/LRC-facing links citing the domain, business cards/print collateral outside the repo.
+
+**Interim ask (small, do this now):** stand up `kyvky.org` (+ spelled-out variants) as a redirect to `www.kyvky.com`, path-preserving — same fix needed for the already-open `.org`-alternates bug above (Hostinger forward strips the path; either fix the Hostinger forward or add the domains to the Vercel project so its edge redirect handles them). This buys the trust signal of owning/serving `.org` immediately without committing to the full rebrand.
+
+**Full rebrand (large, not scoped):** needs an audit pass across every item above before touching anything — in particular the LRC-facing User-Agent strings and the Resend/Supabase auth domain config, both of which can fail scraping/mail/login silently rather than loudly. Flagging as investigate-first, build-later; not started.
+
 ### `/members` page redesign — replace governor's-office photos with search/filter tiles
 
 Note-to-self, 2026-07-18: the three photos of the governor's office on `/members` should be replaced with tiles that let a visitor search the House and Senate sides. Those tiles become anchor links down to the senators/representatives listed below on the same page. Later pass: fill in real search filters (chamber, party, district, name), and backfill as many members as possible so search/filter coverage is complete.
