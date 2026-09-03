@@ -27,7 +27,10 @@ import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { getKyLegiScanClient } from '../src/lib/ky-data-sources';
 import { withLegiscanCaller } from '../src/lib/legiscan-caller';
-import type { LegiScanDatasetListEntry } from '../src/lib/ky-legiscan-client';
+import {
+  isTransientLegiscanNetworkError,
+  type LegiScanDatasetListEntry,
+} from '../src/lib/ky-legiscan-client';
 import {
   buildBillRow,
   buildLegislatorRow,
@@ -81,21 +84,41 @@ function getDb() {
   return supabaseAdmin;
 }
 
-/** Mirrors `updateSourceStatus` in ky-sync-pipeline (which isn't exported). */
-async function recordSourceStatus(status: SyncResult['status'], itemsSynced: number, errorMessage?: string): Promise<void> {
+/**
+ * Mirrors `updateSourceStatus` in ky-sync-pipeline (which isn't exported).
+ *
+ * `touchLastSync` exists because `last_sync_at` is read by `source-health` as
+ * "when this source last actually synced", and advancing it on a run that
+ * synced nothing resets the staleness clock — hiding a source that is failing
+ * every week behind a timestamp that keeps ticking. Only a run that reached a
+ * verdict about upstream data advances it; a run that never got that far
+ * (LegiScan unreachable, fatal crash) records its status and leaves the clock
+ * where it was, so the freshness budget still trips on schedule.
+ */
+async function recordSourceStatus(
+  status: SyncResult['status'],
+  itemsSynced: number,
+  errorMessage?: string,
+  { touchLastSync = true }: { touchLastSync?: boolean } = {},
+): Promise<void> {
   if (DRY_RUN) return;
   try {
     const db = getDb();
-    // `ky_sources.status` values seen elsewhere: 'success' | 'error' | 'skipped'.
-    // A quota-hold skip is reported as `success` in the rest of the pipeline so
-    // `/admin/sync-status` stays green — mirror that.
+    // `ky_sources.status` is CHECK-constrained to 'success' | 'error' |
+    // 'running' (migration 001) — a literal 'skipped' would be rejected by the
+    // database, so every non-error outcome has to persist as 'success'. That
+    // also matches how the rest of the pipeline reports a quota-hold skip,
+    // keeping `/admin/sync-status` green for an outcome that isn't a fault.
+    // The distinction survives in `error_message`.
     const persistedStatus = status === 'error' ? 'error' : 'success';
+    // Omitting `last_sync_at` leaves the stored value untouched on update (and
+    // null on a first-ever insert, which reads correctly as "never completed").
     await db.from('ky_sources').upsert(
       {
         source_name: SOURCE,
         status: persistedStatus,
         items_synced: itemsSynced,
-        last_sync_at: new Date().toISOString(),
+        ...(touchLastSync ? { last_sync_at: new Date().toISOString() } : {}),
         error_message: errorMessage || null,
       },
       { onConflict: 'source_name' },
@@ -169,7 +192,7 @@ async function main() {
     const reason = guard.reason || 'LegiScan quota hold engaged';
     console.log(`[sync:dataset] Skipped — ${reason}`);
     const result: SyncResult = { source: SOURCE, status: 'skipped', itemsSynced: 0, error: reason, duration: Date.now() - start };
-    await recordSourceStatus('skipped', 0, reason);
+    await recordSourceStatus('skipped', 0, reason, { touchLastSync: false });
     await notifySyncSlack({ results: [result], source: SOURCE, dryRun: DRY_RUN, isVercelCron: false, fromCli: true })
       .catch((e) => console.error('[Slack] sync notify failed:', e));
     process.exit(0);
@@ -184,7 +207,7 @@ async function main() {
       const reason = err.message;
       console.log(`[sync:dataset] Skipped — ${reason}`);
       const result: SyncResult = { source: SOURCE, status: 'skipped', itemsSynced: 0, error: reason, duration: Date.now() - start };
-      await recordSourceStatus('skipped', 0, reason);
+      await recordSourceStatus('skipped', 0, reason, { touchLastSync: false });
       await notifySyncSlack({ results: [result], source: SOURCE, dryRun: DRY_RUN, isVercelCron: false, fromCli: true })
         .catch((e) => console.error('[Slack] sync notify failed:', e));
       process.exit(0);
@@ -291,7 +314,12 @@ async function main() {
     duration: Date.now() - start,
   };
 
-  await recordSourceStatus(status, itemsSynced, errorSummary);
+  // Don't advance the freshness clock on a run that ended in failure, even a
+  // partial one: some sessions imported, but the source did not finish
+  // reconciling and should not read as freshly synced.
+  await recordSourceStatus(status, itemsSynced, errorSummary, {
+    touchLastSync: status !== 'error',
+  });
   await notifySyncSlack({ results: [result], source: SOURCE, dryRun: DRY_RUN, isVercelCron: false, fromCli: true })
     .catch((e) => console.error('[Slack] sync notify failed:', e));
 
@@ -307,6 +335,26 @@ async function main() {
 withLegiscanCaller('dataset-sync', main).catch(async (err) => {
   const msg = err instanceof Error ? err.message : String(err);
   console.error(`[sync:dataset] Fatal: ${msg}`);
+
+  // Record the failure on `ky_sources` before exiting. Without this the row
+  // keeps last week's `success` and the health check has no idea the run died —
+  // which is exactly what happened on 2026-08-30, when five 60s getDatasetList
+  // timeouts killed the run and the only signal anyone got was a stale-sync
+  // breach ten days later, misreported as "the workflow never fired".
+  //
+  // A transient LegiScan outage is recorded as `success` (with the reason) so it
+  // does not red /admin/sync-status or page for something that self-heals on the
+  // next run — matching `legiscanUnreachableSkipResult` in ky-sync-pipeline.
+  // Either way `last_sync_at` is left alone, so a source that keeps failing
+  // still breaches its freshness budget on time instead of looking fresh.
+  const transient = isTransientLegiscanNetworkError(err);
+  await recordSourceStatus(
+    transient ? 'skipped' : 'error',
+    0,
+    transient ? `LegiScan unreachable (transient): ${msg}` : msg,
+    { touchLastSync: false },
+  );
+
   await notifySyncExceptionSlack({ error: err, source: SOURCE, dryRun: DRY_RUN, isVercelCron: false, fromCli: true })
     .catch((e) => console.error('[Slack] exception notify failed:', e));
   markSlackErrorNotified();

@@ -78,8 +78,13 @@ export const MONITORED_SOURCES: Record<string, SourceExpectation> = {
   },
   dataset: {
     scheduler: 'GitHub Actions legiscan-dataset-weekly.yml',
-    schedule: '0 8 * * 0',
-    maxAgeHours: 240,
+    schedule: '0 8 * * 0,3',
+    // Runs Sunday with a Wednesday backstop, so the longest healthy gap is ~4
+    // days. 192h (8 days) tolerates both attempts in a week being missed or
+    // running late — GitHub's scheduler has drifted these starts by up to 5.6h
+    // — while still catching a stopped pipeline two days sooner than the old
+    // single-run 240h budget did.
+    maxAgeHours: 192,
   },
 };
 
@@ -152,6 +157,26 @@ function round1(n: number): number {
 }
 
 /**
+ * Why a stale source is stale, when the row knows.
+ *
+ * Staleness alone cannot distinguish "the scheduler never fired" from "it fired
+ * and the run died" — the same missing timestamp describes both. Syncs that
+ * record a reason without advancing `last_sync_at` (a transient upstream
+ * outage, a crashed run) leave it in `error_message`, so surfacing it here turns
+ * a guess into a diagnosis and saves a trip to the Actions history.
+ *
+ * When the row carries no reason at all, that absence is itself the finding:
+ * the job never reported back, so it most likely never started.
+ */
+function lastAttemptNote(row: SourceRow): string {
+  const reason = row.error_message?.trim();
+  if (!reason) return ' — no failure recorded, so the job likely never ran';
+  const oneLine = reason.replace(/\s+/g, ' ');
+  const clipped = oneLine.length > 200 ? `${oneLine.slice(0, 197)}…` : oneLine;
+  return ` — last attempt reported: ${clipped}`;
+}
+
+/**
  * Evaluate every monitored source against its expectation.
  *
  * Order matters: a source in `error` is reported as an error even when it is
@@ -212,7 +237,9 @@ export function evaluateSourceHealth(rows: SourceRow[], now: Date = new Date()):
         source,
         kind: 'stale',
         ageHours,
-        message: `last synced ${round1(ageHours)}h ago, over the ${expect.maxAgeHours}h budget for ${expect.scheduler} (${expect.schedule})`,
+        message:
+          `last synced ${round1(ageHours)}h ago, over the ${expect.maxAgeHours}h budget for ` +
+          `${expect.scheduler} (${expect.schedule})${lastAttemptNote(row)}`,
       });
       continue;
     }
