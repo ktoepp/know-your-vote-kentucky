@@ -467,3 +467,29 @@ export function getKyLegiScanClient(): KyLegiScanClient {
   return _inst;
 }
 
+/**
+ * True when `err` means "couldn't reach LegiScan" (transport-level timeout or
+ * network failure, or a 502/503/504 gateway), as opposed to LegiScan rejecting
+ * us (a `status: 'ERROR'` payload — bad key, quota, etc. — arrives as HTTP 200
+ * and must NOT be treated as transient). LegiScan's public API is intermittently
+ * slow: roughly one in three of the every-6h scheduled syncs sees every request
+ * hit the client's 60s timeout across all {@link MAX_RETRIES} attempts.
+ *
+ * Lives here rather than in a consumer because it classifies errors this client
+ * throws — `ky-sync-pipeline` and `scripts/sync-ky-dataset` both need the same
+ * verdict, and two copies would drift.
+ */
+export function isTransientLegiscanNetworkError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as { code?: string }).code ?? '';
+  if (
+    ['ECONNABORTED', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT'].includes(
+      code,
+    )
+  ) {
+    return true;
+  }
+  const status = (err as { response?: { status?: number } }).response?.status;
+  if (typeof status === 'number' && status >= 502 && status <= 504) return true;
+  return /timeout/i.test(err.message);
+}

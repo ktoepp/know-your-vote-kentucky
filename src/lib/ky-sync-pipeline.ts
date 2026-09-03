@@ -64,6 +64,7 @@ import {
 } from './ky-member-utils';
 import type { KYSource } from '../types/kentucky';
 import {
+  isTransientLegiscanNetworkError,
   legiscanPersonBioSocial,
   type KyLegiScanClient,
   type LegiScanBillDetail,
@@ -373,29 +374,6 @@ async function quotaHoldSkipResult(
     await updateSourceStatus(source, 'success', 0, msg);
   }
   return { source, status: 'skipped', itemsSynced: 0, error: msg, duration: Date.now() - start };
-}
-
-/**
- * True when `err` means "couldn't reach LegiScan" (transport-level timeout or
- * network failure, or a 502/503/504 gateway), as opposed to LegiScan rejecting
- * us (a `status: 'ERROR'` payload — bad key, quota, etc. — arrives as HTTP 200
- * and must NOT be treated as transient). LegiScan's public API is intermittently
- * slow: roughly one in three of the every-6h scheduled syncs sees every request
- * hit the client's 60s timeout across all retries.
- */
-function isTransientLegiscanNetworkError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const code = (err as { code?: string }).code ?? '';
-  if (
-    ['ECONNABORTED', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT'].includes(
-      code,
-    )
-  ) {
-    return true;
-  }
-  const status = (err as { response?: { status?: number } }).response?.status;
-  if (typeof status === 'number' && status >= 502 && status <= 504) return true;
-  return /timeout/i.test(err.message);
 }
 
 /**

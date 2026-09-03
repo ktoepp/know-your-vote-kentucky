@@ -8,6 +8,10 @@
 # any late-arriving change_hash updates get reconciled before the following
 # week starts. Sends a Slack digest on change/error only.
 #
+# Runs twice weekly despite the name: Sunday is the real reconcile, Wednesday is
+# a retry for when LegiScan is unreachable on Sunday. Hash gating makes the
+# extra run free when nothing changed.
+#
 # Secrets (Settings -> Secrets and variables -> Actions):
 #   LEGISCAN_API_KEY, NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY
 # Optional Slack (same webhooks as sync-ky-bills-status.yml):
@@ -34,6 +38,12 @@ on:
     # Sundays 08:00 UTC — one hour after accuracy-audit (07:00 UTC), well after
     # LegiScan's Sunday 04-05 ET dataset regen window.
     - cron: '0 8 * * 0'
+    # Wednesday backstop. LegiScan's API times out often enough that a single
+    # weekly attempt is a single point of failure: on 2026-08-30 all five
+    # retries hit the 60s timeout and the reconcile then sat undone for ten
+    # days. This is a retry, not a second reconcile — hash gating means it costs
+    # one getDatasetList and zero downloads whenever Sunday already succeeded.
+    - cron: '0 8 * * 3'
 
 permissions:
   contents: read
