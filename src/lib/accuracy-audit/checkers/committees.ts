@@ -51,6 +51,39 @@ const FETCH_HEADERS = {
   Accept: 'text/html',
 };
 
+/**
+ * PostgREST caps a single response at ~1000 rows. Every corpus-wide read in
+ * {@link checkStoredCorpusInvariants} must paginate or it silently sees only the
+ * first page — which is exactly how this checker spent weeks reporting ~110
+ * meetings as "agenda lost on write": `ky_committee_agenda_items` holds ~2,600
+ * rows, so an unpaginated fetch returned the first 1,000 and every meeting whose
+ * rows sat past that cap looked empty. All those failures were false positives.
+ */
+const CORPUS_PAGE_SIZE = 1000;
+
+/**
+ * Fetch every row of a corpus-wide query, one {@link CORPUS_PAGE_SIZE}-row page
+ * at a time. `build` receives the `[from, to]` bounds for `.range()`; it must
+ * also apply a stable `.order()` so pages don't overlap or skip rows.
+ */
+async function fetchAllRows<T>(
+  label: string,
+  build: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += CORPUS_PAGE_SIZE) {
+    const { data, error } = await build(from, from + CORPUS_PAGE_SIZE - 1);
+    if (error) throw new Error(`${label}: ${error.message}`);
+    const rows = data ?? [];
+    out.push(...rows);
+    if (rows.length < CORPUS_PAGE_SIZE) break;
+  }
+  return out;
+}
+
 /** Stored agenda row, as selected for verification. */
 export interface StoredAgendaItem {
   meeting_id: string;
@@ -231,15 +264,37 @@ async function checkStoredCorpusInvariants(
   let checked = 0;
 
   // --- Agenda rows present and correctly ordered -----------------------------
-  const { data: meetings, error: mErr } = await db
-    .from('ky_committee_meetings')
-    .select('id, meeting_date, agenda_content_hash, member_refs, ky_committees ( name )');
-  if (mErr) throw new Error(`ky_committee_meetings: ${mErr.message}`);
+  // Both reads paginate: the agenda table alone is ~2,600 rows, well over
+  // PostgREST's 1,000-row cap (see CORPUS_PAGE_SIZE).
+  type MeetingRow = {
+    id: string;
+    meeting_date: string;
+    agenda_content_hash: string | null;
+    member_refs: unknown[] | null;
+    ky_committees: { name?: string } | { name?: string }[] | null;
+  };
+  const meetings = await fetchAllRows<MeetingRow>('ky_committee_meetings', (from, to) =>
+    db
+      .from('ky_committee_meetings')
+      .select('id, meeting_date, agenda_content_hash, member_refs, ky_committees ( name )')
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
 
-  const { data: agenda, error: aErr } = await db
-    .from('ky_committee_agenda_items')
-    .select('meeting_id, sort_order, bill_number, bill_session_label, ky_bill_id');
-  if (aErr) throw new Error(`ky_committee_agenda_items: ${aErr.message}`);
+  type AgendaRow = {
+    meeting_id: string;
+    sort_order: number;
+    bill_number: string | null;
+    ky_bill_id: string | null;
+  };
+  const agenda = await fetchAllRows<AgendaRow>('ky_committee_agenda_items', (from, to) =>
+    db
+      .from('ky_committee_agenda_items')
+      .select('meeting_id, sort_order, bill_number, bill_session_label, ky_bill_id')
+      .order('meeting_id', { ascending: true })
+      .order('sort_order', { ascending: true })
+      .range(from, to),
+  );
 
   const byMeeting = new Map<string, Array<{ sort_order: number; bill_number: string | null; ky_bill_id: string | null }>>();
   for (const r of agenda ?? []) {
@@ -326,17 +381,31 @@ async function checkStoredCorpusInvariants(
   // --- Materials joined to the right committee -------------------------------
   // `meeting_id` is a best-effort date match at sync time; a material pointing at
   // another committee's meeting would file the document under the wrong body.
-  const { data: mats, error: matErr } = await db
-    .from('ky_committee_materials')
-    .select('id, title, committee_id, meeting_id')
-    .not('meeting_id', 'is', null);
-  if (matErr) throw new Error(`ky_committee_materials: ${matErr.message}`);
+  const mats = await fetchAllRows<{
+    id: string;
+    title: string | null;
+    committee_id: string;
+    meeting_id: string | null;
+  }>('ky_committee_materials', (from, to) =>
+    db
+      .from('ky_committee_materials')
+      .select('id, title, committee_id, meeting_id')
+      .not('meeting_id', 'is', null)
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
 
   const committeeByMeeting = new Map<string, string>();
   for (const m of meetings ?? []) committeeByMeeting.set(m.id as string, '');
-  const { data: meetingOwners } = await db
-    .from('ky_committee_meetings')
-    .select('id, committee_id');
+  const meetingOwners = await fetchAllRows<{ id: string; committee_id: string }>(
+    'ky_committee_meetings',
+    (from, to) =>
+      db
+        .from('ky_committee_meetings')
+        .select('id, committee_id')
+        .order('id', { ascending: true })
+        .range(from, to),
+  );
   for (const m of meetingOwners ?? []) committeeByMeeting.set(m.id as string, m.committee_id as string);
 
   for (const mt of mats ?? []) {
@@ -366,10 +435,18 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
   // share an lrc_rsn or a normalized name. Merge with
   // `npm run merge:duplicate-committees` (see decisions.md § 2026-06-12).
   {
-    const { data: allCommittees } = await db
-      .from('ky_committees')
-      .select('lrc_rsn, committee_type, name, slug');
-    const rows = allCommittees ?? [];
+    const rows = await fetchAllRows<{
+      lrc_rsn: number | null;
+      committee_type: string | null;
+      name: string;
+      slug: string;
+    }>('ky_committees', (from, to) =>
+      db
+        .from('ky_committees')
+        .select('lrc_rsn, committee_type, name, slug')
+        .order('slug', { ascending: true })
+        .range(from, to),
+    );
     const byRsn = new Map<number, typeof rows>();
     const byName = new Map<string, typeof rows>();
     for (const c of rows) {
