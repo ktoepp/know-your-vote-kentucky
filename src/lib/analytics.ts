@@ -88,6 +88,13 @@ export const trackSearchPerformed = (props: {
    * results auto-widened to all sessions, `explicit` = user-picked session, `all`.
    */
   sessionScope?: "default" | "default_broadened" | "explicit" | "all";
+  /**
+   * What triggered this execution: `typed` = user typed + submitted, `suggestion_chip`
+   * = clicked a subject-suggestion chip on /search, `topic_chip` = clicked a topic chip
+   * that routes into search (e.g. the /bills "Women's health" chip), `null` = a
+   * programmatic re-execution (URL param change on back/forward, deep-link landing).
+   */
+  source?: "typed" | "suggestion_chip" | "topic_chip" | null;
 }): void => {
   capture("search_performed", {
     query: props.query,
@@ -95,6 +102,7 @@ export const trackSearchPerformed = (props: {
     duration_ms: Math.round(props.durationMs),
     error: props.error ?? null,
     session_scope: props.sessionScope ?? null,
+    source: props.source ?? null,
   });
 };
 

@@ -53,6 +53,7 @@ import { LANDING_TOPICS } from '@/components/home/landing-data';
 import { FOLLOW_COPY } from '@/lib/follow-labels';
 import { useUser } from '@/app/lib/UserContext';
 import { trackTopicFilterUsed } from '@/lib/analytics';
+import { setPendingSearchSource } from '@/lib/search-source-handoff';
 
 export type BillsBrowseChamberMode = KyBillsBrowseChamberMode;
 
@@ -434,6 +435,7 @@ export function BillsBrowse({
             variant="outlined"
             component={Link}
             href="/search?q=women%27s+health"
+            onClick={() => setPendingSearchSource('topic_chip')}
             sx={{ fontWeight: 500, borderRadius: '16px' }}
           />
           <Chip
@@ -443,6 +445,7 @@ export function BillsBrowse({
             variant="outlined"
             component={Link}
             href="/search?q=data+centers"
+            onClick={() => setPendingSearchSource('topic_chip')}
             sx={{ fontWeight: 500, borderRadius: '16px' }}
           />
           {!topicFilter && (

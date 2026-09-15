@@ -36,6 +36,7 @@ import { CardGrid, CardGridItem } from '@/components/ui/CardGrid';
 import DataFreshnessNote from '@/components/civic/DataFreshnessNote';
 import { withTimeout } from '@/lib/async-utils';
 import { trackSearchPerformed } from '@/lib/analytics';
+import { consumePendingSearchSource, setPendingSearchSource } from '@/lib/search-source-handoff';
 import {
   buildKyBillSearchFiltersFromUrlSearch,
   canonicalizeKyBillSearchInput,
@@ -264,7 +265,11 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
   const performSearch = useCallback(async (
     searchQuery: string,
     filters: KyBillSearchFilters,
-    opts?: { broadenIfEmpty?: boolean; sessionScope?: 'default' | 'explicit' | 'all' },
+    opts?: {
+      broadenIfEmpty?: boolean;
+      sessionScope?: 'default' | 'explicit' | 'all';
+      source?: 'typed' | 'suggestion_chip' | 'topic_chip' | null;
+    },
   ) => {
     if (!searchQuery.trim()) return;
     setLoading(true);
@@ -303,6 +308,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
         resultCount: nextBills.length,
         durationMs: performance.now() - startedAt,
         sessionScope: broadened ? 'default_broadened' : opts?.sessionScope,
+        source: opts?.source ?? null,
       });
     } catch (err: any) {
       const raw = String(err?.message || err || 'unknown search error');
@@ -313,6 +319,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
         resultCount: null,
         durationMs: performance.now() - startedAt,
         error: raw === SEARCH_TIMEOUT_COPY ? 'client_timeout_25s' : raw.slice(0, 300),
+        source: opts?.source ?? null,
       });
     } finally {
       setLoading(false);
@@ -352,6 +359,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
     void performSearch(q, filters, {
       broadenIfEmpty: usingDefaultSession,
       sessionScope: explicitAll ? 'all' : usingDefaultSession ? 'default' : 'explicit',
+      source: consumePendingSearchSource(),
     });
     // searchParams is read for filters but intentionally excluded: only q + bill filters
     // (billFilterKey) should re-trigger the bill search, not the category tab.
@@ -401,6 +409,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setPendingSearchSource('typed');
     pushSearchUrl(query);
   };
 
@@ -777,6 +786,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                       color="primary"
                       variant="outlined"
                       onClick={() => {
+                        setPendingSearchSource('suggestion_chip');
                         setQuery(s.subject_name);
                         pushSearchUrl(s.subject_name);
                       }}
@@ -790,6 +800,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                       size="small"
                       variant="outlined"
                       onClick={() => {
+                        setPendingSearchSource('suggestion_chip');
                         setQuery('education');
                         pushSearchUrl('education');
                       }}
@@ -800,6 +811,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                       size="small"
                       variant="outlined"
                       onClick={() => {
+                        setPendingSearchSource('suggestion_chip');
                         setQuery('Medicaid');
                         pushSearchUrl('Medicaid');
                       }}
