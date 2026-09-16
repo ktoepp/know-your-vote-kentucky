@@ -805,18 +805,7 @@ export default function DistrictMapExplorer() {
                 width: '100%',
                 height: '100%',
                 minHeight: 0,
-                '& .district-map-hover-popup.mapboxgl-popup': {
-                  maxWidth: 'none !important',
-                },
-                '& .district-map-hover-popup .mapboxgl-popup-content': {
-                  background: 'transparent',
-                  padding: 0,
-                  boxShadow: 'none',
-                  borderRadius: 0,
-                },
-                '& .district-map-hover-popup .mapboxgl-popup-tip': {
-                  display: 'none',
-                },
+                // Hover-popup chrome overrides live in district-map-canvas.css next to the canvas.
               }}
               onMouseLeave={() => {
                 if (rafRef.current != null) {

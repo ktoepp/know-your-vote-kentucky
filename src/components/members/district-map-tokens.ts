@@ -36,12 +36,18 @@ export const SENATE_HOVER_OVERLAY = hexToRgba(SENATE_OUTLINE, HOVER_OVERLAY_ALPH
 export const HOUSE_SELECTED_FILL = hexToRgba(HOUSE_OUTLINE, 0.62);
 export const SENATE_SELECTED_FILL = hexToRgba(SENATE_OUTLINE, 0.62);
 
-/** Lucide MapPin: stroke, fill (RGBA), pixel size, stroke width */
+/**
+ * Lucide MapPin: stroke, fill, pixel size, stroke width, CSS filter.
+ * Solid primary-blue body with a white stroke and a soft shadow so the pin
+ * separates from both the House (purple) and Senate (green) fills; the earlier
+ * 15%-alpha fill with a dark stroke disappeared against the darker selected fill.
+ */
 export const MAP_MARKER_PIN = {
-  color: '#1e40af',
-  fill: 'rgba(30, 64, 175, 0.15)',
-  size: 32,
+  color: '#ffffff',
+  fill: '#1e40af',
+  size: 36,
   strokeWidth: 2,
+  shadow: 'drop-shadow(0 1px 1px rgba(15, 23, 42, 0.6)) drop-shadow(0 0 3px rgba(15, 23, 42, 0.35))',
 } as const;
 
 /**

@@ -1,0 +1,20 @@
+/*
+ * Hover popup chrome on the district explorer. Imported right after
+ * mapbox-gl.css in DistrictMapCanvas so it always follows Mapbox's own
+ * .mapboxgl-popup-content rule; the chip inside (DistrictMapHoverChip) draws
+ * its own card, so the Mapbox white box, padding, shadow and tip are removed.
+ * Previously an emotion `sx` on the wrapper Box, which stopped reaching the
+ * popup once the canvas became its own lazy chunk.
+ */
+.mapboxgl-popup.district-map-hover-popup {
+  max-width: none !important;
+}
+.mapboxgl-popup.district-map-hover-popup .mapboxgl-popup-content {
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
+.mapboxgl-popup.district-map-hover-popup .mapboxgl-popup-tip {
+  display: none;
+}

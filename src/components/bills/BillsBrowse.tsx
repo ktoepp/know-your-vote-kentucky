@@ -401,10 +401,13 @@ export function BillsBrowse({
             gap: 1,
             justifyContent: 'center',
             mb: 3,
+            alignItems: 'center',
             // WCAG 2.5.5: clickable chips need 44×44 on touch. Desktop keeps the
-            // dense size="small" footprint.
+            // theme's 36px size="small" footprint. (`sm: 'auto'` here used to
+            // drop the fixed height and let the wrapped flex line stretch every
+            // chip to its tallest sibling, so rows rendered at different heights.)
             '& .MuiChip-clickable': {
-              height: { xs: 44, sm: 'auto' },
+              height: { xs: 44, sm: 36 },
             },
           }}
           role="group"

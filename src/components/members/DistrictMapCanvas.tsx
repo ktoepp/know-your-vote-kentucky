@@ -29,6 +29,7 @@ import {
 } from '@/components/members/district-map-sources';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
+import './district-map-canvas.css';
 
 /** Panning limits (Kentucky + small margin). */
 const KY_MAX_BOUNDS: [[number, number], [number, number]] = [
@@ -244,6 +245,7 @@ export const DistrictMapCanvas = forwardRef<MapRef, DistrictMapCanvasProps>(func
             strokeWidth={MAP_MARKER_PIN.strokeWidth}
             color={MAP_MARKER_PIN.color}
             fill={MAP_MARKER_PIN.fill}
+            style={{ filter: MAP_MARKER_PIN.shadow }}
             aria-hidden
             focusable={false}
           />
