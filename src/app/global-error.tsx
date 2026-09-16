@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import { reloadOnChunkLoadError } from "@/lib/chunk-reload";
 
 /**
  * Root error UI when the root layout fails. Must include html/body.
@@ -15,6 +16,9 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    // A chunk missing after a deploy is recovered with a one-shot reload (see
+    // src/lib/chunk-reload.ts); `reset()` would re-run the same stale import.
+    if (reloadOnChunkLoadError(error)) return;
     Sentry.captureException(error);
   }, [error]);
   return (

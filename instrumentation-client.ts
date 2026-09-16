@@ -1,4 +1,6 @@
 import posthog from "posthog-js";
+import { hasSpentChunkReload, recordChunkReloadOutcome } from "@/lib/chunk-reload";
+import { shouldDropException, type ExceptionLike } from "@/lib/telemetry-filters";
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const reportInDev =
@@ -17,92 +19,6 @@ const posthogInDev =
 // project. NEXT_PUBLIC_VERCEL_ENV is baked in via next.config.ts.
 const isPreviewDeploy = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview";
 
-/**
- * Benign "view transition skipped" browser noise.
- *
- * When react-dom / the browser starts a View Transition during a navigation and
- * the tab is hidden (backgrounded) or being unloaded before the transition can
- * run, the browser aborts it with a DOMException (InvalidStateError). This is
- * expected behavior — the user isn't looking at the page and nothing is actually
- * broken — but the resulting unhandled rejection is picked up by PostHog Error
- * Tracking (capture_exceptions) and by Sentry, creating a non-actionable "new
- * issue" that pages us in Slack.
- *
- * Chromium surfaces two different messages for the same condition:
- *   - spec-compliant: "Skipping view transition because document visibility state has become hidden."
- *   - generic:        "Transition was aborted because of invalid state."
- * (see https://github.com/facebook/react/issues/34098)
- *
- * We drop both from our telemetry. This message only ever fires while the tab is
- * hidden, so suppressing it cannot mask a bug a user could actually observe.
- */
-const BENIGN_VIEW_TRANSITION_ERROR =
-  /Skipping view transition because document visibility|view transition was skipped because document visibility|Transition was aborted because of invalid state/i;
-
-/**
- * Errors thrown by scripts we do not ship.
- *
- * Mobile in-app browsers (Facebook/Instagram/Bing webviews), iOS content blockers and
- * desktop extensions inject their own JavaScript into the page. When that code throws,
- * the browser still fires our `window.onerror`, so PostHog and Sentry open an issue
- * against *our* app for a crash in code we cannot read, reproduce or patch. Because the
- * injected script is not a document resource, its stack frames carry no filename at all
- * — every frame is `{ function, lineno, colno }` with nothing to attribute it to.
- *
- * Anything thrown by our own bundle is attributable: every frame names a
- * `/_next/static/chunks/*.js` file (or the document, for the one inline Typekit loader).
- * So "the stack has frames, but not one of them names a source" is a reliable marker for
- * third-party injection, and dropping those keeps the crash signal actionable.
- *
- * Deliberately narrow: exceptions with *no* frames at all (e.g. a `SyntaxError` from an
- * old browser failing to parse our bundle — a real, if unfixable, signal) are kept.
- */
-type StackFrameLike = { filename?: string; source?: string; function?: string };
-type ExceptionLike = {
-  type?: string;
-  value?: string;
-  stacktrace?: { frames?: StackFrameLike[] } | null;
-};
-
-const hasNoAttributableSource = (ex: ExceptionLike | undefined): boolean => {
-  const frames = ex?.stacktrace?.frames ?? [];
-  if (frames.length === 0) return false;
-  return frames.every((f) => !(f?.filename || f?.source || "").trim());
-};
-
-/** True when every exception in the chain came from an unattributable (injected) script. */
-const isInjectedThirdPartyError = (exceptions: ExceptionLike[]): boolean =>
-  exceptions.length > 0 && exceptions.every(hasNoAttributableSource);
-
-/**
- * React streaming-SSR segment swap failing because the placeholder is gone.
- *
- * On routes with a `loading.tsx` React streams Suspense segments and injects tiny
- * inline scripts (`$RS` "replace segment", `$RC` "complete boundary") that look up
- * the placeholder node by id and call `parentNode.removeChild` on it. If something
- * has already rewritten the DOM mid-stream — a browser extension, Edge/Chrome
- * translate or reader mode, or the user navigating away — the lookup returns
- * null and the script throws `Cannot read properties of null (reading 'parentNode')`.
- * That code is React's, not ours, and the condition is outside our control
- * (react issue: "TypeError: Cannot read properties of null (reading 'parentNode') at $RS").
- *
- * Deliberately narrow: only an exception whose *top* frame is `$RS`/`$RC` and whose
- * message names `parentNode` is dropped. A real regression in our streaming markup
- * would still surface through other symptoms (hydration errors, blank segments).
- */
-const REACT_STREAM_SWAP_FN = /^\$R[SC]$/;
-const REACT_STREAM_SWAP_MSG = /reading 'parentNode'/;
-const isReactStreamSwapError = (exceptions: ExceptionLike[]): boolean =>
-  exceptions.some((ex) => {
-    if (!REACT_STREAM_SWAP_MSG.test(ex?.value ?? "")) return false;
-    const frames = ex?.stacktrace?.frames ?? [];
-    if (frames.length === 0) return false;
-    // Sentry lists frames outermost-first; PostHog innermost-first. Check both ends.
-    const first = frames[0]?.function ?? "";
-    const last = frames[frames.length - 1]?.function ?? "";
-    return REACT_STREAM_SWAP_FN.test(first) || REACT_STREAM_SWAP_FN.test(last);
-  });
-
 if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || posthogInDev)) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
@@ -117,28 +33,29 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
     // Duplicates Sentry on purpose: Sentry stays authoritative; PostHog just needs the signal
     // to tie crashes to sessions/users. Must also be enabled in PostHog UI → Error Tracking.
     capture_exceptions: true,
-    // Drop benign view-transition-skipped noise (see BENIGN_VIEW_TRANSITION_ERROR).
+    // Drop known non-actionable noise: benign view-transition aborts, injected
+    // third-party scripts, React streaming segment swaps and chunk-load failures the
+    // page is about to reload away from. Predicates live in src/lib/telemetry-filters.ts.
     before_send: (event) => {
       if (event?.event === "$exception") {
         const exceptions =
           (event.properties?.["$exception_list"] as ExceptionLike[] | undefined) ?? [];
         const topLevelMessage = String(event.properties?.["$exception_message"] ?? "");
-        const isBenign =
-          BENIGN_VIEW_TRANSITION_ERROR.test(topLevelMessage) ||
-          exceptions.some(
-            (ex) =>
-              BENIGN_VIEW_TRANSITION_ERROR.test(ex?.value ?? "") ||
-              BENIGN_VIEW_TRANSITION_ERROR.test(ex?.type ?? ""),
-          );
-        if (isBenign) return null;
-        // Injected in-app-browser / extension scripts (see isInjectedThirdPartyError).
-        if (isInjectedThirdPartyError(exceptions)) return null;
-        // React streaming segment-swap noise (see isReactStreamSwapError).
-        if (isReactStreamSwapError(exceptions)) return null;
+        if (
+          shouldDropException(exceptions, {
+            topLevelMessage,
+            chunkReloadSpent: hasSpentChunkReload(),
+          })
+        ) {
+          return null;
+        }
       }
       return event;
     },
   });
+  // If the previous page in this tab reloaded to recover from a missing chunk, record
+  // that the recovery landed (see src/lib/chunk-reload.ts).
+  recordChunkReloadOutcome((name) => posthog.capture(name));
 }
 
 /**
@@ -163,20 +80,14 @@ async function loadAndInitSentry() {
       enabled:
         !!dsn && (process.env.NODE_ENV === "production" || reportInDev),
 
-      // Benign view-transition-skipped noise (see BENIGN_VIEW_TRANSITION_ERROR).
-      // Same rationale as PostHog's before_send above: it only fires on hidden
-      // tabs, so it's non-actionable and shouldn't open a Sentry issue.
-      ignoreErrors: [BENIGN_VIEW_TRANSITION_ERROR],
-
-      // Same rationale as PostHog's before_send: a crash inside an injected in-app-browser
-      // or extension script is not our bug and cannot be acted on (see
-      // isInjectedThirdPartyError). Kept in sync so the two backends agree on what counts
-      // as a real crash.
+      // Same filter chain as PostHog's before_send above (see
+      // src/lib/telemetry-filters.ts), kept in sync so the two backends agree on
+      // what counts as a real crash.
       beforeSend: (event) => {
         const exceptions = (event.exception?.values ?? []) as ExceptionLike[];
-        if (isInjectedThirdPartyError(exceptions)) return null;
-        // React streaming segment-swap noise (see isReactStreamSwapError).
-        if (isReactStreamSwapError(exceptions)) return null;
+        if (shouldDropException(exceptions, { chunkReloadSpent: hasSpentChunkReload() })) {
+          return null;
+        }
         return event;
       },
 
