@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   Link as MuiLink,
   Stack,
   TextField,
@@ -16,6 +17,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
 import { PasswordField } from '@/components/auth/PasswordField';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
+import { safeAuthRedirectPath } from '@/lib/auth-redirect';
 import { syncPostHogUser, trackUserRegistered } from '@/lib/analytics';
 
 async function establishSessionAfterSignup(
@@ -48,8 +50,9 @@ async function establishSessionAfterSignup(
   return { ok: true };
 }
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -118,7 +121,9 @@ export default function RegisterPage() {
       email_verified: emailVerified,
     });
     router.refresh();
-    router.push('/bills');
+    // Content-surface prompts (e.g. the district map result) pass `next=` so the
+    // new member lands back on what they were doing; default stays /bills.
+    router.push(safeAuthRedirectPath(searchParams.get('next'), '/bills'));
   };
 
   return (
@@ -177,5 +182,21 @@ export default function RegisterPage() {
         </MuiLink>
       </Typography>
     </AuthPaperLayout>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthPaperLayout title="Create account" subtitle="Loading…">
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress aria-label="Loading" />
+          </Box>
+        </AuthPaperLayout>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }

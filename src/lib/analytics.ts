@@ -197,14 +197,36 @@ export const trackTopicFilterUsed = (
  * PII beyond that.
  */
 export const trackDistrictMapLookup = (props: {
-  zip: string;
+  /** 5-digit ZIP for ZIP lookups; null for address / map-click lookups (no PII). */
+  zip: string | null;
+  /** How the point was chosen. Pre-2026-09-16 rows are all ZIP lookups. */
+  lookupType: "zip" | "address" | "map_click";
   houseDistrict?: number | null;
   senateDistrict?: number | null;
 }): void => {
   capture("district_map_lookup", {
     zip: props.zip,
+    lookup_type: props.lookupType,
     house_district: props.houseDistrict ?? null,
     senate_district: props.senateDistrict ?? null,
+    matched: props.houseDistrict != null || props.senateDistrict != null,
+  });
+};
+
+/**
+ * Signed-out visitor clicked a Sign up / Log in prompt placed on a content
+ * surface (not the nav). `surface` names where; `auth_action` which button.
+ * Funnel: `district_map_lookup` → `signup_cta_clicked` → `user_registered`.
+ */
+export const trackSignupCtaClicked = (props: {
+  surface: "district_map_result" | "member_profile";
+  authAction: "register" | "login";
+  memberId?: string | null;
+}): void => {
+  capture("signup_cta_clicked", {
+    surface: props.surface,
+    auth_action: props.authAction,
+    member_id: props.memberId ?? null,
   });
 };
 

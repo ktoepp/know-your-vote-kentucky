@@ -36,12 +36,19 @@ export async function GET(request: NextRequest) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       return NextResponse.json({ error: 'Unexpected geocoding response.' }, { status: 502 });
     }
-    return NextResponse.json({
-      zip,
-      lat,
-      lng,
-      displayName: hit.display_name ?? null,
-    });
+    return NextResponse.json(
+      {
+        zip,
+        lat,
+        lng,
+        displayName: hit.display_name ?? null,
+      },
+      {
+        // ZIP centroids do not move; let the CDN answer repeat ZIPs without a
+        // Nominatim round trip (their policy caps us at 1 request/second).
+        headers: { 'Cache-Control': 'public, s-maxage=604800, stale-while-revalidate=2592000' },
+      },
+    );
   } catch {
     return NextResponse.json({ error: 'Geocoding request failed.' }, { status: 502 });
   }

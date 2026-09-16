@@ -24,8 +24,9 @@ export function LandingTopics() {
           mt: 2,
           // WCAG 2.5.5: topic chips here are the primary "Bills by topic"
           // affordance — 44px on touch, default on desktop.
+          alignItems: 'center',
           '& .MuiChip-clickable': {
-            height: { xs: 44, sm: 'auto' },
+            height: { xs: 44, sm: 36 },
           },
         }}
       >
