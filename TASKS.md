@@ -407,6 +407,35 @@ Filed while debugging a separate PostHog question. Recorded in parallel in the N
 
 - [x] **Suggested-search chips aren't a distinguishable PostHog action.** Shipped as Tier 1 Task 1 in [PR #268](https://github.com/ktoepp/know-your-vote-kentucky/pull/268): `search_performed` now carries `source: "typed" | "suggestion_chip" | "topic_chip" | null` (`src/lib/analytics.ts`). PostHog validation is tracked under that task.
 
+### Signup-funnel design critique, filed 2026-09-16 (recorded, not scoped)
+
+Code-level walkthrough of every signed-out surface, framed around one goal: move visitors toward a free account for bill-update email. Recorded in parallel in the Notion **Wishlist & Roadmap** page ("Product surface & UX — signup funnel, filed 2026-09-16"). **Baseline (PostHog, 2026-08-17 → 09-16, test accounts filtered):** 887 visitors → 4 registrations → 1 first follow. Registration is the choke point, not follow-after-signup. The live site was not rendered for this pass (no Supabase env in the sandbox), so anything visual should be re-checked on a preview deploy. One task per PR, in the order below.
+
+**Tier A — the funnel is not on the path most visitors walk (three small edits, highest-traffic paths)**
+
+- [ ] **Signup is invisible on phones.** `Navigation.tsx:321-333` hides both `Log in` and `Sign up` below `sm`; a phone visitor has to open the hamburger to learn accounts exist. Keep one `Sign up` button visible at `xs`, move `Log in` into the menu.
+- [ ] **Bill page sends new visitors to the wrong door.** Signed-out label is `Log in to follow` (`src/lib/follow-labels.ts:8`) and links to `/auth/login`. A first-time visitor has no account to log in to. Change the signed-out state to `Follow` → `/auth/register?next=/bills/{id}`, with one caption line under it: "Free account. Email when this bill moves."
+- [ ] **Home "Get notified" card links to login.** `LANDING_FEATURE_CARDS[2].href` in `src/components/home/landing-data.ts` is `/auth/login`. Point it at `/auth/register`.
+
+**Tier B — put the prompt where the intent is**
+
+- [ ] **`SignupCta` only exists on two surfaces.** `src/components/civic/SignupCta.tsx` renders on the district-map result and member profile. Absent from `/bills/[id]`, `/bills`, `/bills/topics/*`, and `/search`, which carry most organic traffic. Add it to the bill-detail sidebar and the browse end-of-list / empty state; extend the `surface` union in `SignupCtaProps` and `trackSignupCtaClicked` so the funnel tile can split by surface.
+- [ ] **Home page never asks for a signup.** Hero CTAs are `Find my legislators` / `Browse bills`; alerts are first mentioned on the third feature card. Add a compact signup band after the "Recent legislative action" carousel in `HomePageContent.tsx`: reference-voice heading, one `Sign up` button. No email-capture form (there is no email-only signup path).
+
+**Tier C — post-signup follow-through**
+
+- [ ] **Register lands on `/bills` with no instruction.** `src/app/auth/register/page.tsx` defaults `next` to `/bills`; nothing tells the new member to press Follow. Show a one-time banner ("You are signed up. Select Follow on any bill to get email updates.") and propagate `next=` from every entry point so they land on the bill they were reading.
+- [ ] **Display name is required and first.** Only the welcome-email greeting uses it. Make it optional and last, or drop it.
+- [ ] **Verify page copy says "signing in".** `src/app/auth/verify/page.tsx:81,96`. Voice guide mandates "log in".
+
+**Tier D — consistency and polish**
+
+- [ ] **Two search-button patterns on the home page.** `LandingMapSection` renders a full-width `Search` button plus an icon button inside the same field; `HomeSearchSection` hides one per breakpoint. Pick one and share it.
+- [ ] **Footer "Account" column** is two auth links. Replace with a single `Sign up for bill alerts` link or fold into Explore.
+- [ ] **`SignupCta` hardcodes `#EFF6FF`** background; will not theme. Use a token from `theme.ts`.
+- [ ] **Feature-card body "House + Senate rep"** uses an abbreviation already removed from the meta description (voice guide). Use "representatives".
+- [ ] **Landing topics end with two navigation chips** (`All topics →`, `Browse bills →`) styled identically to topic chips. Make them text links so the chip row reads as one set.
+
 ### Owner wishlist, filed 2026-08-31 (recorded, not scoped)
 
 Feedback from SFG: the site should present as **kyvky.org**, not **kyvky.com**, to build trust in the platform as a nonpartisan civic org rather than a commercial-looking `.com`. Katie confirms the org already owns `kyvky.org` and its spelled-out variants (`knowyourvotekentucky.org` etc. — same family as the existing `knowyourvotekentucky.org` alternate already tracked above under "Open near-term items", which currently just forwards to `.com`).
