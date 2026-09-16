@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import MapGL, { Layer, Marker, NavigationControl, Popup, Source, type MapRef } from 'react-map-gl/mapbox';
-import mapboxgl, { type MapMouseEvent } from 'mapbox-gl';
+import dynamic from 'next/dynamic';
+import type { MapRef } from 'react-map-gl/mapbox';
+import type { MapMouseEvent } from 'mapbox-gl';
 import bbox from '@turf/bbox';
 import {
   Accordion,
@@ -26,7 +27,6 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import NextLink from 'next/link';
 import { Search as SearchIcon } from '@mui/icons-material';
-import { MapPin } from 'lucide-react';
 import type { Feature, FeatureCollection } from 'geojson';
 import type { KYLegislator } from '@/types/kentucky';
 import { useKyMembersBrowseRoster } from '@/lib/use-ky-members-browse-roster';
@@ -40,45 +40,46 @@ import { MemberCard } from '@/components/members/MemberCard';
 import { CHAMBER_TOGGLE_GROUP_SX } from '@/components/civic/GaChamberFilterBar';
 import { memberProfilePath } from '@/lib/ky-member-utils';
 import type { DistrictMapTooltipModel } from '@/components/members/DistrictMapMemberTooltip';
+import { SignupCta } from '@/components/civic/SignupCta';
 import {
-  DISTRICT_LABEL,
-  HOUSE_FILL,
-  HOUSE_HOVER_OVERLAY,
-  HOUSE_OUTLINE,
-  HOUSE_SELECTED_FILL,
-  MAP_MARKER_PIN,
-  OUTSIDE_KY_MASK_FILL,
-  SENATE_FILL,
-  SENATE_HOVER_OVERLAY,
-  SENATE_OUTLINE,
-  SENATE_SELECTED_FILL,
-} from '@/components/members/district-map-tokens';
-import { KY_DISTRICT_MAPBOX_STYLE } from '@/lib/ky-district-mapbox-style';
-import { mapboxGeocodeAddress, mapboxGeocodeSuggest, type MapboxGeocodeSuggestion } from '@/lib/mapbox-geocode';
+  HOUSE_GEOJSON_URL,
+  SENATE_GEOJSON_URL,
+  SL_SOURCE_HOUSE,
+  SL_SOURCE_SENATE,
+} from '@/components/members/district-map-sources';
+import {
+  mapboxGeocodeAddress,
+  mapboxGeocodeSuggest,
+  mapboxGeocodeZip,
+  type MapboxGeocodeSuggestion,
+} from '@/lib/mapbox-geocode';
 import { trackDistrictMapLookup } from '@/lib/analytics';
 
-import 'mapbox-gl/dist/mapbox-gl.css';
-
-const SL_SOURCE_HOUSE = 'ky-sldl';
-const SL_SOURCE_SENATE = 'ky-sldu';
-
-/** Served from `public/geo/`; same paths are fetched below for point-in-polygon lookups. */
-const HOUSE_GEOJSON_URL = '/geo/ky-sldl.geojson';
-const SENATE_GEOJSON_URL = '/geo/ky-sldu.geojson';
-/** World-with-hole polygon from Census state outline + @turf/mask (see scripts/build-ky-outside-mask.ts). */
-const OUTSIDE_KY_MASK_URL = '/geo/ky-outside-mask.geojson';
-
-const SL_MASK = 'ky-outside-mask';
-
-/** House/Senate colors, mask, marker pin — edit `district-map-tokens.ts`. */
-
-/** Panning limits (Kentucky + small margin). */
-const KY_MAX_BOUNDS: [[number, number], [number, number]] = [
-  [-89.9, 36.4],
-  [-81.45, 39.35],
-];
+/**
+ * Mapbox GL (~450KB gz) is the heaviest thing on this page and the lookup does
+ * not need it: boundaries + roster + point-in-polygon run here. The canvas is
+ * its own chunk so the form is usable and a ZIP/address resolves while the map
+ * is still downloading. House/Senate colors, mask, marker pin — edit
+ * `district-map-tokens.ts`.
+ */
+const DistrictMapCanvas = dynamic(() => import('@/components/members/DistrictMapCanvas'), {
+  ssr: false,
+  loading: () => null,
+});
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '';
+
+type LookupType = 'zip' | 'address' | 'map_click';
+
+/**
+ * `next=` target for the signup prompt: re-runs the same lookup after signup /
+ * login (`?address=` for typed queries, `?lat=&lng=` for map clicks).
+ */
+function lookupReturnPath(query: string | null, marker: { lng: number; lat: number } | null): string {
+  if (query) return `/members/map?address=${encodeURIComponent(query)}`;
+  if (marker) return `/members/map?lat=${marker.lat.toFixed(5)}&lng=${marker.lng.toFixed(5)}`;
+  return '/members/map';
+}
 
 function districtSummaryLine(chamber: 'house' | 'senate', nameFromCensus: string | null): string {
   if (!nameFromCensus) return chamber === 'house' ? 'State House district' : 'State Senate district';
@@ -223,6 +224,12 @@ export default function DistrictMapExplorer() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [resolvedLabel, setResolvedLabel] = useState<string | null>(null);
+  /** Query behind the current marker (ZIP or address); null for map clicks. */
+  const [lastQuery, setLastQuery] = useState<string | null>(null);
+  /** Camera move requested before the map chunk mounted; applied in `onMapLoad`. */
+  const pendingCameraRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  const mapLoadedRef = useRef(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   const [hoverPopup, setHoverPopup] = useState<{
     lng: number;
@@ -323,22 +330,36 @@ export default function DistrictMapExplorer() {
     }
   }, [houseFc]);
 
-  useEffect(() => {
-    if (!houseFc || geoLoading) return;
-    const t = window.setTimeout(fitToKy, 100);
-    return () => window.clearTimeout(t);
-  }, [houseFc, geoLoading, fitToKy]);
-
   const resolvePoint = useCallback(
-    (lng: number, lat: number) => {
+    (lng: number, lat: number, lookup: { type: LookupType; zip?: string | null }) => {
       if (!houseFc || !senateFc) return;
       const hf = findDistrictFeatureAtPoint(houseFc, lng, lat);
       const sf = findDistrictFeatureAtPoint(senateFc, lng, lat);
-      setSelectedHouseName(districtNameFromCensusFeature(hf));
-      setSelectedSenateName(districtNameFromCensusFeature(sf));
+      const hName = districtNameFromCensusFeature(hf);
+      const sName = districtNameFromCensusFeature(sf);
+      setSelectedHouseName(hName);
+      setSelectedSenateName(sName);
+      const hNum = parseKyDistrictNumber(hName);
+      const sNum = parseKyDistrictNumber(sName);
+      trackDistrictMapLookup({
+        zip: lookup.zip ?? null,
+        lookupType: lookup.type,
+        houseDistrict: hNum ? Number(hNum) : null,
+        senateDistrict: sNum ? Number(sNum) : null,
+      });
     },
     [houseFc, senateFc],
   );
+
+  /** Moves the camera now, or on map load if the canvas chunk is still arriving. */
+  const flyTo = useCallback((center: [number, number], zoom: number) => {
+    const map = mapRef.current?.getMap();
+    if (map && mapLoadedRef.current) {
+      map.easeTo({ center, zoom, duration: 900 });
+    } else {
+      pendingCameraRef.current = { center, zoom };
+    }
+  }, []);
 
   const onMapClick = useCallback(
     (e: MapMouseEvent) => {
@@ -346,7 +367,8 @@ export default function DistrictMapExplorer() {
       if (!lngLat) return;
       setResolvedLabel(null);
       setSearchError(null);
-      resolvePoint(lngLat.lng, lngLat.lat);
+      setLastQuery(null);
+      resolvePoint(lngLat.lng, lngLat.lat, { type: 'map_click' });
       setMarker({ lng: lngLat.lng, lat: lngLat.lat });
     },
     [resolvePoint],
@@ -360,17 +382,26 @@ export default function DistrictMapExplorer() {
     setSearchLoading(true);
     try {
       if (isZip) {
-        const res = await fetch(`/api/geo/zip?zip=${encodeURIComponent(q)}`);
-        const data = (await res.json()) as { error?: string; lat?: number; lng?: number };
-        if (!res.ok || data.lat == null || data.lng == null) {
-          setSearchError(data.error || 'ZIP code not found.');
-          return;
+        // Mapbox postcode geocoding is a direct browser call with no per-second
+        // cap; the Nominatim-backed route is the fallback (no token, or a ZIP
+        // outside the Kentucky bbox the Mapbox call is biased to).
+        let pt: { lat: number; lng: number } | null = MAPBOX_TOKEN
+          ? await mapboxGeocodeZip(q, MAPBOX_TOKEN).catch(() => null)
+          : null;
+        if (!pt) {
+          const res = await fetch(`/api/geo/zip?zip=${encodeURIComponent(q)}`);
+          const data = (await res.json()) as { error?: string; lat?: number; lng?: number };
+          if (!res.ok || data.lat == null || data.lng == null) {
+            setSearchError(data.error || 'ZIP code not found.');
+            return;
+          }
+          pt = { lat: data.lat, lng: data.lng };
         }
         setResolvedLabel(`ZIP ${q}`);
-        setMarker({ lng: data.lng, lat: data.lat });
-        resolvePoint(data.lng, data.lat);
-        trackDistrictMapLookup({ zip: q });
-        mapRef.current?.getMap()?.easeTo({ center: [data.lng, data.lat], zoom: 10.5, duration: 900 });
+        setLastQuery(q);
+        setMarker({ lng: pt.lng, lat: pt.lat });
+        resolvePoint(pt.lng, pt.lat, { type: 'zip', zip: q });
+        flyTo([pt.lng, pt.lat], 10.5);
       } else {
         if (!MAPBOX_TOKEN) {
           setSearchError('Address search requires a Mapbox token.');
@@ -382,16 +413,17 @@ export default function DistrictMapExplorer() {
           return;
         }
         setResolvedLabel(g.placeName);
+        setLastQuery(q);
         setMarker({ lng: g.lng, lat: g.lat });
-        resolvePoint(g.lng, g.lat);
-        mapRef.current?.getMap()?.easeTo({ center: [g.lng, g.lat], zoom: 11, duration: 900 });
+        resolvePoint(g.lng, g.lat, { type: 'address' });
+        flyTo([g.lng, g.lat], 11);
       }
     } catch {
       setSearchError('Search failed. Try again.');
     } finally {
       setSearchLoading(false);
     }
-  }, [searchInput, resolvePoint]);
+  }, [searchInput, resolvePoint, flyTo]);
 
   const clearHoverFeatureState = useCallback(() => {
     const map = mapRef.current?.getMap();
@@ -527,7 +559,28 @@ export default function DistrictMapExplorer() {
   );
 
   const busy = legLoading || geoLoading;
-  const mapReady = Boolean(houseFc && senateFc && !geoError && MAPBOX_TOKEN);
+  /** Boundaries loaded: ZIP/address lookups and click-throughs work from here. */
+  const dataReady = Boolean(houseFc && senateFc && !geoError);
+  /** Canvas can mount (token present). Tiles may still be loading. */
+  const mapReady = dataReady && Boolean(MAPBOX_TOKEN);
+  /** Address search / suggestions need the geocoder; ZIPs also work without it. */
+  const searchEnabled = dataReady && !searchLoading;
+
+  const onMapLoad = useCallback(() => {
+    mapLoadedRef.current = true;
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    requestAnimationFrame(() => map.resize());
+    setMapLoaded(true);
+    const pending = pendingCameraRef.current;
+    if (pending) {
+      pendingCameraRef.current = null;
+      map.easeTo({ center: pending.center, zoom: pending.zoom, duration: 600 });
+    } else if (!searchParams.get('district')) {
+      // A ?chamber=&district= preselect fits its own district below.
+      fitToKy();
+    }
+  }, [fitToKy, searchParams]);
 
   useEffect(() => {
     if (!MAPBOX_TOKEN || searchInput.trim().length < 3) {
@@ -543,14 +596,26 @@ export default function DistrictMapExplorer() {
     return () => window.clearTimeout(handle);
   }, [searchInput]);
 
-  // Auto-search from ?address= URL param (e.g. from the landing page search)
+  // Auto-search from ?address= (landing page search, signup return trip) or
+  // restore a map-click lookup from ?lat=&lng= (signup return trip). Needs only
+  // the boundary data, not the map chunk.
   useEffect(() => {
+    if (!dataReady) return;
     const addr = searchParams.get('address');
-    if (!addr || !mapReady) return;
-    setSearchInput(addr);
-    void onSearch(addr);
+    if (addr) {
+      setSearchInput(addr);
+      void onSearch(addr);
+      return;
+    }
+    const lat = Number(searchParams.get('lat'));
+    const lng = Number(searchParams.get('lng'));
+    if (Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0) {
+      setMarker({ lng, lat });
+      resolvePoint(lng, lat, { type: 'map_click' });
+      flyTo([lng, lat], 10.5);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady]);
+  }, [dataReady]);
 
   // Preselect from ?chamber=&district= (member-profile locator map click-through).
   // Selection only needs the boundary data — it must work even when map tiles can't
@@ -569,7 +634,7 @@ export default function DistrictMapExplorer() {
   }, [houseFc, senateFc]);
 
   useEffect(() => {
-    if (!mapReady || !houseFc || !senateFc) return;
+    if (!mapLoaded || !houseFc || !senateFc) return;
     const chamberParam = searchParams.get('chamber');
     const districtNum = parseKyDistrictNumber(searchParams.get('district'));
     if ((chamberParam !== 'house' && chamberParam !== 'senate') || !districtNum) return;
@@ -590,7 +655,7 @@ export default function DistrictMapExplorer() {
       /* ignore */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, houseFc, senateFc]);
+  }, [mapLoaded, houseFc, senateFc]);
 
   return (
     <Stack spacing={2}>
@@ -622,7 +687,7 @@ export default function DistrictMapExplorer() {
             }
           }}
           loading={suggestLoading}
-          disabled={searchLoading || !mapReady}
+          disabled={!searchEnabled}
           sx={{ flex: '1 1 260px', maxWidth: 480 }}
           renderInput={(params) => (
             <TextField
@@ -652,7 +717,7 @@ export default function DistrictMapExplorer() {
         <Button
           type="submit"
           variant="contained"
-          disabled={searchLoading || !mapReady || !searchInput.trim()}
+          disabled={!searchEnabled || !searchInput.trim()}
           sx={{ flexShrink: 0, minWidth: 100 }}
         >
           {searchLoading ? <CircularProgress size={18} color="inherit" /> : 'Search'}
@@ -662,7 +727,7 @@ export default function DistrictMapExplorer() {
           value={visibleChamber}
           onChange={(_e, v: 'house' | 'senate' | null) => { if (v != null) setVisibleChamber(v); }}
           size="small"
-          disabled={!mapReady}
+          disabled={!dataReady}
           aria-label="District layer"
           sx={{ flexShrink: 0, ...CHAMBER_TOGGLE_GROUP_SX }}
         >
@@ -764,209 +829,20 @@ export default function DistrictMapExplorer() {
                 setHoveredSenateLeg(null);
               }}
             >
-            <MapGL
+            <DistrictMapCanvas
               ref={mapRef}
-              mapLib={mapboxgl}
-              mapboxAccessToken={MAPBOX_TOKEN}
-              projection="mercator"
-              maxBounds={KY_MAX_BOUNDS}
-              initialViewState={{
-                longitude: -84.87,
-                latitude: 37.35,
-                zoom: 6,
-              }}
-              style={{ width: '100%', height: '100%' }}
-              mapStyle={KY_DISTRICT_MAPBOX_STYLE}
-              onLoad={() => {
-                requestAnimationFrame(() => mapRef.current?.getMap()?.resize());
-              }}
+              mapboxToken={MAPBOX_TOKEN}
+              showHouseLayer={showHouseLayer}
+              showSenateLayer={showSenateLayer}
+              selectedHouseName={selectedHouseName}
+              selectedSenateName={selectedSenateName}
+              marker={marker}
+              hoverPopup={hoverPopup}
+              renderHoverChip={(model) => <DistrictMapHoverChip model={model} />}
+              onLoad={onMapLoad}
               onClick={onMapClick}
               onMouseMove={onMouseMove}
-              interactiveLayerIds={[
-                ...(showHouseLayer ? [`${SL_SOURCE_HOUSE}-fill`] : []),
-                ...(showSenateLayer ? [`${SL_SOURCE_SENATE}-fill`] : []),
-              ]}
-            >
-              <NavigationControl position="top-right" showCompass={false} />
-              <Source id={SL_MASK} type="geojson" data={OUTSIDE_KY_MASK_URL}>
-                <Layer
-                  id={`${SL_MASK}-fill`}
-                  type="fill"
-                  paint={{
-                    'fill-color': OUTSIDE_KY_MASK_FILL,
-                    'fill-opacity': 1,
-                  }}
-                />
-              </Source>
-              <Source id={SL_SOURCE_HOUSE} type="geojson" data={HOUSE_GEOJSON_URL} promoteId="GEOID">
-                <Layer
-                  id={`${SL_SOURCE_HOUSE}-fill`}
-                  type="fill"
-                  paint={{
-                    'fill-color': [
-                      'case',
-                      ['==', ['to-string', ['get', 'NAME']], selectedHouseName ?? '__none__'],
-                      HOUSE_SELECTED_FILL,
-                      ['boolean', ['feature-state', 'hover'], false],
-                      HOUSE_HOVER_OVERLAY,
-                      HOUSE_FILL,
-                    ],
-                    'fill-opacity': 1,
-                    'fill-color-transition': { duration: 120, delay: 0 },
-                  } as mapboxgl.FillPaint}
-                  layout={{ visibility: showHouseLayer ? 'visible' : 'none' }}
-                />
-                <Layer
-                  id={`${SL_SOURCE_HOUSE}-outline`}
-                  type="line"
-                  paint={{
-                    'line-color': HOUSE_OUTLINE,
-                    'line-width': [
-                      'case',
-                      ['==', ['to-string', ['get', 'NAME']], selectedHouseName ?? ''],
-                      2.5,
-                      1,
-                    ],
-                    'line-opacity': [
-                      'case',
-                      ['==', ['to-string', ['get', 'NAME']], selectedHouseName ?? ''],
-                      1,
-                      0.55,
-                    ],
-                  }}
-                  layout={{ visibility: showHouseLayer ? 'visible' : 'none' }}
-                />
-                <Layer
-                  id={`${SL_SOURCE_HOUSE}-labels`}
-                  type="symbol"
-                  layout={{
-                    visibility: showHouseLayer ? 'visible' : 'none',
-                    'text-field': ['concat', 'H-', ['to-string', ['get', 'NAME']]],
-                    'text-font': DISTRICT_LABEL.font,
-                    'text-size': [
-                      'interpolate',
-                      ['linear'],
-                      ['zoom'],
-                      5,
-                      8,
-                      7.5,
-                      10,
-                      9,
-                      11,
-                      12,
-                      13,
-                    ],
-                    'text-allow-overlap': true,
-                    'text-ignore-placement': true,
-                    'text-anchor': 'center',
-                    'text-padding': 4,
-                  }}
-                  paint={{
-                    'text-color': DISTRICT_LABEL.textColor,
-                    'text-halo-color': DISTRICT_LABEL.haloColor,
-                    'text-halo-width': DISTRICT_LABEL.haloWidth,
-                    'text-halo-blur': DISTRICT_LABEL.haloBlur,
-                  }}
-                />
-              </Source>
-              <Source id={SL_SOURCE_SENATE} type="geojson" data={SENATE_GEOJSON_URL} promoteId="GEOID">
-                <Layer
-                  id={`${SL_SOURCE_SENATE}-fill`}
-                  type="fill"
-                  paint={{
-                    'fill-color': [
-                      'case',
-                      ['==', ['to-string', ['get', 'NAME']], selectedSenateName ?? '__none__'],
-                      SENATE_SELECTED_FILL,
-                      ['boolean', ['feature-state', 'hover'], false],
-                      SENATE_HOVER_OVERLAY,
-                      SENATE_FILL,
-                    ],
-                    'fill-opacity': 1,
-                    'fill-color-transition': { duration: 120, delay: 0 },
-                  } as mapboxgl.FillPaint}
-                  layout={{ visibility: showSenateLayer ? 'visible' : 'none' }}
-                />
-                <Layer
-                  id={`${SL_SOURCE_SENATE}-outline`}
-                  type="line"
-                  paint={{
-                    'line-color': SENATE_OUTLINE,
-                    'line-width': [
-                      'case',
-                      ['==', ['to-string', ['get', 'NAME']], selectedSenateName ?? ''],
-                      2.5,
-                      1,
-                    ],
-                    'line-opacity': [
-                      'case',
-                      ['==', ['to-string', ['get', 'NAME']], selectedSenateName ?? ''],
-                      1,
-                      0.55,
-                    ],
-                  }}
-                  layout={{ visibility: showSenateLayer ? 'visible' : 'none' }}
-                />
-                <Layer
-                  id={`${SL_SOURCE_SENATE}-labels`}
-                  type="symbol"
-                  layout={{
-                    visibility: showSenateLayer ? 'visible' : 'none',
-                    'text-field': ['concat', 'S-', ['to-string', ['get', 'NAME']]],
-                    'text-font': DISTRICT_LABEL.font,
-                    'text-size': [
-                      'interpolate',
-                      ['linear'],
-                      ['zoom'],
-                      5,
-                      8,
-                      7.5,
-                      10,
-                      9,
-                      11,
-                      12,
-                      13,
-                    ],
-                    'text-allow-overlap': true,
-                    'text-ignore-placement': true,
-                    'text-anchor': 'center',
-                    'text-padding': 4,
-                  }}
-                  paint={{
-                    'text-color': DISTRICT_LABEL.textColor,
-                    'text-halo-color': DISTRICT_LABEL.haloColor,
-                    'text-halo-width': DISTRICT_LABEL.haloWidth,
-                    'text-halo-blur': DISTRICT_LABEL.haloBlur,
-                  }}
-                />
-              </Source>
-              {marker && (
-                <Marker longitude={marker.lng} latitude={marker.lat} anchor="bottom">
-                  <MapPin
-                    size={MAP_MARKER_PIN.size}
-                    strokeWidth={MAP_MARKER_PIN.strokeWidth}
-                    color={MAP_MARKER_PIN.color}
-                    fill={MAP_MARKER_PIN.fill}
-                    aria-hidden
-                    focusable={false}
-                  />
-                </Marker>
-              )}
-              {hoverPopup && (
-                <Popup
-                  className="district-map-hover-popup"
-                  longitude={hoverPopup.lng}
-                  latitude={hoverPopup.lat}
-                  closeButton={false}
-                  closeOnClick={false}
-                  anchor="bottom"
-                  offset={[0, -10]}
-                  maxWidth="none"
-                >
-                  <DistrictMapHoverChip model={hoverPopup.model} />
-                </Popup>
-              )}
-            </MapGL>
+            />
             </Box>
           )}
           <Typography
@@ -1056,6 +932,15 @@ export default function DistrictMapExplorer() {
                 </Box>
               )}
             </>
+          )}
+
+          {marker && (selectedHouseName || selectedSenateName) && (
+            <SignupCta
+              surface="district_map_result"
+              next={lookupReturnPath(lastQuery, marker)}
+              title="Keep up with your legislators"
+              body="With a free account you can follow the bills they sponsor and the committees they serve on, and get an email digest when something changes."
+            />
           )}
 
           <Accordion elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, '&:before': { display: 'none' } }}>

@@ -161,6 +161,20 @@ const nextConfig: NextConfig = {
         source: '/((?!api/sync).*)',
         headers: securityHeaders,
       },
+      {
+        /**
+         * District boundaries (672KB across the two chambers) change only when
+         * `npm run geo:ky-districts` is re-run, which decisions.md § 2026-07-03
+         * gates on a point-in-polygon parity check. Vercel's static default
+         * (`max-age=0, must-revalidate`) costs a 304 round trip per file per
+         * visit; a day-long browser cache makes the return visit's lookup
+         * instant. Bump the URL if the files are ever regenerated mid-day.
+         */
+        source: '/geo/:path*.geojson',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' },
+        ],
+      },
     ];
   },
 };

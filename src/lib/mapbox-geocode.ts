@@ -66,3 +66,33 @@ export async function mapboxGeocodeSuggest(
       placeName: f.place_name || q,
     }));
 }
+
+/**
+ * ZIP → postal-area centroid via Mapbox (browser). Same token as the map, no
+ * server hop, no Nominatim per-second cap. Biased to Kentucky; returns null for
+ * ZIPs Mapbox does not place inside the bbox so callers can fall back.
+ */
+export async function mapboxGeocodeZip(
+  zip: string,
+  accessToken: string,
+  options?: { bbox?: [number, number, number, number] },
+): Promise<{ lng: number; lat: number } | null> {
+  const z = zip.trim();
+  if (!/^\d{5}$/.test(z) || !accessToken) return null;
+  const bbox = options?.bbox ?? [-89.9, 36.4, -81.45, 39.35];
+  const u = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(z)}.json`);
+  u.searchParams.set('access_token', accessToken);
+  u.searchParams.set('limit', '1');
+  u.searchParams.set('country', 'us');
+  u.searchParams.set('bbox', bbox.join(','));
+  u.searchParams.set('types', 'postcode');
+  const r = await fetch(u.toString());
+  if (!r.ok) return null;
+  const data = (await r.json()) as {
+    features?: { center: [number, number]; text?: string }[];
+  };
+  const f = data.features?.[0];
+  // Guard against a fuzzy match on a different postcode.
+  if (!f?.center || (f.text && f.text !== z)) return null;
+  return { lng: f.center[0], lat: f.center[1] };
+}

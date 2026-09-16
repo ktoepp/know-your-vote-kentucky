@@ -28,6 +28,8 @@ import { OfficialSourceLinks } from '@/components/civic/OfficialSourceLinks';
 import type { KYLegislator } from '@/types/kentucky';
 import { MemberCard } from '@/components/members/MemberCard';
 import { MemberSponsoredBills } from '@/components/members/MemberSponsoredBills';
+import { SignupCta } from '@/components/civic/SignupCta';
+import { legislatorRoleTitle } from '@/lib/legislator-display';
 import { LegislatorDistrictThumbnail } from '@/components/members/LegislatorDistrictThumbnail';
 import { KentuckyDistrictLocatorMap } from '@/components/members/KentuckyDistrictLocatorMap';
 import {
@@ -438,6 +440,14 @@ export function MemberProfileView({
                 Sponsored bills
               </Typography>
             </Box>
+            <SignupCta
+              surface="member_profile"
+              next={pathname}
+              memberId={leg.id}
+              title={`Follow what ${legislatorRoleTitle(leg)} ${leg.last_name ?? leg.name} sponsors`}
+              body="With a free account you can follow any of these bills and get an email digest when they move. Committee follows work the same way."
+              sx={{ mb: 2 }}
+            />
             {sponsoredBills.length === 0 ? (
               <>
                 {/* Keep the session control reachable when the selected session has no sponsored bills. */}
