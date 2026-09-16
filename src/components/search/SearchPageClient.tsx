@@ -614,6 +614,10 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 </Typography>
                 <GaChamberFilterBar value={chamberSelect} onChange={(v) => setFilterParam('chamber', v)} />
               </Box>
+              {/* Every select carries a non-empty sentinel ('all') for its unset choice so MUI
+                  renders all four as filled fields with a floated label. An empty-string value
+                  parks the label inside the field as a placeholder, misaligned with its siblings.
+                  setFilterParam maps 'all' back to "delete the param". */}
               <FormControl size="small" sx={{ minWidth: 160 }}>
                 <InputLabel id="search-filter-status-label">Status</InputLabel>
                 <Select
@@ -636,10 +640,10 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 <Select
                   labelId="search-filter-date-range-label"
                   label="Date range"
-                  value={dateRangeSelect}
+                  value={dateRangeSelect || 'all'}
                   onChange={(e) => setFilterParam('dateRange', e.target.value as string)}
                 >
-                  <MenuItem value="">Any time</MenuItem>
+                  <MenuItem value="all">Any time</MenuItem>
                   <MenuItem value="today">Today</MenuItem>
                   <MenuItem value="week">This week</MenuItem>
                   <MenuItem value="month">This month</MenuItem>
@@ -669,11 +673,11 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                 <Select
                   labelId="search-filter-committee-label"
                   label="Committee"
-                  value={committeeSelect}
+                  value={committeeSelect || 'all'}
                   onChange={(e) => setFilterParam('committee', e.target.value as string)}
                   MenuProps={{ PaperProps: { sx: { maxHeight: 420 } } }}
                 >
-                  <MenuItem value="">All committees</MenuItem>
+                  <MenuItem value="all">All committees</MenuItem>
                   {(() => {
                     const items: React.ReactNode[] = [];
                     let lastChamber: string | undefined;
