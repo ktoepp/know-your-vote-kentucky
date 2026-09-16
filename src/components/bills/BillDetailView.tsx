@@ -12,6 +12,7 @@ import {
   Divider as MuiDivider,
   Button as MuiButton,
   Grid as MuiGrid,
+  IconButton,
   Link as MuiLink,
   Tooltip as MuiTooltip,
   ToggleButton,
@@ -314,9 +315,9 @@ function VoteTallyBar({ yea, nay, nv, absent }: { yea: number; nay: number; nv: 
 }
 
 /**
- * A roll call rendered inline in the legislative-history timeline: tally bar,
- * the existing count chips (keeping their civic tooltips), and a quiet LegiScan
- * source link. `showOutcome` adds a Passed/Failed chip for synthesized rows whose
+ * A roll call rendered inline in the legislative-history timeline: tally bar
+ * with an icon-only LegiScan source link at its end, then the existing count
+ * chips (keeping their civic tooltips). `showOutcome` adds a Passed/Failed chip for synthesized rows whose
  * action text doesn't already state the result; it renders only when `passed`
  * is present in the data — never computed from a threshold.
  */
@@ -348,7 +349,37 @@ function InlineRollCall({
         gap: 1,
       }}
     >
-      <VoteTallyBar yea={vote.yea ?? 0} nay={vote.nay ?? 0} nv={vote.nv ?? 0} absent={vote.absent ?? 0} />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <VoteTallyBar yea={vote.yea ?? 0} nay={vote.nay ?? 0} nv={vote.nv ?? 0} absent={vote.absent ?? 0} />
+        </Box>
+        {legiscanVoteUrl && (
+          // Icon-only source link parked at the end of the tally bar. The 44px hit
+          // area overhangs the 11px bar via negative margins so the row stays compact;
+          // the aria-label carries the meaning on touch, where tooltips never fire.
+          <MuiTooltip title="View this roll call on LegiScan (opens in a new tab)" arrow enterDelay={200}>
+            <IconButton
+              component="a"
+              href={legiscanVoteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="LegiScan roll call (opens in a new tab)"
+              size="small"
+              sx={{
+                width: 44,
+                height: 44,
+                my: -2,
+                mr: -1.5,
+                flexShrink: 0,
+                color: 'text.secondary',
+                '&:hover': { color: 'primary.main' },
+              }}
+            >
+              <OpenInNew sx={EXTERNAL_LINK_ICON_SX} aria-hidden />
+            </IconButton>
+          </MuiTooltip>
+        )}
+      </Box>
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
         {showOutcome && vote.passed != null && (
           <MuiChip
@@ -363,27 +394,6 @@ function InlineRollCall({
         {(vote.nv ?? 0) > 0 && <VoteCountChip bucket="nv" count={vote.nv ?? 0} />}
         {(vote.absent ?? 0) > 0 && <VoteCountChip bucket="absent" count={vote.absent ?? 0} />}
       </Box>
-      {legiscanVoteUrl && (
-        <MuiLink
-          href={legiscanVoteUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="LegiScan roll call (opens in a new tab)"
-          sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 0.5,
-            fontSize: '0.8125rem',
-            fontWeight: 600,
-            color: 'text.secondary',
-            textDecoration: 'none',
-            '&:hover': { color: 'primary.main', textDecoration: 'underline' },
-          }}
-        >
-          LegiScan roll call
-          <OpenInNew sx={EXTERNAL_LINK_ICON_SX} aria-hidden />
-        </MuiLink>
-      )}
     </Box>
   );
 }
@@ -517,7 +527,7 @@ function SponsorCard({
  * and versions can't be interleaved into the dated HistoryTimeline. Deduped by stage
  * (newest document per stage wins). "Most current" follows the newest document
  * regardless of sort order; the default is newest-first because this list's job is
- * "get me the current text" (unlike the timeline, which tells the story oldest-first).
+ * "get me the current text" (the timeline defaults newest-first too; oldest-first is opt-in).
  */
 function BillTextVersionsList({ texts }: { texts: LegiScanText[] }) {
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('newest');
@@ -631,7 +641,9 @@ function HistoryTimeline({
 }) {
   const theme = useTheme();
   const { tooltipsEnabled } = useTooltips();
-  const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest');
+  // Newest-first is the owner-set default on every order toggle (2026-08-22 wishlist);
+  // the oldest-first narrative read stays one click away.
+  const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('newest');
   const [expanded, setExpanded] = useState(false);
   const collapseAt = 8;
 
