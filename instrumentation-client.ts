@@ -57,7 +57,7 @@ const BENIGN_VIEW_TRANSITION_ERROR =
  * Deliberately narrow: exceptions with *no* frames at all (e.g. a `SyntaxError` from an
  * old browser failing to parse our bundle — a real, if unfixable, signal) are kept.
  */
-type StackFrameLike = { filename?: string; source?: string };
+type StackFrameLike = { filename?: string; source?: string; function?: string };
 type ExceptionLike = {
   type?: string;
   value?: string;
@@ -73,6 +73,35 @@ const hasNoAttributableSource = (ex: ExceptionLike | undefined): boolean => {
 /** True when every exception in the chain came from an unattributable (injected) script. */
 const isInjectedThirdPartyError = (exceptions: ExceptionLike[]): boolean =>
   exceptions.length > 0 && exceptions.every(hasNoAttributableSource);
+
+/**
+ * React streaming-SSR segment swap failing because the placeholder is gone.
+ *
+ * On routes with a `loading.tsx` React streams Suspense segments and injects tiny
+ * inline scripts (`$RS` "replace segment", `$RC` "complete boundary") that look up
+ * the placeholder node by id and call `parentNode.removeChild` on it. If something
+ * has already rewritten the DOM mid-stream — a browser extension, Edge/Chrome
+ * translate or reader mode, or the user navigating away — the lookup returns
+ * null and the script throws `Cannot read properties of null (reading 'parentNode')`.
+ * That code is React's, not ours, and the condition is outside our control
+ * (react issue: "TypeError: Cannot read properties of null (reading 'parentNode') at $RS").
+ *
+ * Deliberately narrow: only an exception whose *top* frame is `$RS`/`$RC` and whose
+ * message names `parentNode` is dropped. A real regression in our streaming markup
+ * would still surface through other symptoms (hydration errors, blank segments).
+ */
+const REACT_STREAM_SWAP_FN = /^\$R[SC]$/;
+const REACT_STREAM_SWAP_MSG = /reading 'parentNode'/;
+const isReactStreamSwapError = (exceptions: ExceptionLike[]): boolean =>
+  exceptions.some((ex) => {
+    if (!REACT_STREAM_SWAP_MSG.test(ex?.value ?? "")) return false;
+    const frames = ex?.stacktrace?.frames ?? [];
+    if (frames.length === 0) return false;
+    // Sentry lists frames outermost-first; PostHog innermost-first. Check both ends.
+    const first = frames[0]?.function ?? "";
+    const last = frames[frames.length - 1]?.function ?? "";
+    return REACT_STREAM_SWAP_FN.test(first) || REACT_STREAM_SWAP_FN.test(last);
+  });
 
 if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || posthogInDev)) {
   posthog.init(posthogKey, {
@@ -104,6 +133,8 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
         if (isBenign) return null;
         // Injected in-app-browser / extension scripts (see isInjectedThirdPartyError).
         if (isInjectedThirdPartyError(exceptions)) return null;
+        // React streaming segment-swap noise (see isReactStreamSwapError).
+        if (isReactStreamSwapError(exceptions)) return null;
       }
       return event;
     },
@@ -143,7 +174,10 @@ async function loadAndInitSentry() {
       // as a real crash.
       beforeSend: (event) => {
         const exceptions = (event.exception?.values ?? []) as ExceptionLike[];
-        return isInjectedThirdPartyError(exceptions) ? null : event;
+        if (isInjectedThirdPartyError(exceptions)) return null;
+        // React streaming segment-swap noise (see isReactStreamSwapError).
+        if (isReactStreamSwapError(exceptions)) return null;
+        return event;
       },
 
       sendDefaultPii: true,
