@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { reloadOnChunkLoadError } from '@/lib/chunk-reload';
+import { isChunkLoadError } from '@/lib/telemetry-filters';
 
 export default function Error({
   error,
@@ -9,10 +11,25 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // A chunk that 404s after a deploy cannot be fixed by `reset()` (it re-runs the same
+  // stale import); the page reloads itself once instead. If that reload already
+  // happened this session the chunk is genuinely missing, so offer a manual reload.
+  const [reloading, setReloading] = useState(false);
+  const chunkError = isChunkLoadError(error);
+
   useEffect(() => {
     // Log the error to the console
     console.error('Application Error:', error);
+    if (reloadOnChunkLoadError(error)) setReloading(true);
   }, [error]);
+
+  if (reloading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-surface)] flex items-center justify-center py-12 px-4">
+        <p className="text-sm text-[var(--text-secondary)]">Loading the latest version of the site…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-surface)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -27,7 +44,9 @@ export default function Error({
             Something went wrong!
           </h2>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            An unexpected error occurred. Please try again.
+            {chunkError
+              ? 'The site was updated while this page was open. Reload to get the latest version.'
+              : 'An unexpected error occurred. Please try again.'}
           </p>
         </div>
 
@@ -45,10 +64,10 @@ export default function Error({
 
             <div className="flex space-x-3">
               <button
-                onClick={reset}
+                onClick={chunkError ? () => window.location.reload() : reset}
                 className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Try again
+                {chunkError ? 'Reload page' : 'Try again'}
               </button>
               <button
                 onClick={() => window.location.href = '/'}
