@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "test:env": "tsx scripts/test-env.ts",
     "test:supabase-auth": "tsx scripts/test-supabase-auth-api.ts",
     "db:apply-sql": "tsx scripts/apply-migration-sql.ts",
