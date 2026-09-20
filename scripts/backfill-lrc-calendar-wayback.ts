@@ -44,6 +44,33 @@ function waybackRawUrl(timestamp: string): string {
 
 type CdxRow = string[];
 
+/**
+ * Marker error thrown when every retry against web.archive.org fails with a
+ * network-level error (ECONNREFUSED, DNS failure, socket hang up, timeout, or
+ * an axios error carrying no HTTP response). Wayback has recurring hours-long
+ * outages that we cannot page on, so `main()` catches this and exits 0.
+ */
+class WaybackOutageError extends Error {
+  constructor(cause: unknown) {
+    const msg = cause instanceof Error ? cause.message : String(cause);
+    super(`Wayback Machine unreachable: ${msg}`);
+    this.name = 'WaybackOutageError';
+  }
+}
+
+function isWaybackNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const anyErr = err as { code?: string; response?: unknown; message?: string; cause?: { code?: string } };
+  if (anyErr.response) return false;
+  const code = anyErr.code ?? anyErr.cause?.code ?? '';
+  if (['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'ECONNABORTED'].includes(code)) {
+    return true;
+  }
+  return /\b(?:timeout|timed?\s*out|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN)\b/i.test(
+    anyErr.message ?? '',
+  );
+}
+
 async function listWaybackSnapshots(fromIso: string, toIso: string): Promise<string[]> {
   const params = new URLSearchParams({
     url: 'apps.legislature.ky.gov/legislativecalendar',
@@ -61,17 +88,31 @@ async function listWaybackSnapshots(fromIso: string, toIso: string): Promise<str
     headers: { 'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; lrc-calendar-backfill)' },
   };
 
-  let res;
-  try {
-    res = await axios.get<CdxRow[]>(requestUrl, requestOpts);
-  } catch (err) {
-    const backoffMs = 5_000 + Math.floor(Math.random() * 5_000);
-    console.warn(`Wayback CDX list failed (${(err as Error).message}); retrying once in ${backoffMs}ms…`);
-    await sleep(backoffMs);
-    res = await axios.get<CdxRow[]>(requestUrl, requestOpts);
+  // Exponential backoff over ~5 minutes: 10s, 30s, 90s. Wayback's typical blips
+  // resolve inside that window; a persistent outage still throws and is caught
+  // in main() as WaybackOutageError.
+  const backoffs = [10_000, 30_000, 90_000];
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= backoffs.length; attempt++) {
+    try {
+      const res = await axios.get<CdxRow[]>(requestUrl, requestOpts);
+      return extractCdxTimestamps(res.data);
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= backoffs.length) break;
+      const jitter = Math.floor(Math.random() * 5_000);
+      const waitMs = backoffs[attempt]! + jitter;
+      console.warn(
+        `Wayback CDX list failed (${(err as Error).message}); retrying in ${Math.round(waitMs / 1000)}s (attempt ${attempt + 2}/${backoffs.length + 1})…`,
+      );
+      await sleep(waitMs);
+    }
   }
+  if (isWaybackNetworkError(lastErr)) throw new WaybackOutageError(lastErr);
+  throw lastErr;
+}
 
-  const rows = res.data;
+function extractCdxTimestamps(rows: CdxRow[] | undefined): string[] {
   if (!rows?.length || rows.length < 2) return [];
 
   const timestamps: string[] = [];
@@ -124,13 +165,28 @@ async function main() {
   let totalMeetingsUpserted = 0;
   let totalAgenda = 0;
   let totalErrors = 0;
+  let networkSkipped = 0;
 
   for (let i = 0; i < timestamps.length; i++) {
     const ts = timestamps[i]!;
     const label = `${ts.slice(0, 4)}-${ts.slice(4, 6)}-${ts.slice(6, 8)}`;
     console.log(`\n[${i + 1}/${timestamps.length}] Snapshot ${label} (${ts})`);
 
-    const html = await fetchWaybackHtml(ts);
+    let html: string;
+    try {
+      html = await fetchWaybackHtml(ts);
+    } catch (err) {
+      // Per-snapshot resilience: a network blip on one capture must not kill
+      // the whole run mid-way. Count it, warn, continue. If EVERY capture
+      // fails this way, it's a Wayback outage — surface it as such below.
+      if (isWaybackNetworkError(err)) {
+        networkSkipped++;
+        console.warn(`  Skipping capture ${label}: ${(err as Error).message}`);
+        if (i < timestamps.length - 1 && delayMs > 0) await sleep(delayMs);
+        continue;
+      }
+      throw err;
+    }
     const parsed = parseLegislativeCalendarHtml(html);
     const scheduled = scheduledMeetingsFromParsed(parsed);
 
@@ -162,8 +218,19 @@ async function main() {
     }
   }
 
+  // Every capture failed with a network error → Wayback is out. Surface as
+  // outage so main().catch treats it uniformly with the CDX-listing failure.
+  if (networkSkipped > 0 && networkSkipped === timestamps.length) {
+    throw new WaybackOutageError(
+      new Error(`all ${timestamps.length} snapshot fetches failed with network errors`),
+    );
+  }
+
   console.log('\n--- Summary ---');
-  console.log(`Snapshots processed: ${timestamps.length}`);
+  console.log(`Snapshots processed: ${timestamps.length - networkSkipped}/${timestamps.length}`);
+  if (networkSkipped > 0) {
+    console.log(`Snapshots skipped (Wayback network error): ${networkSkipped}`);
+  }
   console.log(`Meetings parsed (may include duplicates across weeks): ${totalMeetingsParsed}`);
   if (!dryRun) {
     console.log(`Meetings upserted: ${totalMeetingsUpserted}`);
@@ -174,6 +241,15 @@ async function main() {
 }
 
 main().catch((err) => {
+  // A persistent Wayback Machine outage is not our bug to page on. Log the
+  // condition clearly and exit 0 so the weekly workflow does not fire the
+  // Slack error path. The next scheduled run picks up whatever the previous
+  // run would have covered (the range is derived from the session start).
+  if (err instanceof WaybackOutageError) {
+    console.warn(`[wayback-backfill] Skipped: ${err.message}`);
+    console.warn('[wayback-backfill] Upstream outage on web.archive.org. Next scheduled run will retry.');
+    process.exit(0);
+  }
   console.error(err);
   process.exit(1);
 });
