@@ -152,7 +152,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   reported: {
     category: 'bill_status_and_stages',
     title: "Reported Favorably",
-    content: "The committee reviewed the bill and recommends the full chamber vote yes on it. The bill now moves to the floor for debate and a vote."
+    content: "The committee reviewed the bill and recommends the full chamber take it up. The bill now moves to the floor, where members can debate, amend, and vote on it."
   },
 
   reported_favorably_with_committee_substitute: {
