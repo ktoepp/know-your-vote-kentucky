@@ -324,7 +324,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   senate_president: {
     category: 'legislative_bodies_and_people',
     title: "President of the Senate",
-    content: "The leader of the Kentucky Senate, chosen by Senate members from among themselves. The President sets the Senate's agenda, assigns members to committees, and runs floor proceedings."
+    content: "The leader of the Kentucky Senate, chosen by Senate members from among themselves. The President sets the Senate's agenda and assigns members to committees. Day-to-day floor proceedings are typically presided over by the President Pro Tempore."
   },
 
   majority_leader: {
@@ -430,7 +430,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   concurrence: {
     category: 'procedures_and_voting',
     title: "Concurrence",
-    content: "A vote in which a chamber accepts the other chamber's amendments to a bill it already passed. If it concurs, the bill advances to the Governor. If it refuses, the chamber may recede from its own amendments, the bill may die, or both chambers can agree to form a conference committee to negotiate a compromise. Concurrence votes cluster near the end of session."
+    content: "A vote in which a chamber decides whether to accept the other chamber's amendments to a bill it already passed. If it concurs, the bill advances to the Governor. If it refuses to concur, the two chambers typically form a conference committee to negotiate a compromise. Less often the second chamber recedes from its own amendments, or the bill dies. Concurrence votes cluster near the end of session."
   },
 
   veto_recess: {
