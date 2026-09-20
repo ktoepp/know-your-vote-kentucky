@@ -270,13 +270,14 @@ async function checkStoredCorpusInvariants(
     id: string;
     meeting_date: string;
     agenda_content_hash: string | null;
+    agenda_recovery_status: string | null;
     member_refs: unknown[] | null;
     ky_committees: { name?: string } | { name?: string }[] | null;
   };
   const meetings = await fetchAllRows<MeetingRow>('ky_committee_meetings', (from, to) =>
     db
       .from('ky_committee_meetings')
-      .select('id, meeting_date, agenda_content_hash, member_refs, ky_committees ( name )')
+      .select('id, meeting_date, agenda_content_hash, agenda_recovery_status, member_refs, ky_committees ( name )')
       .order('id', { ascending: true })
       .range(from, to),
   );
@@ -313,7 +314,18 @@ async function checkStoredCorpusInvariants(
     // Silent agenda loss: the sync deletes agenda rows before re-inserting and a
     // failed insert leaves a valid hash over an empty agenda. Checked here for
     // the whole corpus, not just meetings on the current calendar.
-    if (items.length === 0 && hash && hash !== EMPTY_AGENDA_HASH) {
+    //
+    // `agenda_recovery_status` is set non-NULL by the repair script
+    // (scripts/repair-missing-agenda-items.ts) once a meeting has been triaged:
+    // either the rows were reingested from Wayback, or Wayback has no usable
+    // snapshot and the loss is irrecoverable upstream. Either way the audit
+    // has nothing more to page on for this row.
+    if (
+      items.length === 0 &&
+      hash &&
+      hash !== EMPTY_AGENDA_HASH &&
+      !m.agenda_recovery_status
+    ) {
       findings.push({
         severity: 'fail',
         domain: 'committees',
@@ -556,13 +568,14 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
     meeting_date: string;
     time_and_location: string | null;
     agenda_content_hash: string | null;
+    agenda_recovery_status: string | null;
     status: string | null;
   }> = [];
   if (seenMeetingDates.length > 0) {
     const sortedDates = [...seenMeetingDates].sort();
     const { data, error } = await db
       .from('ky_committee_meetings')
-      .select('id, committee_id, meeting_date, time_and_location, agenda_content_hash, status')
+      .select('id, committee_id, meeting_date, time_and_location, agenda_content_hash, agenda_recovery_status, status')
       .gte('meeting_date', sortedDates[0]!)
       .lte('meeting_date', sortedDates[sortedDates.length - 1]!);
     if (error) {
@@ -585,6 +598,7 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
     derived: DerivedAgendaItem[];
     liveHash: string;
     storedHash: string | null;
+    recoveryStatus: string | null;
   }> = [];
   let checked = 0;
 
@@ -655,6 +669,7 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
       derived: deriveAgendaItems(meeting),
       liveHash: agendaContentHash(meeting),
       storedHash: stored.agenda_content_hash,
+      recoveryStatus: stored.agenda_recovery_status,
     });
   }
 
@@ -695,7 +710,14 @@ export async function checkCommittees(db: SupabaseClient, cfg: AuditConfig): Pro
       // but nothing is stored. The sync deletes agenda rows before re-inserting
       // and a failed insert leaves exactly this state — a valid hash over an
       // empty agenda, rendering as a blank agenda on the committee page.
-      if (stored.length === 0 && m.storedHash && m.storedHash !== EMPTY_AGENDA_HASH) {
+      // `recoveryStatus` non-NULL means the repair script has triaged this
+      // meeting (reingested or confirmed irrecoverable upstream); suppress.
+      if (
+        stored.length === 0 &&
+        m.storedHash &&
+        m.storedHash !== EMPTY_AGENDA_HASH &&
+        !m.recoveryStatus
+      ) {
         findings.push({
           severity: 'fail',
           domain: 'committees',
