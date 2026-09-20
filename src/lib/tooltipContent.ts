@@ -282,13 +282,13 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   senate: {
     category: 'legislative_bodies_and_people',
     title: "Kentucky Senate",
-    content: "One of the two chambers of the Kentucky General Assembly. It has 38 members, each representing a district across the state. Senators serve 4-year terms, staggered in two classes: odd-numbered districts elect in presidential-election years, even-numbered districts elect in midterm years."
+    content: "One of the two chambers of the Kentucky General Assembly. It has 38 members, each representing a district across the state. Senators serve 4-year terms, staggered in two classes: even-numbered districts elect in presidential-election years, odd-numbered districts elect in midterm years."
   },
 
   committee: {
     category: 'legislative_bodies_and_people',
     title: "Committee",
-    content: "A smaller group of legislators that focuses on a specific policy area, such as Education or Judiciary. Committees hold hearings, dig into the details of bills, and decide whether to send them on to the full chamber."
+    content: "A smaller group of legislators that focuses on a specific policy area, such as Education or Judiciary. Committees hold hearings, review bills in detail, and vote on whether to report them to the full chamber. Bills a committee does not report typically do not advance."
   },
 
   subcommittee: {
@@ -300,7 +300,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   lrc: {
     category: 'legislative_bodies_and_people',
     title: "Legislative Research Commission (LRC)",
-    content: "The nonpartisan staff agency that supports the Kentucky General Assembly. The LRC provides bill drafting services, conducts policy research, and handles the legislature's day-to-day operations. It is overseen by a statutory committee of House and Senate leaders (KRS 7.090)."
+    content: "A bipartisan body of House and Senate leaders (KRS 7.090), supported by a nonpartisan staff agency. The LRC drafts bills, conducts policy research, and handles the Kentucky General Assembly's day-to-day operations."
   },
 
   sponsor: {
@@ -362,7 +362,7 @@ export const governmentTooltips: Record<string, TooltipContent> = {
   amendment: {
     category: 'procedures_and_voting',
     title: "Amendment",
-    content: "A proposed change to a bill's text. Amendments can be offered in committee or on the floor by any member."
+    content: "A proposed change to a bill's text. Amendments can be offered in committee or on the floor by any member, and are adopted by a majority vote of the members present."
   },
 
   yeas_nays: {
