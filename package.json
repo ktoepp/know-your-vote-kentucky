@@ -61,6 +61,8 @@
     "probe:legacy-material-urls": "tsx scripts/probe-legacy-material-urls.ts",
     "repair:agenda-bill-links": "tsx scripts/repair-agenda-bill-links.ts",
     "repair:agenda-bill-links:live": "tsx scripts/repair-agenda-bill-links.ts --live",
+    "repair:agenda-items": "tsx scripts/repair-missing-agenda-items.ts",
+    "repair:agenda-items:dry": "tsx scripts/repair-missing-agenda-items.ts --dry-run",
     "probe:committee-links:dry": "tsx scripts/probe-committee-material-links.ts --dry",
     "reconcile:committee-memberships": "tsx scripts/reconcile-committee-memberships.ts",
     "remap:recommittal-statuses": "tsx scripts/remap-recommittal-statuses.ts",
