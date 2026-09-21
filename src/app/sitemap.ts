@@ -34,6 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/glossary', changeFrequency: 'monthly', priority: 0.5 },
     { path: '/guides', changeFrequency: 'monthly', priority: 0.6 },
     { path: '/guides/find-your-kentucky-legislator', changeFrequency: 'monthly', priority: 0.6 },
+    { path: '/guides/what-your-kentucky-legislators-do', changeFrequency: 'monthly', priority: 0.6 },
     { path: '/guides/track-a-kentucky-bill', changeFrequency: 'monthly', priority: 0.6 },
     { path: '/guides/how-a-kentucky-bill-becomes-a-law', changeFrequency: 'monthly', priority: 0.6 },
     { path: '/guides/kentucky-general-assembly-sessions', changeFrequency: 'monthly', priority: 0.6 },
