@@ -11,7 +11,7 @@ const PATH = '/guides/how-a-kentucky-bill-becomes-a-law';
 const TITLE = 'How a bill becomes a law in Kentucky';
 const DESCRIPTION =
   "The steps a bill takes through the Kentucky General Assembly: introduction, committee, three readings, floor votes, the second chamber, and the governor's signature or veto.";
-const DATE_MODIFIED = '2026-07-18';
+const DATE_MODIFIED = '2026-09-21';
 
 export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
@@ -23,30 +23,36 @@ export const metadata: Metadata = buildPageMetadata({
 // The acts-effective-date line tracks the current session's published date.
 export const revalidate = 3600;
 
-const STEPS: { title: string; body: string }[] = [
+const STEPS: { title: string; body: string; meter?: string }[] = [
   {
     title: '1. Introduction',
     body: 'A House or Senate member files the bill in their own chamber. Bills that raise revenue must start in the House of Representatives. Each bill receives a number: HB for House bills, SB for Senate bills.',
+    meter: 'Meter: "Introduced".',
   },
   {
     title: '2. Committee',
     body: 'The bill is referred to a committee, which can hold hearings, amend the bill, report it favorably to the floor, or take no action. Most bills that fail simply never leave committee.',
+    meter: 'Meter: still on "Introduced". Committee work happens before the origin chamber’s floor vote advances the bill.',
   },
   {
     title: '3. Readings and floor vote',
     body: 'The Kentucky Constitution requires three readings in each chamber on separate days before final passage. After the readings the full chamber debates, may amend, and votes. Most bills need at least two-fifths of the members elected and a majority of those voting. Appropriation and revenue bills need a majority of all members elected.',
+    meter: 'Meter advances to "Passed House" or "Passed Senate", whichever is the origin chamber.',
   },
   {
     title: '4. The second chamber',
     body: 'A bill that passes one chamber repeats the process in the other: committee, readings, and a floor vote. If the second chamber changes the bill, the first chamber must concur, or the two chambers negotiate a shared version in a conference committee.',
+    meter: 'Meter advances to the second chamber label once it passes.',
   },
   {
     title: '5. The governor',
     body: 'The governor has ten days, not counting Sundays, to sign the bill, veto it, or let it become law without a signature. On appropriation bills the governor can veto individual line items.',
+    meter: 'Meter reaches "Became law" if the governor signs or lets the bill become law without a signature. A veto shows as "Vetoed" until an override.',
   },
   {
     title: '6. Veto override',
     body: 'The General Assembly can override a veto with a majority of the members elected in each chamber, meaning 51 votes in the House and 20 in the Senate. This is a simple majority, unlike the two-thirds required in the U.S. Congress.',
+    meter: 'A successful override moves the meter from "Vetoed" to "Became law".',
   },
 ];
 
@@ -84,6 +90,15 @@ export default function BillBecomesLawGuidePage() {
         defines the terms used below.
       </Typography>
 
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3, fontStyle: 'italic' }}>
+        Each step below notes where the on-page bill progress meter sits during that step. Open
+        any bill on the{' '}
+        <MuiLink component={NextLink} href="/bills" underline="hover">
+          bills
+        </MuiLink>{' '}
+        page to see it in context.
+      </Typography>
+
       {STEPS.map((step) => (
         <Box component="section" key={step.title} sx={{ mb: 3 }}>
           <Typography variant="h6" component="h2" fontWeight={700} gutterBottom>
@@ -92,6 +107,11 @@ export default function BillBecomesLawGuidePage() {
           <Typography variant="body1" color="text.secondary">
             {step.body}
           </Typography>
+          {step.meter && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontStyle: 'italic' }}>
+              {step.meter}
+            </Typography>
+          )}
         </Box>
       ))}
 

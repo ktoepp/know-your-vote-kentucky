@@ -22,6 +22,12 @@ const GUIDES = [
       'Look up your state representative and senator by address, or browse all 138 districts.',
   },
   {
+    href: '/guides/what-your-kentucky-legislators-do',
+    title: 'What your Kentucky legislators do',
+    blurb:
+      'The role of a Kentucky state representative and senator, what they can help with, and how state office differs from federal office.',
+  },
+  {
     href: '/guides/track-a-kentucky-bill',
     title: 'How to track a Kentucky bill',
     blurb:
