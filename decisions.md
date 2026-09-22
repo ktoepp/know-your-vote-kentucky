@@ -2462,9 +2462,9 @@ Vercel API count_pageviews / aggregate_pageviews / count_events (project prj_lZw
   → 404 Not Found — "Web Analytics not found."
 ```
 
-That response is what Vercel returns when Web Analytics is **not enabled** on the project (or when a query is scoped to a project without the feature attached). The `@vercel/analytics` client script is loading from `layout.tsx`, but the dashboard side is not accepting/exposing the data — so there is no Vercel-side pageview total to compare against. Either analytics has never been enabled in the Vercel project settings, or it was enabled and later unlinked; either way there is no counted number to pit against PostHog's 1,377.
+The Notion "kyv-analytics" page records Vercel Web Analytics as **enabled dashboard-side on 2026-08-17** ("The source file recorded it as OFF (API returning 404 despite `<Analytics`)"). So the 404 is not a "never enabled" state; it is a Vercel-side artifact where Web Analytics runs and displays in the dashboard but does not expose data via the API — matching what the Notion source already logged over a month ago. Either way, the counted 30-day Vercel pageview total is not retrievable from this session, so the ±5 % reconciliation cannot be performed here.
 
-Deferred until Katie clarifies whether Web Analytics was ever turned on in the Vercel dashboard.
+Deferred: pull the Vercel dashboard's own 30-day total by hand and reconcile; if the gap is large, revisit ad-blocker coverage as the likely driver (PostHog's `us.i.posthog.com` gets blocked more than Vercel's first-party `/_vercel/insights`).
 
 ### Cost & quota
 
@@ -2495,7 +2495,7 @@ PostHog covers everything the Metrics Dashboard needs today. Vercel covers only 
 - `@vercel/speed-insights` stays untouched — it's a different product (Core Web Vitals) that PostHog does not replace at the same fidelity.
 
 **Revisit if:**
-- Katie confirms Web Analytics was enabled in the Vercel dashboard and the "not found" response is a scoping/plan issue — then rerun the reconciliation and expect ±5 % agreement, with the residual explained by ad-blocker coverage (PostHog's `us.i.posthog.com` domain is more commonly blocked than Vercel's first-party `/_vercel/insights`).
+- The Vercel dashboard's manually pulled 30-day pageview total diverges from PostHog's 1,377 by more than ±5 % — then investigate ad-blocker coverage (PostHog's `us.i.posthog.com` domain is more commonly blocked than Vercel's first-party `/_vercel/insights`) or bot filtering differences.
 - PostHog monthly event volume approaches the free-plan ceiling (roughly 10× today's ~10k/mo) — at that point revisit sampling, `before_send` filters, or moving to Vercel-only for anonymous pageviews and keeping PostHog for authenticated events.
 - The Metrics Dashboard adds a metric PostHog cannot serve (e.g., raw log-level data not in the event stream), which none of the current v1 metrics need.
 
@@ -2504,4 +2504,4 @@ PostHog covers everything the Metrics Dashboard needs today. Vercel covers only 
 - This entry only. No code, config, or dependency changes: both `@vercel/analytics ^2.0.1` and `posthog-js ^1.378.1` remain in `package.json`; both `<Analytics/>` and `PostHogPageviewTracker` remain mounted in `src/app/layout.tsx`.
 - Follow-up items (not landed):
   - Notion Strategic Hub → Product → "Compare Vercel Analytics vs PostHog" to-do to be checked off with a pointer to this entry.
-  - Confirm with Katie whether Vercel Web Analytics was ever enabled in the dashboard; if the intent is to keep it as a backup source-of-truth for pageviews, it needs enabling there before the next reconciliation.
+  - Pull the Vercel dashboard's own 30-day pageview total by hand and record it alongside PostHog's 1,377 as the missing reconciliation datapoint (Vercel Analytics is enabled per Notion "kyv-analytics" but its query API returns 404).
