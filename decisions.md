@@ -2417,3 +2417,91 @@ Migration 055 is applied (`ky_analyze_read_path_tables` present, `ky_bills` relo
 
 **Revisit if:** the Mapbox postcode centroid disagrees with Nominatim's for a KY ZIP that straddles a district line (spot-check a few border ZIPs on the preview; the fallback path is one line to prefer); PostHog shows `signup_cta_clicked` high and `user_registered` flat, which points at the register form rather than the prompt; or the profile prompt above Sponsored bills reads as noise on profiles with no bills (then gate it on `sponsoredBills.length > 0`).
 
+
+---
+
+## 2026-09-22
+
+**Analytics primary source — Vercel Web Analytics vs PostHog.** Both instruments have shipped in `src/app/layout.tsx:135-136` for ~30 days (Vercel `<Analytics/>` + `<SpeedInsights/>`; PostHog init in `instrumentation-client.ts:22-55`). Task: pick one as source of truth for engagement.
+
+### Bottom line up front
+
+- **Keep PostHog as primary.** It is the only side of the pair that currently produces retrievable data for KYV and it is the only side that carries the product events the Metrics Dashboard needs (`district_map_lookup` → `signup_cta_clicked` → `user_registered` funnel, plus `search_performed`, `bill_followed`, `committee_followed`, `topic_filter_used`, `search_result_clicked`, `preferences_saved`, `account_deleted` — 20 named helpers in [`src/lib/analytics.ts`](./src/lib/analytics.ts)).
+- **Do not uninstall `@vercel/analytics` or `@vercel/speed-insights` yet** — Katie's explicit ok is required, and Speed Insights is orthogonal (Core Web Vitals, not pageviews). See "Revisit if" below.
+
+### Counted numbers (Aug 23 – Sep 22, 2026 UTC, `filterTestAccounts: true`)
+
+Pulled via PostHog `query-web-overview` and `query-trends` against project `kyvky.com` (id 450281):
+
+| Metric | Value |
+| --- | --- |
+| Visitors (unique) | 909 |
+| Pageviews | 1,377 |
+| Sessions | 964 |
+| Avg session duration | 141.7 s |
+| Bounce rate | 48.76 % |
+
+Top 5 pages by pageview: `/auth/login` 214 · `/members/map` 135 · `/members` 113 · `/` 88 · `/search` 48.
+Top 5 referrers: `$direct` 458 · `www.bing.com` 478 · `www.google.com` 165 · `duckduckgo.com` 147 · `search.yahoo.com` 109.
+
+Custom-event volume in the same window (via `posthog.capture` sites enumerated in `src/lib/analytics.ts` and 15 other files):
+- `district_map_lookup`: 75 (the biggest product signal — ZIP/address/map-click district lookups, ~11/day peak on 2026-09-16 and 09-17)
+- `search_performed`: 32
+- `user_registered`: 3
+- `bill_followed`: 1
+- `signup_cta_clicked`: 0 (the funnel CTA landed 2026-09-12 per § 2026-09-15 handoff; zero clicks in the tail so far)
+
+Total PostHog events ingested for the period ≈ pageviews + ~110 custom + `$pageleave`/`$autocapture`/`$exception` background. Order of magnitude ~5–10k events/mo — nowhere near the PostHog free-plan monthly ceiling.
+
+### Reconciliation
+
+**Cannot reconcile in the ±5 % band** — Vercel Web Analytics returned zero rows for KYV:
+
+```
+Vercel API count_pageviews / aggregate_pageviews / count_events (project prj_lZwB7…):
+  → 404 Not Found — "Web Analytics not found."
+```
+
+That response is what Vercel returns when Web Analytics is **not enabled** on the project (or when a query is scoped to a project without the feature attached). The `@vercel/analytics` client script is loading from `layout.tsx`, but the dashboard side is not accepting/exposing the data — so there is no Vercel-side pageview total to compare against. Either analytics has never been enabled in the Vercel project settings, or it was enabled and later unlinked; either way there is no counted number to pit against PostHog's 1,377.
+
+Deferred until Katie clarifies whether Web Analytics was ever turned on in the Vercel dashboard.
+
+### Cost & quota
+
+- **PostHog.** ~5–10k events/mo current volume. PostHog's free tier covers well over that for product analytics events; KYV has no meaningful risk of tipping into paid usage until traffic grows 10–100×. Session replay is not enabled in this project (verified via `get_session` on the PostHog project), so replay quota is not consumed. Cost today: $0.
+- **Vercel.** No events being counted → no consumption of Vercel's Web Analytics quota. Speed Insights is a separate product and continues to run; it consumes a separate Web Vitals quota. Cost today: $0.
+- **Conclusion.** Neither instrument is a cost or quota risk at KYV's current scale. Neither should be dropped for cost reasons.
+
+### Feature fit against the Strategic Hub Metrics Dashboard
+
+| Need | PostHog | Vercel Web Analytics |
+| --- | --- | --- |
+| Pageviews, unique visitors, top pages, referrers | ✓ (verified above) | ✓ **when enabled** — currently returns 404 |
+| Sessions, session duration, bounce rate | ✓ (`query-web-overview`) | ✓ (limited) |
+| Custom product events (`district_map_lookup`, `search_performed`, `bill_followed`, …) | ✓ 20+ named helpers in `src/lib/analytics.ts` | ✗ Vercel's custom-event API exists but nothing in the KYV codebase calls it — grep for `va.track`, `track(` from `@vercel/analytics` returns zero call sites |
+| Funnels — `district_map_lookup → signup_cta_clicked → user_registered` (the funnel the § 2026-09-16 handoff added the events for) | ✓ native | ✗ not supported |
+| Retention / stickiness | ✓ native (`query-retention`, `query-stickiness`) | ✗ not supported |
+| Person profiles + identity stitching post-signup | ✓ `posthog.identify` in [`src/app/lib/UserContext.tsx`](./src/app/lib/UserContext.tsx) and `syncPostHogUser` | ✗ visitor-level only |
+| Route upkeep as pages change | Auto (no per-route config — `PostHogPageviewTracker` fires on every route change) | Auto |
+| PII posture | 5-digit ZIP is the coarsest PII captured (`src/lib/analytics.ts:199-214`); `person_profiles: "always"` creates anonymous profiles that identify() upgrades. Ad-blocker coverage is a known blind spot | No PII, no identity |
+
+PostHog covers everything the Metrics Dashboard needs today. Vercel covers only the visitor-level top of that list, and only if it is enabled.
+
+### Recommendation
+
+**PostHog is primary. Vercel Web Analytics stays installed but is not the source of truth.**
+- The custom-event taxonomy that answers "is the map lookup → signup funnel working?" only exists in PostHog. Duplicating it into `va.track()` doubles maintenance for no marginal insight.
+- Vercel's 30-day pageview total is not currently retrievable, so it cannot serve as source of truth even for the top-of-funnel metrics it would otherwise cover.
+- `@vercel/speed-insights` stays untouched — it's a different product (Core Web Vitals) that PostHog does not replace at the same fidelity.
+
+**Revisit if:**
+- Katie confirms Web Analytics was enabled in the Vercel dashboard and the "not found" response is a scoping/plan issue — then rerun the reconciliation and expect ±5 % agreement, with the residual explained by ad-blocker coverage (PostHog's `us.i.posthog.com` domain is more commonly blocked than Vercel's first-party `/_vercel/insights`).
+- PostHog monthly event volume approaches the free-plan ceiling (roughly 10× today's ~10k/mo) — at that point revisit sampling, `before_send` filters, or moving to Vercel-only for anonymous pageviews and keeping PostHog for authenticated events.
+- The Metrics Dashboard adds a metric PostHog cannot serve (e.g., raw log-level data not in the event stream), which none of the current v1 metrics need.
+
+### What changed in the repo
+
+- This entry only. No code, config, or dependency changes: both `@vercel/analytics ^2.0.1` and `posthog-js ^1.378.1` remain in `package.json`; both `<Analytics/>` and `PostHogPageviewTracker` remain mounted in `src/app/layout.tsx`.
+- Follow-up items (not landed):
+  - Notion Strategic Hub → Product → "Compare Vercel Analytics vs PostHog" to-do to be checked off with a pointer to this entry.
+  - Confirm with Katie whether Vercel Web Analytics was ever enabled in the dashboard; if the intent is to keep it as a backup source-of-truth for pageviews, it needs enabling there before the next reconciliation.
