@@ -2427,7 +2427,7 @@ Migration 055 is applied (`ky_analyze_read_path_tables` present, `ky_bills` relo
 ### Bottom line up front
 
 - **Keep PostHog as primary.** It is the only side of the pair that currently produces retrievable data for KYV and it is the only side that carries the product events the Metrics Dashboard needs (`district_map_lookup` → `signup_cta_clicked` → `user_registered` funnel, plus `search_performed`, `bill_followed`, `committee_followed`, `topic_filter_used`, `search_result_clicked`, `preferences_saved`, `account_deleted` — 20 named helpers in [`src/lib/analytics.ts`](./src/lib/analytics.ts)).
-- **Do not uninstall `@vercel/analytics` or `@vercel/speed-insights` yet** — Katie's explicit ok is required, and Speed Insights is orthogonal (Core Web Vitals, not pageviews). See "Revisit if" below.
+- **Retiring `@vercel/analytics`** per Katie's ok in the follow-up (2026-09-22). `@vercel/speed-insights` stays — it's orthogonal (Core Web Vitals, not pageviews). Change lands in this PR: removes the `<Analytics/>` mount from `src/app/layout.tsx` and drops the `@vercel/analytics` dependency from `package.json` / `package-lock.json`.
 
 ### Counted numbers (Aug 23 – Sep 22, 2026 UTC, `filterTestAccounts: true`)
 
@@ -2501,7 +2501,9 @@ PostHog covers everything the Metrics Dashboard needs today. Vercel covers only 
 
 ### What changed in the repo
 
-- This entry only. No code, config, or dependency changes: both `@vercel/analytics ^2.0.1` and `posthog-js ^1.378.1` remain in `package.json`; both `<Analytics/>` and `PostHogPageviewTracker` remain mounted in `src/app/layout.tsx`.
-- Follow-up items (not landed):
-  - Notion Strategic Hub → Product → "Compare Vercel Analytics vs PostHog" to-do to be checked off with a pointer to this entry.
-  - Pull the Vercel dashboard's own 30-day pageview total by hand and record it alongside PostHog's 1,377 as the missing reconciliation datapoint (Vercel Analytics is enabled per Notion "kyv-analytics" but its query API returns 404).
+- `src/app/layout.tsx`: removed `import { Analytics } from '@vercel/analytics/next'` and the `<Analytics />` mount below `<SpeedInsights />`.
+- `package.json` / `package-lock.json`: dropped `@vercel/analytics ^2.0.1`. `@vercel/speed-insights ^2.0.0` and `posthog-js ^1.378.1` stay.
+- Follow-up items:
+  - [x] Notion Strategic Hub → Product → "Compare Vercel Analytics vs PostHog" checked off with a pointer to this entry.
+  - [ ] Optional: turn off Web Analytics in the Vercel dashboard project settings so the disabled state matches the codebase (the API 404 confused the source file for a month; a dashboard-off state avoids the same confusion next time).
+  - [ ] Pull the Vercel dashboard's own 30-day pageview total by hand before disabling, if the reconciliation datapoint is still wanted; otherwise skip.
