@@ -1,7 +1,7 @@
 /**
  * LegiScan API Client — Kentucky Legislature Bills & Votes
  * REST client for https://api.legiscan.com/
- * Free tier: 30,000 queries/month
+ * Free tier: 10,000 queries/month and ~2 req/s sustained (from 2026-10-01)
  * Required env: LEGISCAN_API_KEY
  */
 import axios, { AxiosInstance } from 'axios';

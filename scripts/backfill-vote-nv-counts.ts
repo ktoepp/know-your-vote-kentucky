@@ -24,6 +24,7 @@
 import './load-env';
 import { createClient } from '@supabase/supabase-js';
 import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
+import { legiscanPublicMonthlyLimit } from '../src/lib/legiscan-quota';
 
 const LIVE = process.argv.includes('--live');
 const sessionArg = process.argv.find((a) => a.startsWith('--session='));
@@ -31,7 +32,7 @@ const SESSION = sessionArg?.split('=')[1] ?? null;
 const limitArg = process.argv.find((a) => a.startsWith('--limit='));
 const LIMIT = limitArg ? parseInt(limitArg.split('=')[1] ?? '', 10) : Infinity;
 
-const MONTHLY_QUOTA = 30000;
+const MONTHLY_QUOTA = legiscanPublicMonthlyLimit();
 
 type Target = { billId: string; rollCallId: number; billNumber: string };
 

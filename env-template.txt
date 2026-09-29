@@ -212,7 +212,7 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # set SLACK_SYNC_BILLS_DIGEST_ALWAYS=false to bill digest only on changes/errors.
 # SLACK_SYNC_SKIP_METADATA=true — omit LegiScan quota + ky_sources lines from digests.
 # SLACK_LEGISCAN_QUOTA_ALERT_PCT=90 — also posts SLACK_WEBHOOK_ERRORS when monthly usage crosses this %.
-# LEGISCAN_MONTHLY_QUERY_LIMIT=30000 — label for quota math (match your LegiScan plan).
+# LEGISCAN_MONTHLY_QUERY_LIMIT=10000 — monthly cap for quota math; default 10000 (Public tier from 2026-10-01). Match your LegiScan plan.
 # LEGISCAN_SYNC_QUOTA_STOP_PCT=95 — skip LegiScan sync calls at/above this monthly usage % (defaults to ACCURACY_LEGISCAN_QUOTA_STOP_PCT).
 # LEGISCAN_CALLER=<slug> — tags this process's LegiScan calls in the quota breakdown (`month:op@caller`).
 #   The sync pipeline, accuracy audit and dataset reconcile tag themselves; set this for ad-hoc
@@ -237,7 +237,7 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # SLACK_SYNC_BILLS_DIGEST_ALWAYS=
 # SLACK_SYNC_SKIP_METADATA=false
 # SLACK_LEGISCAN_QUOTA_ALERT_PCT=90
-# LEGISCAN_MONTHLY_QUERY_LIMIT=30000
+# LEGISCAN_MONTHLY_QUERY_LIMIT=10000
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Content accuracy audit (npm run audit:accuracy — weekly via

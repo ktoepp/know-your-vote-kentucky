@@ -97,10 +97,17 @@ export function summarizeLegiscanMonthUsage(
   return { month, total, byOp: ops, unattributed: Math.max(0, total - attributed) };
 }
 
+/**
+ * LegiScan Public API monthly cap. 10,000 from 2026-10-01 (was 30,000); the
+ * default matters because every hold/alert threshold is a percentage of it,
+ * and a stale 30k default would put the 95% hold above the real cap.
+ */
+export const LEGISCAN_PUBLIC_MONTHLY_LIMIT_DEFAULT = 10_000;
+
 export function legiscanPublicMonthlyLimit(): number {
   const raw = process.env.LEGISCAN_MONTHLY_QUERY_LIMIT?.trim();
   const n = raw ? parseInt(raw, 10) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : 30_000;
+  return Number.isFinite(n) && n > 0 ? n : LEGISCAN_PUBLIC_MONTHLY_LIMIT_DEFAULT;
 }
 
 export type LegiscanQuotaSummary = {
