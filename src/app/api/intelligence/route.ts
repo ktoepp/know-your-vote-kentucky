@@ -15,6 +15,7 @@ import {
   setCached,
   INTELLIGENCE_PROMPT_VERSION,
 } from '@/lib/anthropic-cache';
+import { LEGISCAN_API_ATTRIBUTION } from '@/lib/legiscan-attribution';
 
 export async function GET(request: NextRequest) {
   try {
@@ -114,6 +115,7 @@ export async function GET(request: NextRequest) {
         items: withAnalysis,
         count: withAnalysis.length,
         generated: new Date().toISOString(),
+        attribution: LEGISCAN_API_ATTRIBUTION,
       },
       { headers: { 'x-kyvk-cache': `hits=${cacheHits};misses=${cacheMisses}` } },
     );

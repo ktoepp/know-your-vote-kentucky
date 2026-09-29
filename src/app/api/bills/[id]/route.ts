@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchKyBillDetailPageData } from '@/lib/ky-bill-detail-server';
+import { LEGISCAN_API_ATTRIBUTION } from '@/lib/legiscan-attribution';
 
 const BILL_DETAIL_CACHE_SECONDS = 300;
 
@@ -15,7 +16,7 @@ export async function GET(
   }
 
   return NextResponse.json(
-    { bill: data.bill, detail: data.detail },
+    { bill: data.bill, detail: data.detail, attribution: LEGISCAN_API_ATTRIBUTION },
     {
       headers: {
         'Cache-Control': `public, s-maxage=${BILL_DETAIL_CACHE_SECONDS}, stale-while-revalidate=600`,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
 import { buildKyBillSearchFiltersFromUrlSearch, canonicalizeKyBillSearchInput, fetchKyBillsMatchingSearch } from '@/lib/ky-search-bills';
 import { parseLimit, ValidationError } from '@/lib/api-validation';
+import { LEGISCAN_API_ATTRIBUTION } from '@/lib/legiscan-attribution';
 
 /** Public bill data only — safe for CDN caching (matches /api/bills/browse). */
 const SEARCH_CACHE_HEADERS = {
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
         results,
         query: q,
         count: results.length,
+        attribution: LEGISCAN_API_ATTRIBUTION,
       },
       { headers: SEARCH_CACHE_HEADERS },
     );

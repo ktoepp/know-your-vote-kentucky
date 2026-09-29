@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchKyBillsBrowsePage, type KyBillsBrowseQuery } from '@/lib/ky-bills-browse-server';
 import type { KyBillSortKey } from '@/lib/bill-display';
 import { parseKyBillSessionParam } from '@/lib/ky-bills-browse-url';
+import { LEGISCAN_API_ATTRIBUTION } from '@/lib/legiscan-attribution';
 
 const SORT_KEYS: KyBillSortKey[] = [
   'last_action_date',
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await fetchKyBillsBrowsePage(query);
-    return NextResponse.json(result, {
+    return NextResponse.json({ ...result, attribution: LEGISCAN_API_ATTRIBUTION }, {
       headers: {
         'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
       },

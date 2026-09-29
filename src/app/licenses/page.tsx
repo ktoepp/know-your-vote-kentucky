@@ -3,6 +3,7 @@ import { Container, Typography, Link as MuiLink, Stack, Divider } from '@mui/mat
 import Link from 'next/link';
 import { APP_VERSION } from '@/lib/app-version';
 import { buildPageMetadata } from '@/lib/seo';
+import { CC_BY_4_NAME, CC_BY_4_URL, LEGISCAN_CHANGES_NOTE, LEGISCAN_URL } from '@/lib/legiscan-attribution';
 
 export const metadata: Metadata = buildPageMetadata({
   title: 'Licenses & attributions',
@@ -43,8 +44,17 @@ export default function LicensesPage() {
         <Typography variant="body2" color="text.secondary" component="div">
           <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
             <li>
-              <strong>LegiScan.</strong> Bill text, sponsors, and roll calls where synced. Use subject to your LegiScan
-              API and product terms.
+              <strong>LegiScan.</strong> Bill details, sponsors, status history and roll-call votes come from{' '}
+              <MuiLink href={LEGISCAN_URL} target="_blank" rel="noopener noreferrer">
+                LegiScan
+              </MuiLink>{' '}
+              and are licensed under the{' '}
+              <MuiLink href={CC_BY_4_URL} target="_blank" rel="noopener license noreferrer">
+                Creative Commons Attribution 4.0 International license ({CC_BY_4_NAME})
+              </MuiLink>
+              . We changed this data: {LEGISCAN_CHANGES_NOTE.charAt(0).toLowerCase() + LEGISCAN_CHANGES_NOTE.slice(1)} Our changes
+              are ours, not LegiScan&rsquo;s, and LegiScan does not endorse this site. If you reuse the data, credit LegiScan
+              under the same license.
             </li>
             <li>
               <strong>Plural (Open States).</strong> Legislator and metadata sources via{' '}
