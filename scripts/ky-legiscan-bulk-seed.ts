@@ -13,6 +13,7 @@
  * Idempotent: re-running against unchanged data is a no-op (0 downloads).
  * Not wired to cron; manual backfill only.
  */
+import { fetchDatasetZipGated } from '../src/lib/legiscan-dataset-store';
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { getKyLegiScanClient } from '../src/lib/ky-data-sources';
@@ -57,10 +58,9 @@ function getDb() {
 async function processDatasetEntry(entry: LegiScanDatasetListEntry): Promise<{ bills: number; people: number; votes: number }> {
   const client = getKyLegiScanClient();
   const db = getDb();
-  const dataset = await client.fetchDataset(entry.session_id, entry.access_key);
-  if (!dataset?.zip) throw new Error(`Empty dataset payload for session ${entry.session_id}`);
+  const dataset = await fetchDatasetZipGated(client, entry);
   const { bills, people, rollCalls } = parseDatasetZip(dataset.zip);
-  const sessionName = dataset.session_name || entry.session_name || entry.session_title || String(entry.session_id);
+  const sessionName = entry.session_name || entry.session_title || String(entry.session_id);
   console.log(`[bulk-seed] Parsed dataset ${entry.session_id} (${sessionName}): ${bills.length} bills, ${people.length} people, ${rollCalls.length} roll calls`);
 
   if (dryRun) {

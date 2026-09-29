@@ -26,6 +26,7 @@
  */
 import { getKyLegiScanClient, type LegiScanDatasetListEntry } from '../ky-legiscan-client';
 import { parseDatasetZip } from '../ky-legiscan-dataset-import';
+import { fetchDatasetZipGated, type DatasetBlobStore } from '../legiscan-dataset-store';
 
 /**
  * Ranks sessions by how many sampled rows each covers and returns the top
@@ -121,7 +122,7 @@ async function loadDatasetList(client: DatasetClient): Promise<{ list: LegiScanD
  */
 export async function loadDatasetCorpus(
   sessionIds: Iterable<number | null | undefined>,
-  deps: { client?: DatasetClient } = {},
+  deps: { client?: DatasetClient; store?: DatasetBlobStore | null } = {},
 ): Promise<DatasetCorpus> {
   const client = deps.client ?? getKyLegiScanClient();
   const wanted = [...new Set([...sessionIds].filter((s): s is number => typeof s === 'number' && Number.isFinite(s)))];
@@ -152,12 +153,11 @@ export async function loadDatasetCorpus(
       continue;
     }
     try {
-      const dataset = await client.fetchDataset(sessionId, entry.access_key);
-      corpus.quotaCost += 1;
-      if (!dataset?.zip) {
-        failureCache.set(sessionId, 'getDataset returned no zip payload');
-        continue;
-      }
+      // Hash-gated: a (session, dataset_hash) already downloaded by any path —
+      // usually the weekly dataset sync — is read from the store for 0 queries.
+      // Re-downloading unchanged datasets is what LegiScan warned us about.
+      const dataset = await fetchDatasetZipGated(client, entry, { store: deps.store });
+      corpus.quotaCost += dataset.quotaCost;
       const payloads = parseDatasetZip(dataset.zip);
       const bills = new Map<number, Record<string, unknown>>();
       for (const b of payloads.bills) {

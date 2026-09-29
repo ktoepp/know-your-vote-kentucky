@@ -3,7 +3,8 @@
  * Backfill `ky_votes` for sessions the dataset importer left with zero roll calls.
  *
  * Why this exists — the TASKS.md plan ("prefer the Dataset Pull API path") does
- * not work for older sessions, and the 2026-08-01 forced full re-import proved
+ * not work for older sessions, and the 2026-08-01 forced full re-import { fetchDatasetZipGated } from '../src/lib/legiscan-dataset-store';
+import proved
  * it: `getDataset` ships roll-call JSON files only from the 2018 Regular Session
  * onward. Every earlier KY session decoded to `0 roll calls`, so re-running
  * `sync:ky:dataset --force` can never fill them in, no matter how many times.
@@ -141,8 +142,9 @@ async function fetchStoredRollCallIds(db: Db, billUuids: string[]): Promise<Set<
 
 async function planSession(db: Db, entry: LegiScanDatasetListEntry): Promise<SessionPlan> {
   const client = getKyLegiScanClient();
-  const dataset = await client.fetchDataset(entry.session_id, entry.access_key);
-  if (!dataset?.zip) throw new Error(`Empty dataset payload for session ${entry.session_id}`);
+  // Hash-gated through the shared store — this used to re-download the same
+  // unchanged dataset on every run.
+  const dataset = await fetchDatasetZipGated(client, entry);
   const { bills, rollCalls } = parseDatasetZip(dataset.zip);
 
   // Recover roll-call ids from the bill payloads. Sessions whose ZIP *does* ship
