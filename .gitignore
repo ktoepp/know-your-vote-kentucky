@@ -81,3 +81,6 @@ diagnose-after.txt
 
 # ICP persona walkthrough research (persona, findings, improvement plan) — local working docs
 /docs/icp-review/
+
+# GSC API service account credentials
+.gsc/

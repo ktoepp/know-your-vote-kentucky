@@ -1,5 +1,6 @@
 'use client';
 
+import { LegiScanCredit } from '@/components/civic/LegiScanCredit';
 import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import {
@@ -869,7 +870,11 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
     httpUrlForUiLink(latestText?.state_link) ||
     httpUrlForUiLink(originalText?.state_link) ||
     httpUrlForUiLink(bill.bill_text_url);
-  const legiscanBillDocHref = httpUrlForUiLink(bill.bill_text_url);
+  // `bill_text_url` holds LegiScan's `url` on some import paths and its
+  // `state_link` (an LRC page) on others. Only label it "LegiScan" when it
+  // actually points there, since the official LRC links are shown separately.
+  const billTextHref = httpUrlForUiLink(bill.bill_text_url);
+  const legiscanBillDocHref = billTextHref && /^https?:\/\/(www\.)?legiscan\.com\//i.test(billTextHref) ? billTextHref : null;
   const kyLegBillHref = kyLrcBillDetailsUrl(bill.bill_number, bill.session);
   const showOfficialKyBillLink = !omitKyLegislatureBillLink404;
 
@@ -1147,6 +1152,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
                 )}
               </Box>
             )}
+            <LegiScanCredit />
           </MuiCardContent>
         </MuiCard>
 

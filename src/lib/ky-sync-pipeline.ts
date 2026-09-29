@@ -1766,11 +1766,24 @@ async function runVotesSync(options: SyncOptions): Promise<SyncResult> {
       return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
     }
     log(source, `Fetching votes for ${bills.length} bills (limit ${billLimit})`);
+    // Roll calls are immutable once recorded; skip the ones already stored so
+    // each run spends getRollCall only on votes taken since the last run.
+    const storedRollCalls = new Map<string, Set<number>>();
+    const { data: storedRows } = await db
+      .from('ky_votes')
+      .select('bill_id, roll_call_id')
+      .in('bill_id', bills.map((b) => b.id))
+      .not('roll_call_id', 'is', null);
+    for (const r of storedRows || []) {
+      const set = storedRollCalls.get(r.bill_id) ?? new Set<number>();
+      set.add(Number(r.roll_call_id));
+      storedRollCalls.set(r.bill_id, set);
+    }
     const rows: Record<string, unknown>[] = [];
     let skippedNoRollCallId = 0;
     for (const bill of bills) {
       try {
-        const votes = await legiscanClient.fetchVotes(bill.legiscan_id!);
+        const votes = await legiscanClient.fetchVotes(bill.legiscan_id!, storedRollCalls.get(bill.id));
         if (!votes.length) continue;
         for (const vote of votes) {
           if (vote.roll_call_id == null) {

@@ -18,7 +18,8 @@
  *
  * Hash-gated (LegiScan dataset best practices): compares each session's dataset_hash from
  * getDatasetList against ky_legiscan_datasets and SKIPS sessions whose hash is unchanged
- * since last import — re-pulling an unchanged dataset returns identical bills and cannot
+ * since last import { fetchDatasetZipGated } from '../src/lib/legiscan-dataset-store';
+import — re-pulling an unchanged dataset returns identical bills and cannot
  * fill a gap (bills still missing history simply aren't in that dataset version). After a
  * clean import it records the hash so the next run skips that session entirely.
  *
@@ -191,7 +192,7 @@ async function main() {
 
     let dataset;
     try {
-      dataset = await client.fetchDataset(entry.session_id, entry.access_key);
+      dataset = await fetchDatasetZipGated(client, entry);
     } catch (err) {
       if (isLegiscanQuotaHoldError(err)) {
         quotaStopped = true;

@@ -26,6 +26,7 @@
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { getKyLegiScanClient } from '../src/lib/ky-data-sources';
+import { fetchDatasetZipGated } from '../src/lib/legiscan-dataset-store';
 import { withLegiscanCaller } from '../src/lib/legiscan-caller';
 import {
   isTransientLegiscanNetworkError,
@@ -138,10 +139,13 @@ interface SessionSyncOutcome {
 
 async function processDatasetEntry(entry: LegiScanDatasetListEntry): Promise<SessionSyncOutcome> {
   const client = getKyLegiScanClient();
-  const dataset = await client.fetchDataset(entry.session_id, entry.access_key);
-  if (!dataset?.zip) throw new Error(`Empty dataset payload for session ${entry.session_id}`);
+  // Goes through the hash-keyed store: a changed dataset is downloaded once and
+  // kept for the accuracy audit; a --force re-import of an unchanged hash reads
+  // the stored copy and spends no query.
+  const dataset = await fetchDatasetZipGated(client, entry);
+  console.log(`[sync:dataset] Dataset ${entry.session_id} from ${dataset.source}`);
   const { bills, people, rollCalls } = parseDatasetZip(dataset.zip);
-  const sessionName = dataset.session_name || entry.session_name || entry.session_title || String(entry.session_id);
+  const sessionName = entry.session_name || entry.session_title || String(entry.session_id);
   console.log(`[sync:dataset] Parsed dataset ${entry.session_id} (${sessionName}): ${bills.length} bills, ${people.length} people, ${rollCalls.length} roll calls`);
 
   if (DRY_RUN) {

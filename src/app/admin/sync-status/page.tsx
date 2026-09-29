@@ -7,7 +7,7 @@ import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
-import { summarizeLegiscanMonthUsage } from '@/lib/legiscan-quota';
+import { legiscanPublicMonthlyLimit, summarizeLegiscanMonthUsage } from '@/lib/legiscan-quota';
 import {
   evaluateSourceHealth,
   fetchSourceRows,
@@ -114,7 +114,7 @@ export default async function SyncStatusPage() {
   // Per-operation buckets exist only for months recorded after migration 054
   // (2026-08-24); an empty breakdown means not-instrumented, not zero usage.
   const legiscanUsage = summarizeLegiscanMonthUsage(legiscanPayload, monthKey);
-  const legiscanTotal = 30000;
+  const legiscanTotal = legiscanPublicMonthlyLimit();
   const legiscanPct = legiscanUsed != null ? (legiscanUsed / legiscanTotal) * 100 : 0;
   const progressColor: 'primary' | 'warning' | 'error' =
     legiscanUsed == null ? 'primary' : legiscanPct >= 95 ? 'error' : legiscanPct >= 80 ? 'warning' : 'primary';

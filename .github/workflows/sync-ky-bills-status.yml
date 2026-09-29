@@ -36,7 +36,10 @@ on:
   schedule:
     # Every 6h — conservative hash-gated sync (~2 LegiScan key requests per run: session list + master list raw).
     # Vercel Cron owns the guaranteed daily bills sync (0 5 UTC); this adds intra-day freshness with no 05:00 overlap.
-    - cron: '0 */6 * * *'
+    # :40 past, not :00 — keeps this off the minutes when other LegiScan callers
+    # start (Vercel legislators 06:00 / votes 06:15, legislator-links Mon 12:00),
+    # since each process throttles itself but they share one ~2 req/s key limit.
+    - cron: '40 */6 * * *'
 
 permissions:
   contents: read
@@ -75,6 +78,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+          LEGISCAN_MONTHLY_QUERY_LIMIT: ${{ vars.LEGISCAN_MONTHLY_QUERY_LIMIT || '10000' }}
           SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
           SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
           SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}
@@ -95,6 +99,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+          LEGISCAN_MONTHLY_QUERY_LIMIT: ${{ vars.LEGISCAN_MONTHLY_QUERY_LIMIT || '10000' }}
           SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
           SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
           SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}

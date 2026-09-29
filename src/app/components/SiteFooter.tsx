@@ -5,6 +5,7 @@ import { Box, Container, Divider, Link as MuiLink, Stack, Typography } from '@mu
 import Link from 'next/link';
 import Image from 'next/image';
 import { APP_VERSION } from '@/lib/app-version';
+import { CC_BY_4_NAME, CC_BY_4_URL, LEGISCAN_CHANGES_NOTE, LEGISCAN_URL } from '@/lib/legiscan-attribution';
 
 const NAV_WORDMARK_SRC = '/branding/Logo-03.png';
 
@@ -101,8 +102,16 @@ export default function SiteFooter() {
               Free civic resource for Kentucky residents
             </Typography>
             <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.5 }}>
-              Profile information is sourced from public data (Open States and official Kentucky
-              sources) and may lag updates.
+              Bill, vote and sponsor data from{' '}
+              <MuiLink href={LEGISCAN_URL} target="_blank" rel="noopener noreferrer" color="inherit">
+                LegiScan
+              </MuiLink>
+              , licensed under{' '}
+              <MuiLink href={CC_BY_4_URL} target="_blank" rel="noopener license noreferrer" color="inherit">
+                {CC_BY_4_NAME}
+              </MuiLink>
+              . {LEGISCAN_CHANGES_NOTE} Legislator profiles come from Open States and official Kentucky
+              sources. All of it may lag updates.
             </Typography>
           </Box>
 

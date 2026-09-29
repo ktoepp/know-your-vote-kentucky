@@ -172,9 +172,34 @@ function legiscanPeopleIdFromPublicUrl(url: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * people_ids in the latest KY session's roster — one `getSessionPeople` call per run.
+ * Every probed row is an active legislator, so the roster confirms nearly all of
+ * them; `getPerson` is only spent on ids the roster doesn't contain. This used to
+ * be one `getPerson` per legislator (~138/week, 59% of September 2026's quota).
+ */
+let sessionRosterIds: Promise<Set<number>> | null = null;
+function latestSessionRosterIds(): Promise<Set<number>> {
+  if (!sessionRosterIds) {
+    sessionRosterIds = (async () => {
+      const client = getKyLegiScanClient();
+      const sessions = await client.fetchSessions();
+      const latest = [...sessions].sort((a, b) => (b.year_end || 0) - (a.year_end || 0))[0];
+      if (!latest) return new Set<number>();
+      const people = await client.getSessionPeople(latest.session_id);
+      return new Set(people.map((p) => p.people_id));
+    })();
+  }
+  return sessionRosterIds;
+}
+
 /** True when LegiScan API confirms this people_id exists (avoids Cloudflare on public HTML). */
 async function verifyLegiscanPersonViaApi(peopleId: number): Promise<ProbeResult> {
   try {
+    const roster = await latestSessionRosterIds();
+    if (roster.has(peopleId)) {
+      return { ok: true, status: 200, finalUrl: legiscanPersonUrl(peopleId) };
+    }
     const client = getKyLegiScanClient();
     const person = await client.getPerson(peopleId);
     if (person?.people_id === peopleId) {

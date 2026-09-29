@@ -35,15 +35,16 @@ on:
         type: boolean
         default: false
   schedule:
-    # Sundays 08:00 UTC — one hour after accuracy-audit (07:00 UTC), well after
-    # LegiScan's Sunday 04-05 ET dataset regen window.
-    - cron: '0 8 * * 0'
+    # Sundays 11:00 UTC — after LegiScan's Sunday 04-05 ET regen window (08:00-
+    # 10:00 UTC depending on DST; the old 08:00 slot sat inside it), and two
+    # hours before accuracy-audit (13:00 UTC), which reads the ZIPs this stores.
+    - cron: '0 11 * * 0'
     # Wednesday backstop. LegiScan's API times out often enough that a single
     # weekly attempt is a single point of failure: on 2026-08-30 all five
     # retries hit the 60s timeout and the reconcile then sat undone for ten
     # days. This is a retry, not a second reconcile — hash gating means it costs
     # one getDatasetList and zero downloads whenever Sunday already succeeded.
-    - cron: '0 8 * * 3'
+    - cron: '0 11 * * 3'
 
 permissions:
   contents: read
@@ -69,6 +70,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+      LEGISCAN_MONTHLY_QUERY_LIMIT: ${{ vars.LEGISCAN_MONTHLY_QUERY_LIMIT || '10000' }}
       SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}
       SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
       SLACK_WEBHOOK_SYNC: ${{ secrets.SLACK_WEBHOOK_SYNC }}

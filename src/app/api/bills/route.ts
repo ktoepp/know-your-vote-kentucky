@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../lib/supabaseClient';
 import { parseLimit, parseEnum, ValidationError } from '@/lib/api-validation';
 import { billMatchesBrowseStatusFilter, BROWSE_STATUS_BUCKETS } from '@/lib/bill-display';
+import { LEGISCAN_API_ATTRIBUTION } from '@/lib/legiscan-attribution';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
       bills: rows,
       source: 'supabase',
       count: rows.length,
+      attribution: LEGISCAN_API_ATTRIBUTION,
     });
   } catch (error) {
     if (error instanceof ValidationError) {

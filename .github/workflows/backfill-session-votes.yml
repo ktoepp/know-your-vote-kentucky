@@ -78,6 +78,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+          LEGISCAN_MONTHLY_QUERY_LIMIT: ${{ vars.LEGISCAN_MONTHLY_QUERY_LIMIT || '10000' }}
           # Inputs travel as env vars, never interpolated into the script body —
           # `${{ }}` in a run block is a script-injection seam.
           INPUT_SESSIONS: ${{ inputs.sessions }}

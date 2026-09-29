@@ -19,8 +19,11 @@ name: Content accuracy audit
 on:
   workflow_dispatch:
   schedule:
-    # Weekly - Sundays 07:00 UTC.
-    - cron: '0 7 * * 0'
+    # Weekly - Sundays 13:00 UTC. After LegiScan's dataset regen (Sun 04-05 ET =
+    # 08-10 UTC across DST) and after the 11:00 UTC dataset sync, which stores
+    # each new ZIP — so the audit's dataset loads read the stored copy for zero
+    # queries instead of re-downloading (LegiScan warning, 2026-07-07).
+    - cron: '0 13 * * 0'
 
 permissions:
   contents: read
@@ -51,6 +54,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+      LEGISCAN_MONTHLY_QUERY_LIMIT: ${{ vars.LEGISCAN_MONTHLY_QUERY_LIMIT || '10000' }}
       OPENSTATES_API_KEY: ${{ secrets.OPENSTATES_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       SLACK_WEBHOOK_STATUS_REPORTS: ${{ secrets.SLACK_WEBHOOK_STATUS_REPORTS }}

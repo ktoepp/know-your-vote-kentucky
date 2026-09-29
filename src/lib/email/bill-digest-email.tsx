@@ -12,6 +12,7 @@ import {
 } from 'react-email';
 import * as React from 'react';
 import { EMAIL_DARK_MODE_CSS, EmailBrandHeader } from '@/lib/email/brand';
+import { CC_BY_4_NAME, CC_BY_4_URL, LEGISCAN_URL } from '@/lib/legiscan-attribution';
 
 export type BillDigestLine = {
   detail: string;
@@ -344,6 +345,12 @@ export function BillDigestEmail(props: {
               Bill status lines quote the legislature&rsquo;s official action text where available. The{' '}
               <Link href={glossaryHref} style={inlineLink} className="kv-link">glossary</Link> explains the terms.
               Dates in parentheses show when Know Your Vote Kentucky recorded each update, which can lag the action itself.
+            </Text>
+            <Text style={footerText} className="kv-muted">
+              Bill data from{' '}
+              <Link href={LEGISCAN_URL} style={inlineLink} className="kv-link">LegiScan</Link>, licensed under{' '}
+              <Link href={CC_BY_4_URL} style={inlineLink} className="kv-link">{CC_BY_4_NAME}</Link>. We reformat it and add
+              plain-language status labels.
             </Text>
             <Text style={footerLinks} className="kv-muted">
               <Link href={preferencesHref} style={inlineLink} className="kv-link">Change digest settings</Link>

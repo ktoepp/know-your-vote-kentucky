@@ -38,7 +38,7 @@ meeting schedules come from the Kentucky Legislative Research Commission (LRC).
 
 ## Data sources
 
-- LegiScan (https://legiscan.com): bill text, sponsors, votes, status.
+- LegiScan (https://legiscan.com): bill text, sponsors, votes, status. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). We reformat it, add plain-language status labels and topics, and write AI summaries. Credit LegiScan when reusing this data.
 - Open States (https://openstates.org): legislator roster, districts, contact info.
 - Kentucky LRC (https://legislature.ky.gov): committee schedules and agendas.
 
