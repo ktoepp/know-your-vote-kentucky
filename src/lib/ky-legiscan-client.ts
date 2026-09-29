@@ -86,8 +86,19 @@ const LEGISCAN_KY_MASTERLIST_RAW_KEY_PREFIX = 'legiscan_ky_masterlist_raw_';
 
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const SESSIONS_PERSIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * How fresh the persisted session list must be to skip `getSessionList`
+ * entirely. The list changes a few times a year (a new session is created);
+ * a day of lag is harmless, and it saves ~4 of the ~5 calls/day the syncs made.
+ */
+const SESSIONS_FRESH_MS = 24 * 60 * 60 * 1000;
 const MASTERLIST_RAW_PERSIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const RATE_DELAY = 500;
+/**
+ * Minimum gap between request starts, per process. LegiScan enforces a
+ * sliding-window ~2 req/s sustained limit from 2026-10-01; 650 ms (~1.5 req/s)
+ * leaves headroom for network jitter compressing gaps on the wire.
+ */
+const RATE_DELAY = 650;
 const MAX_RETRIES = 5;
 const REQUEST_TIMEOUT_MS = 60_000;
 /** How long the client trusts its last quota-guard result before re-checking. */
@@ -108,6 +119,8 @@ export class KyLegiScanClient {
   private apiKey: string;
   private cache = new Map<string, { data: unknown; ts: number }>();
   private lastReq = 0;
+  /** Serializes throttle waits so concurrent callers can't read the same `lastReq` and fire together. */
+  private throttleChain: Promise<void> = Promise.resolve();
   private quotaCheckedAt = 0;
   private quotaHoldReason: string | null = null;
   private quotaHoldSummary: Awaited<ReturnType<typeof checkLegiscanQuotaForSync>>['summary'] = null;
@@ -121,10 +134,14 @@ export class KyLegiScanClient {
     });
   }
 
-  private async throttle(): Promise<void> {
-    const wait = RATE_DELAY - (Date.now() - this.lastReq);
-    if (wait > 0) await new Promise(r => setTimeout(r, wait));
-    this.lastReq = Date.now();
+  private throttle(): Promise<void> {
+    const next = this.throttleChain.then(async () => {
+      const wait = RATE_DELAY - (Date.now() - this.lastReq);
+      if (wait > 0) await new Promise(r => setTimeout(r, wait));
+      this.lastReq = Date.now();
+    });
+    this.throttleChain = next.catch(() => {});
+    return next;
   }
 
   private getCached<T>(key: string): T | null {
@@ -152,8 +169,9 @@ export class KyLegiScanClient {
     const cached = this.getCached<T>(ck);
     if (cached) return cached;
     await this.ensureQuotaAllows();
-    await this.throttle();
     for (let i = 1; i <= MAX_RETRIES; i++) {
+      // Retries are requests too — every attempt waits its turn.
+      await this.throttle();
       try {
         const r = await this.client.get('/', { params: { key: this.apiKey, ...params } });
         void this.incrementQueryCounter(params.op);
@@ -220,7 +238,7 @@ export class KyLegiScanClient {
     return payload[m] || 0;
   }
 
-  private async readPersistedKySessions(): Promise<LegiScanSession[] | null> {
+  private async readPersistedKySessions(maxAgeMs: number = SESSIONS_PERSIST_TTL_MS): Promise<LegiScanSession[] | null> {
     if (!supabaseAdmin) return null;
     try {
       const { data, error } = await supabaseAdmin
@@ -238,7 +256,8 @@ export class KyLegiScanClient {
       const fetchedAt = payload?.fetched_at || data?.updated_at;
       if (fetchedAt) {
         const ageMs = Date.now() - new Date(fetchedAt).getTime();
-        if (ageMs > SESSIONS_PERSIST_TTL_MS) {
+        if (ageMs > maxAgeMs) {
+          if (maxAgeMs < SESSIONS_PERSIST_TTL_MS) return null;
           console.warn(
             `[KyLegiScan] Cached KY sessions are stale (${Math.round(ageMs / 86_400_000)}d old); ignoring`,
           );
@@ -336,6 +355,8 @@ export class KyLegiScanClient {
   }
 
   async fetchSessions(): Promise<LegiScanSession[]> {
+    const fresh = await this.readPersistedKySessions(SESSIONS_FRESH_MS);
+    if (fresh?.length) return fresh;
     console.log('[KyLegiScan] Fetching KY sessions');
     try {
       const d = await this.request<any>({ op: 'getSessionList', state: 'KY' });
@@ -413,11 +434,16 @@ export class KyLegiScanClient {
     return vd?.roll_call ? (vd.roll_call as LegiScanVote) : null;
   }
 
-  async fetchVotes(billId: number): Promise<LegiScanVote[]> {
+  /**
+   * Roll calls for a bill. `skipRollCallIds` are ones the caller already has:
+   * a roll call never changes once recorded, so re-fetching it only spends quota.
+   */
+  async fetchVotes(billId: number, skipRollCallIds?: ReadonlySet<number>): Promise<LegiScanVote[]> {
     const detail = await this.fetchBillDetail(billId);
     if (!detail?.votes?.length) return [];
     const results: LegiScanVote[] = [];
     for (const v of detail.votes) {
+      if (skipRollCallIds?.has(v.roll_call_id)) continue;
       const rc = await this.fetchRollCall(v.roll_call_id);
       if (rc) results.push(rc);
     }
