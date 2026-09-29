@@ -2507,3 +2507,56 @@ PostHog covers everything the Metrics Dashboard needs today. Vercel covers only 
   - [x] Notion Strategic Hub → Product → "Compare Vercel Analytics vs PostHog" checked off with a pointer to this entry.
   - [ ] Optional: turn off Web Analytics in the Vercel dashboard project settings so the disabled state matches the codebase (the API 404 confused the source file for a month; a dashboard-off state avoids the same confusion next time).
   - [ ] Pull the Vercel dashboard's own 30-day pageview total by hand before disabling, if the reconciliation datapoint is still wanted; otherwise skip.
+
+---
+
+## 2026-09-29 — PROPOSED: LegiScan Public API changes (Oct 1 quota cut, Nov 1 enforcement) — stay free, fix four things first
+
+> **Status: PROPOSED — not decided.** Research only; no code, env, or production changes were made. Katie's call. Source: LegiScan's 2026-09-23 email to katietoepp@gmail.com ("LegiScan Public API Changes - October 1"). Supersedes nothing yet; builds on [§ 2026-08-21](#2026-08-21--legiscan-push-vs-pull-stay-on-pull-the-97-ceiling-was-a-pre-fix-read-path-artifact) and [§ 2026-08-24](#2026-08-24--legiscan-quota-instrumented-by-operation-and-caller).
+
+**What changes.** From 2026-10-01: Public quota 30,000 → **10,000/month**; new sliding-window rate limit of **~2 req/s sustained**; self-service paid tiers ($1,000/yr = 30k, then +10k per $1,000, $6,000/yr = 100k National Pull; state-limited Pull "still the most cost effective route to 100k … also starting at $1,000/yr" — our 2026-08-18 quote was 2-state/100k at $1,100/yr). From **2026-11-01**: audited enforcement of CC BY 4.0 attribution and the one-key rule; violating keys are **permanently banned**. Overage is a hard stop until the 1st, not a bill.
+
+### Measured usage (our counter, not LegiScan's)
+
+Source: `ky_sync_state.legiscan_query_counter` (read-only `SELECT`, 2026-09-29 12:25 UTC). The client increments it on every successful HTTP response ([ky-legiscan-client.ts:155](src/lib/ky-legiscan-client.ts:155)); per-op/per-caller buckets exist only from 2026-08-24.
+
+| Month | Queries | vs new 10k cap | Breakdown |
+|---|---:|---:|---|
+| 2026-06 | 29,164 | 292% | none — pre-fix read-path bug artifact ([Notion usage correction](https://app.notion.com/p/3c3f63e88157813c8930eb269527f2b6)); not a baseline |
+| 2026-07 | 5,443 | 54% | none — includes July's one-off backfills (nv-count / dataset backfill incident) |
+| 2026-08 | 1,165 | 12% | 211 attributed (08-24→31), 954 pre-instrumentation |
+| 2026-09 (to 09-29 12:25 UTC) | **939** | **9.4%** | fully attributed, below |
+
+September by op@caller: `getPerson@untagged` **552** (59%) · `getSessionList` 162 (135 sync-bills, 27 sync-legislators) · `getMasterListRaw@sync-bills` 135 · `getDataset@accuracy-audit` **43** · `getSessionPeople@sync-legislators` 33 · `getDatasetList` 14 (8 dataset-sync, 6 accuracy-audit). **Zero `getBill`/`getRollCall`** — interim; hash-gating and the interim guard are working.
+
+**Cross-checks (GitHub Actions run history + logs):** 111 `sync-ky-bills-status` runs + ~29 daily Vercel bills crons ≈ 140 vs 135 `getMasterListRaw`. 4 `legislator-links-weekly` runs × 138 = 552 `getPerson` exactly — that untagged caller is `scripts/verify-legislator-external-links.ts`. 4 scheduled audit runs logged 28 `getDataset`; the other 15 (and 2 of the 6 lists) came from audit runs outside Actions against the production DB.
+
+**What the counter misses:** failed attempts. Sept bills-status logs show **50** `timeout of 60000ms exceeded` attempts (5 of 111 runs) that never incremented; LegiScan may count them. Runs with no Supabase service key (local dev against another DB) also don't count. Upper bound on September as LegiScan sees it: ~1,000, not 939.
+
+### Session-peak estimate (the load that matters)
+
+No post-fix session month exists. Built from the 2026 RS in our DB instead of the 08-21 model: March 2026 (peak) had **2,970 bill-days with actions** (5,187 actions) and **420 roll calls**. Hash-gated sync spends one `getBill` per changed bill per run → ~3,000–5,200 `getBill`; plus ~310 masterlist/session-list, votes cron 450–775 (5 bills/day, re-fetches every roll call), link verifier ~600, audit ~60, dataset ~20, people ~35. **≈ 4,500–7,000/month for Kentucky at peak** — under 10k, but 45–70% of it, and one manual backfill (`refresh:bill-status` last spent 1,737 `getBill`; `backfill:vote-nv-counts` would spend ~6,944) exhausts the month with no recovery until the 1st. **Two states at peak ≈ 9,000–14,000 → over the cap.**
+
+### Four things that are wrong today regardless of option
+
+1. **The quota guard still thinks the cap is 30,000.** `LEGISCAN_MONTHLY_QUERY_LIMIT` defaults to 30,000 ([legiscan-quota.ts:103](src/lib/legiscan-quota.ts:103)) and is not set in Vercel or GitHub; the admin card hardcodes it ([sync-status/page.tsx:117](src/app/admin/sync-status/page.tsx:117)). After Oct 1 the 95% hold engages at 28,500 — i.e. never — and Slack bands (90/95/98%) never fire before LegiScan cuts us off.
+2. **The accuracy audit re-downloads unchanged datasets — the exact behavior LegiScan warned us about on 2026-07-07**, after which we told them "all getDataset calls now gate on dataset_hash." That was true then; [legiscan-dataset-corpus.ts:155](src/lib/accuracy-audit/legiscan-dataset-corpus.ts:155) (added 08-24) fetches up to ~11 datasets per run with no `dataset_hash` check, including closed sessions that never change (sessions 2024 and 2247 were each pulled 4× in September while `sync-ky-dataset` logged "25 unchanged" every run). It also runs Sunday 07:00 UTC — before LegiScan regenerates datasets (4–5 AM ET). `scripts/backfill-session-votes.ts:144` is ungated too (manual). With audit enforcement starting Nov 1, this is the likeliest thing to get the key restricted.
+3. **Attribution does not meet CC BY 4.0** (details in TASKS.md): LegiScan is credited on `/about` and `/licenses`, but nowhere is the **CC BY 4.0 license named or linked**, nothing **indicates changes** (status mapping, topic tags, AI summaries), the site-wide footer credits "Open States and official Kentucky sources" and **omits LegiScan**, the public CORS-open `/api/bills` JSON and digest emails redistribute LegiScan data with no credit, and the bill page's "LegiScan" button actually links to the LRC site.
+4. **Rate limiting has zero margin.** The client spaces request starts 500 ms apart ([ky-legiscan-client.ts:90](src/lib/ky-legiscan-client.ts:90)) — exactly 2/s — per process, and the throttle isn't concurrency-safe (concurrent callers read the same `lastReq`). No current caller issues concurrent requests, but independent processes overlap: GH bills sync at 06:00/12:00 UTC with Vercel legislators (06:00) and votes (06:15) daily, and with the Monday 12:00 link verifier (138 sequential `getPerson`). In session that is ~4 req/s sustained for minutes.
+
+### Options
+
+**(a) Stay under 10k — caching + reduced polling.** Fix 1–4, plus cut the avoidable volume: link verifier checks people_ids against one `getSessionPeople` response instead of 138 `getPerson` (−~550/mo); read the 7-day persisted session list before calling `getSessionList` (−~160/mo); votes cron skips `roll_call_id`s already stored — roll calls are static (−most of 450–775 in session); one masterlist poll/day in interim (−~110/mo). Interim → ~200–300/mo; KY session peak → ~3,500–6,000. Effort ~2–3 dev-days. $0.
+**(b) Pay $1,000/yr for 30k.** Restores today's headroom. Doesn't fix 2–4, which are ban risks, not quota risks. If we ever pay, the state-limited Pull (100k for ~$1,000–1,100/yr on KY+1) dominates the national 30k tier for this product.
+**(c) Push API for committee schedules.** Committee schedules come from the LRC calendar scrape (`ky-lrc-calendar-sync.ts`, zero LegiScan calls), not LegiScan, so Push buys nothing there; Push is unpriced for us and is full-database replication we'd have to host ([§ 2026-08-21](#2026-08-21--legiscan-push-vs-pull-stay-on-pull-the-97-ceiling-was-a-pre-fix-read-path-artifact)).
+**(d) Combination.** (a) now; (b) as a pre-agreed trigger, not a purchase.
+
+### Recommendation — (d), which is (a) now with (b) held as a trigger
+
+- **Chosen:** Stay on the free Public key. Before 10-01: set `LEGISCAN_MONTHLY_QUERY_LIMIT=10000` (Vercel + GH secret) and fix the admin hardcode. Before 11-01: hash-gate every `getDataset` path (audit + `backfill-session-votes`), move the audit after 10:00 UTC Sunday, fix attribution (footer, `/licenses` with license link + changes notice, bill-page credit, API `attribution` field, digest footer), add rate margin (650 ms spacing, serialized throttle, staggered cron minutes). Then the volume cuts in (a). Reply to LegiScan's 09-23 email confirming one key on account `ktoepp` and describing our attribution, before 11-01.
+- **Optimization:** Removes both ban vectors (dataset re-pulls, attribution) and the silent-cutoff risk (guard at 30k) at $0, and leaves Kentucky's session peak at roughly a third to a half of the new cap.
+- **Cost / trade-off:** ~2–3 dev-days in October, competing with Tier 1 analytics work. The link verifier stops proving each LegiScan profile URL individually (it proves the people_id is in the current session roster instead — same guarantee for active members, weaker for former ones). Interim masterlist freshness drops from ~4.8h to ~24h.
+- **Non-goals:** No second key, ever (one-key rule; also blocks any "dev key"). No Push. No paid tier until the trigger fires. No change to the read path (already zero LegiScan calls).
+- **Revisit if:** a 2027 RS month passes 5,000 queries by the 15th (projects over ~8,000) → buy before month-end, state-limited Pull first; a second state is committed; LegiScan replies with a concern about our key; or any single-run script is about to spend >1,000 queries (price it against the month first).
+
+**Key ownership, for the record:** the 03-09 "LegiScan Account Details" email (OneVote account `ktoepp`), the 03-13 key-registration email, the 07-07 dataset warning about *our* traffic, and the 09-23 announcement all went to katietoepp@gmail.com; Vercel's `LEGISCAN_API_KEY` was created 83 minutes after that account registration, by Katie's Vercel user. LegiScan's "no keys registered to kyvky.com" (08-18) answered a question sent from katie@kyvky.com — the key is on the gmail account, not missing. Inferred, high confidence; confirm by comparing the key on the OneVote API Status page against Vercel's.
