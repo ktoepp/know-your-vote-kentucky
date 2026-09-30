@@ -42,7 +42,7 @@ import { withTimeout } from '@/lib/async-utils';
 import { formatCivicDate } from '@/lib/civic-date';
 import { searchKyCommitteeAgendaItems } from '@/lib/ky-committee-search';
 import { KY_MEETING_BROWSE_SELECT } from '@/lib/ky-ga-browse-select';
-import { KY_SESSIONS } from '@/lib/ky-sessions';
+import { getMostRecentStartedSession } from '@/lib/ky-sessions';
 import {
   gaChamberFilterLabel,
   kyTodayIso,
@@ -153,7 +153,7 @@ export function MeetingsBrowse({ initialMeetings }: MeetingsBrowseProps) {
       from.setDate(from.getDate() - 30);
       // Reach back to the active/most-recent session start so the "Recent"
       // filter can surface the full session, not just the last 30 days.
-      const sessionStart = new Date(`${KY_SESSIONS[0]!.start}T12:00:00`);
+      const sessionStart = new Date(`${getMostRecentStartedSession().start}T12:00:00`);
       if (sessionStart < from) from.setTime(sessionStart.getTime());
       const to = new Date(`${today}T12:00:00`);
       to.setDate(to.getDate() + 120);

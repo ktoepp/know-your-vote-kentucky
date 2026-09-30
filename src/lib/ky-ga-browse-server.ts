@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { KYCommittee, KYCommitteeMeetingBrowse } from '@/types/kentucky';
 import { kyTodayIso } from '@/lib/ky-committee-display';
 import { KY_COMMITTEE_BROWSE_SELECT, KY_MEETING_BROWSE_SELECT } from '@/lib/ky-ga-browse-select';
-import { KY_SESSIONS } from '@/lib/ky-sessions';
+import { getMostRecentStartedSession } from '@/lib/ky-sessions';
 
 const GA_BROWSE_REVALIDATE_SECONDS = 300;
 
@@ -39,7 +39,7 @@ const getCachedMeetingsBrowseWindow = unstable_cache(
     from.setDate(from.getDate() - 30);
     // Reach back to the active/most-recent session start so the "Recent"
     // filter can surface the full session, not just the last 30 days.
-    const sessionStart = new Date(`${KY_SESSIONS[0]!.start}T12:00:00`);
+    const sessionStart = new Date(`${getMostRecentStartedSession().start}T12:00:00`);
     if (sessionStart < from) from.setTime(sessionStart.getTime());
     const to = new Date(`${today}T12:00:00`);
     to.setDate(to.getDate() + 120);

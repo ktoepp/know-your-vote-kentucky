@@ -18,6 +18,7 @@
     "sync:ky": "tsx scripts/manual-sync.ts",
     "sync:ky:legislators": "tsx scripts/manual-sync.ts legislators",
     "sync:ky:sessions": "tsx scripts/list-ky-legiscan-sessions.ts",
+    "sync:ky:session-preview": "tsx scripts/preview-session-sync.ts",
     "sync:ky:quota": "tsx scripts/manual-sync.ts bills --quota-backfill",
     "sync:ky:bills:status": "tsx scripts/manual-sync.ts bills --use-change-hash --skip-bill-sponsor-details",
     "sync:ky:dry": "tsx scripts/manual-sync.ts --dry-run",

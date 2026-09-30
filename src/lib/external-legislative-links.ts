@@ -3,11 +3,16 @@
  * LegiScan public roll call pages are stable; Ballotpedia rarely has per-vote URLs, so we use search when needed.
  */
 
+import { getMostRecentStartedSession } from './ky-sessions';
 import { normalizeHttpsUrl } from './legislator-link-normalize';
 
 const KY_STATE = 'KY';
 
-const KY_DEFAULT_SESSION_LABEL = '2026 RS';
+/** LRC's short label for the session bills are in right now, e.g. "2026 RS". */
+function kyDefaultSessionLabel(): string {
+  const s = getMostRecentStartedSession();
+  return `${s.start.slice(0, 4)} ${s.type === 'special' ? 'SS' : 'RS'}`;
+}
 
 /**
  * Official Kentucky LRC HTML bill page (`legislature.ky.gov`).
@@ -16,7 +21,7 @@ const KY_DEFAULT_SESSION_LABEL = '2026 RS';
 export function kyLrcBillDetailsUrl(billNumber: string | null | undefined, session: string | null | undefined): string {
   const leg = String(billNumber ?? '').trim();
   const sessRaw = String(session ?? '').trim();
-  const sess = sessRaw !== '' ? sessRaw : KY_DEFAULT_SESSION_LABEL;
+  const sess = sessRaw !== '' ? sessRaw : kyDefaultSessionLabel();
   return `https://legislature.ky.gov/Legislation/Pages/bill-details.aspx?legislation=${encodeURIComponent(leg)}&session=${encodeURIComponent(sess)}`;
 }
 

@@ -354,14 +354,23 @@ export class KyLegiScanClient {
     }
   }
 
-  async fetchSessions(): Promise<LegiScanSession[]> {
-    const fresh = await this.readPersistedKySessions(SESSIONS_FRESH_MS);
-    if (fresh?.length) return fresh;
+  /**
+   * `live` skips the day-old persisted copy and always spends one `getSessionList`
+   * (the session preview uses it to see a just-published session). `persist: false`
+   * leaves `ky_sync_state` untouched, for dry runs.
+   */
+  async fetchSessions(
+    { live = false, persist = true }: { live?: boolean; persist?: boolean } = {},
+  ): Promise<LegiScanSession[]> {
+    if (!live) {
+      const fresh = await this.readPersistedKySessions(SESSIONS_FRESH_MS);
+      if (fresh?.length) return fresh;
+    }
     console.log('[KyLegiScan] Fetching KY sessions');
     try {
       const d = await this.request<any>({ op: 'getSessionList', state: 'KY' });
       const sessions: LegiScanSession[] = d?.sessions || [];
-      if (sessions.length > 0) {
+      if (persist && sessions.length > 0) {
         await this.persistKySessions(sessions);
       }
       return sessions;
@@ -385,7 +394,10 @@ export class KyLegiScanClient {
     return Object.values(d.masterlist).filter((b: any) => b.bill_id) as LegiScanBillSummary[];
   }
 
-  async fetchMasterListRaw(sessionId: number): Promise<LegiScanMasterListRawBill[]> {
+  async fetchMasterListRaw(
+    sessionId: number,
+    { persist = true }: { persist?: boolean } = {},
+  ): Promise<LegiScanMasterListRawBill[]> {
     console.log(`[KyLegiScan] Fetching masterlistraw for session ${sessionId}`);
     try {
       const d = await this.request<any>({ op: 'getMasterListRaw', id: String(sessionId) });
@@ -393,7 +405,7 @@ export class KyLegiScanClient {
       const bills = Object.values(d.masterlist).filter(
         (b: any) => b && b.bill_id,
       ) as LegiScanMasterListRawBill[];
-      if (bills.length > 0) {
+      if (persist && bills.length > 0) {
         await this.persistKyMasterListRaw(sessionId, bills);
       }
       return bills;

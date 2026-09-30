@@ -5,11 +5,12 @@
  */
 import './load-env';
 import { getKyLegiScanClient } from '../src/lib/ky-data-sources';
+import { sortKySessionsNewestFirst } from '../src/lib/ky-legiscan-session-discovery';
 
 async function main() {
   const client = getKyLegiScanClient();
   const sessions = await client.fetchSessions();
-  const sorted = [...sessions].sort((a, b) => (b.year_end || 0) - (a.year_end || 0));
+  const sorted = sortKySessionsNewestFirst(sessions);
   console.log('session_id\tsession_name\tyears');
   for (const s of sorted) {
     console.log(`${s.session_id}\t${s.session_name}\t${s.year_start}-${s.year_end}`);
