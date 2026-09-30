@@ -14,7 +14,7 @@ import { buildPageMetadata } from '@/lib/seo';
 
 const PATH = '/guides/kentucky-general-assembly-sessions';
 const TITLE = 'Kentucky General Assembly session dates and schedule';
-const DATE_MODIFIED = '2026-07-18';
+const DATE_MODIFIED = '2026-09-30';
 
 // Session dates, phase, and the interim window render live from KY_SESSIONS so
 // this page never goes stale when a new session is added.

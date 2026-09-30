@@ -52,7 +52,7 @@ import { memberProfilePath } from '@/lib/ky-member-utils';
 import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
 import { parseKyBillSessionParam } from '@/lib/ky-bills-browse-url';
 import { parseGaChamberParam } from '@/lib/ky-ga-browse-url';
-import { KY_BILL_SESSION_OPTIONS, getCivicDataSessionName } from '@/lib/ky-sessions';
+import { getKyBillSessionFilterOptions, getCivicDataSessionName } from '@/lib/ky-sessions';
 import { PaginatedSection } from '@/components/ui/PaginatedSection';
 import { PAGE_SIZE_CHOICES, toPageSizeChoice, usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useKyBillCommittees } from '@/lib/use-ky-bill-committees';
@@ -661,7 +661,7 @@ export function SearchPageClient({ legislatorRoster }: SearchPageClientProps) {
                   MenuProps={{ PaperProps: { sx: { maxHeight: 420 } } }}
                 >
                   <MenuItem value="all">All sessions</MenuItem>
-                  {KY_BILL_SESSION_OPTIONS.map((s) => (
+                  {getKyBillSessionFilterOptions().map((s) => (
                     <MenuItem key={s} value={s}>
                       {s === defaultSession ? `${s} (current)` : s}
                     </MenuItem>

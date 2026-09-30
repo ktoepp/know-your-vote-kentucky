@@ -2560,3 +2560,38 @@ No post-fix session month exists. Built from the 2026 RS in our DB instead of th
 - **Revisit if:** a 2027 RS month passes 5,000 queries by the 15th (projects over ~8,000) → buy before month-end, state-limited Pull first; a second state is committed; LegiScan replies with a concern about our key; or any single-run script is about to spend >1,000 queries (price it against the month first).
 
 **Key ownership, for the record:** the 03-09 "LegiScan Account Details" email (OneVote account `ktoepp`), the 03-13 key-registration email, the 07-07 dataset warning about *our* traffic, and the 09-23 announcement all went to katietoepp@gmail.com; Vercel's `LEGISCAN_API_KEY` was created 83 minutes after that account registration, by Katie's Vercel user. LegiScan's "no keys registered to kyvky.com" (08-18) answered a question sent from katie@kyvky.com — the key is on the gmail account, not missing. Inferred, high confidence; confirm by comparing the key on the OneVote API Status page against Vercel's.
+
+---
+
+## 2026-09-30 — 2027 Regular Session: scheduled in `KY_SESSIONS`, discovered from LegiScan by name, never by id
+
+**Trigger.** PR #286's follow-up: the newest `KY_SESSIONS` entry was the 2026 RS, so `getSessionPhase()` would have read `interim` through all of 2027 and the phase-gated LegiScan syncs (`votes`, `legislator-bios`) would have stayed off for the whole session.
+
+**Findings.**
+
+- The bills sync never needed a session id. It sorts `getSessionList` newest-first and takes the first session whose master list has bills ([ky-sync-pipeline.ts](src/lib/ky-sync-pipeline.ts) `syncKyBillsByHash`); the dataset reconcile walks all of `getDatasetList`. The only hard-coded session knowledge is the calendar in `src/lib/ky-sessions.ts`, plus one stray `'2026 RS'` default in `external-legislative-links.ts`.
+- LRC's [2027 Regular Session Calendar](https://legislature.ky.gov/Documents/27RS_Calendar.pdf) (posted 2026-09-10, linked from [Schedules & Calendars](https://legislature.ky.gov/Schedules-Calendars/Pages/default.aspx)): Part I convenes Tue Jan 5 (legislative days 1–4, Jan 5–8); break Jan 9–Feb 1; Part II convenes Feb 2; last day for Senate bills Feb 16, House bills Feb 17; concurrence Mar 11–12; veto days Mar 13–24; day 29 Mar 25; sine die Tue Mar 30 (day 30). Matches Ky. Const. §36/§42 (30 legislative days, adjourn by March 30).
+- LegiScan had not listed the session on 2026-09-30: live `getSessionList` returned 26 KY sessions, newest `2247 2026 Regular Session`.
+- Five places treated `KY_SESSIONS[0]` as "the session bills are in now" (`getCivicDataSessionName`, the banner fallback, two committee-meeting windows, the guide description). Adding a future session at index 0 would have pointed `/bills`, search, member profiles, the home highlights and the sitemap at a session with zero bills for three months.
+- Two callers took the roster of `sorted[0]` (legislator `people_id` reconcile, link verifier). A freshly created LegiScan session has no people, so both would have silently matched nobody during the gap.
+
+**Decisions.**
+
+- **Add the session to the calendar now; resolve the LegiScan id at run time.** `KY_SESSIONS[0]` is the 2027 RS with LRC's dates and veto-recess milestones. No `session_id` constant exists. New `src/lib/ky-legiscan-session-discovery.ts` holds the one sort (`year_end`, then `session_id`), name → session matching, and the roster fallback.
+- **"Current session" means most recently convened.** New `getMostRecentStartedSession()`; `getCivicDataSessionName()` and the four other `KY_SESSIONS[0]` readers use it. Pages flip to 2027 on Jan 5, not before. Filter dropdowns use `getKyBillSessionFilterOptions()`, which hides sessions that have not convened; `KY_BILL_SESSION_OPTIONS` still validates `?session=` URLs.
+- **The pre-publication gap is a skip.** Not listed → the syncs never see it. Listed with an empty master list → logged `Skipping … expected until LegiScan publishes its bills`, previous session syncs, source status stays `success`. Master list errors on a brand-new session (no rows in `ky_bills` for it yet) are caught the same way; quota holds and errors on a session we already hold bills for still surface. Nothing in the gap writes `error` to `ky_sources` or posts to Slack.
+- **Dry-run preview, off by default.** `npm run sync:ky:session-preview` asks live `getSessionList` for the next scheduled session and, once listed, diffs the master list against `ky_bills` to print the `getBill` count a sync would spend. `--apply` runs the hash-gated bills sync for that session. Dry run writes only the quota counter.
+
+**Call budget (10,000/month).** Measured from `ky_sync_state.legiscan_query_counter`, September 2026: 945 total, of which bills sync 274 (136 `getSessionList` + 138 `getMasterListRaw` over ~140 runs ≈ 2 calls/run; since PR #286 the session list is read from the day-old persisted copy, so ≈ 1.2/run going forward). The preview dry run measured 1 call (`getSessionList@session-preview` = 1).
+
+| State | Bills sync per run | Runs/month | Added by this change | Month total (all callers) |
+|---|---:|---:|---:|---:|
+| Interim, 2027 not listed (now) | 1 `getMasterListRaw` + ≤1 `getSessionList`/day | ~150 | 0 | ~300 (3%) |
+| 2027 listed, no bills yet | 2 `getMasterListRaw` | ~150 | +150 masterlist, +~35 `getSessionPeople` | ~490 (5%) |
+| In session | 1 `getMasterListRaw` + 1 `getBill` per new/changed bill | ~150 | votes cron on (was off for lack of a 2027 entry) | § 2026-09-29 peak estimate stands: 4,500–7,000 for a 60-day session; 2025 RS (the comparable 30-day session) had 1,441 bills vs 1,737 in 2026 |
+
+- **Optimization:** The 2027 session turns on by date and by LegiScan's own list, with no deploy and no id to look up in January, and the three months before it cost nothing visible: no empty pages, no red source, no alert.
+- **Cost / trade-off:** Up to ~185 extra LegiScan calls a month (1.9% of the cap) while the session is listed but empty. The first pickup spends one `getBill` per bill with no per-run cap other than the quota guard. `KY_SESSIONS[0]` no longer means "current", which every future reader has to know (the comment and a test say so). The Part I/II break (Jan 9–Feb 1) reads as `in_session`: the banner shows the session as active and the votes cron runs (5 `getBill` a day plus any new roll calls).
+- **Non-goals:** No second LegiScan key and no key changes. No stored session id. No new `getDataset` path — 2027 data arrives through the existing hash-gated reconcile. No per-run `getBill` cap. No separate "recess" phase for the Part I/II break. No production writes from this branch (the `--apply` path was not run).
+- **Revisit if:** LegiScan lists the session under a name other than "2027 Regular Session" (bills would be stored under a label the app does not know; the preview warns); LRC revises the calendar (re-check in March); the first-week pickup pushes January past 5,000 queries by the 15th (the § 2026-09-29 trigger); or a special session is called, which needs its own `KY_SESSIONS` entry and a check of the same-year sort order.
+

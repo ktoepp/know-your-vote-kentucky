@@ -2,7 +2,7 @@ import {
   getActiveSession,
   getInterimPeriod,
   getSessionPhase,
-  KY_SESSIONS,
+  getMostRecentStartedSession,
   type KYSessionPhase,
 } from '@/lib/ky-sessions';
 import { formatCivicDate } from '@/lib/civic-date';
@@ -74,7 +74,7 @@ export function getSessionBannerModel(asOf: Date = new Date()): SessionBannerMod
   }
 
   // Fallback (no active session, no derivable interim) — show the most recent session label.
-  const session = KY_SESSIONS[0]!;
+  const session = getMostRecentStartedSession(asOf);
   return {
     sessionName: session.name,
     dateRange: `${fmtDate(session.start)} – ${fmtDate(session.end)}`,

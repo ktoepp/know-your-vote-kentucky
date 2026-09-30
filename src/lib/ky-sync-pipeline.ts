@@ -34,6 +34,10 @@ import {
 import { checkLegiscanQuotaForSync, isLegiscanQuotaHoldError } from './legiscan-quota';
 import { getSessionPhase } from './ky-sessions';
 import {
+  fetchLatestNonEmptySessionRoster,
+  sortKySessionsNewestFirst,
+} from './ky-legiscan-session-discovery';
+import {
   buildOrdinanceSponsorsJson,
   isLegistarMatterLikelyTestNoise,
   matterTopicsFromLegistar,
@@ -730,6 +734,17 @@ async function upsertKyBillRows(
   return synced;
 }
 
+/** True when `ky_bills` already holds at least one bill for this session label. */
+async function sessionHasStoredBills(sessionName: string): Promise<boolean> {
+  try {
+    const { data } = await getSupabase().from('ky_bills').select('id').eq('session', sessionName).limit(1);
+    return Boolean(data?.length);
+  } catch {
+    // Can't tell — treat as an established session so the original error surfaces.
+    return true;
+  }
+}
+
 /**
  * Hash-gated incremental bills sync (LegiScan plan §3). Uses `getMasterListRaw` and
  * stored `change_hash` on `ky_bills` to skip unchanged bills; `getBill` is only
@@ -766,9 +781,28 @@ async function syncKyBillsByHash(
     const wantSessions = Math.max(1, options.historicSessions ?? 1);
     for (const s of sortedSessions) {
       if (sessionJobs.length >= wantSessions) break;
-      const rawBills = await client.fetchMasterListRaw(s.session_id);
+      let rawBills: LegiScanMasterListRawBill[];
+      try {
+        rawBills = await client.fetchMasterListRaw(s.session_id);
+      } catch (err) {
+        // A session LegiScan has just created can error on its master list until
+        // bills are loaded. That is the expected pre-session gap, not a failed
+        // sync: fall through to the previous session. Anything else (quota hold,
+        // an outage on a session we already hold bills for) still surfaces.
+        const isNewest = s === sortedSessions[0] && sortedSessions.length > 1;
+        if (
+          isLegiscanQuotaHoldError(err) ||
+          !isNewest ||
+          (await sessionHasStoredBills(s.session_name))
+        ) {
+          throw err;
+        }
+        const msg = err instanceof Error ? err.message : String(err);
+        log(source, `Skipping ${s.session_name} (not published on LegiScan yet: ${msg}) — expected before it convenes`);
+        continue;
+      }
       if (!rawBills.length) {
-        log(source, `Skipping ${s.session_name} (0 bills on masterlistraw)`);
+        log(source, `Skipping ${s.session_name} (0 bills on masterlistraw) — expected until LegiScan publishes its bills`);
         continue;
       }
       sessionJobs.push({ session: s, rawBills });
@@ -957,7 +991,7 @@ async function runBillsSync(options: SyncOptions): Promise<SyncResult> {
       log(source, 'No sessions found');
       return { source, status: 'success', itemsSynced: 0, duration: Date.now() - start };
     }
-    const sorted = [...sessions].sort((a, b) => (b.year_end || 0) - (a.year_end || 0));
+    const sorted = sortKySessionsNewestFirst(sessions);
 
     if (options.useChangeHash === true) {
       return await syncKyBillsByHash(source, client, sorted, options, start);
@@ -1252,10 +1286,11 @@ async function reconcileKyLegislatorLegiscanIdsFromLatestSession(
 ): Promise<number> {
   const sessions = await legiscanClient.fetchSessions();
   if (!sessions.length) return 0;
-  const sortedSessions = [...sessions].sort((a, b) => (b.year_end || 0) - (a.year_end || 0));
-  const sessionId = sortedSessions[0]!.session_id;
-  const people = await legiscanClient.getSessionPeople(sessionId);
-  if (!people.length) return 0;
+  const roster = await fetchLatestNonEmptySessionRoster(sessions, (id) =>
+    legiscanClient.getSessionPeople(id),
+  );
+  if (!roster) return 0;
+  const people = roster.people;
 
   const { data: legs, error } = await db
     .from('ky_legislators')

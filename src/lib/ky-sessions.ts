@@ -41,8 +41,11 @@ export interface KYSessionRecord {
 }
 
 /**
- * Newest first — `KY_SESSIONS[0]` must stay the current/most-recent session
- * (used by `getCivicDataSessionName`, `guideDescription`, etc.).
+ * Newest first. `KY_SESSIONS[0]` may be a scheduled session that has not convened
+ * yet (add the next one as soon as LRC posts its calendar, so the phase-gated
+ * syncs switch on the day it convenes). Code that needs "the session bills are
+ * in right now" must use `getMostRecentStartedSession` / `getCivicDataSessionName`,
+ * never `KY_SESSIONS[0]`.
  *
  * Historical dates (2010–2024) were researched from official Kentucky sources —
  * LRC Informational Bulletins ("General Assembly Action" per session), LRC
@@ -56,6 +59,21 @@ export interface KYSessionRecord {
  * labels still exist for bill filtering in `KY_BILL_SESSION_OPTIONS`.
  */
 export const KY_SESSIONS: KYSessionRecord[] = [
+  {
+    name: '2027 Regular Session',
+    start: '2027-01-05',
+    end: '2027-03-30',
+    type: 'regular',
+    milestones: {
+      // Part I Jan 5–8 (days 1–4); break Jan 9–Feb 1; Part II convenes Feb 2.
+      // Concurrence days: Mar 11–12; veto recess Mar 13–24; reconvenes Mar 25; sine die Mar 30.
+      // Source: LRC 2027 Regular Session Calendar (legislature.ky.gov/Documents/27RS_Calendar.pdf,
+      // posted 09.10.26). LRC revises these calendars in session — re-check in March.
+      vetoRecessStart: '2027-03-13',
+      vetoRecessEnd: '2027-03-25',
+      sineDie: '2027-03-30',
+    },
+  },
   {
     name: '2026 Regular Session',
     start: '2026-01-06',
@@ -162,6 +180,7 @@ function addDaysIso(iso: string, days: number): string {
  * the data layer surfaces so a missed update never silently drops a session.
  */
 export const KY_BILL_SESSION_OPTIONS: readonly string[] = [
+  '2027 Regular Session',
   '2026 Regular Session',
   '2025 Regular Session',
   '2024 Regular Session',
@@ -195,10 +214,53 @@ export function isKnownKyBillSession(value: string | null | undefined): value is
   return KY_BILL_SESSION_OPTIONS.includes(value);
 }
 
+/**
+ * Session labels to offer in filter dropdowns: `KY_BILL_SESSION_OPTIONS` minus
+ * sessions in `KY_SESSIONS` that have not convened yet, which have no bills to
+ * filter to. The full list still validates `?session=` URLs.
+ */
+export function getKyBillSessionFilterOptions(asOf: Date = new Date()): readonly string[] {
+  const today = atNoon(asOf.toISOString().slice(0, 10));
+  const upcoming = new Set(
+    KY_SESSIONS.filter((s) => atNoon(s.start) > today).map((s) => s.name),
+  );
+  return upcoming.size ? KY_BILL_SESSION_OPTIONS.filter((s) => !upcoming.has(s)) : KY_BILL_SESSION_OPTIONS;
+}
+
 /** Returns the currently active session, or null if today is outside all session windows. */
 export function getActiveSession(asOf: Date = new Date()): KYSessionRecord | null {
   const today = atNoon(asOf.toISOString().slice(0, 10));
   return KY_SESSIONS.find((s) => today >= atNoon(s.start) && today <= atEndOfDay(s.end)) ?? null;
+}
+
+/**
+ * The session that most recently convened (the active one during a session, the
+ * one that just ended during interim). Skips scheduled sessions that have not
+ * started, so adding next year's calendar early never points pages at a session
+ * with no bills.
+ */
+export function getMostRecentStartedSession(asOf: Date = new Date()): KYSessionRecord {
+  const today = atNoon(asOf.toISOString().slice(0, 10));
+  let latest: KYSessionRecord | undefined;
+  for (const s of KY_SESSIONS) {
+    if (atNoon(s.start) > today) continue;
+    if (!latest || atNoon(s.start) > atNoon(latest.start)) latest = s;
+  }
+  return latest ?? KY_SESSIONS[KY_SESSIONS.length - 1]!;
+}
+
+/**
+ * The next regular session on the calendar that has not convened yet, or null
+ * when `KY_SESSIONS` has none scheduled.
+ */
+export function getNextScheduledRegularSession(asOf: Date = new Date()): KYSessionRecord | null {
+  const today = atNoon(asOf.toISOString().slice(0, 10));
+  let next: KYSessionRecord | null = null;
+  for (const s of KY_SESSIONS) {
+    if (s.type !== 'regular' || atNoon(s.start) <= today) continue;
+    if (!next || atNoon(s.start) < atNoon(next.start)) next = s;
+  }
+  return next;
 }
 
 /**
@@ -286,9 +348,9 @@ export function getKySessionActsEffectiveDate(sessionName: string | null | undef
   return session?.milestones?.actsEffectiveDate ?? null;
 }
 
-/** Ongoing window → that session; otherwise the most recent session (for bill/vote display). */
+/** Ongoing window → that session; otherwise the most recently convened session (for bill/vote display). */
 export function getCivicDataSessionName(asOf: Date = new Date()): string {
-  return (getActiveSession(asOf) ?? KY_SESSIONS[0]!).name;
+  return (getActiveSession(asOf) ?? getMostRecentStartedSession(asOf)).name;
 }
 
 export const SESSION_TYPE_DESCRIPTIONS: Record<KYSessionType, string> = {

@@ -44,7 +44,7 @@ import {
   parseKyBillSortDirParam,
   parseKyBillSortParam,
 } from '@/lib/ky-bills-browse-url';
-import { KY_BILL_SESSION_OPTIONS } from '@/lib/ky-sessions';
+import { getKyBillSessionFilterOptions } from '@/lib/ky-sessions';
 import { withTimeout } from '@/lib/async-utils';
 import { usePersistedPageSize } from '@/lib/use-persisted-page-size';
 import { useFollowedBillsAndTopics } from '@/lib/use-followed-bills-topics';
@@ -548,7 +548,7 @@ export function BillsBrowse({
                 MenuProps={{ PaperProps: { sx: { maxHeight: 420 } } }}
               >
                 <MenuItem value="">All sessions</MenuItem>
-                {KY_BILL_SESSION_OPTIONS.map((s) => (
+                {getKyBillSessionFilterOptions().map((s) => (
                   <MenuItem key={s} value={s}>{s}</MenuItem>
                 ))}
               </Select>

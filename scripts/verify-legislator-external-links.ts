@@ -36,6 +36,7 @@ import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { legiscanPersonUrl, normalizeBallotpediaHref } from '../src/lib/external-legislative-links';
 import { normalizeHttpsUrl, type LegislatorExternalLink } from '../src/lib/legislator-link-normalize';
 import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
+import { fetchLatestNonEmptySessionRoster } from '../src/lib/ky-legiscan-session-discovery';
 import { makeHostGateRouter, type HostLimit } from '../src/lib/host-rate-gate';
 import { isLegiscanQuotaHoldError } from '../src/lib/legiscan-quota';
 import {
@@ -184,10 +185,10 @@ function latestSessionRosterIds(): Promise<Set<number>> {
     sessionRosterIds = (async () => {
       const client = getKyLegiScanClient();
       const sessions = await client.fetchSessions();
-      const latest = [...sessions].sort((a, b) => (b.year_end || 0) - (a.year_end || 0))[0];
-      if (!latest) return new Set<number>();
-      const people = await client.getSessionPeople(latest.session_id);
-      return new Set(people.map((p) => p.people_id));
+      const roster = await fetchLatestNonEmptySessionRoster(sessions, (id) =>
+        client.getSessionPeople(id),
+      );
+      return new Set((roster?.people ?? []).map((p) => p.people_id));
     })();
   }
   return sessionRosterIds;
