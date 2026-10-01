@@ -87,6 +87,35 @@ describe("isChunkLoadError", () => {
   });
 });
 
+describe("isChunkLoadError — missing webpack module (stale runtime)", () => {
+  const msg = "undefined is not an object (evaluating 'e[n].call')";
+  const frame = (filename: string) => ({ filename });
+  test("matches when a frame is in the webpack runtime chunk", () => {
+    assert.equal(
+      isChunkLoadError({
+        type: "TypeError",
+        value: msg,
+        stacktrace: { frames: [frame("https://www.kyvky.com/_next/static/chunks/webpack-e518c720e8cc1a11.js")] },
+      }),
+      true,
+    );
+    const err = new TypeError("Cannot read properties of undefined (reading 'call')");
+    err.stack = "TypeError: x\n at https://www.kyvky.com/_next/static/chunks/webpack-e518c720e8cc1a11.js:1:100";
+    assert.equal(isChunkLoadError(err), true);
+  });
+  test("does not match the same message from app code or without frames", () => {
+    assert.equal(isChunkLoadError({ type: "TypeError", value: msg }), false);
+    assert.equal(
+      isChunkLoadError({
+        type: "TypeError",
+        value: msg,
+        stacktrace: { frames: [frame("https://www.kyvky.com/_next/static/chunks/4002-0b83b9d458ba7648.js")] },
+      }),
+      false,
+    );
+  });
+});
+
 describe("isRecoverableChunkLoadError", () => {
   const chunk: ExceptionLike[] = [{ type: "ChunkLoadError", value: "Loading chunk 7122 failed." }];
   test("drops the first chunk failure in a session (a reload is about to fix it)", () => {

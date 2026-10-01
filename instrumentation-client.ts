@@ -1,5 +1,5 @@
 import posthog from "posthog-js";
-import { hasSpentChunkReload, recordChunkReloadOutcome } from "@/lib/chunk-reload";
+import { hasSpentChunkReload, recordChunkReloadOutcome, reloadOnChunkLoadError } from "@/lib/chunk-reload";
 import { shouldDropException, type ExceptionLike } from "@/lib/telemetry-filters";
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
@@ -56,6 +56,15 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
   // If the previous page in this tab reloaded to recover from a missing chunk, record
   // that the recovery landed (see src/lib/chunk-reload.ts).
   recordChunkReloadOutcome((name) => posthog.capture(name));
+}
+
+// Chunk/module failures from dynamic imports surface as unhandled rejections, which no
+// React error boundary sees (so error.tsx / global-error.tsx never reload). Recover the
+// same way: one guarded hard reload (src/lib/chunk-reload.ts).
+if (typeof window !== "undefined") {
+  window.addEventListener("unhandledrejection", (e) => {
+    if (e.reason instanceof Error) reloadOnChunkLoadError(e.reason);
+  });
 }
 
 /**
