@@ -122,11 +122,27 @@ export const isReactStreamSwapError = (exceptions: ExceptionLike[]): boolean =>
  */
 const CHUNK_LOAD_TYPE = /^ChunkLoadError$/;
 const CHUNK_LOAD_MSG = /Loading (?:CSS )?chunk [\w-]+ failed/;
+/**
+ * Webpack's `__webpack_require__` does `modules[id].call(...)`; when a stale runtime
+ * (cached HTML / old `webpack-*.js`) loads a chunk from a newer build, that id is absent
+ * from the module map and Safari reports "undefined is not an object (evaluating 'e[n].call')"
+ * (V8: "Cannot read properties of undefined (reading 'call')"). The message alone is too
+ * generic, so it only counts when a frame is in the webpack runtime chunk.
+ */
+const MISSING_MODULE_MSG =
+  /undefined is not an object \(evaluating '\w+\[\w+\]\.call'\)|Cannot read properties of undefined \(reading 'call'\)/;
+const WEBPACK_RUNTIME_FRAME = /\/_next\/static\/chunks\/webpack-[\w]+\.js/;
 export const isChunkLoadError = (ex: ExceptionLike | Error | undefined): boolean => {
   if (!ex) return false;
   const type = ex instanceof Error ? ex.name : ex.type;
   const message = ex instanceof Error ? ex.message : ex.value;
-  return CHUNK_LOAD_TYPE.test(type ?? "") || CHUNK_LOAD_MSG.test(message ?? "");
+  if (CHUNK_LOAD_TYPE.test(type ?? "") || CHUNK_LOAD_MSG.test(message ?? "")) return true;
+  if (!MISSING_MODULE_MSG.test(message ?? "")) return false;
+  return ex instanceof Error
+    ? WEBPACK_RUNTIME_FRAME.test(ex.stack ?? "")
+    : (ex.stacktrace?.frames ?? []).some((f) =>
+        WEBPACK_RUNTIME_FRAME.test(f?.filename || f?.source || ""),
+      );
 };
 
 /**
