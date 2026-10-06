@@ -38,8 +38,6 @@ CI (`checks`, `build`) is green: link the run. For anything CI cannot run (needs
 <!-- Planned (from the WP's Data-limit impact) · Actual (LegiScan queries, Open States calls,
      LRC fetches, Anthropic $) · Counter before/after if applicable. Or "none". -->
 
-none
-
 ## Deploy notes
 
 <!-- Anything that must happen before/alongside merge, or "None."
@@ -61,8 +59,6 @@ None.
 <!-- Each human-only step, in order, with the exact command or setting, whether it needs
      production secrets, the expected result, and what to do if it differs. Or "none". -->
 
-- [ ]
-
 ## Rollback
 
 <!-- How to undo this PR: revert SHA, down-migration SQL, env flag. -->
@@ -70,5 +66,3 @@ None.
 ## Found, not fixed
 
 <!-- Out-of-scope issues noticed, or "none". -->
-
-none
