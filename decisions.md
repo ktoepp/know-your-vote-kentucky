@@ -2651,3 +2651,5 @@ The live sync made one HTTP request. 9/21 (#266): `timeout of 30000ms exceeded`.
 ### 10/5 cancellations (LRC #296, legislator links #30)
 
 Both jobs: `conclusion: cancelled`, `runner_id: 0`, empty runner name, 0 billable ms, logs 404, cancelled ~15 min after creation (20:02→20:17, 20:10→20:25). The legislator-links job's own timeout is 20 min, so this was not our timeout. No runner was ever assigned: a GitHub-side failure, not a code or concurrency fault. Both triggers had also fired late (18:00 cron → 20:02, 12:00 cron → 20:10). The next LRC run (#297, 23:48 UTC) succeeded on the same commit. No workflow change. If it recurs, add a retry.
+
+**Verification (2026-10-06):** LRC live sync on this branch passed ([run 37472619217](https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/37472619217)). The legislator-links re-run passed ([run 37368048514, attempt 2](https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/37368048514)) and spent 2 LegiScan queries (two `getSessionPeople`, zero `getPerson`), which confirms the 09-29 roster change (previously ~138 `getPerson` per run).

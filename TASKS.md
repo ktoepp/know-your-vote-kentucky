@@ -51,7 +51,8 @@ Full numbers and reasoning: [decisions.md § 2026-10-06](./decisions.md#2026-10-
 - [x] **LRC calendar sync — 9/21 and 9/27 failures fixed.** Single-shot fetch: 9/21 `timeout of 30000ms exceeded`, 9/27 HTTP 200 with a 0-byte body, mislabeled "page structure likely changed". `fetchCalendarHtml` now retries 3× (15 s, 30 s backoff) on timeouts, 5xx, 408/429 and bodies under 1 KB, and names an exhausted empty body as an upstream LRC issue.
 - [x] **10/5 cancellations (LRC #296 and legislator links #30) were GitHub-side, not ours.** Both jobs show `runner_id: 0`, 0 billable ms and no logs, cancelled ~15 min after creation; both scheduled triggers fired late (LRC 18:00 cron created 20:02, links 12:00 cron created 20:10). No runner was ever assigned. No code change; the next LRC run (#297, 23:48 UTC) succeeded.
 - [ ] **Watch:** if "no runner" cancellations recur, add a `workflow_run`-triggered retry; not worth it for one event.
-- [ ] **Watch the first post-fix link-verifier run** reports `getPerson@legislator-links` near 0 (roster check) rather than ~138.
+- [x] **First post-fix link-verifier run spent 2 queries, not ~140.** Re-run of #30 (attempt 2, 2026-10-06): 1 `getSessionPeople@sync-legislators` + 1 `getSessionPeople@legislator-links`, 0 `getPerson`. Counter 41 → 43.
+- [x] **Re-runs green:** LRC calendar on this branch [run 37472619217](https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/37472619217); legislator links [run 37368048514 attempt 2](https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/37368048514). The retry fix reaches the scheduled LRC runs only after this branch merges to `main`.
 
 ### LegiScan Public API changes — Oct 1 quota cut, Nov 1 enforcement (researched 2026-09-29)
 
