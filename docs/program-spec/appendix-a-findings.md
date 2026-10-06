@@ -1,6 +1,8 @@
 # Appendix A — Evidence base (audit of 2026-10-06)
 
-This appendix is the evidence base for the program spec. Every work package (WP) in `docs/program-spec/` cites the finding IDs below. A finding is closed only when a WP's acceptance criteria are met **or** it is explicitly listed in `README.md` § "Deferred / not doing".
+This appendix is the evidence base for the program spec. Every work package (WP) in `docs/program-spec/` cites the finding IDs below. A finding is closed only when a WP's acceptance criteria are met **or** it is explicitly listed in [`DEFERRED.md`](DEFERRED.md) (the deferred / not-doing register).
+
+**Read the errata too.** Spec review re-checked these findings in the repo. Findings marked **[Corrected: see Errata]** are wrong or incomplete as first written. The corrected text and the owning WP are in § "Errata and new findings (spec review 2026-10-06)" at the end of this file, which also gives IDs **N1–N5** to defects that review found. Where a finding's text and its erratum disagree, the erratum is correct.
 
 **Provenance.** Five read-only audits ran on 2026-10-06 against `main` @ `a4e543a` (PR #289):
 
@@ -17,7 +19,7 @@ This appendix is the evidence base for the program spec. Every work package (WP)
 
 Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
 
-**Publication note.** This repo is public. Findings are phrased as *what must change*, not how to exploit it. No personal data is included.
+**Publication note.** This repo is public. Findings are phrased as *what must change*, not how to exploit it. No personal data is included. S3 and S4 are summarized only; their details are in the owner's private security note.
 
 ---
 
@@ -79,7 +81,7 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
 - **E1** [V] Size: about 68k lines of app code plus 9.7k lines of scripts.
   - 42 pages, 30 API routes, 86 npm scripts, 75 env vars.
   - 57 migrations (two are numbered `045`), 31 tables, 22 SQL functions.
-- **E2** [V] Schedules sprawl across three schedulers.
+- **E2** [V] **[Corrected: see Errata]** Schedules sprawl across three schedulers.
   - Vercel: 9 crons.
   - GitHub Actions: 6 scheduled workflows with 9 cron lines, plus 4 manual workflows and a Slack notifier.
   - Claude Code Routines: 2 daily ("System health check", "accuracy spot check").
@@ -142,7 +144,7 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
 
 ## A — AI summaries and classification
 
-- **A1** [V2] `src/lib/ky-content-generation.ts` builds its prompt from:
+- **A1** [V2] **[Corrected: see Errata]** `src/lib/ky-content-generation.ts` builds its prompt from:
   - title, LegiScan description, status, topics and LegiScan subjects
   - optional `editor_notes`
   
@@ -160,7 +162,7 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
 
 ## S — Security, compliance, platform currency (deps and code audits)
 
-- **S1** [V] Framework currency.
+- **S1** [V] **[Corrected: see Errata]** Framework currency.
   - `next` is pinned exactly at 15.5.22, which has critical and high advisories; 15.5.27 fixes them.
   - Next 16 is the current major. Upgrading is blocked by `@mui/material-nextjs` 5.18, which supports only next ≤15, so it forces an MUI v5 → v7/v9 migration across about 132 files.
   - Other upgrade work:
@@ -175,9 +177,9 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
   - `maplibre-gl`, via react-map-gl (probably not shipped)
   
   The `overrides` pin vulnerable `sharp` 0.35.3 (needs ≥0.35.4) and `brace-expansion` 5.0.8 (needs ≥5.0.12).
-- **S3** [V2] Admin-route access control (`src/middleware.ts`) needs hardening. The specifics are tracked privately and will be restored here after the fix merges (WS2).
-- **S4** [V2] The session-establishment flow after sign-up (`src/app/api/auth/establish-session/route.ts`) needs an owner decision on email-verification behavior. The specifics are tracked privately and will be restored here after the decision is made (WS2).
-- **S5** [V] `vercel.json` sets CORS `*` with GET/POST/PUT/DELETE on `/api/(bills|search|intelligence|geo)`. Only `/api/bills/[id]/follow` mutates, and it uses a Bearer JWT, RLS and a rate limit, so the risk is low but the header is over-broad.
+- **S3** [V2] Harden admin-route access control (`src/middleware.ts`) and consolidate the six bearer-token checks (E11) into one constant-time guard. Details are in the owner's private security note. Owning WP: WS2-02.
+- **S4** [V2] The post-signup session flow (`src/app/api/auth/establish-session/route.ts`) needs hardening per an owner decision. Details are in the owner's private security note. Owning WP: WS2-03.
+- **S5** [V] **[Corrected: see Errata]** `vercel.json` sets CORS `*` with GET/POST/PUT/DELETE on `/api/(bills|search|intelligence|geo)`. Only `/api/bills/[id]/follow` mutates, and it uses a Bearer JWT, RLS and a rate limit, so the risk is low but the header is over-broad.
 - **S6** [V] Supabase:
   - RLS is on for all tables except `ky_committee_materials_legacy_dupes_048`, which was created with CREATE TABLE AS. It holds public data.
   - `ky_increment_bill_view` is SECURITY DEFINER and callable by `anon`, so view counts can be inflated.
@@ -192,7 +194,7 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
 
 ## D — Data limits and vendors (deps audit unless noted)
 
-- **D1** [V] LegiScan.
+- **D1** [V] **[Corrected: see Errata]** LegiScan.
   - **Terms:**
     - The Public API cap dropped from 30k to **10k queries/month** on 2026-10-01, with a limit of about 2 requests/s.
     - Enforcement starts 2026-11-01, and creating multiple keys risks suspension.
@@ -212,7 +214,7 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
     - `docs/reference/legiscan/LegiScan-API-Crash-Course.txt` and the README still say 30,000.
     - Key ownership is unconfirmed.
 - **D2** [V] Open States v3 (Plural) bulk data is CC0. `/people` often returns 504s. Rate limits are unverified. It is stewarded by a for-profit company.
-- **D3** [V] The Kentucky LRC has no API or data feed. Four HTML scrapers plus Wayback backfills depend on its pages. Fetches have no documented politeness policy (User-Agent with contact, rate limit, conditional GET) [I: verify in code].
+- **D3** [V] **[Corrected: see Errata]** The Kentucky LRC has no API or data feed. Four HTML scrapers plus Wayback backfills depend on its pages. Fetches have no documented politeness policy (User-Agent with contact, rate limit, conditional GET) [I: verify in code].
 - **D4** [V] Current plans:
   - Supabase Pro (an org shared with another project; DB 197 MB)
   - Vercel Pro (required for the cron cadence)
@@ -238,7 +240,7 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
   - It shows unlabeled "House Floor Vote — Failed 20–21, Absent 59" rows, e.g. seven of them on HB500 2026, a budget that passed.
   - A forced Title Case transform produces "Delivered To Secretary Of State".
   - Dotted glossary underlines cover nearly every phrase.
-- **U4** [V] The homepage is stale between sessions.
+- **U4** [V] **[Corrected: see Errata]** The homepage is stale between sessions.
   - The newest action is 2026-04-27, and the carousels show April bills.
   - The session banner sends people to LRC even though `/meetings` has 91 upcoming meetings.
   - "Most viewed bills" ranks by lifetime views (the top bill has 78).
@@ -255,7 +257,7 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
   - On mobile the filters fill the first screen, and Topic appears twice.
   - `/members` on mobile is 24,050px tall.
   - Cards carry "chip soup", and three status labels that all mean "became law" read differently.
-- **U9** [V] Party is shown only as a ~10px colored dot, i.e. by color alone.
+- **U9** [V] **[Corrected: see Errata]** Party is shown only as a ~10px colored dot, i.e. by color alone.
 - **U10** [V] The follow funnel leaks.
   - It requires name, email, password and verification before a follow.
   - The copy "Follow what Representative X sponsors" promises a legislator follow that does not exist.
@@ -263,7 +265,7 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
 - **U11** [V] Member profiles lack context.
   - There is no party-line context, no key votes, and no plain-language line per bill.
   - Sponsored bills and a large signup box sit above the voting record.
-- **U12** [V] `/bills` defaults to a session that ended in April. No 2027 bills exist yet; prefiling was abolished in 2022 (market).
+- **U12** [V] **[Corrected: see Errata]** `/bills` defaults to a session that ended in April. No 2027 bills exist yet; prefiling was abolished in 2022 (market).
 - **U13** [V] Performance:
   - First-load JS is 380–407 kB gzipped, about 2.2–2.7 MB uncompressed, and 4.4 MB on desktop home (the Mapbox preview).
   - CLS is 0.38 on `/committees` and 0.13–0.15 on `/search`, because the nav auth area and the footer shift after hydration.
@@ -313,3 +315,37 @@ Numbers are as of 2026-10-06. **Re-check any number before acting on it.**
 - **O2** Respects data limits: LegiScan, Open States and LRC load, vendor free tiers, and AI spend.
 - **O3** Packaged as an offering to merge into or partner with a larger organization, e.g. CalMatters Digital Democracy.
 - **O4** "At the very least proof of my thinking": the repo and docs should demonstrate rigor to a partner or funder.
+
+---
+
+## Errata and new findings (spec review 2026-10-06)
+
+Spec reviewers re-checked the findings above in the repo (`a4e543a`; working tree `96365a2` changes docs only). The full evidence is in each workstream file's "Findings re-checked" section. This section repeats only the outcome, so that an agent reading this appendix first does not build on a wrong premise. The "Owning WP" column names the WP that acts on the corrected finding.
+
+### Corrected findings
+
+| ID | Correction (one line) | Owning WP |
+|---|---|---|
+| **S1** | Next 16 does **not** force an MUI migration. `@mui/material-nextjs` 7.3.9 and later peers `next ^16.0.0` and has no `@mui/material` peer (npm metadata, re-checked 2026-10-06), so the upgrade needs only a `@mui/material-nextjs` bump from the current `^5.18.0`. No MUI v5 → v7/v9 migration is in the program. | WS2-11c |
+| **S5** | Understated. The CORS `*` group in `vercel.json` (~26) also covers `/api/intelligence`, which no page uses and which calls Anthropic at request time, and `/api/geo/zip`, which proxies Nominatim under a 1 request/second policy. | WS2-07 |
+| **A1** | `legiscan_texts` holds **no bill text**. It stores version metadata and links only (`doc_id`, type, date, URL; migration 036 column comment), and LegiScan datasets carry no text either. Grounding summaries in text therefore needs a new, budgeted fetch. The `Status` input is still passed (`ky-content-generation.ts` ~105) and is not a hash input. | WS3-04 (drop `Status`); WS3-07 and WS3-08 (text source) |
+| **D1** | "Remove the key" does **not** stop requests: with an empty key the client only warns and keeps sending keyless requests with retries (see **N3**). The brake that reaches every scheduler is `LEGISCAN_MONTHLY_QUERY_LIMIT`. Also: the counter write is fire-and-forget, and a LegiScan `status: "ERROR"` reply is retried up to 5 times, each retry counted. | WS4-02 (client); WS4-01 (budget doc); WS9-06a (runbook) |
+| **D3** | Partly wrong. The LRC scrapers **do** send an identifying User-Agent (`KnowYourVoteKentucky/1.0 (+https://kyvky.com; <job>)`). They lack a contact address, a shared rate limit and conditional GET. Separately, `/api/lrc/bill-link-status` fetches LRC on every bill-page view. | WS4-09a (polite helper); WS6-03 (bill-page probe) |
+| **E2** | There are **10** workflow files: 6 scheduled (9 cron lines), **3** manual-only and the Slack notifier, not "4 manual". Schedules are also duplicated in `src/lib/sentry-sync-cron.ts`, and one has already drifted: `MONITORED_SOURCES.dataset` in `src/lib/source-health.ts` (~81) says `0 8 * * 0,3` while `legiscan-dataset-weekly.yml` runs `0 11 * * 0` and `0 11 * * 3`. Quote schedules from `vercel.json` and the workflow files, never from `MONITORED_SOURCES`. | WS4-11 (one registry); WS4-12 |
+| **U4** | Partly stale. "Recent legislative action" already hides itself after 30 days without substantive action (`LATEST_ACTION_WINDOW_DAYS`); only "Most viewed bills" shows April bills. "Most viewed" ranks by PostHog unique visitors over the past day and falls back to lifetime `view_count` only when PostHog server credentials are missing or fewer than 3 bills resolve [verify which path production uses, Owner]. | WS6-04b; WS6-10 |
+| **U9** | Partly wrong. The avatar badge does contain a party letter (D/R), so party is not shown by color alone visually. But the badge is `aria-hidden` (`LegislatorAvatar.tsx` ~69) and about 9 px, so assistive technology gets no party at all, and no profile shows party as text. | WS6-08 |
+| **U12** | By design, not a bug. `/bills` defaults to the most recent session through `getCivicDataSessionName` and flips to the 2027 RS automatically on 2027-01-05. The defect is the missing explanation. The market note "prefiling was abolished in 2022" conflicts with the live banner and the glossary tooltip [verify against LRC before repeating it]. | WS6-10; WS6-04a (decision 2) |
+
+Other workstream re-checks refine findings without reversing them (for example S2's counts, S7's importer count, S8, S9 not being rendered anywhere, S10, E3, E8, U17). Read the owning workstream's "Findings re-checked" section before acting on any finding.
+
+### New findings
+
+Cite these IDs in WPs and PRs like any other finding. The WP tables predate these errata and may not list N-IDs, so every PR that acts on N1–N5 cites the N-ID in its "Findings re-checked" section.
+
+| ID | Finding | Evidence (verified 2026-10-06) | Owning WP |
+|---|---|---|---|
+| **N1** | [V2] `npm run audit:accuracy:dry` still runs the Anthropic pass, so a "dry run" spends money. `docs/accuracy-audit.md` (~124) also names a `--skip-llm` flag that does not exist; the real flag is `--no-llm`. | `scripts/accuracy-audit.ts` ~177 passes `skipLlm: args.skipLlm` (`false` unless `--no-llm`), and `src/lib/accuracy-audit/types.ts` ~233 uses `overrides.skipLlm ?? (dryRun \|\| …)`, so the explicit `false` wins over `--dry-run`. | WS3-15 |
+| **N2** | [I] Member-profile sponsor matching can adopt another member's LegiScan `people_id`. A sponsor whose name merely **ends with** the member's surname matches, and on the path where a member has no `legiscan_id`, `resolveLegiscanPeopleIdFromBillSponsors` can then pick up the wrong person. Inferred from code; the aggregate data check is in the owning WP. Related: E10. | `src/lib/ky-member-utils.ts` ~737 (`nm.endsWith(last)`); `src/lib/member-profile-data.ts` ~74, called at ~262 and ~306. | WS5-12a |
+| **N3** | [V2] The LegiScan client sends **keyless** requests. With `LEGISCAN_API_KEY` empty it logs a warning and carries on, and every request is sent with an empty `key` and retried up to `MAX_RETRIES`. This is why removing the key is not a stop (D1). | `src/lib/ky-legiscan-client.ts` constructor ~129–130; `request()` ~166–189. | WS4-02 (step 5) |
+| **N4** | [V2] A public read path uses the service-role client. `createServerClient()` prefers `SUPABASE_SERVICE_ROLE_KEY` over the anon key, so public bill-detail reads run with service-role privileges instead of under RLS. Related: S7. Until it is fixed, WS8-02's output allowlist limits what public endpoints return. | `src/lib/ky-bill-detail-server.ts` ~21–26. | WS2 § Deferred (S7 row; trigger: WS8-02 merged and its tests show the anon key returns the same data); WS8-02 (allowlist) |
+| **N5** | [V2] The meetings list can silently drop **upcoming** meetings. `fetchKyMeetingsBrowseWindow` reads from the most recent session start (about 9 months back today) to 120 days ahead in ascending date order with `.limit(500)`, so if the window holds more than 500 rows the rows cut are the future ones. The client path for `/meetings?q=` has the same limit. Whether production currently exceeds 500 is unverified [verify: Owner SELECT count over the same window]. Related: U5, U17. | `src/lib/ky-ga-browse-server.ts` ~33–66 (`.limit(500)` ~53); `src/components/committees/MeetingsBrowse.tsx` ~160–172. | WS6-06 (fetch upcoming separately); WS3-06a (informed of the limit) |
