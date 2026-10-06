@@ -221,7 +221,7 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 #
 # GitHub → Slack (commits / PRs / merges): add repo secret SLACK_WEBHOOK_GITHUB (Incoming Webhook URL).
 # Workflow: .github/workflows/slack-repo-events.yml — not read from this file; configure only in GitHub.
-# GET /api/cron/health-check (Vercel Cron every 15m in vercel.json) alerts on DB/env failures.
+# GET /api/cron/health-check (Vercel Cron daily at 14:00 UTC in vercel.json) alerts on DB/env failures.
 #
 # SLACK_WEBHOOK_STATUS_REPORTS=https://hooks.slack.com/services/T.../B.../xxx
 # SLACK_WEBHOOK_ERRORS=https://hooks.slack.com/services/T.../B.../xxx

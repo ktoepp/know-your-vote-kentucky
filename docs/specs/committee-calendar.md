@@ -96,7 +96,7 @@ Do **not** copy: legacy layout, premium paywall split, session-reset banner patt
 | Anthropic | **$0** v1 | No agenda summarization in v1 |
 | Mapbox | Unchanged | Map geocodes only |
 
-Track LegiScan usage: `ky_sync_state` → `legiscan_query_counter` (default limit 30,000/month).
+Track LegiScan usage: `ky_sync_state` → `legiscan_query_counter` (default limit 10,000/month; see [docs/data-budget.md](../data-budget.md)).
 
 ## Paused Vercel crons (re-enable template)
 

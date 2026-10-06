@@ -173,7 +173,7 @@ The handoff itself: commit what is safe and open the draft PR. Then write under 
 Before **any** external call (LegiScan, Open States, the LRC site, the Wayback Machine, Anthropic, Resend, Mapbox), do all of the following:
 
 1. **Estimate.** Write down how many calls, which operations, and the cost in money. Use the WP's **Data-limit impact** field as the ceiling. If the WP says "none", you make zero external calls.
-2. **Check the counter.** For LegiScan, run `npm run check:legiscan-quota`. It needs production secrets, so this is usually an Owner action. Ignore its "Run cost: ~26" line: that figure is hard-coded for the dataset reconcile, so compute your own run cost.
+2. **Check the counter.** For LegiScan, run `npm run check:legiscan-quota`. It needs production secrets, so this is usually an Owner action. Pass `--planned=N` to compare your estimate with the cap and the planning target.
 3. **Dry-run first.** Read the script's header comment before you run it, because "dry-run" means three different things in this repo:
    - **No DB writes, but the vendor is still called.** Examples: `scripts/manual-sync.ts --dry-run`, and `scripts/backfill-bill-summaries.ts --dry-run`, which still generates through Anthropic and so still spends money. `npm run audit:accuracy:dry` also still calls Anthropic until WS3-15 merges (N1); until then, add `--no-llm` (`npm run audit:accuracy:dry -- --no-llm`) to skip that pass.
    - **Plan only, no LegiScan calls.** Example: `npm run sync:ky:dataset:dry`.

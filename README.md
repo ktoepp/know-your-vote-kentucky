@@ -71,7 +71,7 @@ All tooling lives in `scripts/` and is exposed via `package.json`. There is no J
 | --- | --- |
 | `npm run test:env` | Validate required env vars. |
 | `npm run sync:ky` | Manual sync (all default sources). `:legislators`, `:quota`, `:dry`, `:lrc-calendar`, `:lrc-committee-materials`, `:lrc-enrollment-actions` for targeted runs. |
-| `npm run check:legiscan-quota` | LegiScan API usage this month (vs 30k cap). |
+| `npm run check:legiscan-quota` | LegiScan API usage this month (vs 10k cap, see docs/data-budget.md). |
 | `npm run db:apply-sql` | Apply SQL when `DATABASE_URL` is set. |
 | `npm run geo:ky-districts` / `geo:ky-mask` | Rebuild district GeoJSON / outside-mask assets. |
 | `npm run verify:votes` / `verify:legislator-links` / `spot-check:bill-links` | Data integrity checks. |
@@ -159,7 +159,7 @@ All counters land in `ky_sync_state` (JSONB, date-bucketed) via the `ky_incremen
 
 | Key | Bucket | Tracks |
 | --- | --- | --- |
-| `legiscan_query_counter` | `YYYY-MM` | LegiScan API calls vs 30k/month cap |
+| `legiscan_query_counter` | `YYYY-MM` | LegiScan API calls vs 10k cap (see docs/data-budget.md) |
 | `rate_limit_denies` | `YYYY-MM-DD` | `/api/intelligence` 429s |
 | `anthropic_cache_hits` / `_misses` | `YYYY-MM-DD` | Anthropic response cache |
 

@@ -1,3 +1,5 @@
+NOTE (KYvKY, 2026-10-06): LegiScan cut the Public API cap to 10,000/month from 2026-10-01. The 30,000 below is out of date. See docs/data-budget.md.
+
 
 
 LegiScan API Crash Course
