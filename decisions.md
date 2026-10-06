@@ -2598,3 +2598,58 @@ No post-fix session month exists. Built from the 2026 RS in our DB instead of th
 ## 2026-10-01 — Stale-build module errors recover via the existing one-shot reload, including from `unhandledrejection`
 
 Sentry KNOW-YOUR-VOTE-KENTUCKY-S was a stale-client error (old webpack runtime, missing module id), not a bug in `legislatorAvatarSx`. Decision: widen `isChunkLoadError` to the webpack missing-module TypeError **only when a frame is in `/_next/static/chunks/webpack-*.js`** (the bare message is too generic), and listen for `unhandledrejection` in `instrumentation-client.ts` to call `reloadOnChunkLoadError`. Reuses the sessionStorage one-shot guard, so a real failure can't loop and the second occurrence still reports. Rejected: a Sentry-only filter (would hide the error without recovering the visitor).
+
+---
+
+## 2026-10-06 — LegiScan post-cut health check; LRC calendar fetch retries; 10/5 runs never got a runner
+
+**Status: done** (branch `claude/zen-wright-13casl`). Builds on [§ 2026-09-29](#2026-09-29--proposed-legiscan-public-api-changes-oct-1-quota-cut-nov-1-enforcement--stay-free-fix-four-things-first).
+
+### Counted LegiScan queries
+
+Command (read-only, Supabase SQL on the production project):
+
+```sql
+select k, v from ky_sync_state, jsonb_each_text(payload) e(k, v)
+where key = 'legiscan_query_counter' and k ~ '^2026-(08|09|10)'
+order by k;
+```
+
+| Month | Total | Breakdown (op@caller) |
+|---|---:|---|
+| 2026-08 | 1,165 | 211 attributed from 08-24; 954 pre-instrumentation |
+| 2026-09 | **947** (final) | getPerson@untagged 552 · getSessionList 164 (136 sync-bills, 27 sync-legislators, 1 session-preview) · getMasterListRaw@sync-bills 139 · getDataset@accuracy-audit 43 · getSessionPeople 34 · getDatasetList 15 |
+| 2026-10 (1st–6th) | **41** | getMasterListRaw 23 · getSessionPeople 6 · getSessionList 5 · getDataset@accuracy-audit 5 · getDatasetList 2 |
+
+Zero `getBill`/`getRollCall` since instrumentation. The counter counts successful responses only; failed attempts are not counted (see 09-29 for the ~50/month upper bound). October's `getSessionList@sync-bills` dropped from ~4.5/day to <1/day (persisted list), and the 5 October `getDataset` calls are the hash store's first-use downloads: `storage.objects` in bucket `legiscan-datasets` holds exactly 5 ZIPs created 2026-10-04 17:12 UTC, one per session.
+
+The only in-session month with a counter is **April 2026: 917** (sine die + veto period, hash-gated sync).
+
+### Projection, Jan–Mar 2027
+
+Measured inputs from our DB for the 2025 RS (1,441 bills): bills introduced Jan **295** · Feb **953** · Mar **193**; roll calls Jan 4 · Feb 169 · Mar 528. Change-driven re-fetch volume is scaled from March 2026's 2,970 bill-days with actions (§ 09-29) by 1,441/1,737. Fixed load after the 09-29 cuts ≈ 250/month (masterlist ~150, people/session lists ~40, link verifier ~20, dataset + audit ~20, votes cron getBill ~150 in session).
+
+| Month | First pickup | Change re-fetch | Roll calls | Fixed | **Total** |
+|---|---:|---:|---:|---:|---:|
+| Jan 2027 | ~300 | 300–700 | ~5 | ~400 | **~1,000–1,500** |
+| Feb 2027 | ~950 | 1,500–2,300 | ~170 | ~400 | **~3,000–4,000** |
+| Mar 2027 | ~200 | 2,400–3,700 | ~530 | ~400 | **~3,500–5,500** |
+
+The upper end allows a changed bill to be fetched by more than one run per day. Peak is ≤55% of 10k with one state. The 09-29 trigger stands: >5,000 by the 15th of a month → buy before month-end.
+
+### Compliance checks
+
+- **Rate:** every call goes through `KyLegiScanClient.request()`; 650 ms serialized throttle including retries. No other code calls `api.legiscan.com`. Residual risk is two processes overlapping (each ~1.5 req/s); GitHub's late scheduled starts (see below) make overlaps less predictable than the cron table suggests. Harmless in interim.
+- **Gating:** bills sync `change_hash`-gated on both schedulers; all `getDataset` paths `dataset_hash`-gated with the Storage copy; reconcile Sun 11:00 UTC is after the Sunday 5 AM ET regen (09:00 UTC EDT / 10:00 UTC EST). The legacy non-hash bills path is manual-only and ungated (unchanged; price before running).
+- **Attribution:** present on every surface that shows or serves LegiScan data (footer, `/licenses`, bill page, digest email, `/llms.txt`, `/api/bills*`, `/api/search`, `/api/intelligence`).
+- **One key:** single env var, read by one client. Locations: Vercel env, GitHub Actions secret (6 workflows), local dev env files. No new key registered. Owning account still unconfirmed.
+
+### LRC calendar sync failures (9/21, 9/27)
+
+The live sync made one HTTP request. 9/21 (#266): `timeout of 30000ms exceeded`. 9/27 (#278, Wayback job's live refresh step): HTTP 200 with a **0-byte body**, which the 0-day-heading guard reported as "the page structure likely changed". The parser was fine; every run before and after parsed normally. Fix: `fetchCalendarHtml` retries up to 3 attempts (15 s, then 30 s) on timeouts, network errors, 5xx, 408, 429 and bodies under 1 KB, and an exhausted empty body is reported as an upstream LRC issue. Other 4xx still fail at once. The 0-day guard stays for real structure changes.
+
+### 10/5 cancellations (LRC #296, legislator links #30)
+
+Both jobs: `conclusion: cancelled`, `runner_id: 0`, empty runner name, 0 billable ms, logs 404, cancelled ~15 min after creation (20:02→20:17, 20:10→20:25). The legislator-links job's own timeout is 20 min, so this was not our timeout. No runner was ever assigned: a GitHub-side failure, not a code or concurrency fault. Both triggers had also fired late (18:00 cron → 20:02, 12:00 cron → 20:10). The next LRC run (#297, 23:48 UTC) succeeded on the same commit. No workflow change. If it recurs, add a retry.
+
+**Verification (2026-10-06):** LRC live sync on this branch passed ([run 37472619217](https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/37472619217)). The legislator-links re-run passed ([run 37368048514, attempt 2](https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/37368048514)) and spent 2 LegiScan queries (two `getSessionPeople`, zero `getPerson`), which confirms the 09-29 roster change (previously ~138 `getPerson` per run).

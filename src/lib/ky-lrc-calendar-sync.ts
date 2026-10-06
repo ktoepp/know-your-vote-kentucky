@@ -185,13 +185,40 @@ export function deriveAgendaItems(meeting: LrcCalendarMeeting): DerivedAgendaIte
   });
 }
 
+/** Below this many bytes the response cannot be the calendar page (a quiet interim week is ~30 KB). */
+const MIN_CALENDAR_HTML_BYTES = 1_000;
+const CALENDAR_FETCH_ATTEMPTS = 3;
+
+/**
+ * LRC's calendar host intermittently times out or answers 200 with an empty
+ * body (2026-09-21 timeout, 2026-09-27 0-byte body). A single attempt turned
+ * each blip into a failed run, so retry transient outcomes with backoff and
+ * report an empty body as an upstream error, not a parser break.
+ */
 async function fetchCalendarHtml(): Promise<string> {
-  const res = await axios.get<string>(LRC_LEGISLATIVE_CALENDAR_URL, {
-    timeout: 30_000,
-    responseType: 'text',
-    headers: FETCH_HEADERS,
-  });
-  return res.data;
+  let lastError = '';
+  for (let attempt = 1; attempt <= CALENDAR_FETCH_ATTEMPTS; attempt++) {
+    try {
+      const res = await axios.get<string>(LRC_LEGISLATIVE_CALENDAR_URL, {
+        timeout: 30_000,
+        responseType: 'text',
+        headers: FETCH_HEADERS,
+      });
+      const html = typeof res.data === 'string' ? res.data : '';
+      if (html.length >= MIN_CALENDAR_HTML_BYTES) return html;
+      lastError = `LRC calendar returned HTTP ${res.status} with ${html.length} bytes`;
+    } catch (err) {
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      // 4xx other than 408/429 will not fix itself on retry.
+      if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) throw err;
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+    if (attempt < CALENDAR_FETCH_ATTEMPTS) {
+      log(`Calendar fetch attempt ${attempt}/${CALENDAR_FETCH_ATTEMPTS} failed (${lastError}); retrying`);
+      await new Promise((r) => setTimeout(r, 15_000 * attempt));
+    }
+  }
+  throw new Error(`${lastError} after ${CALENDAR_FETCH_ATTEMPTS} attempts (upstream LRC issue, not a parser change)`);
 }
 
 async function resolveBillIdMap(
