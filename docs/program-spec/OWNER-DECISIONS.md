@@ -10,6 +10,20 @@ Every WP decision that has options is listed here, sorted by the date its defaul
 - **Where to answer.** In the WP's PR, or in `CURRENT.md` or an ADR once WS5-03a/b exist.
 - **Public repo.** Security decisions name only the choice and the date. Their options and details are in the owner's private security note and never appear here.
 
+## Decisions made
+
+| Date | WP | Decision | Choice |
+|---|---|---|---|
+| 2026-10-06 | WS2-03 (1), (2) | Post-signup session flow; existing accounts | Owner accepted the defaults (details in the private note) |
+| 2026-10-06 | WS2-05 (1), (2) | `FEEDBACK.md` git history; outreach notes | (a) HEAD only; move outreach notes out |
+| 2026-10-06 | WS3-03a | Roll-call outcome chip | (c) "failed" only |
+| 2026-10-06 | WS3-04 (1), (2) | Changed-bill summaries; "Who it may affect" clause | (a) caveat; (b) hide at render until grounded |
+| 2026-10-06 | WS7-01 | Headline reach figure | (c) both, Kentucky human visitors first |
+| 2026-10-06 | WS7-06 | PMF survey | (c) stop |
+| 2026-10-06 | WS1-04, WS2-02 | CI Node version and build job; admin access method | Defaults: `'24'` with a separate `build` job; header only |
+
+Rows below that are listed in this table are settled; agents do not wait on their dates.
+
 ## 1. Decision calendar
 
 27 of the 84 rows are Core.
