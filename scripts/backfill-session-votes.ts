@@ -3,8 +3,7 @@
  * Backfill `ky_votes` for sessions the dataset importer left with zero roll calls.
  *
  * Why this exists — the TASKS.md plan ("prefer the Dataset Pull API path") does
- * not work for older sessions, and the 2026-08-01 forced full re-import { fetchDatasetZipGated } from '../src/lib/legiscan-dataset-store';
-import proved
+ * not work for older sessions, and the 2026-08-01 forced full re-import proved
  * it: `getDataset` ships roll-call JSON files only from the 2018 Regular Session
  * onward. Every earlier KY session decoded to `0 roll calls`, so re-running
  * `sync:ky:dataset --force` can never fill them in, no matter how many times.
@@ -28,6 +27,7 @@ import proved
  *   npm run backfill:session-votes -- --sessions=1103,1161 --live --limit=500
  */
 import './load-env';
+import { fetchDatasetZipGated } from '../src/lib/legiscan-dataset-store';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { getKyLegiScanClient } from '../src/lib/ky-data-sources';
 import type { LegiScanDatasetListEntry } from '../src/lib/ky-legiscan-client';
