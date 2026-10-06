@@ -1,3 +1,10 @@
+## WP
+
+<!-- Program PRs: [WSn-NN · Title](docs/program-spec/<workstream-file>.md#anchor) · Findings: …
+     Then "Findings re-checked:" with each cited finding (and any N1–N5 erratum acted on):
+     still true / changed / already fixed, with evidence.
+     Non-program PRs: write `none` and keep the other sections. -->
+
 ## Summary
 
 <!-- What changed and why, in a few sentences. Lead with the user-visible effect. -->
@@ -7,6 +14,31 @@
 <!-- Bullet the notable changes. Group by area (email, site, cron, API, docs) when the PR spans several. -->
 
 -
+
+## Acceptance criteria
+
+<!-- Program PRs: copy the WP's acceptance criteria verbatim, each ticked [x] or left [ ] with a reason.
+     Non-program PRs: write `none`. -->
+
+## Verification
+
+<!-- How you know it works. Describe anything manual. -->
+
+CI (`checks`, `build`) is green: link the run. For anything CI cannot run (needs production secrets), paste the command and the tail of its output.
+
+<!-- Check what applies: -->
+
+- [ ] Email changes: rendered sample reviewed (`npm run preview:digest`), plain-text part reads cleanly
+- [ ] Data/sync changes: verified against real data (describe below)
+
+<!-- Screenshots for visual changes go here. -->
+
+## Data-limit spend
+
+<!-- Planned (from the WP's Data-limit impact) · Actual (LegiScan queries, Open States calls,
+     LRC fetches, Anthropic $) · Counter before/after if applicable. Or "none". -->
+
+none
 
 ## Deploy notes
 
@@ -24,14 +56,19 @@ None.
      - Email footers include the postal address (KYVKY_POSTAL_ADDRESS)?
      - voice-and-tone.md updated if canonical strings changed? -->
 
-## Verification
+## Owner actions remaining
 
-<!-- How you know it works. Check what applies and describe anything manual. -->
+<!-- Each human-only step, in order, with the exact command or setting, whether it needs
+     production secrets, the expected result, and what to do if it differs. Or "none". -->
 
-- [ ] `npx tsc --noEmit` clean
-- [ ] `npm run lint` clean
-- [ ] `npm run build` passes
-- [ ] Email changes: rendered sample reviewed (`npm run preview:digest`), plain-text part reads cleanly
-- [ ] Data/sync changes: verified against real data (describe below)
+- [ ]
 
-<!-- Screenshots for visual changes go here. -->
+## Rollback
+
+<!-- How to undo this PR: revert SHA, down-migration SQL, env flag. -->
+
+## Found, not fixed
+
+<!-- Out-of-scope issues noticed, or "none". -->
+
+none

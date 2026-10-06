@@ -65,7 +65,7 @@ If `next dev` returns 500s or missing webpack chunks: kill anything on port 3000
 
 ### Maintenance scripts
 
-All tooling lives in `scripts/` and is exposed via `package.json`. There is no Jest/Vitest suite — `npm run test:env` only validates `.env.local`.
+All tooling lives in `scripts/` and is exposed via `package.json`. Unit tests: `npm test` (Node's built-in runner via `tsx`, files `src/**/*.test.ts`). `npm run check` runs type checks, lint and tests. CI (`.github/workflows/ci.yml`) runs the same plus `next build` on every PR.
 
 | Script | Purpose |
 | --- | --- |
