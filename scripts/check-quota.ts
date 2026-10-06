@@ -1,6 +1,7 @@
 import './load-env';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import {
+  LEGISCAN_FAILED_ATTEMPT_COUNTER_KEY,
   LEGISCAN_QUERY_COUNTER_KEY,
   legiscanPublicMonthlyLimit,
   summarizeLegiscanMonthUsage,
@@ -21,11 +22,21 @@ async function main() {
     .eq('key', LEGISCAN_QUERY_COUNTER_KEY)
     .maybeSingle();
 
+  // Failed attempts (WS4-02): a separate counter row, already included in the month total.
+  const { data: failedRow } = await supabaseAdmin!
+    .from('ky_sync_state')
+    .select('payload')
+    .eq('key', LEGISCAN_FAILED_ATTEMPT_COUNTER_KEY)
+    .maybeSingle();
+  const failedPayload = (failedRow?.payload as Record<string, unknown> | null) ?? {};
+  const failedAttempts = Number(failedPayload[month] ?? 0) || 0;
+
   const usage = summarizeLegiscanMonthUsage(data?.payload as Record<string, unknown> | null, month);
   const limit = legiscanPublicMonthlyLimit();
 
   console.log(`Month:     ${usage.month}`);
   console.log(`Used:      ${usage.total.toLocaleString()} / ${limit.toLocaleString()} (${pct(usage.total, limit)})`);
+  console.log(`Failed attempts (included in total): ${failedAttempts.toLocaleString()}`);
   console.log(`Run cost:  ~${PLANNED_RUN_COST} queries (1 list + 25 datasets)`);
   console.log(`After run: ${(limit - usage.total - PLANNED_RUN_COST).toLocaleString()} remaining`);
   console.log(usage.total + PLANNED_RUN_COST <= limit ? '✅ Safe to proceed' : '❌ Insufficient quota');
