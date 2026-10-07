@@ -101,7 +101,7 @@ Every WP carries a **Program class** line, and `TRACKER.md` has a Class column. 
 
 **PR title:** `WSn-NN: <the WP's imperative title>`.
 
-**Open as a draft.** Mark the PR ready only when every acceptance box is ticked or explained. Never merge your own PR. The repo's `.github/pull_request_template.md` still applies: fill in its sections and add the program sections, using this body:
+**Open as a draft.** Mark the PR ready only when every acceptance box is ticked or explained. Never merge your own PR. The repo's `.github/pull_request_template.md` now matches this body: fill in every section, in this order:
 
 ```markdown
 ## WP
@@ -264,7 +264,8 @@ Example: `- [ ] Run npm run check:legiscan-quota (needs prod env). Expect Used <
 - `npx tsc --noEmit`: exits 0.
 - `npm run lint`: 0 errors. Add no new warnings in the files you touched.
 - `npm test`: all pass. Add tests as the WP requires, as `src/**/*.test.ts` files run by `node --test` through `tsx`.
-- `npm run build`: passes. Whether it completes without Supabase env vars has not been checked [verify]. If it fails *only* for missing env vars, paste the error and mark the build "owner to confirm".
+- `npm run build`: passes with no env vars (verified 2026-10-06). CI runs it on every PR.
+- `npm run check`: the one-command local gate. It runs `npm run typecheck`, `npm run lint` and `npm test` in that order and must exit 0.
 - Because `next.config.ts` sets `eslint.ignoreDuringBuilds: true` (E8), a green build does not mean lint is clean. Run lint separately.
 
 **Changes to `scripts/`.** `tsconfig.json` excludes `scripts/` (E8), so tsc does not check them. Re-read every import line in your diff. Commit `d00b4c4` put an `import` inside a JSDoc comment and broke two scripts (E9). Once the CI work for E8 lands, use whatever scripts type-check it adds.
