@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -16,39 +16,11 @@ import {
 import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
 import { PasswordField } from '@/components/auth/PasswordField';
+import { ResendConfirmationButton } from '@/components/auth/ResendConfirmationButton';
 import { authEmailRedirectOrigin } from '@/lib/site-canonical';
 import { safeAuthRedirectPath } from '@/lib/auth-redirect';
+import { signupUiState, verifyRedirectUrl } from '@/lib/auth/signup-result';
 import { syncPostHogUser, trackUserRegistered } from '@/lib/analytics';
-
-async function establishSessionAfterSignup(
-  email: string,
-  password: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const res = await fetch('/api/auth/establish-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  const body = (await res.json().catch(() => ({}))) as {
-    access_token?: string;
-    refresh_token?: string;
-    error?: string;
-  };
-  if (!res.ok || !body.access_token || !body.refresh_token) {
-    return { ok: false, error: body.error ?? 'Could not sign you in after signup.' };
-  }
-  if (!supabase) {
-    return { ok: false, error: 'Authentication service is not configured.' };
-  }
-  const { error: sessionErr } = await supabase.auth.setSession({
-    access_token: body.access_token,
-    refresh_token: body.refresh_token,
-  });
-  if (sessionErr) {
-    return { ok: false, error: sessionErr.message };
-  }
-  return { ok: true };
-}
 
 function RegisterForm() {
   const router = useRouter();
@@ -58,6 +30,13 @@ function RegisterForm() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState<{ email: string; redirectTo: string } | null>(null);
+  const sentHeadingRef = useRef<HTMLParagraphElement>(null);
+  const safeNext = safeAuthRedirectPath(searchParams.get('next'), '');
+
+  useEffect(() => {
+    if (sent) sentHeadingRef.current?.focus();
+  }, [sent]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,18 +52,19 @@ function RegisterForm() {
       setLoading(false);
       return;
     }
-    const origin = authEmailRedirectOrigin();
+    const emailRedirectTo = verifyRedirectUrl(authEmailRedirectOrigin(), safeNext);
     const { data, error: signErr } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: `${origin}/auth/verify`,
+        emailRedirectTo,
       },
     });
-    if (signErr) {
+    const state = signupUiState({ session: data.session, error: signErr });
+    if (state === 'error') {
       setLoading(false);
-      setError(signErr.message);
+      setError(signErr?.message ?? 'Could not create your account. Try again.');
       return;
     }
     const identities = data.user?.identities;
@@ -98,38 +78,50 @@ function RegisterForm() {
 
     const emailVerified = Boolean(data.user?.email_confirmed_at);
     syncPostHogUser(data.user);
-
-    let signedIn = Boolean(data.session);
-    if (!signedIn) {
-      const sessionResult = await establishSessionAfterSignup(email, password);
-      if (!sessionResult.ok) {
-        setLoading(false);
-        setError(sessionResult.error);
-        return;
-      }
-      signedIn = true;
-    }
-
-    setLoading(false);
-    if (!signedIn) {
-      setError('Account created, but we could not start your session. Try logging in.');
-      return;
-    }
-
     trackUserRegistered({
       needs_verification: !emailVerified,
       email_verified: emailVerified,
     });
+    setLoading(false);
+
+    if (state === 'check-email') {
+      setSent({ email, redirectTo: emailRedirectTo });
+      return;
+    }
+
     router.refresh();
     // Content-surface prompts (e.g. the district map result) pass `next=` so the
     // new member lands back on what they were doing; default stays /bills.
-    router.push(safeAuthRedirectPath(searchParams.get('next'), '/bills'));
+    router.push(safeNext || '/bills');
   };
+
+  if (sent) {
+    const loginHref = safeNext ? `/auth/login?next=${encodeURIComponent(safeNext)}` : '/auth/login';
+    return (
+      <AuthPaperLayout title="Check your inbox">
+        <Stack spacing={2}>
+          <Typography ref={sentHeadingRef} tabIndex={-1} variant="body1" align="center" sx={{ outline: 'none' }}>
+            We sent a link to <strong>{sent.email}</strong>. Select it to finish creating your account.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" align="center">
+            If it does not arrive in a few minutes, check your spam folder.
+          </Typography>
+          <ResendConfirmationButton email={sent.email} emailRedirectTo={sent.redirectTo} startCoolingDown />
+        </Stack>
+        <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 3 }}>
+          Confirmed your address?{' '}
+          <MuiLink component={Link} href={loginHref} underline="hover">
+            Log in
+          </MuiLink>
+        </Typography>
+      </AuthPaperLayout>
+    );
+  }
 
   return (
     <AuthPaperLayout
       title="Create account"
-      subtitle="Use your email to register. You can browse right away. We will send a link to verify your address."
+      subtitle="Use your email to register. We will email you a link to confirm your address."
     >
       <Box component="form" onSubmit={handleRegister}>
         <Stack spacing={2}>

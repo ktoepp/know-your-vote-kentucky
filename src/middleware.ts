@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 import { shouldRefreshSupabaseSession } from '@/lib/supabase/session-middleware';
+import { checkAdminAccess } from '@/lib/auth/shared-secret';
 
 export async function middleware(request: NextRequest) {
   const sessionResponse = shouldRefreshSupabaseSession(request)
@@ -8,15 +9,19 @@ export async function middleware(request: NextRequest) {
     : NextResponse.next({ request });
 
   if (request.nextUrl.pathname.startsWith('/admin')) {
-    const adminToken = process.env.ADMIN_TOKEN;
-    if (!adminToken) return sessionResponse;
-
-    const provided = request.headers.get('x-admin-token');
-    if (provided !== adminToken) {
-      return new NextResponse('Unauthorized', {
-        status: 401,
-        headers: { 'WWW-Authenticate': 'Bearer realm="admin"' },
-      });
+    // Only an exact 'ok' continues. src/app/admin/layout.tsx repeats this check.
+    const access = await checkAdminAccess(request.headers);
+    switch (access) {
+      case 'ok':
+        break;
+      case 'denied':
+        return new NextResponse('Unauthorized', {
+          status: 401,
+          headers: { 'WWW-Authenticate': 'Bearer realm="admin"' },
+        });
+      case 'not-configured':
+      default:
+        return new NextResponse('Not Found', { status: 404 });
     }
   }
 

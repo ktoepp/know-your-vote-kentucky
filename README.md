@@ -37,7 +37,7 @@ Read first if you're picking up this project:
 
 ### Hidden routes (no nav, `noindex`)
 
-`/dashboard` (legacy redirect target — superseded by `/profile`), `/browse`, `/find-content`, `/design-system`, `/dev/digest-history`, `/dev/bill-summary-preview` (dev-only, gated on `NODE_ENV`). Reachable by URL for development. `/admin/sync-status` requires the `ADMIN_TOKEN` header.
+`/dashboard` (legacy redirect target — superseded by `/profile`), `/browse`, `/find-content`, `/design-system`, `/dev/digest-history`, `/dev/bill-summary-preview` (dev-only, gated on `NODE_ENV`). Reachable by URL for development. The `/admin` pages (`/admin/sync-status`, `/admin/accuracy`) open only when `ADMIN_TOKEN` is set and the request sends it in the `x-admin-token` header. Without `ADMIN_TOKEN` they return 404, and a missing or wrong header gets 401. Middleware and the admin layout both check it, through `src/lib/auth/shared-secret.ts`.
 
 ### Tooltip taxonomy
 
@@ -65,7 +65,7 @@ If `next dev` returns 500s or missing webpack chunks: kill anything on port 3000
 
 ### Maintenance scripts
 
-All tooling lives in `scripts/` and is exposed via `package.json`. There is no Jest/Vitest suite — `npm run test:env` only validates `.env.local`.
+All tooling lives in `scripts/` and is exposed via `package.json`. Unit tests: `npm test` (Node's built-in runner via `tsx`, files `src/**/*.test.ts`). `npm run check` runs type checks, lint and tests. CI (`.github/workflows/ci.yml`) runs the same plus `next build` on every PR.
 
 | Script | Purpose |
 | --- | --- |
@@ -163,7 +163,7 @@ All counters land in `ky_sync_state` (JSONB, date-bucketed) via the `ky_incremen
 | `rate_limit_denies` | `YYYY-MM-DD` | `/api/intelligence` 429s |
 | `anthropic_cache_hits` / `_misses` | `YYYY-MM-DD` | Anthropic response cache |
 
-These feed `/admin/sync-status` (requires `ADMIN_TOKEN`).
+These feed `/admin/sync-status` (send `ADMIN_TOKEN` in the `x-admin-token` header).
 
 ### Outbound mail
 

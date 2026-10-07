@@ -16,7 +16,10 @@ import {
 import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
 import { PasswordField } from '@/components/auth/PasswordField';
+import { ResendConfirmationButton } from '@/components/auth/ResendConfirmationButton';
 import { safeAuthRedirectPath } from '@/lib/auth-redirect';
+import { verifyRedirectUrl } from '@/lib/auth/signup-result';
+import { authEmailRedirectOrigin } from '@/lib/site-canonical';
 
 function LoginForm() {
   const router = useRouter();
@@ -25,11 +28,13 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setUnconfirmedEmail(null);
     if (!supabase) {
       setError('Authentication service is not configured.');
       setLoading(false);
@@ -40,7 +45,9 @@ function LoginForm() {
       password,
     });
     setLoading(false);
-    if (signErr) {
+    if (signErr?.code === 'email_not_confirmed') {
+      setUnconfirmedEmail(email.trim());
+    } else if (signErr) {
       setError(signErr.message);
     } else {
       const next = safeAuthRedirectPath(searchParams.get('next'), '/profile');
@@ -81,10 +88,26 @@ function LoginForm() {
             {error}
           </Alert>
         )}
+        {unconfirmedEmail && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            This address is not confirmed yet. Select the link in the email we sent when you signed up, or send a new one.
+          </Alert>
+        )}
         <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 3 }} disabled={loading}>
           {loading ? 'Logging in…' : 'Log in'}
         </Button>
       </Box>
+      {unconfirmedEmail && (
+        <Box sx={{ mt: 2 }}>
+          <ResendConfirmationButton
+            email={unconfirmedEmail}
+            emailRedirectTo={verifyRedirectUrl(
+              authEmailRedirectOrigin(),
+              safeAuthRedirectPath(searchParams.get('next'), ''),
+            )}
+          />
+        </Box>
+      )}
       <Divider sx={{ my: 3 }}>
         <Typography variant="caption" color="text.secondary">
           New here?

@@ -121,12 +121,11 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_default_public_token
 # LOG_LEVEL=info
 
 # =============================================================================
-# OPTIONAL — Operator Dashboard
+# Operator Dashboard (/admin pages)
 # =============================================================================
-# Protects GET /admin/sync-status. Set to a random secret and pass it as the
-# x-admin-token request header. If unset, the page is accessible without auth
-# (safe for local dev; always set this in production).
-# ADMIN_TOKEN=your_admin_token_here
+# Operator token for the /admin pages, sent as the x-admin-token request header.
+# Use a random value of 32 or more characters. Without it the /admin pages return 404.
+ADMIN_TOKEN=your_admin_token_here
 
 # =============================================================================
 # OPTIONAL — Sentry (error monitoring)
