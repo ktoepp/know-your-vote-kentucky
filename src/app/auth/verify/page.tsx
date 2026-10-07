@@ -6,6 +6,7 @@ import { Alert, Box, Button, CircularProgress, Typography } from '@mui/material'
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthPaperLayout } from '@/components/auth/AuthPaperLayout';
+import { safeAuthRedirectPath } from '@/lib/auth-redirect';
 
 async function exchangeSessionTokens(
   client: SupabaseClient,
@@ -42,8 +43,10 @@ async function ackEmailVerification(token: string): Promise<boolean> {
 export default function VerifyEmailPage() {
   const [status, setStatus] = useState<'working' | 'ok' | 'error'>('working');
   const [message, setMessage] = useState<string | null>(null);
+  const [nextPath, setNextPath] = useState('');
 
   useEffect(() => {
+    setNextPath(safeAuthRedirectPath(new URLSearchParams(window.location.search).get('next'), ''));
     if (!supabase) {
       setStatus('error');
       setMessage('Authentication service is not configured.');
@@ -127,7 +130,17 @@ export default function VerifyEmailPage() {
           {message}
         </Alert>
       )}
-      {status === 'ok' && (
+      {status === 'ok' && nextPath && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Button variant="contained" component={Link} href={nextPath} fullWidth size="large">
+            Go back to where you were
+          </Button>
+          <Button variant="outlined" component={Link} href="/profile" fullWidth>
+            Go to profile
+          </Button>
+        </Box>
+      )}
+      {status === 'ok' && !nextPath && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Button variant="contained" component={Link} href="/profile" fullWidth size="large">
             Go to profile
