@@ -18,14 +18,14 @@
  *
  * Hash-gated (LegiScan dataset best practices): compares each session's dataset_hash from
  * getDatasetList against ky_legiscan_datasets and SKIPS sessions whose hash is unchanged
- * since last import { fetchDatasetZipGated } from '../src/lib/legiscan-dataset-store';
-import — re-pulling an unchanged dataset returns identical bills and cannot
+ * since last import — re-pulling an unchanged dataset returns identical bills and cannot
  * fill a gap (bills still missing history simply aren't in that dataset version). After a
  * clean import it records the hash so the next run skips that session entirely.
  *
  * Requires LEGISCAN_API_KEY, SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL.
  */
 import './load-env';
+import { fetchDatasetZipGated } from '../src/lib/legiscan-dataset-store';
 import AdmZip from 'adm-zip';
 import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
