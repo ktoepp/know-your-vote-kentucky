@@ -2653,3 +2653,18 @@ The live sync made one HTTP request. 9/21 (#266): `timeout of 30000ms exceeded`.
 Both jobs: `conclusion: cancelled`, `runner_id: 0`, empty runner name, 0 billable ms, logs 404, cancelled ~15 min after creation (20:02→20:17, 20:10→20:25). The legislator-links job's own timeout is 20 min, so this was not our timeout. No runner was ever assigned: a GitHub-side failure, not a code or concurrency fault. Both triggers had also fired late (18:00 cron → 20:02, 12:00 cron → 20:10). The next LRC run (#297, 23:48 UTC) succeeded on the same commit. No workflow change. If it recurs, add a retry.
 
 **Verification (2026-10-06):** LRC live sync on this branch passed ([run 37472619217](https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/37472619217)). The legislator-links re-run passed ([run 37368048514, attempt 2](https://github.com/ktoepp/know-your-vote-kentucky/actions/runs/37368048514)) and spent 2 LegiScan queries (two `getSessionPeople`, zero `getPerson`), which confirms the 09-29 roster change (previously ~138 `getPerson` per run).
+
+---
+
+## 2026-10-06 — WS2-01: dependency patch round
+
+**Status: in review** (branch `wp/ws2-01-next-15-patch`). Patch round inside Next 15 before its end of support (~10-21) and the election window. `npm audit --omit=dev`: 16 (2 critical, 11 high, 3 moderate) → **0**. Full `npm audit`: 29 → 13, all dev/tooling.
+
+- **`next` and `eslint-config-next` 15.5.22 → 15.5.27** (exact pins kept). **`axios` `^1.18.1` → `^1.20.0`.**
+- **`sharp` override removed.** next 15.5.27 accepts `sharp ^0.34.3 || ^0.35.4` natively, so npm resolves the fixed 0.35.5 with no pin. One fewer override to track. Re-add `"sharp": "0.35.5"` only if `npm ls sharp` ever shows less than 0.35.5.
+- **`brace-expansion` override 5.0.8 → 5.0.12.** Supersedes the value set in [§ 2026-07-27](#2026-07-27--cleared-the-residual-devtooling-npm-audit-advisories-9--0); the blanket override itself stays for the reason given there.
+- Transitives refreshed in range with `npm update` (undici, socket.io-parser, engine.io, maplibre-gl, minimatch, nanoid, source-map-js, fast-uri, browserslist, dompurify, fflate, baseline-browser-mapping). `maplibre-gl` 5.23.0 → 6.13.0 is the only major move: every 5.x was in the vulnerable range, and the app imports only `react-map-gl/mapbox`, so it is not shipped.
+- **Rejected:** blanket `npm audit fix` (churned the eslint devtree in earlier rounds), any `--force`, Next 16 / React 19 / MUI majors (WS2-11a, WS2-11c), replacing axios.
+- **Contingency rule.** After 2026-10-21, new advisories are detected by Dependabot alerts (turned on by WS1-07). The owner triages any critical Next.js alert within 72 hours. If it has no 15.x patch, WS2-11c becomes P0 and is pulled forward. In W1 this needs an Owner go-ahead.
+
+**Revisit if:** a critical Next.js advisory lands with no 15.x patch (rule above), or WS2-11c moves production to Next 16.
