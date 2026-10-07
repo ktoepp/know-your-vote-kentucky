@@ -21,6 +21,7 @@
  * `running` for weeks, all answered `{ok:true}`.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectUnlessOperator } from '@/lib/auth/operator-guard';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { notifyHealthCheckFailureSlack, notifySourceHealthSlack } from '@/lib/slack-webhook';
 import {
@@ -30,28 +31,9 @@ import {
   shouldAlertOnHealth,
 } from '@/lib/source-health';
 
-function getBearerToken(req: NextRequest): string | null {
-  const auth = req.headers.get('authorization');
-  if (!auth) return null;
-  const token = auth.replace(/^Bearer\s+/i, '').trim();
-  return token || null;
-}
-
-function authenticate(req: NextRequest): boolean {
-  const token = getBearerToken(req);
-  if (!token) return false;
-  const syncKey = process.env.SYNC_API_KEY?.trim();
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!syncKey && !cronSecret) return false;
-  if (syncKey && token === syncKey) return true;
-  if (cronSecret && token === cronSecret) return true;
-  return false;
-}
-
 export async function GET(req: NextRequest) {
-  if (!authenticate(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await rejectUnlessOperator(req);
+  if (denied) return denied;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();

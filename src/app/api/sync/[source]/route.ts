@@ -10,6 +10,7 @@
  * Protected by SYNC_API_KEY or CRON_SECRET bearer token.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectUnlessOperator } from '@/lib/auth/operator-guard';
 import { syncAll, SYNC_SOURCES } from '../../../../lib/ky-sync-pipeline';
 import {
   isVercelCronRequest,
@@ -19,34 +20,12 @@ import {
 
 export const maxDuration = 300;
 
-function getBearerToken(req: NextRequest): string | null {
-  const auth = req.headers.get('authorization');
-  if (!auth) return null;
-  const token = auth.replace(/^Bearer\s+/i, '').trim();
-  return token || null;
-}
-
-function authenticate(req: NextRequest): boolean {
-  const token = getBearerToken(req);
-  if (!token) return false;
-  const syncKey = process.env.SYNC_API_KEY?.trim();
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!syncKey && !cronSecret) {
-    console.warn('[Sync API] Neither SYNC_API_KEY nor CRON_SECRET configured — rejecting all requests');
-    return false;
-  }
-  if (syncKey && token === syncKey) return true;
-  if (cronSecret && token === cronSecret) return true;
-  return false;
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ source: string }> },
 ) {
-  if (!authenticate(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await rejectUnlessOperator(req);
+  if (denied) return denied;
 
   const { source } = await params;
 

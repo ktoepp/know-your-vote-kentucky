@@ -3,30 +3,12 @@
  * Auth: Bearer CRON_SECRET or SYNC_API_KEY (same as other cron helpers).
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectUnlessOperator } from '@/lib/auth/operator-guard';
 import { runSlackSmokeTest } from '@/lib/slack-webhook';
 
-function getBearerToken(req: NextRequest): string | null {
-  const auth = req.headers.get('authorization');
-  if (!auth) return null;
-  const token = auth.replace(/^Bearer\s+/i, '').trim();
-  return token || null;
-}
-
-function authenticate(req: NextRequest): boolean {
-  const token = getBearerToken(req);
-  if (!token) return false;
-  const syncKey = process.env.SYNC_API_KEY?.trim();
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!syncKey && !cronSecret) return false;
-  if (syncKey && token === syncKey) return true;
-  if (cronSecret && token === cronSecret) return true;
-  return false;
-}
-
 export async function GET(req: NextRequest) {
-  if (!authenticate(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await rejectUnlessOperator(req);
+  if (denied) return denied;
   const triggeredBy =
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     req.headers.get('x-vercel-id') ||
@@ -36,9 +18,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!authenticate(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await rejectUnlessOperator(req);
+  if (denied) return denied;
   const triggeredBy =
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     req.headers.get('x-vercel-id') ||
