@@ -9,6 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm test",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "test:env": "tsx scripts/test-env.ts",
     "test:supabase-auth": "tsx scripts/test-supabase-auth-api.ts",
