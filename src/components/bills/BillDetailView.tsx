@@ -30,6 +30,12 @@ import { useTheme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import NextLink from 'next/link';
 import { AiGeneratedBlock } from '@/components/civic/AiAttribution';
+import {
+  TEXT_TYPE_LABELS,
+  billChangedAfterIntroduction,
+  selectCurrentBillText,
+  textDateOrNull,
+} from '@/lib/bill-text-versions';
 import { CopyableEmail } from '@/components/civic/CopyableEmail';
 import { LegislatorExternalLinkButton } from '@/components/civic/LegislatorExternalLinkButton';
 import { LegislatorIdentityBlock } from '@/components/civic/LegislatorIdentityBlock';
@@ -124,22 +130,6 @@ interface LegiScanText {
   state_link: string;
   /** LegiScan getBill texts[] includes the document date; older synced rows may lack it. */
   date?: string;
-}
-
-/** Friendly labels for LegiScan texts[] type values; unknown types render as-is. */
-const TEXT_TYPE_LABELS: Record<string, string> = {
-  Introduced: 'Introduced (original)',
-  'Comm Sub': 'Committee Substitute',
-  Amended: 'Amended',
-  Engrossed: 'Engrossed (passed one chamber)',
-  Enrolled: 'Enrolled (passed both chambers)',
-  Chaptered: 'Enacted: Acts chapter (final law)',
-  Draft: 'Draft',
-};
-
-/** KY texts[] ship date "0000-00-00"; treat anything non-real as missing. */
-function textDateOrNull(date: string | undefined): string | null {
-  return date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !date.startsWith('0000') ? date : null;
 }
 
 interface LegiScanSubject {
@@ -459,8 +449,9 @@ function SponsorCard({
  * Compact list of official document versions from legiscan_texts. KY document dates
  * are "0000-00-00", so chronology comes from LegiScan's array order (oldest → newest)
  * and versions can't be interleaved into the dated HistoryTimeline. Deduped by stage
- * (newest document per stage wins). "Most current" follows the newest document
- * regardless of sort order; the default is newest-first because this list's job is
+ * (newest document per stage wins). "Most current" follows selectCurrentBillText (the
+ * same selector as the page's official-text link) regardless of sort order; the
+ * default is newest-first because this list's job is
  * "get me the current text" (the timeline defaults newest-first too; oldest-first is opt-in).
  */
 function BillTextVersionsList({ texts }: { texts: LegiScanText[] }) {
@@ -483,7 +474,7 @@ function BillTextVersionsList({ texts }: { texts: LegiScanText[] }) {
     });
     return {
       rows: sortOrder === 'newest' ? deduped : [...deduped].reverse(),
-      mostCurrentDocId: deduped[0]?.doc_id,
+      mostCurrentDocId: selectCurrentBillText(texts)?.doc_id,
     };
   }, [texts, sortOrder]);
 
@@ -796,8 +787,8 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
   const billVotes = (detail?.votes ?? []) as BillVoteRow[];
   const sponsors = (detail?.sponsors ?? []) as LegiScanSponsor[];
 
-  // Most recent text version first
-  const latestText = texts.find(t => t.type === 'Chaptered' || t.type === 'Enrolled' || t.type === 'Engrossed') ?? texts[0];
+  // Most current text version: the same selector drives the versions list's "Most current" chip.
+  const latestText = selectCurrentBillText(texts);
   const originalText = texts.find(t => t.type === 'Introduced');
   const officialTextForAi =
     httpUrlForUiLink(latestText?.state_link) ||
@@ -1096,6 +1087,8 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
               <MuiCard sx={{ mb: 3, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
                 <MuiCardContent>
                   <AiGeneratedBlock
+                    basis={{ kind: 'description' }}
+                    changedAfterIntroduction={billChangedAfterIntroduction(texts, history)}
                     officialHref={officialTextForAi}
                     officialLabel="Open official bill text (PDF)"
                     billNumber={bill.bill_number}

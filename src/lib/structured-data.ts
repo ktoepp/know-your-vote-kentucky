@@ -3,6 +3,7 @@ import { publicSiteOrigin } from '@/lib/site-canonical';
 import { formatKyLegislatorDistrict } from '@/lib/bill-display';
 import { kyMemberTitleShort, normalizeLegislatorPhotoUrl } from '@/lib/ky-member-utils';
 import { normalizeKyGaDisplayName } from '@/lib/ky-committee-display';
+import { stripAudienceClause } from '@/lib/ai-summary-basis';
 
 type JsonLdNode = Record<string, unknown>;
 
@@ -70,7 +71,7 @@ export function buildBreadcrumbJsonLd(crumbs: BreadcrumbCrumb[]): JsonLdNode {
 export function buildBillJsonLd(bill: KYBill, path: string): JsonLdNode {
   const description =
     bill.description?.trim() ||
-    bill.ai_summary?.trim() ||
+    stripAudienceClause(bill.ai_summary?.trim() ?? '') ||
     `Kentucky ${bill.bill_number}: ${bill.title}`;
   const rawSponsors: unknown = bill.sponsors;
   const sponsors = (Array.isArray(rawSponsors) ? rawSponsors : [])
