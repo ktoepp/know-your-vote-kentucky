@@ -23,8 +23,18 @@ import {
   normalizeKyGaAgendaLine,
 } from '@/lib/ky-committee-display';
 import { KY_SESSIONS } from '@/lib/ky-sessions';
+import { ROLL_CALL_OUTCOME_POLICY, rollCallOutcomeLabel } from '@/lib/roll-call-label';
 import type { CalendarDayCell, CalendarMonth } from '@/lib/calendar-grid';
 import type { KYCommitteeAgendaItem, KYCommitteeMeetingBrowse } from '@/types/kentucky';
+
+/**
+ * The result of one roll call, per `ROLL_CALL_OUTCOME_POLICY` (WS3-03a), as a
+ * " · Vote result: failed" suffix, or nothing when the policy shows no label.
+ */
+function outcomeSuffix(passed: boolean | null): string {
+  const label = rollCallOutcomeLabel(passed, ROLL_CALL_OUTCOME_POLICY);
+  return label ? ` · ${label}` : '';
+}
 
 /** A floor/chamber vote joined to its bill number for calendar display. */
 interface CalendarVote {
@@ -471,7 +481,7 @@ export function MeetingsCalendar({
                             <strong>{v.billNumber ?? 'Bill'}</strong>
                           )}{' '}
                           {v.chamber ? `· ${v.chamber === 'house' ? 'House' : 'Senate'} floor` : '· Floor'}
-                          {v.passed != null ? ` · ${v.passed ? 'Passed' : 'Failed'}` : ''}
+                          {outcomeSuffix(v.passed)}
                         </Typography>
                       </Box>
                     ))}

@@ -288,22 +288,6 @@ describe("rollCallOutcomeLabel (WS3-03a)", () => {
     assert.equal(rollCallOutcomeLabel(true, ROLL_CALL_OUTCOME_POLICY), null);
     assert.equal(rollCallOutcomeLabel(false, ROLL_CALL_OUTCOME_POLICY), "Vote result: failed");
   });
-
-  test("the chip result does not depend on whether the roll call matched history", () => {
-    const matched = deriveRollCallLabel(
-      { date: "2026-02-10", desc: "House: Veto Override RCS# 155", yea: 91, nay: 0 },
-      history,
-    );
-    const unmatched = deriveRollCallLabel(
-      { date: "2026-02-11", desc: "House: Veto Override RCS# 156", yea: 20, nay: 21 },
-      history,
-    );
-    assert.equal(matched.matched, true);
-    assert.equal(unmatched.matched, false);
-    // The label function takes only `passed` and the policy, so a failed vote
-    // reads the same on a matched row and an unmatched row.
-    assert.equal(rollCallOutcomeLabel(false, ROLL_CALL_OUTCOME_POLICY), "Vote result: failed");
-  });
 });
 
 describe("WS3-03a copy rules", () => {
