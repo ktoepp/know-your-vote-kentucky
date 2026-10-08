@@ -268,7 +268,7 @@ Example: `- [ ] Run npm run check:legiscan-quota (needs prod env). Expect Used <
 - `npm run check`: the one-command local gate. It runs `npm run typecheck`, `npm run lint` and `npm test` in that order and must exit 0.
 - Because `next.config.ts` sets `eslint.ignoreDuringBuilds: true` (E8), a green build does not mean lint is clean. Run lint separately.
 
-**Changes to `scripts/`.** `tsconfig.json` excludes `scripts/` (E8), so tsc does not check them. Re-read every import line in your diff. Commit `d00b4c4` put an `import` inside a JSDoc comment and broke two scripts (E9). Once the CI work for E8 lands, use whatever scripts type-check it adds.
+**Changes to `scripts/`.** `tsconfig.json` excludes `scripts/` (E8), so tsc does not check them. Re-read every import line in your diff. Commit `d00b4c4` put an `import` inside a JSDoc comment and broke two scripts (E9). Run `npm run typecheck:scripts`; CI runs it on every PR.
 
 **UI changes.**
 
