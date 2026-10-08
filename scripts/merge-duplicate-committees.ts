@@ -74,7 +74,7 @@ async function main() {
     .from('ky_committees')
     .select(hasAliases ? 'id, lrc_rsn, committee_type, name, slug, aliases' : 'id, lrc_rsn, committee_type, name, slug');
   if (error) { console.error('DB fetch failed:', error.message); process.exit(1); }
-  const committees = (rows ?? []) as CommitteeRow[];
+  const committees = (rows ?? []) as unknown as CommitteeRow[];
   const bySlug = new Map(committees.map((c) => [c.slug, c]));
 
   // --- Resolve pairs ---------------------------------------------------------
@@ -123,7 +123,7 @@ async function main() {
 
   for (const { loser, survivor } of pairs) {
     const actions: Action[] = [];
-    const act = async (step: string, detail: string, fn?: () => Promise<{ error: { message: string } | null }>) => {
+    const act = async (step: string, detail: string, fn?: () => PromiseLike<{ error: { message: string } | null }>) => {
       actions.push({ step, detail });
       console.log(`  - ${step}: ${detail}`);
       if (live && fn) {
