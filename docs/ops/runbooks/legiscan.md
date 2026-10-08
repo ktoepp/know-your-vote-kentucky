@@ -16,8 +16,9 @@ One key, 10,000 queries a month, audited from 2026-11-01. A violation can mean a
 
 ## Stop the spend
 
-- **(a) GitHub workflows.** Least to most drastic from here; stop at the first step that holds. GitHub → Actions → each workflow → "…" → "Disable workflow". Immediate, no deploy. The six that hold the key: `sync-ky-bills-status.yml`, `legiscan-dataset-weekly.yml`, `legislator-links-weekly.yml`, `accuracy-audit.yml`, `backfill-vote-nv-counts.yml`, `backfill-session-votes.yml`. The last two are already disabled from WS4-04 until WS4-03a merges, and are never re-enabled to work around a cap.
-- **(b) The limit brake, everywhere.** Set the GitHub repository **variable** (Settings → Secrets and variables → Actions → Variables, not a secret) `LEGISCAN_MONTHLY_QUERY_LIMIT=1`, and the Vercel Production env var of the same name, then redeploy production (Vercel → Deployments → Redeploy). Once the month count is 1 or more, usage is at least 100% of the limit and the client throws `LegiscanQuotaHoldError` before it sends. Expect: one 100% quota-band page (expected); a running process may keep sending for up to 60 s (`QUOTA_GUARD_TTL_MS`); the guard fails open if the counter cannot be read (Supabase down); the first query of a new month can pass. For a script on your own machine, put the line in `.env.local` (it overrides the shell) or stop the script.
+**Always do both (a) and (b).** (a) does not touch the Vercel crons or a manual `/api/sync` caller; (b) reaches every scheduler but has the gaps listed in (b). Add (c) if the guard may fail open (Supabase down, or the counter cannot be read). Use (d) only together with (a)–(c).
+- **(a) GitHub workflows.** GitHub → Actions → each workflow → "…" → "Disable workflow". Immediate, no deploy. The six that hold the key: `sync-ky-bills-status.yml`, `legiscan-dataset-weekly.yml`, `legislator-links-weekly.yml`, `accuracy-audit.yml`, `backfill-vote-nv-counts.yml`, `backfill-session-votes.yml`. The last two are already disabled from WS4-04 until WS4-03a merges, and are never re-enabled to work around a cap.
+- **(b) The limit brake, everywhere.** Set the GitHub repository **variable** (Settings → Secrets and variables → Actions → Variables, not a secret) `LEGISCAN_MONTHLY_QUERY_LIMIT=1`, and the Vercel Production env var of the same name, then redeploy production (Vercel → Deployments → Redeploy). Once the month count is 1 or more, usage is at least 100% of the limit and the client throws `LegiscanQuotaHoldError` before it sends. Expect one 100% quota-band page (expected). A running process may keep sending for up to 60 s, and the guard fails open if the counter cannot be read; the other gaps are in the data budget's [kill-switch section](../../data-budget.md#kill-switch-existing-brake-no-new-code). For a script on your own machine, put the line in `.env.local` (it overrides the shell) or stop the script.
 - **(c) Vercel crons.** If the guard may fail open, stop the three LegiScan crons in `vercel.json`: bills 05:00, legislators 06:00, votes 06:15 UTC. Use Vercel → Project → Settings → Cron Jobs → Disable [verify the control exists; it disables every cron, including health-check], or a hotfix PR that removes those three entries from `vercel.json` (allowed in any window as a P0).
 - **(d) Last resort, only together with (a)–(c).** Remove `LEGISCAN_API_KEY` from Vercel (then redeploy) and from the GitHub secrets, and keep the value only in your password manager. **Removing the key is not the stop.** Until WS4-02 merges, the client only warns and keeps sending keyless requests to `api.legiscan.com` for bills, votes and dataset runs, with retries, and the counter still increments [verify whether LegiScan counts or penalizes keyless requests from our IP]. After WS4-02 the client refuses to send without a key, but the key also lives on your machine, so (a)–(c) stay the stop. Health breaches are then expected.
 
@@ -44,16 +45,15 @@ Match the jumped caller tag (`month:op@caller` in the readout) to its source, an
 
 ## Recover
 
-1. Fix the cause first (a PR, or wait for the month to roll over). Then undo in reverse order: restore the key if (d) was used, then the crons from (c). Lift the brake: delete the repository variable (workflows fall back to `'10000'`), set the Vercel var back to 10000 (or remove it), and redeploy.
+1. Fix the cause first (a PR, or wait for the month to roll over). After a suspension or terms email, reply from the account that holds the key (WS4-04) and keep (a)–(c) in place until LegiScan answers. Then undo in reverse order: restore the key if (d) was used, then the crons from (c). Lift the brake: delete the repository variable (workflows fall back to `'10000'`), set the Vercel var back to 10000 (or remove it), and redeploy.
 2. Re-enable one scheduled workflow at a time and run `npm run check:legiscan-quota` after each run. The two backfill workflows stay disabled unless WS4-03a has merged.
 3. If the 100% page fired during the brake, the quota-band page stays silent for the rest of that month (the band is stored per month). Read the counter by hand each day until the 1st. If the month passes 5,000 by the 15th, follow the paid-tier trigger in `docs/data-budget.md` (WS4-04).
-4. After a suspension or terms email, reply from the account that holds the key (WS4-04), and keep (a)–(c) in place until LegiScan answers.
 
 ## Never
 
-- Register or request a second key, or rotate the key to "reset" a quota. Remove or weaken LegiScan attribution (`src/lib/legiscan-attribution.ts`).
-- Run a backfill to catch up after an outage. The hash-gated syncs self-heal.
-- Re-enable `backfill-vote-nv-counts` or `backfill-session-votes` before WS4-03a merges, or any LegiScan workflow to work around a cap.
+- Register or request a second key, or rotate the key to "reset" a quota.
+- Remove or weaken LegiScan attribution (`src/lib/legiscan-attribution.ts`).
+- Run a backfill to catch up after an outage (the hash-gated syncs self-heal), or re-enable `backfill-vote-nv-counts` or `backfill-session-votes` before WS4-03a merges, or any LegiScan workflow to work around a cap.
 
 ## Log it
 
