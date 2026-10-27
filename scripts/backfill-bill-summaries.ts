@@ -143,7 +143,8 @@ async function main() {
   const samples: string[] = [];
 
   await mapWithConcurrency(candidates, CONCURRENCY, async ({ row, hash }) => {
-    const text = await generateBillSummary(row as KYBill);
+    // generateBillSummary reads only the columns selected above, so the partial row is enough.
+    const text = await generateBillSummary(row as unknown as KYBill);
     if (!isUsableSummary(text)) {
       skippedUnusable += 1;
       console.warn(`  skip ${row.bill_number}: generator returned no usable summary`);
