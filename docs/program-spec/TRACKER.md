@@ -21,10 +21,10 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 
 | ID | Title | WS | Priority | Window | Tier | Size | Depends on | Class | Status |
 |---|---|---|---|---|---|---|---|---|---|
-| WS1-01 | Restore the missing dataset-store import in two backfill scripts | WS1 | P0 | W0 | Sonnet | S | none | Core | todo |
+| WS1-01 | Restore the missing dataset-store import in two backfill scripts | WS1 | P0 | W0 | Sonnet | S | none | Core | done (#292) |
 | WS1-02 | Type-check `scripts/` with its own tsconfig and clear the errors | WS1 | P0 | W0 | Sonnet | M | WS1-01, WS1-04 (soft: WS5-01a) | Core | todo |
 | WS1-03 | Replace `next lint` with the ESLint CLI and a warning ceiling | WS1 | P1 | W0 | Sonnet | S | none | Core | todo |
-| WS1-04 | Add a secret-free pull-request CI workflow and align the PR template | WS1 | P0 | W0 (target merge 2026-10-12) | Sonnet | M | none | Core | awaiting-owner |
+| WS1-04 | Add a secret-free pull-request CI workflow and align the PR template | WS1 | P0 | W0 (target merge 2026-10-12) | Sonnet | M | none | Core | done (#293) |
 | WS1-05a | Assert that LegiScan `getDataset` is reached only through the gated store | WS1 | P0 | W0 | Sonnet | S | none | Core | todo |
 | WS1-05b | Add repo-invariant tests for migrations, script references and cron paths | WS1 | P2 | W2 | Sonnet | S | WS1-05a | Backlog | todo |
 | WS1-07 | Protect `main` with a ruleset that requires CI and turn on GitHub security alerts | WS1 | P1 | W0 (toggles by 2026-10-20; ruleset the day after WS1-04 merges) | Owner | S | WS1-04 (ruleset steps only; the toggle steps depend on nothing) | Backlog | todo |
@@ -34,9 +34,9 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS1-12 | Test that every outbound email carries the postal address and unsubscribe link | WS1 | P1 | W2 (target merge 2026-11-20) | Sonnet | S | none | Backlog | todo |
 | WS1-13 | Caption the digest progress meter with the newest event | WS1 | P2 | W2 | Sonnet | S | none (merge after WS7-07b if WS7-07b is open) | Backlog | todo |
 | WS1-15 | Pin district lookup against the committed boundaries | WS1 | P1 | W0 (target merge 2026-10-20) | Sonnet | S | none | Backlog | todo |
-| WS2-01 | Patch Next.js 15 and clear production dependency advisories | WS2 | P0 | W0 | Sonnet | S | none (prefer after WS1-04) | Core | todo |
-| WS2-02 | Harden admin-route access control and consolidate six bearer-token checks into one constant-time guard | WS2 | P0 | W0 | Opus | M | none | Core | todo |
-| WS2-03 | Harden the post-signup session flow (owner decision) | WS2 | P0 | W0 | Opus | M | none | Core | todo |
+| WS2-01 | Patch Next.js 15 and clear production dependency advisories | WS2 | P0 | W0 | Sonnet | S | none (prefer after WS1-04) | Core | done (#294) |
+| WS2-02 | Harden admin-route access control and consolidate six bearer-token checks into one constant-time guard | WS2 | P0 | W0 | Opus | M | none | Core | done (#295) |
+| WS2-03 | Harden the post-signup session flow (owner decision) | WS2 | P0 | W0 | Opus | M | none | Core | done (#297) |
 | WS2-04 | Guard Mapbox attribution on every shipped map surface | WS2 | P2 | W1 | Sonnet | S | WS5-02 | Backlog | todo |
 | WS2-05 | Remove personal data from FEEDBACK.md and block its return | WS2 | P0 | W0 | Sonnet | S | none | Core | todo |
 | WS2-06a | Stop the browser view-count write | WS2 | P1 | W0 | Sonnet | S | none | Backlog | todo |
@@ -53,7 +53,7 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS2-13 | Get a legal review of /privacy and /terms when a trigger fires | WS2 | P3 | W4 | Owner | S | WS2-09b | Backlog | todo |
 | WS2-14 | Run the pre-session security readiness check | WS2 | P1 | FZ | Sonnet | S | WS2-01, WS2-02, WS2-03, WS2-05, WS2-06b, WS2-07, WS2-09b, WS2-11c, WS2-15 | Backlog | todo |
 | WS2-15 | Confirm 2FA and recovery codes on every vendor account that can deploy, change DNS, read user data or spend money | WS2 | P1 | W0 | Owner | S | none | Backlog | todo |
-| WS3-01 | Extract roll-call labelling into a tested library | WS3 | P0 | W0 | Sonnet | S | none | Core | todo |
+| WS3-01 | Extract roll-call labelling into a tested library | WS3 | P0 | W0 | Sonnet | S | none | Core | done (#296) |
 | WS3-02 | Show derived vote labels on member profiles | WS3 | P0 | W0 | Sonnet | S | WS3-01 | Core | todo |
 | WS3-03a | Label unmatched roll calls honestly and fix the outcome chip | WS3 | P0 | W0 | Sonnet | S | WS3-01 | Core | todo |
 | WS3-03b | Use sentence case and fewer underlines in bill history | WS3 | P2 | W2 | Sonnet | S | WS3-03a, WS6-09a | Backlog | todo |
@@ -76,11 +76,11 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS3-13 | Use one "became law" status label on cards and filters | WS3 | P3 | W4 | Sonnet | S | WS1-10, WS3-03b, WS6-09a | Backlog | todo |
 | WS3-14 | Publish a corrections log and the procedure behind it | WS3 | P1 | W1 | Sonnet | S | WS3-02, WS3-04 | Backlog | todo |
 | WS3-15 | Make the accuracy audit's dry run skip the Anthropic pass | WS3 | P1 | W1 | Sonnet | S | none | Backlog | todo |
-| WS4-01 | Publish one data budget and remove stale 30k quota references | WS4 | P0 | W0 | Sonnet | S | none | Core | todo |
+| WS4-01 | Publish one data budget and remove stale 30k quota references | WS4 | P0 | W0 | Sonnet | S | none | Core | done (#298) |
 | WS4-02 | Count every LegiScan attempt and stop retrying rejected requests | WS4 | P0 | W0 | Opus | S | none | Core | todo |
 | WS4-03a | Charge every LegiScan call to a per-run budget and deny unbudgeted processes | WS4 | P0 | W2 | Opus | M | WS4-01, WS4-02 | Core | todo |
 | WS4-03b | Print estimates in the high-spend LegiScan scripts and make the hash path the default | WS4 | P1 | W2 | Sonnet | S | WS4-03a, WS1-01 (soft: WS5-01a) | Backlog | todo |
-| WS4-04 | Confirm LegiScan key ownership and adopt the budget and paid-tier trigger | WS4 | P0 | W0 | Owner | S | WS4-01 | Core | todo |
+| WS4-04 | Confirm LegiScan key ownership and adopt the budget and paid-tier trigger | WS4 | P0 | W0 | Owner | S | WS4-01 | Core | done (owner 2026-10-08) |
 | WS4-05 | Test all four LRC parsers against the saved pages | WS4 | P1 | W1 (merge by 10-30, or after 11-05) | Sonnet | M | none | Backlog | todo |
 | WS4-06 | Make the hash-gated bills sync resumable, then turn on its run cap | WS4 | P0 | W2 | Opus | M | WS4-03a | Core | todo |
 | WS4-07 | Set an Anthropic spend limit and record the model's retirement date | WS4 | P2 | W2 | Owner | S | WS4-01 | Backlog | todo |
