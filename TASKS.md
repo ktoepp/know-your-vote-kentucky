@@ -40,6 +40,39 @@ Ordered by consequence, not effort.
 - [ ] **Measure one real session before revisiting Push.** Every month in the counter is either pre-fix (Apr–Jun) or interim (Jul–Aug); the current architecture has **never been observed under session load**. The 2027 Regular Session (Jan–mid-Apr) is the first honest test. Modelled sizing: ~8,000–15,000/month for one state at peak, ~16,000–30,000 for two — two states at session peak is the only load that actually approaches the cap.
 - [ ] **Push pricing — ask only when the second state is committed.** LegiScan left this as the open follow-up from their 2026-08-18 reply and it is the one live thread with them. Reopening it now means negotiating against a ceiling we have just disproved. Trigger: instrumented session data projecting two states over ~25,000/month. **Revisit if:** a single Kentucky session month exceeds ~20,000, or LegiScan changes the Public tier. **2026-09-29: LegiScan did change the Public tier** (10k cap) — see below; the "~20,000" trigger is superseded by the PROPOSED one there.
 
+### LegiScan 11-01 compliance check (2026-10-27, read-only, branch `docs/legiscan-11-01-check`)
+
+**Verdict: compliant now.** Nothing has to merge before 11-01. Production runs `main` @ `1478c82` (PR #298 merge, deployed 2026-10-08 and still the live production deployment), which already carries the 2026-09-29 throttle, hash-gating and attribution work.
+
+- [x] **1. Monthly volume: verified.** Counter `ky_sync_state.legiscan_query_counter`, read 2026-10-27: **Oct 1–27 = 201** (`getMasterListRaw` 118, `getSessionPeople` 35, `getSessionList` 24, `getDataset` 13, `getDatasetList` 11; 0 `getBill`/`getRollCall`). 201 ÷ 27 × 31 ≈ **231/month = 2.3% of 10,000**. The counter matched LegiScan's own figure exactly on 2026-10-08 (57). It matches the schedules:
+  - Bills sync: Vercel `0 5 * * *` + GH `sync-ky-bills-status` `40 */6 * * *` = 5 runs/day × 27 days = 135 runs → 118 `getMasterListRaw`, plus ~1 `getSessionList`/day (24, from the day-old persisted list). `getBill` only for changed hashes, so 0 in interim.
+  - Legislators: Vercel `0 6 * * *` (27) + GH `legislator-links-weekly` `0 12 * * 1` (4 × ~2) ≈ 35 `getSessionPeople`.
+  - Dataset: GH `legiscan-dataset-weekly` `0 11 * * 0` and `0 11 * * 3` (~8 runs) + `accuracy-audit` `0 13 * * 0` (4 runs) ≈ 12 `getDatasetList` (11 counted); `getDataset` only on a hash change (13).
+  - Votes: Vercel `15 6 * * *` `limit=5` skips stored roll calls, so 0 in interim.
+  - Session peak (Jan–Mar 2027) is still projected at ≤5,500/month (≤55%), per decisions.md § 2026-10-06.
+  - Caveat: the counter records successful responses only, so failed attempts are missing until #299 (WS4-02) lands. In September that was about 50.
+- [x] **2. Rate ≤ 2 req/s: verified per process, inferred across processes.**
+  - Every LegiScan call goes through `KyLegiScanClient.request()`. The only `api.legiscan.com` base URL is `src/lib/ky-legiscan-client.ts:132`, and the client is created only by the singleton `getKyLegiScanClient()` (`:503–505`). The dataset path goes through it too (`legiscan-dataset-store.ts:125` → `client.fetchDataset`).
+  - `RATE_DELAY = 650` (`:101`). Throttle waits are serialized through a promise chain (`:121–123`, `:137–145`), so callers inside one process cannot fire together. Retries also wait their turn (`:174`). That caps one process at ~1.54 req/s.
+  - Shipped in `cb7d2d9`, an ancestor of the production commit.
+  - Across processes, schedules are staggered: GH bills at :40; Vercel at 05:00, 06:00 and 06:15; dataset Wed/Sun 11:00; audit Sun 13:00; links Mon 12:00. In interim each run makes 1–3 calls, so an overlap is unlikely, and even then would be brief.
+- [x] **3. One key: verified in config, inferred for values, unknown for laptops.** Only the name is listed here, never the value.
+  - Vercel has exactly one `LEGISCAN_API_KEY` entry, targeting production + preview + development. It was last edited 2026-03-10 and has not changed since.
+  - GitHub Actions: one secret name, `secrets.LEGISCAN_API_KEY`, used by six workflows: `sync-ky-bills-status`, `legislator-links-weekly`, `legiscan-dataset-weekly`, `accuracy-audit`, `backfill-vote-nv-counts`, `backfill-session-votes`. The two backfills show `disabled_manually` (since 2026-10-08).
+  - Code: read only at `ky-legiscan-client.ts:129`, plus presence checks (`ky-sync-pipeline.ts:1640`, `scripts/test-env.ts:12`). `env-template.txt:71` is a placeholder.
+  - Inferred: the Vercel and GitHub values are the same key. The owner confirmed on 2026-10-08 that the LegiScan account shows exactly one Public key and that it matches Vercel and GitHub (OWNER-DECISIONS row in PR #300, not yet merged).
+  - Unknown: developers' local `.env.local`, which can't be inspected from here.
+  - No key was registered or rotated.
+- [x] **4. PRs: verified.**
+  - **#298 is live:** the production deployment is its merge commit. It is docs and constants only (data budget, `check-quota --planned`), with no runtime change.
+  - **#301 (WS1-05a)** adds one test file, `src/lib/repo-invariants.test.ts`, which fails CI if any code reaches `getDataset` outside the hash-gated store. It is a regression guard and is not needed for compliance.
+  - **#307 (WS9-06a)** adds `docs/ops/runbooks/legiscan.md` and `docs/ops/README.md`: the stop-the-spend procedure. It is docs only and not needed for compliance, but it is worth merging before 11-01 so the procedure exists if a ban warning arrives.
+- [ ] **Before 11-01 (recommended, not required):**
+  - Merge #307.
+  - Rebase and merge **#299 (WS4-02)**. Today a LegiScan `status: "ERROR"` rejection is retried up to `MAX_RETRIES = 5` times (`ky-legiscan-client.ts:102`, `:176–188`), and a missing key still sends keyless requests. Spec 04 lists "no retried rejections" as an 11-01 item. #299 is a draft with merge conflicts.
+  - Merge #300, which records the 10-08 one-key confirmation in the repo.
+- [ ] **Separate finding:** no digest email has been logged since 2026-10-12 11:00 UTC (`ky_notifications_log`: 27 rows, all `sent`), and `/api/webhooks/resend` had no hits in the last 3 days. Check whether `/api/cron/notify` is running or simply has nothing to send.
+
 ### LegiScan health check + two workflow failures (2026-10-06, branch `claude/zen-wright-13casl`)
 
 Full numbers and reasoning: [decisions.md § 2026-10-06](./decisions.md#2026-10-06--legiscan-post-cut-health-check-lrc-calendar-fetch-retries-1005-runs-never-got-a-runner).
