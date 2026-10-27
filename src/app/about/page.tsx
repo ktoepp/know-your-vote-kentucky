@@ -77,9 +77,12 @@ export default function AboutPage() {
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, mb: 2 }}>
           Bill pages carry a plain-language summary written by a language model working under fixed
-          rules: it describes what a bill does, using only the bill&apos;s own fields and any notes an
-          editor has verified against the official text. It never characterizes a legislator. Votes,
-          sponsorships, and positions pass through exactly as the official record has them.
+          rules. Today it works from the bill&apos;s title, its official description and subject
+          labels, and any notes an editor has checked against the official text. It does not yet read
+          the full bill text, so a summary can describe an earlier version of a bill that changed. It
+          never characterizes a legislator. Votes, sponsorships, and positions pass through exactly as
+          the official record has them. Each summary links to the official text and has a link to
+          report a problem.
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
           Summaries cover every bill from the 2024 session forward. Sessions back to 2010 are indexed

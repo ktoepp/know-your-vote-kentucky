@@ -8,6 +8,7 @@ import { JsonLd } from '@/components/seo/JsonLd';
 import { buildBillJsonLd, buildBreadcrumbJsonLd } from '@/lib/structured-data';
 import { formatKyBillNumberSpaced, kyBillSeoCatchline, kyBillSessionYear } from '@/lib/bill-display';
 import { buildPageMetadata } from '@/lib/seo';
+import { stripAudienceClause } from '@/lib/ai-summary-basis';
 import { fetchTopBillSlugsForPrerender } from '@/lib/sitemap-data';
 
 export const revalidate = 300;
@@ -40,7 +41,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = `Kentucky ${spacedNumber}${year ? ` (${year})` : ''}${catchline ? `: ${catchline}` : ''}`;
   const body =
     bill.description?.trim() ||
-    bill.ai_summary?.trim() ||
+    stripAudienceClause(bill.ai_summary?.trim() ?? '') ||
     bill.title?.trim() ||
     '';
   const sessionLabel = (bill.session || '').trim();

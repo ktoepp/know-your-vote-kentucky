@@ -91,23 +91,30 @@ async function generateSummary(prompt: string): Promise<string> {
   }
 }
 
-/** AI-generated plain-language summary of a KY state bill */
-export async function generateBillSummary(bill: KYBill): Promise<string> {
+/**
+ * The user prompt for a KY bill summary. Pure, so tests can check its inputs without
+ * calling Anthropic. Status is deliberately not passed: the system rules forbid status
+ * language, and the page shows status separately (WS3-04).
+ */
+export function buildBillSummaryUserPrompt(bill: KYBill): string {
   const subjectNames = (bill.legiscan_subjects ?? [])
     .map((s) => s?.subject_name?.trim())
     .filter((s): s is string => !!s);
-  const prompt = `Summarize this Kentucky state bill for voters, following the system rules
+  return `Summarize this Kentucky state bill for voters, following the system rules
 (2-3 plain-language sentences, then an optional "Who it may affect:" clause grounded only in the fields below).
 
 Bill Number: ${bill.bill_number}
 Title: ${bill.title}
 ${bill.description ? `Description: ${bill.description}` : ''}
-${bill.status ? `Status: ${bill.status}` : ''}
 ${bill.chamber ? `Chamber: Kentucky ${bill.chamber === 'house' ? 'House' : 'Senate'}` : ''}
 ${bill.topics?.length ? `Topics: ${bill.topics.join(', ')}` : ''}
 ${subjectNames.length ? `Official LegiScan subjects: ${subjectNames.join(', ')}` : ''}
 ${bill.editor_notes?.trim() ? `Editor-verified notes (confirmed against the official bill text): ${bill.editor_notes.trim()}` : ''}`;
-  return generateSummary(prompt);
+}
+
+/** AI-generated plain-language summary of a KY state bill */
+export async function generateBillSummary(bill: KYBill): Promise<string> {
+  return generateSummary(buildBillSummaryUserPrompt(bill));
 }
 
 /** AI-generated plain-language summary of a local ordinance */
