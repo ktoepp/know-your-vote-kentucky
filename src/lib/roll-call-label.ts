@@ -47,6 +47,39 @@ export interface RollCallRowLike {
 export const UNMATCHED_ROLL_CALL_CAPTION =
   'The official bill history does not say which motion this vote was on.';
 
+/**
+ * Which roll calls show an outcome chip (WS3-03a):
+ * - 'none': no chip on any roll call
+ * - 'all': a chip on every roll call, passed or failed
+ * - 'failed_only': a chip only where the vote failed
+ */
+export type RollCallOutcomePolicy = 'none' | 'all' | 'failed_only';
+
+/**
+ * The owner's choice for the roll-call outcome chip: option (c), "failed" only
+ * (OWNER-DECISIONS.md, 2026-10-06). "Failed" is the one outcome a reader cannot
+ * reliably infer from the tally (Ky. Const. § 46 needs a constitutional
+ * majority), and it applies to matched and unmatched roll calls alike.
+ */
+export const ROLL_CALL_OUTCOME_POLICY: RollCallOutcomePolicy = 'failed_only';
+
+/** Tooltip on the outcome chip, so a failed vote is not read as a failed bill. */
+export const ROLL_CALL_OUTCOME_TOOLTIP = 'This is the result of this one vote, not the status of the bill.';
+
+/**
+ * Chip text for one roll call's own result, or null when no chip should show.
+ * Driven only by the stored `passed` value, never computed from the tally, and
+ * independent of whether the roll call matched a history action.
+ */
+export function rollCallOutcomeLabel(
+  passed: boolean | null | undefined,
+  policy: RollCallOutcomePolicy,
+): string | null {
+  if (passed == null || policy === 'none') return null;
+  if (passed) return policy === 'all' ? 'Vote result: passed' : null;
+  return 'Vote result: failed';
+}
+
 export interface RollCallLabel {
   label: string;
   /** True when the roll call was matched to an official history action. */
