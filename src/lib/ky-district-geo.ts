@@ -58,3 +58,13 @@ export function districtNameFromCensusFeature(f: GeoJSON.Feature | null): string
   const name = p?.NAME;
   return typeof name === 'string' && name.trim() !== '' ? name.trim() : null;
 }
+
+/**
+ * Notice shown in place of the "ZIP 40004" label on a ZIP lookup result
+ * (`DistrictMapExplorer`). A ZIP lookup resolves one point, the ZIP's center,
+ * and district lines can split a ZIP code (U6), so the result says what it is
+ * based on and points to the more precise street-address lookup.
+ */
+export function zipCenterNotice(zip: string): string {
+  return `Based on the center of ZIP ${zip}. District lines can split a ZIP code, so a street address is more precise.`;
+}

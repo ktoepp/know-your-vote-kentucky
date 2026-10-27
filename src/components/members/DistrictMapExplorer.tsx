@@ -35,6 +35,7 @@ import {
   districtNameFromCensusFeature,
   findDistrictFeatureAtPoint,
   parseKyDistrictNumber,
+  zipCenterNotice,
 } from '@/lib/ky-district-geo';
 import { MemberCard } from '@/components/members/MemberCard';
 import { CHAMBER_TOGGLE_GROUP_SX } from '@/components/civic/GaChamberFilterBar';
@@ -69,7 +70,7 @@ const DistrictMapCanvas = dynamic(() => import('@/components/members/DistrictMap
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '';
 
-type LookupType = 'zip' | 'address' | 'map_click';
+export type LookupType = 'zip' | 'address' | 'map_click';
 
 /**
  * `next=` target for the signup prompt: re-runs the same lookup after signup /
@@ -224,6 +225,14 @@ export default function DistrictMapExplorer() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [resolvedLabel, setResolvedLabel] = useState<string | null>(null);
+  /**
+   * How the current result was found. Set only in `resolvePoint`, so a map
+   * click or address lookup after a ZIP lookup resets it. Null before any
+   * lookup and for a `?chamber=&district=` preselect.
+   */
+  const [lastLookupType, setLastLookupType] = useState<LookupType | null>(null);
+  /** The address/ZIP input, focused by "Enter a street address" on a ZIP result. */
+  const addressInputRef = useRef<HTMLInputElement | null>(null);
   /** Query behind the current marker (ZIP or address); null for map clicks. */
   const [lastQuery, setLastQuery] = useState<string | null>(null);
   /** Camera move requested before the map chunk mounted; applied in `onMapLoad`. */
@@ -333,6 +342,7 @@ export default function DistrictMapExplorer() {
   const resolvePoint = useCallback(
     (lng: number, lat: number, lookup: { type: LookupType; zip?: string | null }) => {
       if (!houseFc || !senateFc) return;
+      setLastLookupType(lookup.type);
       const hf = findDistrictFeatureAtPoint(houseFc, lng, lat);
       const sf = findDistrictFeatureAtPoint(senateFc, lng, lat);
       const hName = districtNameFromCensusFeature(hf);
@@ -692,6 +702,7 @@ export default function DistrictMapExplorer() {
           renderInput={(params) => (
             <TextField
               {...params}
+              inputRef={addressInputRef}
               // WCAG 3.3.2: placeholder is not a label — provide both a
               // screen-reader-visible label and the placeholder hint.
               label="Address or ZIP code"
@@ -870,10 +881,32 @@ export default function DistrictMapExplorer() {
             </Paper>
           ) : (
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-              {resolvedLabel && (
-                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                  {resolvedLabel}
-                </Typography>
+              {lastLookupType === 'zip' && lastQuery ? (
+                // A ZIP resolves to its center point only (U6). The notice
+                // replaces the "ZIP 40004" label at render time.
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    {zipCenterNotice(lastQuery)}
+                  </Typography>
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={() => {
+                      const input = addressInputRef.current;
+                      input?.focus();
+                      input?.select();
+                    }}
+                    sx={{ mt: 0.5, ml: -0.75, px: 0.75 }}
+                  >
+                    Enter a street address
+                  </Button>
+                </Box>
+              ) : (
+                resolvedLabel && (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                    {resolvedLabel}
+                  </Typography>
+                )
               )}
               <Stack spacing={0.5}>
                 {selectedHouseName && (
