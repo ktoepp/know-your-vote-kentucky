@@ -21,6 +21,7 @@
  *   `quotaBackfillAdvanceCursor=false` — do not advance cursor after success (testing).
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectUnlessOperator } from '@/lib/auth/operator-guard';
 import { syncAll, getSyncStatus, SYNC_SOURCES } from '../../../lib/ky-sync-pipeline';
 import { withVercelSyncCronMonitor } from '../../../lib/sentry-sync-cron';
 import {
@@ -31,27 +32,6 @@ import {
 
 /** Pro / Enterprise: raise if your plan allows longer functions. */
 export const maxDuration = 300;
-
-function getBearerToken(req: NextRequest): string | null {
-  const auth = req.headers.get('authorization');
-  if (!auth) return null;
-  const token = auth.replace(/^Bearer\s+/i, '').trim();
-  return token || null;
-}
-
-function authenticate(req: NextRequest): boolean {
-  const token = getBearerToken(req);
-  if (!token) return false;
-  const syncKey = process.env.SYNC_API_KEY?.trim();
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!syncKey && !cronSecret) {
-    console.warn('[Sync API] Neither SYNC_API_KEY nor CRON_SECRET configured — rejecting all requests');
-    return false;
-  }
-  if (syncKey && token === syncKey) return true;
-  if (cronSecret && token === cronSecret) return true;
-  return false;
-}
 
 function syncParamsFromUrl(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -93,9 +73,8 @@ function syncParamsFromUrl(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!authenticate(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await rejectUnlessOperator(req);
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const source = searchParams.get('source');
@@ -170,9 +149,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!authenticate(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await rejectUnlessOperator(req);
+  if (denied) return denied;
 
   const {
     source,

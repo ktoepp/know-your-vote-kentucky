@@ -51,9 +51,9 @@ Outcome of this pass should land in `decisions.md` and adjust M1 / M3 scope as n
 
 | Flow | Surface | Notes |
 |---|---|---|
-| Sign up | `/auth/register` | Email + password; Supabase sends verification email |
+| Sign up | `/auth/register` | Email + password; Supabase sends a confirmation email. No session until the link is opened: the page shows a check-your-inbox state with `ResendConfirmationButton`. `next=` is carried through the link to `/auth/verify`. |
 | Email verification | redirect to `/auth/verify` | Confirms `email_verified_at` in profile |
-| Sign in | `/auth/login` | Existing |
+| Sign in | `/auth/login` | Existing. An unconfirmed address shows a short notice and `ResendConfirmationButton`. |
 | Password reset | `/auth/forgot` → emailed link → `/auth/reset` | Supabase magic link |
 | Change email | `/profile/security` | Re-verification required |
 | Change password | `/profile/security` | Requires current password |

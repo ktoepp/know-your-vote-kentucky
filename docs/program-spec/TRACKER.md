@@ -24,7 +24,7 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS1-01 | Restore the missing dataset-store import in two backfill scripts | WS1 | P0 | W0 | Sonnet | S | none | Core | todo |
 | WS1-02 | Type-check `scripts/` with its own tsconfig and clear the errors | WS1 | P0 | W0 | Sonnet | M | WS1-01, WS1-04 (soft: WS5-01a) | Core | todo |
 | WS1-03 | Replace `next lint` with the ESLint CLI and a warning ceiling | WS1 | P1 | W0 | Sonnet | S | none | Core | todo |
-| WS1-04 | Add a secret-free pull-request CI workflow and align the PR template | WS1 | P0 | W0 (target merge 2026-10-12) | Sonnet | M | none | Core | todo |
+| WS1-04 | Add a secret-free pull-request CI workflow and align the PR template | WS1 | P0 | W0 (target merge 2026-10-12) | Sonnet | M | none | Core | awaiting-owner |
 | WS1-05a | Assert that LegiScan `getDataset` is reached only through the gated store | WS1 | P0 | W0 | Sonnet | S | none | Core | todo |
 | WS1-05b | Add repo-invariant tests for migrations, script references and cron paths | WS1 | P2 | W2 | Sonnet | S | WS1-05a | Backlog | todo |
 | WS1-07 | Protect `main` with a ruleset that requires CI and turn on GitHub security alerts | WS1 | P1 | W0 (toggles by 2026-10-20; ruleset the day after WS1-04 merges) | Owner | S | WS1-04 (ruleset steps only; the toggle steps depend on nothing) | Backlog | todo |
