@@ -68,6 +68,7 @@ import {
 } from './ky-member-utils';
 import type { KYSource } from '../types/kentucky';
 import {
+  LegiscanMissingKeyError,
   isTransientLegiscanNetworkError,
   legiscanPersonBioSocial,
   type KyLegiScanClient,
@@ -788,10 +789,12 @@ async function syncKyBillsByHash(
         // A session LegiScan has just created can error on its master list until
         // bills are loaded. That is the expected pre-session gap, not a failed
         // sync: fall through to the previous session. Anything else (quota hold,
-        // an outage on a session we already hold bills for) still surfaces.
+        // a missing API key, an outage on a session we already hold bills for)
+        // still surfaces.
         const isNewest = s === sortedSessions[0] && sortedSessions.length > 1;
         if (
           isLegiscanQuotaHoldError(err) ||
+          err instanceof LegiscanMissingKeyError ||
           !isNewest ||
           (await sessionHasStoredBills(s.session_name))
         ) {
