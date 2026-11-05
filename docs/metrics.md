@@ -1,6 +1,6 @@
 # KYvKY metrics: definitions, exclusions, queries and ledger
 
-One written definition per KPI, one exclusion rule set, one runnable query per KPI and the dated ledger. Owner: WS7 (WS7-01; monthly rows by WS7-12). **No decision thresholds or verdict rules live here**; they are only in `docs/evaluation/README.md` (WS8-08). PostHog project 450281, timezone UTC. All queries are read-only aggregates: never paste person-level rows into this file.
+One written definition per KPI, one exclusion rule set, one runnable query per KPI and the dated ledger. Owner: WS7 (WS7-01; monthly rows by WS7-12). **No decision rules or the numbers they compare against live here**; see the pointer in "2027 session measurement protocol" below. PostHog project 450281, timezone UTC. All queries are read-only aggregates: never paste person-level rows into this file.
 
 ## Definitions
 
@@ -248,3 +248,44 @@ Funder and partner copy uses only these rows, with the "as of" date (WS7-03). Ke
 | 2026-11-05 | 12.9% | "About 1 in 8 Kentucky visitors in late September 2026 looked up their own legislators." | KPI-5, `kpi-5` (Sep 16 → Oct 1) |
 | 2026-11-05 | 2.8% | "About 3 in 100 first-time Kentucky visitors came back the next week (June–September 2026)." | KPI-3, `kpi-3` |
 | 2026-11-05 | 86.5% (655/757) | "Most Kentucky visitors (about 87%) found KYvKY through a search engine (June–September 2026)." | KPI-8, `kpi-8` (Jun 1 → Oct 1) |
+
+## 2027 session measurement protocol (pre-registered)
+
+Thresholds and verdict rules live only in docs/evaluation/README.md (WS8-08). This section defines how each number is measured.
+
+Owner: WS7 (WS7-08). Values are filled by WS7-12 (monthly rows) and WS7-13 (2027 session measured values). Data-cost measurement (LegiScan, LRC, Anthropic) is defined by WS4-15 (load rehearsal) and WS4-16 (`docs/data-cost-per-state.md`) and is not repeated here.
+
+**Period.** 2027-01-05 → 2027-03-30. Weekly metrics use the 13 ISO weeks whose Mondays run from 2027-01-04 to 2027-03-29, so PostHog queries use `{FROM}` = `2027-01-04` and `{TO}` = `2027-04-05`. Every PostHog number applies E-test, E-auth-bot and E-internal exactly as written in Exclusions, with E-auth-bot evaluated over the query's own period. KPI definitions are those in Definitions as of 2027-01-05; any change is an amendment below.
+
+**Metric map.** One row per WS8-08 metric. Backlog owners are marked; if one has not reported by 2027-04-15, WS7-13 records that input as `not measured`.
+
+| WS8-08 metric | Measured by | How, for the 2027 session |
+|---|---|---|
+| Weekly KY human visitors (in-session weekly median) | KPI-1, `kpi-1` | KPI-1 per ISO week for the 13 weeks; the median of the 13 values. |
+| Week-1 return (gating return metric) | KPI-3, `kpi-3` | Cohort weeks 2027-01-04 → 2027-03-22 (12 cohorts, so every W+1 ends by 2027-04-04), pooled as returned ÷ new. Final on 2027-04-05. Also recorded: `kpi-3-posthog` for continuity. |
+| 30-day return (context) | KPI-4, `kpi-4` | First-pageview months Jan, Feb and Mar 2027. The March cohort is final on 2027-04-30, so WS7-13 records its query date. |
+| Find-my-legislators share (context) | KPI-5, `kpi-5` | One value over the period, plus one per month. |
+| Weekly-email subscribers | KPI-6, `kpi-6` (SQL) | The My Legislators subscriber count from a snapshot run on 2027-03-30 (Owner-run). The state cannot be rebuilt later, so a late run records its actual date. |
+| Digest recipients and weekly-email sends | KPI-7, `kpi-7` (SQL), `kpi-7-visits` | Jan, Feb and Mar 2027 by `kind`: sends by `delivery_status`, unique recipients, `bounced`, `complained`; email-attributed visitors by `utm_campaign`. March unique bill-digest recipients is the KPI-7 figure WS8-08 compares with KPI-6. |
+| Partner-attributed opt-ins (context) | KPI-9, `kpi-9` | The `partner` row of `kpi-9` over the period. Other rows are reported beside it. |
+| Owner maintenance hours | WS5-13 (Backlog) | `docs/evaluation/2027-04-maintenance.md`, in-session monthly average. |
+| Cash cost and data headroom (context) | WS4-16 (Backlog), from WS4-15 | `docs/data-cost-per-state.md`. |
+| Corrections and audit faithfulness (context) | WS3-14 (Backlog), WS3-11a (Backlog, applied by WS9-14) | The corrections log count for the period, and the audit result as WS9-14 reports it. |
+| Partner signals and "partner conversation open" | WS8-11 (Backlog) counts | Category counts on 2027-04-15, counts only. The definition is in WS8-08's file. |
+
+**What will not be claimed.** No PMF score. No "users" meaning accounts: say "accounts". No visitor total without the "human" qualifier and the Kentucky figure first. No comparison with the 2026 session, which was not measured (T7).
+
+**Readout dates.** 2026-11-10: October and election-period readout (WS7-14). On or after 2027-01-02: December row (WS7-12). 2027-02-02 and 2027-03-02: January and February rows (WS7-12). 2027-03-30: KPI-6 snapshot (Owner-run). 2027-04-01 → 04-15: March row and 2027 session measured values (WS7-13), handed to WS8-16 by 2027-04-15.
+
+**Retention-bet status** (filled by the owner on 2026-12-07):
+
+`Weekly email at the 2026-12-07 cut line: <shipped | shipped, signed-in only | deferred to W5>`
+
+- If deferred: `The 2027 session is measured without a retention bet. KPI-6 weekly-email subscribers and KPI-9 are reported as n/a.`
+- If signed-in only (WS7-09f did not ship): KPI-6 weekly-email subscribers count only visitors who opted in while logged in, and WS7-13 states this beside the figure.
+
+### Amendments
+
+Changes after 2027-01-05 need an ADR, per WS8-08's rule. List each here with its date and ADR.
+
+_None._
