@@ -27,6 +27,8 @@ Read in this order before changing anything:
 5. `CLAUDE.md` and, if your WP touches user-facing copy, `docs/voice-and-tone.md`.
 6. The files the WP lists under **Current state**. Open them yourself. Line numbers are approximate.
 
+April 2027 thresholds and verdict rules: docs/evaluation/README.md (WS8-08). How each number is measured: docs/metrics.md (WS7-08). Do not change either after 2027-01-05 without an ADR.
+
 **Do not read `TASKS.md` (about 203 KB) or `decisions.md` (about 432 KB) in full.** Grep them for your topic, the file names you will touch, and your finding IDs. For example, `grep -n -i "veto override\|RCS#" TASKS.md decisions.md`. For any overlapping open item, say in the PR whether your WP **keeps**, **supersedes** or **folds in** it.
 
 Do not follow the repo-root `README.md`'s "For AI agents → Read first" list (E12). It points you at the 160k-token docs and contains stale facts. For example, it says "3/5 veto override", which is wrong: Kentucky overrides with a majority of members elected (U18).
