@@ -3,6 +3,13 @@
 import React from 'react';
 import { Box, Chip, Link, Typography } from '@mui/material';
 import { ExpandableText } from '@/components/ui/ExpandableText';
+import {
+  AUDIENCE_CLAUSE_LABEL,
+  SHOW_AUDIENCE_CLAUSE,
+  aiSummaryBasisLine,
+  stripAudienceClause,
+  type AiSummaryBasis,
+} from '@/lib/ai-summary-basis';
 
 /**
  * Inline label + body for AI-generated summaries on list cards and tooltips.
@@ -42,8 +49,9 @@ export function AiSummaryInline({ children }: { children: React.ReactNode }) {
 /** Inbox that fields summary-feedback reports (see FEEDBACK.md workflow). */
 const FEEDBACK_EMAIL = 'katie@kyvky.com';
 
-/** Label the generator emits before the impacted-audience clause (kept in sync with ky-content-generation.ts). */
-const AUDIENCE_LABEL = 'Who it may affect:';
+/** Shown above a description-based summary when the bill changed after introduction (WS3-04). */
+const CHANGED_AFTER_INTRODUCTION_CAVEAT =
+  'This bill changed after it was introduced. This summary may describe an earlier version.';
 
 /**
  * Render a plain-text summary, bolding the "Who it may affect:" label when present.
@@ -52,15 +60,15 @@ const AUDIENCE_LABEL = 'Who it may affect:';
  */
 function renderSummaryBody(children: React.ReactNode): React.ReactNode {
   if (typeof children !== 'string') return children;
-  const idx = children.indexOf(AUDIENCE_LABEL);
+  const idx = children.indexOf(AUDIENCE_CLAUSE_LABEL);
   if (idx === -1) return children;
   return (
     <>
       {children.slice(0, idx)}
       <Box component="span" sx={{ fontWeight: 700 }}>
-        {AUDIENCE_LABEL}
+        {AUDIENCE_CLAUSE_LABEL}
       </Box>
-      {children.slice(idx + AUDIENCE_LABEL.length)}
+      {children.slice(idx + AUDIENCE_CLAUSE_LABEL.length)}
     </>
   );
 }
@@ -68,6 +76,10 @@ function renderSummaryBody(children: React.ReactNode): React.ReactNode {
 interface AiGeneratedBlockProps {
   title?: string;
   children: React.ReactNode;
+  /** What the summary was built from; drives the basis line above the title. */
+  basis: AiSummaryBasis;
+  /** True when the bill changed after introduction; shows a caveat on description-based summaries. */
+  changedAfterIntroduction?: boolean;
   /** Primary government or host source to verify against (e.g. LegiScan PDF). */
   officialHref?: string | null;
   officialLabel?: string;
@@ -84,18 +96,23 @@ interface AiGeneratedBlockProps {
 export function AiGeneratedBlock({
   title = 'Plain-language summary',
   children,
+  basis,
+  changedAfterIntroduction = false,
   officialHref,
   officialLabel = 'Open official bill text',
   billNumber,
   beta = false,
 }: AiGeneratedBlockProps) {
+  const summary =
+    !SHOW_AUDIENCE_CLAUSE && typeof children === 'string' ? stripAudienceClause(children) : children;
+  const showChangedCaveat = changedAfterIntroduction && basis.kind === 'description';
   const feedbackHref = billNumber
     ? `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(`Feedback on ${billNumber} summary`)}`
     : null;
   return (
     <Box>
-      <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 0.75, letterSpacing: '0.08em' }}>
-        AI-generated. Always verify with primary sources
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75, fontWeight: 500 }}>
+        {aiSummaryBasisLine(basis)}
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
         <Typography variant="subtitle1" fontWeight={700}>
@@ -103,16 +120,21 @@ export function AiGeneratedBlock({
         </Typography>
         {beta && <Chip label="Beta" size="small" color="warning" variant="outlined" sx={{ fontWeight: 600 }} />}
       </Box>
-      {typeof children === 'string' ? (
+      {showChangedCaveat && (
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          {CHANGED_AFTER_INTRODUCTION_CAVEAT}
+        </Typography>
+      )}
+      {typeof summary === 'string' ? (
         <ExpandableText
-          text={children}
+          text={summary}
           moreLabel="Show full summary"
           renderText={renderSummaryBody}
           typographyProps={{ variant: 'body2', color: 'text.secondary', sx: { lineHeight: 1.7, whiteSpace: 'pre-line' } }}
         />
       ) : (
         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, whiteSpace: 'pre-line' }}>
-          {renderSummaryBody(children)}
+          {renderSummaryBody(summary)}
         </Typography>
       )}
       {(officialHref || feedbackHref) && (

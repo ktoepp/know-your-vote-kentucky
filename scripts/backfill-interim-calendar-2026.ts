@@ -392,7 +392,7 @@ async function main() {
           committee_name: r.committee_name,
           committee_slug: r.slug,
         },
-      }).throwOnError().then(() => {}).catch(() => {}); // ignore duplicate events
+      }).throwOnError().then(() => {}, () => {}); // ignore duplicate events
       continue;
     }
 
@@ -420,7 +420,7 @@ async function main() {
         committee_name: r.committee_name,
         committee_slug: r.slug,
       },
-    }).throwOnError().then(() => {}).catch(() => {}); // ignore duplicate events
+    }).throwOnError().then(() => {}, () => {}); // ignore duplicate events
   }
 
   console.log(`\nDone: ${inserted} inserted, ${skipped} already existed, ${errors.length} errors`);

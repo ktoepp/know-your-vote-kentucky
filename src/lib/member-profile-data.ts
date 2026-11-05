@@ -4,6 +4,11 @@ import { getCivicDataSessionName, KY_BILL_SESSION_OPTIONS } from '@/lib/ky-sessi
 import { bucketLegiscanVoteText, type VoteBucket } from '@/lib/legiscan-vote-tally';
 import { matchLegislatorBySponsorName } from '@/lib/ky-member-utils';
 import {
+  dedupeRollCallRows,
+  deriveRollCallLabel,
+  type RollCallHistoryEntry,
+} from '@/lib/roll-call-label';
+import {
   classifySponsorRole,
   getSponsorRecordDisplayName,
   parseLegiscanSponsorRecords,
@@ -148,14 +153,29 @@ function tallyFromMap(tallies: Map<VoteBucket, number>) {
   };
 }
 
+/** Bill fields shown beside each roll call on a member profile. */
+export type MemberVoteBill = Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status' | 'session'>;
+
+/**
+ * One row of `get_votes_for_legislator` (`SETOF ky_votes`). `KYVote` omits two columns the
+ * RPC also returns and the read-time twin dedupe needs.
+ */
+export type MemberRpcVoteRow = KYVote & { roll_call_id?: number | null; nv_count?: number | null };
+
 export interface MemberRecentRollVote {
   voteId: string;
   date: string | null;
-  description: string | null;
+  /**
+   * Label derived from the bill's official action history (`deriveRollCallLabel`), never
+   * LegiScan's raw roll-call description, which reads "Veto Override" on ordinary House votes.
+   */
+  label: string;
+  /** False when no official history action matched this roll call (show the unmatched caption). */
+  labelMatched: boolean;
   chamber: 'house' | 'senate' | null;
   myVote: string | null;
   myBucket: VoteBucket;
-  bill: Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status' | 'session'> | null;
+  bill: MemberVoteBill | null;
 }
 
 export interface MemberVoteRecord {
@@ -186,19 +206,97 @@ function emptyMemberVoteRecord(sessionName: string, unavailable = false): Member
   };
 }
 
-function mapRollVotes(
-  myVotes: { vote: KYVote; myVote: string | null; bucket: VoteBucket }[],
-  billById: Map<string, Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status' | 'session'>>,
-): MemberRecentRollVote[] {
-  return myVotes.map(({ vote, myVote, bucket }) => ({
-    voteId: vote.id,
-    date: vote.date,
-    description: vote.description,
-    chamber: vote.chamber,
-    myVote,
-    myBucket: bucket,
-    bill: billById.get(vote.bill_id) ?? null,
-  }));
+/** Sort key matching `fetchDbVotes`: date ascending (NULL first), then roll_call_id ascending (NULL last). */
+function compareRollCallQueryOrder(a: MemberRpcVoteRow, b: MemberRpcVoteRow): number {
+  if (a.date !== b.date) {
+    if (a.date == null) return -1;
+    if (b.date == null) return 1;
+    return a.date < b.date ? -1 : 1;
+  }
+  const ra = a.roll_call_id ?? null;
+  const rb = b.roll_call_id ?? null;
+  if (ra === rb) return 0;
+  if (ra == null) return 1;
+  if (rb == null) return -1;
+  return ra - rb;
+}
+
+/**
+ * Collapse twin rows for the same physical roll call (`dedupeRollCallRows`, the same read-time
+ * dedupe the bill page runs). The dedupe keys on date and tally, so it runs per bill: two
+ * different bills can share a date and tally on a busy floor day and must both survive.
+ * Each group is passed in the bill page's query order (earliest row wins ties). The result
+ * keeps the RPC's original order.
+ */
+function dedupeMemberRollCallRows<T extends MemberRpcVoteRow>(votes: readonly T[]): T[] {
+  const byBill = new Map<string, T[]>();
+  for (const v of votes) {
+    const group = byBill.get(v.bill_id);
+    if (group) group.push(v);
+    else byBill.set(v.bill_id, [v]);
+  }
+  const keep = new Set<T>();
+  for (const group of byBill.values()) {
+    for (const row of dedupeRollCallRows([...group].sort(compareRollCallQueryOrder))) keep.add(row);
+  }
+  return votes.filter((v) => keep.has(v));
+}
+
+/**
+ * Normalize a `ky_bills.legiscan_history` value into the entries the roll-call matcher reads.
+ * NULL (rows synced before migration 036) or malformed values become an empty history, which
+ * yields the unmatched "roll call no. N" fallback label.
+ */
+export function rollCallHistoryFromLegiscan(raw: unknown): RollCallHistoryEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RollCallHistoryEntry[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const h = item as { date?: unknown; action?: unknown; chamber?: unknown };
+    if (typeof h.action !== 'string') continue;
+    out.push({
+      date: typeof h.date === 'string' ? h.date : '',
+      action: h.action,
+      chamber: typeof h.chamber === 'string' ? h.chamber : '',
+    });
+  }
+  return out;
+}
+
+/**
+ * Pure mapping from RPC roll-call rows to the member profile's vote rows and tally (WS3-02).
+ * Twin rows are deduped first, so the tally and the total count each physical roll call once.
+ * Each row's label comes from the bill's official action history. Bills with no stored
+ * history get the unmatched fallback ("House roll call no. 155").
+ */
+export function buildMemberRollVotes(
+  votes: readonly MemberRpcVoteRow[],
+  billsById: ReadonlyMap<string, MemberVoteBill>,
+  historyByBillId: ReadonlyMap<string, readonly RollCallHistoryEntry[]>,
+  peopleKey: string,
+): { votes: MemberRecentRollVote[]; tally: ReturnType<typeof tallyFromMap>; totalRollCalls: number } {
+  const deduped = dedupeMemberRollCallRows(votes);
+  const tallies = new Map<VoteBucket, number>();
+  for (const b of ['yea', 'nay', 'nv', 'absent', 'unknown'] as const) tallies.set(b, 0);
+
+  const rows = deduped.map((vote): MemberRecentRollVote => {
+    const myVote = memberRollVote(vote.roll_call, peopleKey);
+    const bucket = bucketLegiscanVoteText(myVote);
+    tallies.set(bucket, (tallies.get(bucket) ?? 0) + 1);
+    const { label, matched } = deriveRollCallLabel(vote, historyByBillId.get(vote.bill_id) ?? []);
+    return {
+      voteId: vote.id,
+      date: vote.date,
+      label,
+      labelMatched: matched,
+      chamber: vote.chamber,
+      myVote,
+      myBucket: bucket,
+      bill: billsById.get(vote.bill_id) ?? null,
+    };
+  });
+
+  return { votes: rows, tally: tallyFromMap(tallies), totalRollCalls: deduped.length };
 }
 
 /** Order session labels newest-first, using the canonical list; unknown labels sort last (desc). */
@@ -329,20 +427,10 @@ export async function fetchMemberVoteRecord(
     return emptyMemberVoteRecord(sessionName, true);
   }
 
-  const votes = (rows ?? []) as KYVote[];
-  const tallies = new Map<VoteBucket, number>();
-  for (const b of ['yea', 'nay', 'nv', 'absent', 'unknown'] as const) tallies.set(b, 0);
-
-  const myVotes: { vote: KYVote; myVote: string | null; bucket: VoteBucket }[] = [];
-  for (const v of votes) {
-    const text = memberRollVote(v.roll_call, peopleKey);
-    const bucket = bucketLegiscanVoteText(text);
-    tallies.set(bucket, (tallies.get(bucket) ?? 0) + 1);
-    myVotes.push({ vote: v, myVote: text, bucket });
-  }
-
-  const billIds = [...new Set(myVotes.map((m) => m.vote.bill_id))];
-  const billById = new Map<string, Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status' | 'session'>>();
+  const rpcVotes = (rows ?? []) as MemberRpcVoteRow[];
+  const billIds = [...new Set(rpcVotes.map((v) => v.bill_id))];
+  const billById = new Map<string, MemberVoteBill>();
+  const historyByBillId = new Map<string, RollCallHistoryEntry[]>();
 
   if (billIds.length) {
     const { data: bills } = await supabase
@@ -350,19 +438,38 @@ export async function fetchMemberVoteRecord(
       .select('id, bill_number, title, status, session')
       .in('id', billIds);
     for (const b of bills ?? []) {
-      billById.set(
-        b.id,
-        b as Pick<KYBill, 'id' | 'bill_number' | 'title' | 'status' | 'session'>,
+      billById.set(b.id, b as MemberVoteBill);
+    }
+
+    // Separate query: history is used only here, on the server, to derive vote labels.
+    // It is never added to any object passed to the client.
+    const { data: histories, error: historyError } = await supabase
+      .from('ky_bills')
+      .select('id, legiscan_history')
+      .in('id', billIds);
+    if (historyError) {
+      // Labels then fall back to "House roll call no. N" with the unmatched caption.
+      console.warn(
+        `ky_bills legiscan_history read failed (people_id=${peopleKey}, session=${sessionName}): ${historyError.message}`,
       );
+    }
+    for (const h of histories ?? []) {
+      const row = h as { id: string; legiscan_history?: unknown };
+      historyByBillId.set(row.id, rollCallHistoryFromLegiscan(row.legiscan_history));
     }
   }
 
-  const allVotes = mapRollVotes(myVotes, billById);
+  const { votes: allVotes, tally, totalRollCalls } = buildMemberRollVotes(
+    rpcVotes,
+    billById,
+    historyByBillId,
+    peopleKey,
+  );
 
   return {
     sessionName,
-    totalRollCalls: votes.length,
-    tally: tallyFromMap(tallies),
+    totalRollCalls,
+    tally,
     recent: allVotes.slice(0, recentLimit),
     votes: allVotes,
     unavailable: false,
