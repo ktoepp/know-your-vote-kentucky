@@ -12,22 +12,22 @@ Five lines for partner conversations (WS8-10). Every figure is an estimate; WS4-
 2. **LRC fetches a day by scheduled jobs** (*estimate from code*): about 97 a day today, about 77 a day once WS4-09b stops fetches for sessions that cannot change. See "LRC load by source" below.
 3. **AI cost** (*estimate*): about $0.006 per bill summary today (A8), about $0.03 per bill once summaries are grounded in bill text (WS3 estimate).
 4. **Cash** (*estimate, inferred*): about $700–1,100 a year for hosting, database and vendors (D4).
-5. **Safeguards** (*description, not a measurement*): one LegiScan key, `change_hash` gating, per-run caps (planned, WS4-03a), the 95% quota hold, and polite LRC fetching (planned, WS4-09a).
+5. **Safeguards** (*description, not a measurement*): one LegiScan key, `change_hash` gating, per-run caps (WS4-03a), the 95% quota hold, and polite LRC fetching (planned, WS4-09a).
 
 ## Per-vendor table
 
 | Vendor | Hard limit | Our planning target | Alert level | Per-run cap | Where it is enforced in code | Who can change it |
 |---|---|---|---|---|---|---|
-| LegiScan (all callers) | 10,000 queries/month (`LEGISCAN_PUBLIC_MONTHLY_LIMIT_DEFAULT`); about 2 requests/s sliding | 5,000/month; no run takes the month above 6,000 | Slack at 90/95/98/100% (`QUOTA_ALERT_BANDS`, `src/lib/slack-webhook.ts`); sync hold at 95% | see rows below | `src/lib/ky-legiscan-client.ts` `ensureQuotaAllows()` → `src/lib/legiscan-quota.ts` `checkLegiscanQuotaForSync()`; per-run caps planned: WS4-03a | Owner (WS4-04) |
-| LegiScan `sync-bills` | as above | as above | as above | counted, no cap (`null`) until WS4-06 sets 250 | planned: WS4-03a, WS4-06 | Owner |
-| LegiScan `sync-legislators` | as above | as above | as above | 10 | planned: WS4-03a | Owner |
-| LegiScan `sync-votes` | as above | as above | as above | 60 | planned: WS4-03a | Owner |
-| LegiScan `dataset-sync` | as above | as above | as above | 40 | planned: WS4-03a | Owner |
-| LegiScan `accuracy-audit` | as above | as above | as above | 40 | planned: WS4-03a | Owner |
-| LegiScan `session-preview` | as above | as above | as above | 5 | planned: WS4-03a | Owner |
-| LegiScan `legislator-links` | as above | as above | as above | 40 | planned: WS4-03a | Owner |
-| LegiScan `sync-legislator-bios` | as above | as above | as above | **`--budget`-only**: no `perRunCap` key. Manual-only (`getPerson`, 1 per legislator that needs enrichment, up to about 138). After WS4-03a it resolves to 0 and every run passes `--budget=N` through `scripts/manual-sync.ts` | planned: WS4-03a | Owner, per run |
-| LegiScan, any other caller (scripts, WP tags) | as above | as above | as above | 0; must pass `--budget=N`. Above 1,000 needs owner approval | planned: WS4-03a (`--owner-approved`: WS4-03b) | Owner, per run |
+| LegiScan (all callers) | 10,000 queries/month (`LEGISCAN_PUBLIC_MONTHLY_LIMIT_DEFAULT`); about 2 requests/s sliding | 5,000/month; no run takes the month above 6,000 | Slack at 90/95/98/100% (`QUOTA_ALERT_BANDS`, `src/lib/slack-webhook.ts`); sync hold at 95% | see rows below | `src/lib/ky-legiscan-client.ts` `ensureQuotaAllows()` → `src/lib/legiscan-quota.ts` `checkLegiscanQuotaForSync()`; per-run caps: `src/lib/legiscan-run-budget.ts` (WS4-03a) | Owner (WS4-04) |
+| LegiScan `sync-bills` | as above | as above | as above | counted, no cap (`null`) until WS4-06 sets 250 | `legiscan-run-budget.ts` (WS4-03a); cap planned: WS4-06 | Owner |
+| LegiScan `sync-legislators` | as above | as above | as above | 10 | `legiscan-run-budget.ts` (WS4-03a) | Owner |
+| LegiScan `sync-votes` | as above | as above | as above | 60 | `legiscan-run-budget.ts` (WS4-03a) | Owner |
+| LegiScan `dataset-sync` | as above | as above | as above | 40 | `legiscan-run-budget.ts` (WS4-03a) | Owner |
+| LegiScan `accuracy-audit` | as above | as above | as above | 40 | `legiscan-run-budget.ts` (WS4-03a) | Owner |
+| LegiScan `session-preview` | as above | as above | as above | 5 | `legiscan-run-budget.ts` (WS4-03a) | Owner |
+| LegiScan `legislator-links` | as above | as above | as above | 40 | `legiscan-run-budget.ts` (WS4-03a) | Owner |
+| LegiScan `sync-legislator-bios` | as above | as above | as above | **`--budget`-only**: no `perRunCap` key. Manual-only (`getPerson`, 1 per legislator that needs enrichment, up to about 138). It resolves to 0, so every run passes `--budget=N` through `scripts/manual-sync.ts` | `legiscan-run-budget.ts` (WS4-03a) | Owner, per run |
+| LegiScan, any other caller (scripts, WP tags) | as above | as above | as above | 0; must pass `--budget=N`. Above 1,000 needs owner approval | `legiscan-run-budget.ts` (WS4-03a); `--owner-approved`: WS4-03b | Owner, per run |
 | Kentucky LRC site | public site, no API, no published limit | serial, at most 1 request/s per host | none yet; WS4-10 makes an empty parse an error | none | planned: WS4-09a (`DATA_BUDGET.lrc`) | Owner |
 | Open States | none published [verify on the account page] | about 6 calls a day | 7-day zero-yield alarm (existing) | none | up to 3 attempts per request (`MAX_RETRIES`, `src/lib/ky-openstates-client.ts`); no counter | Owner |
 | Anthropic | pay as you go | Console monthly limit $40 (PROPOSED) | Console usage page | `--limit=N` today; `--max-usd` once WS3-09c merges | `scripts/backfill-bill-summaries.ts` flags; Console limit set by the owner (WS4-07) | Owner |
@@ -53,9 +53,28 @@ Five lines for partner conversations (WS8-10). Every figure is an estimate; WS4-
 - **Our counter undercounts.** It records successful responses only (until WS4-02). Add 10% to any estimate.
 - [verify] LegiScan's API manual page 7 sets per-operation timing guidelines (Crash Course line 8). Confirm that our cadence for getMasterListRaw and getSessionList meets them.
 
+## How a run's LegiScan budget is chosen
+
+Since WS4-03a, every LegiScan HTTP attempt (retries included, cache hits not) is charged to a per-run budget in [`src/lib/legiscan-run-budget.ts`](../src/lib/legiscan-run-budget.ts) before it is counted or sent. The client picks the budget in this order:
+
+1. **Pipeline scope.** The four sync entry points in `src/lib/ky-sync-pipeline.ts` (`sync-bills`, `sync-legislators`, `sync-legislator-bios`, `sync-votes`) open a scope per run: `--budget=N` passed through `scripts/manual-sync.ts` if given, else the caller tag's `perRunCap`. Vercel routes always run inside this scope.
+2. **`--budget=N`** on the command line of any other process. One counter covers the whole process.
+3. **Caller-tag default.** The tag (`withLegiscanCaller` or `LEGISCAN_CALLER`) gets `DATA_BUDGET.legiscan.perRunCap[tag]`, one counter per tag. `null` means counted with no cap.
+4. **Denied.** Any other tag, including `untagged` and every `wp-wsn-nn` tag, gets 0. The first call throws `No LegiScan budget for caller "<tag>": pass --budget=N (see docs/data-budget.md)` before any HTTP request. On Vercel (`VERCEL=1`) a call outside a pipeline scope is always denied.
+
+A run that reaches its budget stops with `LegiScan run budget reached (spent N of M)`. Sync sources record it as `skipped` with that note on `ky_sources`. The monthly 95% hold (`LegiscanQuotaHoldError`) is checked first and still applies to every run.
+
+Example, a manual script with a budget of 50 queries:
+
+```bash
+LEGISCAN_CALLER=wp-ws4-03b npx tsx scripts/refresh-bill-status-from-legiscan.ts --dry-run --budget=50
+```
+
+The two manual GitHub workflows that spend LegiScan queries (`backfill-session-votes`, `backfill-vote-nv-counts`) take a required `budget` input and pass it as `--budget=N`. Scheduled workflows pass no `--budget`: they resolve their cap from their tag. A budget above 1,000 needs owner approval.
+
 ## Kill switch (existing brake, no new code)
 
-Set the GitHub repository variable **and** the Vercel environment variable `LEGISCAN_MONTHLY_QUERY_LIMIT=1`. Vercel needs a redeploy for the environment change to take effect. Every GitHub workflow that calls LegiScan already passes `LEGISCAN_MONTHLY_QUERY_LIMIT: ${{ vars.LEGISCAN_MONTHLY_QUERY_LIMIT || '10000' }}`. With a limit of 1, the client's quota guard raises `LegiscanQuotaHoldError` on every request once the month total is at least 1, for scheduled routes and scripts alike (WS4-03a adds a test for this).
+Set the GitHub repository variable **and** the Vercel environment variable `LEGISCAN_MONTHLY_QUERY_LIMIT=1`. Vercel needs a redeploy for the environment change to take effect. Every GitHub workflow that calls LegiScan already passes `LEGISCAN_MONTHLY_QUERY_LIMIT: ${{ vars.LEGISCAN_MONTHLY_QUERY_LIMIT || '10000' }}`. With a limit of 1, the client's quota guard raises `LegiscanQuotaHoldError` on every request once the month total is at least 1, for scheduled routes and scripts alike. A unit test in `src/lib/ky-legiscan-client.test.ts` covers this path (WS4-03a).
 
 Known gaps:
 
@@ -111,5 +130,5 @@ Short form of [operating manual §4](program-spec/00-agent-operating-manual.md#4
 1. **Estimate** the calls by operation and the money, and add 10% for the undercounting counter.
 2. **Check the counter:** `npm run check:legiscan-quota -- --planned=N` (needs production secrets; it reads `ky_sync_state` only and makes no LegiScan call). It prints the month's usage, then the planned and remaining lines, compared with both the cap and the planning target.
 3. **Dry-run first.** Read the script's header: "dry run" means different things in different scripts.
-4. **Set a stop condition**, such as `--limit=N` or (from WS4-03a) `--budget=N`. Above 1,000 LegiScan queries needs owner approval.
+4. **Set a stop condition**, such as `--limit=N` or `--budget=N` (enforced by the client since WS4-03a). Above 1,000 LegiScan queries needs owner approval.
 5. **Record** the planned and actual spend and the counter before and after.
