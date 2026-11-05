@@ -16,7 +16,7 @@ Decision KPIs get ledger columns. Context KPIs have a query and are run on deman
 | KPI-6 | Accounts and subscribers | decision | Supabase, Owner-run, aggregate counts on the query date: accounts; verified accounts; accounts with ≥ 1 bill or committee follow; accounts with the digest on (`digest_frequency <> 'off'`, not unsubscribed, not suppressed); after WS7-09a, My Legislators subscribers (`my_legislators_weekly`, not unsubscribed, not suppressed, verified). | `kpi-6` (SQL) |
 | KPI-7 | Email | decision | Sends per month by `delivery_status` (and by `kind` after WS7-07b), unique recipients per month, `bounced` and `complained` counts (Supabase, Owner-run); plus **email-attributed visitors**: unique persons with a `$pageview` where `utm_medium = 'email'`, by `utm_campaign` (after WS7-05 or WS7-09b). | `kpi-7` (SQL), `kpi-7-visits` |
 | KPI-8 | Acquisition mix | context | Share of KPI-1 persons by the referring domain of their first `$pageview` in the period: **search** (Bing, Google, DuckDuckGo, Yahoo, Ecosia, Brave, Kagi, Qwant and any other search domain seen), **direct**, **social**, **partner** (`utm_medium = 'partner'`), **email** (`utm_medium = 'email'`), **other**. | `kpi-8` |
-| KPI-9 | Weekly-email opt-in source | decision input (WS8-08 partner signals) | Count of `my_legislators_opt_in` events with `action = 'on'`, by the person's first-touch medium: `partner`, `search`, `direct`, `email`, `other`, from `$initial_utm_medium` and `$initial_referring_domain` (both confirmed in the project's person properties on 2026-11-05). Needs only WS7-09d's event. | `kpi-9` |
+| KPI-9 | Weekly-email opt-in source | decision input (WS8-08 partner signals) | Count of `my_legislators_opt_in` events with `action = 'on'`, by the person's first-touch medium, checked in this order: `partner`, `email` (both from `$initial_utm_medium`, so they win over the referrer), `search`, `direct`, `other`, from `$initial_utm_medium` and `$initial_referring_domain` (both confirmed in the project's person properties on 2026-11-05). Needs only WS7-09d's event. | `kpi-9` |
 
 **Partner-link convention (T4).** Partner placements link with `?utm_source=<partner-slug>&utm_medium=partner&utm_campaign=<placement>`. `posthog-js` keeps `utm_*` (`save_campaign_params` defaults to true), so KPI-8 and KPI-9 pick these up with no code. **Partner slugs:** _none yet._ List each one (slug, partner, first link date) here before its link goes live.
 
@@ -172,10 +172,10 @@ FROM f WHERE is_ky = 1 GROUP BY grp ORDER BY persons DESC
 ```sql
 -- kpi-9: weekly-email opt-ins by first-touch medium. Returns nothing until WS7-09d ships the event.
 SELECT multiIf(person.properties.$initial_utm_medium = 'partner', 'partner',
+    person.properties.$initial_utm_medium = 'email', 'email',
     match(coalesce(person.properties.$initial_referring_domain, ''),
           '(^|\\.)(google|bing|duckduckgo|yahoo|ecosia|brave|kagi|qwant|baidu|yandex|startpage)\\.'), 'search',
-    person.properties.$initial_referring_domain = '$direct', 'direct',
-    person.properties.$initial_utm_medium = 'email', 'email', 'other') AS first_touch, count() AS opt_ins
+    person.properties.$initial_referring_domain = '$direct', 'direct', 'other') AS first_touch, count() AS opt_ins
 FROM events WHERE event = 'my_legislators_opt_in' AND properties.action = 'on'
   AND timestamp >= toDateTime('2027-01-01') AND timestamp < toDateTime('2027-02-01')
   AND NOT (coalesce(properties.$current_url, '') ILIKE '%vercel.app%') AND person_id NOT IN COHORT 339637
