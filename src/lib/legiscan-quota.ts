@@ -6,6 +6,14 @@ import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 export const LEGISCAN_QUERY_COUNTER_KEY = 'legiscan_query_counter';
 
 /**
+ * Failed LegiScan attempts (transport error, timeout or non-2xx), in one
+ * `YYYY-MM` bucket per month (WS4-02). Kept out of the main counter because
+ * `parseLegiscanUsageBucket` would read any extra bucket there as an operation
+ * name. Every failed attempt is also included in the main month total.
+ */
+export const LEGISCAN_FAILED_ATTEMPT_COUNTER_KEY = 'legiscan_failed_attempt_counter';
+
+/**
  * Bucket keys in the counter payload, since migration 054 / 2026-08-24:
  *
  *   "2026-08"                        month total (authoritative — the guard reads this)
@@ -118,6 +126,14 @@ export type LegiscanQuotaSummary = {
   pct: number;
 };
 
+/**
+ * This month's LegiScan usage against the cap. `used` is the month-total
+ * bucket, which counts every HTTP attempt (recorded before it is sent, so
+ * timeouts, failed attempts and retries are included), not only successful
+ * responses (WS4-02). Failed attempts are also counted on their own under
+ * {@link LEGISCAN_FAILED_ATTEMPT_COUNTER_KEY}; they are part of `used`, not
+ * extra to it.
+ */
 export async function fetchLegiscanQuotaSummary(): Promise<LegiscanQuotaSummary | null> {
   if (!supabaseAdmin) return null;
   const month = new Date().toISOString().slice(0, 7);

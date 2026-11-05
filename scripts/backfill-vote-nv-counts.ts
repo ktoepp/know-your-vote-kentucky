@@ -22,7 +22,7 @@
  *   npm run backfill:vote-nv-counts -- --live                    # all sessions
  */
 import './load-env';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getKyLegiScanClient } from '../src/lib/ky-legiscan-client';
 import { legiscanPublicMonthlyLimit } from '../src/lib/legiscan-quota';
 
@@ -36,7 +36,7 @@ const MONTHLY_QUOTA = legiscanPublicMonthlyLimit();
 
 type Target = { billId: string; rollCallId: number; billNumber: string };
 
-async function collectTargets(db: ReturnType<typeof createClient>): Promise<Target[]> {
+async function collectTargets(db: SupabaseClient): Promise<Target[]> {
   const targets: Target[] = [];
   const PAGE = 1000;
   let from = 0;
