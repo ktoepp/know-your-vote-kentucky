@@ -3,10 +3,18 @@
  * REST client for https://api.legiscan.com/
  * Free tier: 10,000 queries/month and ~2 req/s sustained (from 2026-10-01)
  * Required env: LEGISCAN_API_KEY
+ *
+ * Quota accounting (WS4-02): the monthly counter counts every HTTP *attempt*,
+ * recorded before the request is sent, so timeouts and retries that LegiScan
+ * may still bill are included in the month total. Failed attempts (transport
+ * error, timeout or non-2xx) are also counted on their own in
+ * `legiscan_failed_attempt_counter`. A `status: "ERROR"` reply is a rejection
+ * and is never retried, and a client with an empty key sends nothing.
  */
 import axios, { AxiosInstance } from 'axios';
 import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
 import {
+  LEGISCAN_FAILED_ATTEMPT_COUNTER_KEY,
   LegiscanQuotaHoldError,
   checkLegiscanQuotaForSync,
   normalizeLegiscanOp,
@@ -114,9 +122,61 @@ type PersistedKyMasterListRawPayload = {
   fetched_at: string;
 };
 
+/**
+ * LegiScan answered with `status: "ERROR"` (bad key, bad parameter, quota).
+ * That is a completed, billable attempt and a refusal, so the client never
+ * retries it.
+ */
+export class LegiscanRejectedError extends Error {
+  readonly op: string | undefined;
+  constructor(op: string | undefined, message: string) {
+    super(message);
+    this.name = 'LegiscanRejectedError';
+    this.op = op;
+  }
+}
+
+/**
+ * The client has no API key. Thrown by `request()` before the quota check, the
+ * throttle, the attempt counter or any HTTP call, so nothing is recorded or sent.
+ */
+export class LegiscanMissingKeyError extends Error {
+  readonly op: string | undefined;
+  constructor(op: string | undefined) {
+    super('LegiScan API key is empty: refusing to send (see docs/data-budget.md)');
+    this.name = 'LegiscanMissingKeyError';
+    this.op = op;
+  }
+}
+
+/**
+ * Seams for tests. Every field is optional, and the defaults are the
+ * production behaviour (axios, the Supabase counters, the quota guard and a
+ * real timer).
+ */
+export type KyLegiScanClientDeps = {
+  http?: Pick<AxiosInstance, 'get'>;
+  /** Called once per HTTP attempt, before it is sent. */
+  recordAttempt?: (op: string | undefined) => Promise<void>;
+  /** Called once per failed attempt (transport error, timeout or non-2xx). */
+  recordFailure?: (op: string | undefined) => Promise<void>;
+  checkQuota?: typeof checkLegiscanQuotaForSync;
+  /** Waits between retries. The request throttle is separate and unchanged. */
+  sleep?: (ms: number) => Promise<void>;
+};
+
+function httpStatusOf(err: unknown): number | undefined {
+  const status = (err as { response?: { status?: unknown } } | null)?.response?.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
 export class KyLegiScanClient {
-  private client: AxiosInstance;
+  private client: Pick<AxiosInstance, 'get'>;
   private apiKey: string;
+  private readonly recordAttempt: (op: string | undefined) => Promise<void>;
+  private readonly recordFailure: (op: string | undefined) => Promise<void>;
+  private readonly checkQuota: typeof checkLegiscanQuotaForSync;
+  private readonly sleep: (ms: number) => Promise<void>;
   private cache = new Map<string, { data: unknown; ts: number }>();
   private lastReq = 0;
   /** Serializes throttle waits so concurrent callers can't read the same `lastReq` and fire together. */
@@ -125,13 +185,24 @@ export class KyLegiScanClient {
   private quotaHoldReason: string | null = null;
   private quotaHoldSummary: Awaited<ReturnType<typeof checkLegiscanQuotaForSync>>['summary'] = null;
 
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.LEGISCAN_API_KEY || '';
+  /**
+   * Never throws, even without a key: `getKyLegiScanClient()` is built eagerly
+   * by callers that may only need other sources. A missing key is refused in
+   * `request()` instead.
+   */
+  constructor(apiKey?: string, deps: KyLegiScanClientDeps = {}) {
+    this.apiKey = (apiKey || process.env.LEGISCAN_API_KEY || '').trim();
     if (!this.apiKey) console.warn('[KyLegiScan] LEGISCAN_API_KEY not set');
-    this.client = axios.create({
-      baseURL: 'https://api.legiscan.com/',
-      timeout: REQUEST_TIMEOUT_MS,
-    });
+    this.client =
+      deps.http ??
+      axios.create({
+        baseURL: 'https://api.legiscan.com/',
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+    this.recordAttempt = deps.recordAttempt ?? ((op) => this.incrementQueryCounter(op));
+    this.recordFailure = deps.recordFailure ?? (() => this.incrementFailedAttemptCounter());
+    this.checkQuota = deps.checkQuota ?? checkLegiscanQuotaForSync;
+    this.sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
   private throttle(): Promise<void> {
@@ -155,7 +226,7 @@ export class KyLegiScanClient {
     const now = Date.now();
     if (now - this.quotaCheckedAt > QUOTA_GUARD_TTL_MS) {
       this.quotaCheckedAt = now;
-      const result = await checkLegiscanQuotaForSync();
+      const result = await this.checkQuota();
       this.quotaHoldReason = result.blocked ? result.reason ?? 'LegiScan quota hold' : null;
       this.quotaHoldSummary = result.summary;
     }
@@ -164,28 +235,63 @@ export class KyLegiScanClient {
     }
   }
 
+  /** Counting must never block a sync: a recorder that throws is logged and ignored. */
+  private async safeRecord(
+    kind: 'attempt' | 'failed attempt',
+    record: (op: string | undefined) => Promise<void>,
+    op: string | undefined,
+  ): Promise<void> {
+    try {
+      await record(op);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[KyLegiScan] Failed to record ${kind}: ${msg}`);
+    }
+  }
+
   private async request<T>(params: Record<string, string>): Promise<T> {
     const ck = JSON.stringify(params);
     const cached = this.getCached<T>(ck);
     if (cached) return cached;
+    const op = params.op;
+    // Before the quota check, the throttle, the counter and any HTTP call:
+    // without a key nothing is recorded or sent.
+    if (!this.apiKey) throw new LegiscanMissingKeyError(op);
     await this.ensureQuotaAllows();
     for (let i = 1; i <= MAX_RETRIES; i++) {
       // Retries are requests too — every attempt waits its turn.
       await this.throttle();
+      // Counted before sending, so a timeout LegiScan may still bill is in the total.
+      await this.safeRecord('attempt', this.recordAttempt, op);
+      let data: any;
       try {
         const r = await this.client.get('/', { params: { key: this.apiKey, ...params } });
-        void this.incrementQueryCounter(params.op);
-        if (r.data?.status === 'ERROR') throw new Error(`LegiScan: ${r.data.alert?.message || 'unknown error'}`);
-        this.cache.set(ck, { data: r.data, ts: Date.now() });
-        return r.data as T;
-      } catch (err: any) {
-        console.error(`[KyLegiScan] Attempt ${i}/${MAX_RETRIES} failed: ${err.message}`);
-        if (i === MAX_RETRIES) throw err;
+        if (typeof r?.status === 'number' && (r.status < 200 || r.status >= 300)) {
+          // axios rejects non-2xx itself; this covers an http stub that does not.
+          throw Object.assign(new Error(`LegiScan HTTP ${r.status}`), { response: { status: r.status } });
+        }
+        data = r?.data;
+      } catch (err: unknown) {
+        await this.safeRecord('failed attempt', this.recordFailure, op);
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[KyLegiScan] Attempt ${i}/${MAX_RETRIES} failed: ${message}`);
+        const retryable = isTransientLegiscanNetworkError(err) || httpStatusOf(err) === 429;
+        if (!retryable || i === MAX_RETRIES) throw err;
         const isTimeout =
-          err.code === 'ECONNABORTED' || /timeout/i.test(String(err.message ?? ''));
+          (err as { code?: string }).code === 'ECONNABORTED' || /timeout/i.test(message);
         const delayMs = isTimeout ? 2000 * 2 ** (i - 1) : 1000 * i;
-        await new Promise((r) => setTimeout(r, delayMs));
+        await this.sleep(delayMs);
+        continue;
       }
+      // A rejection is a completed attempt, not a failure: never retried, never cached.
+      if (data?.status === 'ERROR') {
+        throw new LegiscanRejectedError(
+          op,
+          `LegiScan: ${data.alert?.message || 'unknown error'}`,
+        );
+      }
+      this.cache.set(ck, { data, ts: Date.now() });
+      return data as T;
     }
     throw new Error('Unreachable');
   }
@@ -195,7 +301,8 @@ export class KyLegiScanClient {
   }
 
   /**
-   * Records one billable LegiScan query in three buckets of the same payload:
+   * Records one LegiScan attempt (counted before it is sent, whatever the
+   * outcome) in three buckets of the same payload:
    * `YYYY-MM` (the month total, which is what the quota guard and the admin
    * page read), `YYYY-MM:op`, and `YYYY-MM:op@caller`.
    *
@@ -219,6 +326,24 @@ export class KyLegiScanClient {
       if (error) throw error;
     } catch (err: any) {
       console.warn(`[KyLegiScan] Failed to increment query counter: ${err?.message || err}`);
+    }
+  }
+
+  /**
+   * Records one failed attempt (transport error, timeout or non-2xx) in the
+   * single `YYYY-MM` bucket of {@link LEGISCAN_FAILED_ATTEMPT_COUNTER_KEY}. The
+   * same attempt is already in the main month total via `incrementQueryCounter`.
+   */
+  private async incrementFailedAttemptCounter(): Promise<void> {
+    try {
+      if (!supabaseAdmin) return;
+      const { error } = await supabaseAdmin.rpc('ky_increment_counter_multi', {
+        counter_key: LEGISCAN_FAILED_ATTEMPT_COUNTER_KEY,
+        bucket_keys: [KyLegiScanClient.monthKey()],
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      console.warn(`[KyLegiScan] Failed to increment failed-attempt counter: ${err?.message || err}`);
     }
   }
 
