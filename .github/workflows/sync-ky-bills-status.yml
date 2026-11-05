@@ -56,10 +56,13 @@ jobs:
   sync-bills:
     name: Sync bill statuses (conservative)
     runs-on: ubuntu-latest
-    # Worst realistic run: hash-gated sync (~2 min) + 120s retry wait + a second sync,
-    # then backfill:bill-summaries --limit=300 Anthropic calls (the long pole, ~15-20 min).
-    # 45 leaves headroom for that while still cutting a hung LegiScan/Anthropic fetch loose
-    # well before GitHub's 6h default — the job fires every 6h, so a 6h hang overlaps runs.
+    # 45-minute split (WS4-06): setup ~2 min, bills sync <= 18 min (--deadline-seconds, 1080 s),
+    # summaries <= 25 min (WS3-09c step 5). Retry path: 18 + 2 (wait) + 18 = 38 min; the summary
+    # step is then skipped because it needs the first sync's success.
+    # Residual risk: the deadline is checked before each LegiScan fetch, so one in-flight request
+    # with its retries can overrun by a few minutes. This timeout still bounds the run, and WS4-15
+    # measures real durations. It also cuts a hung fetch loose well before GitHub's 6h default
+    # (the job fires every 6h, so a 6h hang would overlap runs).
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +93,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EXTRA="--historic-sessions=${{ inputs.historic_sessions }}"
           fi
-          npm run sync:ky:bills:status -- ${EXTRA}
+          npm run sync:ky:bills:status -- --deadline-seconds=1080 ${EXTRA}
 
       - name: Retry bills sync after transient failure
         if: failure() && steps.bills_sync.outcome == 'failure'
@@ -113,7 +116,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EXTRA="--historic-sessions=${{ inputs.historic_sessions }}"
           fi
-          npm run sync:ky:bills:status -- ${EXTRA}
+          npm run sync:ky:bills:status -- --deadline-seconds=1080 ${EXTRA}
 
       - name: Summarize new/changed bills (beta AI summaries)
         # Runs only after a clean primary sync. backfill:bill-summaries regenerates ai_summary for

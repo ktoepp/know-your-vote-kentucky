@@ -50,8 +50,9 @@ export const DATA_BUDGET: DataBudget = {
     // decisions.md § 2026-09-29 (option d), "Revisit if" trigger. PROPOSED, WS4-04.
     paidTierTriggerByDay15: 5000,
     perRunCap: {
-      // PROPOSED, WS4-04: counted and uncapped until WS4-06 makes the sync resumable and sets 250.
-      'sync-bills': null,
+      // WS4-06 owner decision (default 250, due 2026-11-20): the hash-gated sync writes every
+      // 25 bills and stops early at the cap, so the next run continues instead of re-buying.
+      'sync-bills': 250,
       // PROPOSED, WS4-04: getSessionList + getSessionPeople per run (decisions.md § 2026-10-06).
       'sync-legislators': 10,
       // PROPOSED, WS4-04: ~5 getBill/day plus new roll calls in session (decisions.md § 2026-09-30).

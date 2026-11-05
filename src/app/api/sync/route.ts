@@ -22,7 +22,12 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { rejectUnlessOperator } from '@/lib/auth/operator-guard';
-import { syncAll, getSyncStatus, SYNC_SOURCES } from '../../../lib/ky-sync-pipeline';
+import {
+  syncAll,
+  getSyncStatus,
+  SYNC_ROUTE_DEADLINE_MS,
+  SYNC_SOURCES,
+} from '../../../lib/ky-sync-pipeline';
 import { withVercelSyncCronMonitor } from '../../../lib/sentry-sync-cron';
 import {
   isVercelCronRequest,
@@ -73,6 +78,8 @@ function syncParamsFromUrl(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  // WS4-06: the hash-gated bills sync stops starting new fetches after this.
+  const deadlineAt = Date.now() + SYNC_ROUTE_DEADLINE_MS;
   const denied = await rejectUnlessOperator(req);
   if (denied) return denied;
 
@@ -122,6 +129,7 @@ export async function GET(req: NextRequest) {
         quotaBackfillAdvanceCursor,
         useChangeHash,
         force,
+        deadlineAt,
       }),
     );
     const hasErrors = results.some((r) => r.status === 'error');
@@ -149,6 +157,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // WS4-06: the hash-gated bills sync stops starting new fetches after this.
+  const deadlineAt = Date.now() + SYNC_ROUTE_DEADLINE_MS;
   const denied = await rejectUnlessOperator(req);
   if (denied) return denied;
 
@@ -182,6 +192,7 @@ export async function POST(req: NextRequest) {
         quotaBackfillAdvanceCursor,
         useChangeHash,
         force,
+        deadlineAt,
       }),
     );
     const hasErrors = results.some((r) => r.status === 'error');

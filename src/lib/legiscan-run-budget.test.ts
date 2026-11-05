@@ -163,10 +163,11 @@ test('legiscanRunBudgetRemaining tracks the scope and is null with no scope', ()
   });
 });
 
-test('resolveRunBudget: explicit 0 → 0, null key → null, missing key → 0, scheduled tag → its cap', () => {
+test('resolveRunBudget: explicit 0 → 0, missing key → 0, scheduled tag → its cap', () => {
   assert.equal(resolveRunBudget('accuracy-audit', 0), 0);
   assert.equal(resolveRunBudget('sync-bills', 7), 7);
-  assert.equal(resolveRunBudget('sync-bills'), null);
+  // WS4-06 turned the bills cap on (it was null, counted and uncapped, under WS4-03a).
+  assert.equal(resolveRunBudget('sync-bills'), 250);
   assert.equal(resolveRunBudget('no-such-tag'), 0);
   assert.equal(resolveRunBudget('untagged'), 0);
   assert.equal(resolveRunBudget('sync-legislator-bios'), 0);

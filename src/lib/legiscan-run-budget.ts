@@ -17,7 +17,7 @@
  * On Vercel (`VERCEL=1`) the no-scope fallback is always 0: every LegiScan call
  * made by a route must run inside a pipeline scope.
  *
- * `null` means counted but uncapped (for example `sync-bills` until WS4-06).
+ * `null` means counted but uncapped (no tag uses it since WS4-06 capped `sync-bills`).
  *
  * No Supabase call is made here. The module keeps no global counter for scoped
  * calls; the process-level fallback counters only serve scripts.

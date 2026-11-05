@@ -35,9 +35,19 @@ import { checkLegiscanQuotaForSync, isLegiscanQuotaHoldError } from './legiscan-
 import {
   isLegiscanRunBudgetError,
   isLegiscanStopError,
+  legiscanRunBudgetRemaining,
   resolveRunBudget,
   withLegiscanRunBudget,
 } from './legiscan-run-budget';
+import {
+  BILLS_HASH_EARLY_STOP_STREAK_KEY,
+  earlyStopNote,
+  nextEarlyStopStreak,
+  partitionByStoredHash,
+  runHashSyncChunks,
+  writeHashSyncChunk,
+  type HashSyncStopReason,
+} from './ky-bills-hash-sync-chunks';
 import { getSessionPhase } from './ky-sessions';
 import {
   fetchLatestNonEmptySessionRoster,
@@ -271,7 +281,21 @@ export interface SyncOptions {
    * `--budget=N` here. Each LegiScan source in the run gets its own scope.
    */
   legiscanRunBudget?: number;
+  /**
+   * Epoch ms after which the hash-gated bills sync starts no new `getBill`
+   * (WS4-06). Rows fetched so far are written and the next run continues.
+   * The sync routes set `request start + SYNC_ROUTE_DEADLINE_MS`; the CLI sets
+   * it only with `--deadline-seconds=N`.
+   */
+  deadlineAt?: number;
 }
+
+/**
+ * Time budget for a sync started by `/api/sync` or `/api/sync/[source]`, in ms.
+ * Both routes have `maxDuration = 300` s; 240 s leaves room for the last
+ * in-flight request, the final writes and the response (WS4-06).
+ */
+export const SYNC_ROUTE_DEADLINE_MS = 240_000;
 
 export interface SyncResult {
   source: string;
@@ -785,6 +809,22 @@ async function sessionHasStoredBills(sessionName: string): Promise<boolean> {
  * Hash-gated incremental bills sync (LegiScan plan §3). Uses `getMasterListRaw` and
  * stored `change_hash` on `ky_bills` to skip unchanged bills; `getBill` is only
  * called for changed or new bills. Requires migration 007 columns.
+ *
+ * Resumable (WS4-06, see `ky-bills-hash-sync-chunks.ts`):
+ * - Changed bills are fetched in a stable order: new bills first, then changed
+ *   bills, each by `bill_id` ascending.
+ * - Rows are written every 25 (`HASH_SYNC_CHUNK_SIZE`), at the end, and on
+ *   every early exit. A row's `change_hash` is written with it, so the next run
+ *   skips what this run paid for and continues with the rest.
+ * - The run is capped by `perRunCap['sync-bills']` (`src/lib/data-budget.ts`),
+ *   which also pays for the session list and master lists. Before each
+ *   `getBill` the loop stops when the cap has no calls left or
+ *   `options.deadlineAt` has passed. A cap reached mid-retry stops it too.
+ * - An early stop returns `success` with the note in `error`, records it on
+ *   `ky_sources`, and adds one to `ky_sync_state.bills_hash_early_stop_streak`
+ *   (a complete run sets it to 0).
+ * - A quota hold writes what was fetched, then re-throws to the usual
+ *   `skipped` handling in `runBillsSync`.
  */
 async function syncKyBillsByHash(
   source: string,
@@ -862,29 +902,16 @@ async function syncKyBillsByHash(
   let grandNew = 0;
   let grandSynced = 0;
 
+  // Pass 1 (database reads only): compare every queued session's hashes, so an
+  // early stop can report N of M across the whole run.
+  const planned: { session: LegiScanSession; changedOrNew: LegiScanMasterListRawBill[] }[] = [];
   for (const { session, rawBills } of sessionJobs) {
     const scanned = rawBills.length;
     const existingHashes = await fetchExistingHashesByLegiscanIds(
       readDb,
       rawBills.map((b) => b.bill_id),
     );
-
-    const changedOrNew: LegiScanMasterListRawBill[] = [];
-    let unchanged = 0;
-    let changed = 0;
-    let inserted = 0;
-    for (const b of rawBills) {
-      const stored = existingHashes.get(b.bill_id);
-      if (stored === undefined) {
-        inserted++;
-        changedOrNew.push(b);
-      } else if (stored && b.change_hash && stored === b.change_hash) {
-        unchanged++;
-      } else {
-        changed++;
-        changedOrNew.push(b);
-      }
-    }
+    const { changedOrNew, unchanged, changed, inserted } = partitionByStoredHash(rawBills, existingHashes);
     log(
       source,
       `${session.session_name} hash-gated: scanned=${scanned} unchanged_skipped=${unchanged} changed_updated=${changed} new_inserted=${inserted}`,
@@ -894,100 +921,7 @@ async function syncKyBillsByHash(
     grandUnchanged += unchanged;
     grandChanged += changed;
     grandNew += inserted;
-
-    if (options.dryRun || !changedOrNew.length || !db) continue;
-
-    const existingSubjectsForBatch = await fetchExistingLegiscanSubjectsByLegiscanIds(
-      db,
-      changedOrNew.map((b) => b.bill_id),
-    );
-
-    const rows: Record<string, unknown>[] = [];
-    for (let i = 0; i < changedOrNew.length; i++) {
-      const raw = changedOrNew[i];
-      // `getMasterListRaw` returns only bill_id / number / change_hash — it does NOT carry
-      // title, status, last_action, etc.  We must call getBillDetail for every changed bill to
-      // get the full record.  `skipSponsors` controls whether sponsor data is *written* to the
-      // row, not whether the detail fetch happens at all.
-      let sponsors: unknown = null;
-      let introducedDate: string | null = null;
-      let detailFetched = false;
-      let detail: LegiScanBillDetail | null = null;
-      try {
-        detail = await client.fetchBillDetail(raw.bill_id);
-        if (detail) {
-          detailFetched = true;
-          if (!skipSponsors && detail.sponsors?.length) sponsors = detail.sponsors;
-          introducedDate = deriveIntroducedDate(detail);
-        }
-      } catch (err: any) {
-        if (isLegiscanStopError(err)) throw err;
-        log(source, `Detail fetch failed for ${raw.number}: ${err?.message || err}`);
-      }
-      if (!detail) continue; // skip if detail fetch failed entirely
-      const topics = classifyTopics(detail.title || '', detail.description || '');
-      // Build the last_action string the same way the accuracy checker does — from the
-      // detail's history array — so the status mapper gets consistent input.
-      const lastActionFromDetail = (() => {
-        if (detail.last_action) return detail.last_action;
-        const history = Array.isArray(detail.history) ? detail.history : [];
-        let latest: { action?: string; date?: string } | null = null;
-        for (const h of history) {
-          if (!h?.action) continue;
-          if (!latest || new Date(h.date ?? '').getTime() >= new Date(latest.date ?? '').getTime()) {
-            latest = h;
-          }
-        }
-        return latest?.action ?? '';
-      })();
-      const row: Record<string, unknown> = {
-        legiscan_id: raw.bill_id,
-        bill_number: detail.number || raw.number,
-        title: detail.title,
-        description: detail.description || null,
-        session: session.session_name,
-        status: mapLegiScanBillStatus(
-          detail.status ?? raw.status,
-          lastActionFromDetail,
-          Array.isArray(detail.history) ? detail.history : undefined,
-        ),
-        chamber: chamberFromBillNumber(raw.number),
-        last_action: lastActionFromDetail || null,
-        last_action_date: detail.last_action_date || null,
-        bill_text_url: detail.url || raw.url || null,
-        topics: topics.length > 0 ? topics : null,
-        source: 'legiscan',
-        change_hash: raw.change_hash || null,
-        legiscan_session_id: session.session_id,
-        updated_from_legiscan_at: new Date().toISOString(),
-      };
-      if (!skipSponsors) row.sponsors = sponsors;
-      row.introduced_date = introducedDate;
-      Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
-      Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
-      Object.assign(row, legiscanHistoryTextColumnsFromDetail(detail));
-      rows.push(row);
-      if ((i + 1) % 25 === 0) {
-        log(source, `Hash-gated enrich ${i + 1}/${changedOrNew.length}`);
-      }
-    }
-    const prevSnapshots = await fetchBillHistorySnapshots(
-      db,
-      changedOrNew.map((b) => b.bill_id),
-    );
-    const synced = await upsertKyBillRows(source, db, rows);
-    grandSynced += synced;
-    try {
-      await recordBillStatusHistoryForBuiltBatch({
-        db,
-        prevByLegiscan: prevSnapshots,
-        rawBills: changedOrNew,
-        builtRows: rows,
-      });
-    } catch (histErr: unknown) {
-      logError(source, `Bill status history: ${histErr instanceof Error ? histErr.message : String(histErr)}`);
-    }
-    log(source, `${session.session_name}: upserted ${synced}/${rows.length} (hash-gated)`);
+    planned.push({ session, changedOrNew });
   }
 
   log(
@@ -995,13 +929,146 @@ async function syncKyBillsByHash(
     `Hash-gated totals: scanned=${grandScanned} unchanged_skipped=${grandUnchanged} changed_updated=${grandChanged} new_inserted=${grandNew}`,
   );
 
-  if (options.dryRun) {
+  if (options.dryRun || !db) {
     log(source, `[DRY RUN] Would upsert ${grandChanged + grandNew} bill rows (hash-gated)`);
     return { source, status: 'success', itemsSynced: grandChanged + grandNew, duration: Date.now() - start };
   }
 
+  // Pass 2: fetch and write in chunks, stopping at the deadline or the run budget.
+  const totalChanged = grandChanged + grandNew;
+  let attempted = 0;
+  let stoppedEarly: HashSyncStopReason | null = null;
+  for (const { session, changedOrNew } of planned) {
+    if (!changedOrNew.length) continue;
+
+    const loop = await runHashSyncChunks<LegiScanMasterListRawBill, LegiScanBillDetail>(changedOrNew, {
+      // `getMasterListRaw` returns only bill_id / number / change_hash — it does NOT carry
+      // title, status, last_action, etc.  We must call getBillDetail for every changed bill to
+      // get the full record.  `skipSponsors` controls whether sponsor data is *written* to the
+      // row, not whether the detail fetch happens at all.
+      fetchDetail: (raw) => client.fetchBillDetail(raw.bill_id),
+      buildRow: (raw, detail) => buildHashGatedBillRow(raw, detail, session, skipSponsors),
+      writeChunk: (rawBills, builtRows) =>
+        writeHashSyncChunk(rawBills, builtRows, {
+          snapshot: (ids) => fetchBillHistorySnapshots(db, ids),
+          upsert: (rows) => upsertKyBillRows(source, db, rows),
+          recordHistory: ({ prevByLegiscan, rawBills: raws, builtRows: rows }) =>
+            recordBillStatusHistoryForBuiltBatch({ db, prevByLegiscan, rawBills: raws, builtRows: rows }),
+          onHistoryError: (histErr) =>
+            logError(source, `Bill status history: ${histErr instanceof Error ? histErr.message : String(histErr)}`),
+        }),
+      isStopError: isLegiscanStopError,
+      isRunBudgetError: isLegiscanRunBudgetError,
+      budgetRemaining: legiscanRunBudgetRemaining,
+      deadlineAt: options.deadlineAt,
+      log: (msg) => log(source, msg),
+      describe: (raw) => raw.number,
+    });
+
+    attempted += loop.attempted;
+    grandSynced += loop.synced;
+    log(source, `${session.session_name}: upserted ${loop.synced}/${loop.built} (hash-gated, ${loop.flushes} chunk(s))`);
+    if (loop.stoppedEarly) {
+      stoppedEarly = loop.stoppedEarly;
+      break;
+    }
+  }
+
+  await writeBillsEarlyStopStreak(source, db, stoppedEarly);
+
+  if (stoppedEarly) {
+    const note = earlyStopNote(stoppedEarly, attempted, totalChanged);
+    log(source, note);
+    await updateSourceStatus(source, 'success', grandSynced, note);
+    return { source, status: 'success', itemsSynced: grandSynced, error: note, duration: Date.now() - start };
+  }
+
   await updateSourceStatus(source, 'success', grandSynced);
   return { source, status: 'success', itemsSynced: grandSynced, duration: Date.now() - start };
+}
+
+/** Builds one `ky_bills` row for the hash-gated path from its `getBill` detail. */
+function buildHashGatedBillRow(
+  raw: LegiScanMasterListRawBill,
+  detail: LegiScanBillDetail,
+  session: LegiScanSession,
+  skipSponsors: boolean,
+): Record<string, unknown> {
+  const sponsors: unknown = !skipSponsors && detail.sponsors?.length ? detail.sponsors : null;
+  const introducedDate = deriveIntroducedDate(detail);
+  const topics = classifyTopics(detail.title || '', detail.description || '');
+  // Build the last_action string the same way the accuracy checker does — from the
+  // detail's history array — so the status mapper gets consistent input.
+  const lastActionFromDetail = (() => {
+    if (detail.last_action) return detail.last_action;
+    const history = Array.isArray(detail.history) ? detail.history : [];
+    let latest: { action?: string; date?: string } | null = null;
+    for (const h of history) {
+      if (!h?.action) continue;
+      if (!latest || new Date(h.date ?? '').getTime() >= new Date(latest.date ?? '').getTime()) {
+        latest = h;
+      }
+    }
+    return latest?.action ?? '';
+  })();
+  const row: Record<string, unknown> = {
+    legiscan_id: raw.bill_id,
+    bill_number: detail.number || raw.number,
+    title: detail.title,
+    description: detail.description || null,
+    session: session.session_name,
+    status: mapLegiScanBillStatus(
+      detail.status ?? raw.status,
+      lastActionFromDetail,
+      Array.isArray(detail.history) ? detail.history : undefined,
+    ),
+    chamber: chamberFromBillNumber(raw.number),
+    last_action: lastActionFromDetail || null,
+    last_action_date: detail.last_action_date || null,
+    bill_text_url: detail.url || raw.url || null,
+    topics: topics.length > 0 ? topics : null,
+    source: 'legiscan',
+    change_hash: raw.change_hash || null,
+    legiscan_session_id: session.session_id,
+    updated_from_legiscan_at: new Date().toISOString(),
+  };
+  if (!skipSponsors) row.sponsors = sponsors;
+  row.introduced_date = introducedDate;
+  Object.assign(row, committeeFieldsFromLegiScanDetail(detail));
+  Object.assign(row, legiscanSubjectColumnsFromDetail(detail));
+  Object.assign(row, legiscanHistoryTextColumnsFromDetail(detail));
+  return row;
+}
+
+/**
+ * Upserts the `bills_hash_early_stop_streak` row (WS4-06; WS4-08 reads it):
+ * `count` goes up by one on an early stop and back to 0 on a complete run.
+ * A failure here is logged and never fails the sync.
+ */
+async function writeBillsEarlyStopStreak(
+  source: string,
+  db: ReturnType<typeof getSupabase>,
+  stoppedEarly: HashSyncStopReason | null,
+): Promise<void> {
+  try {
+    const { data, error: readErr } = await db
+      .from('ky_sync_state')
+      .select('payload')
+      .eq('key', BILLS_HASH_EARLY_STOP_STREAK_KEY)
+      .maybeSingle();
+    if (readErr) throw new Error(readErr.message);
+    const nowIso = new Date().toISOString();
+    const payload = nextEarlyStopStreak(data?.payload ?? null, stoppedEarly, nowIso);
+    const { error } = await db
+      .from('ky_sync_state')
+      .upsert({ key: BILLS_HASH_EARLY_STOP_STREAK_KEY, payload, updated_at: nowIso }, { onConflict: 'key' });
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    logError(
+      source,
+      `${BILLS_HASH_EARLY_STOP_STREAK_KEY} not updated: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 
 export async function syncKyBills(options: SyncOptions = {}): Promise<SyncResult> {

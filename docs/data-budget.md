@@ -19,7 +19,7 @@ Five lines for partner conversations (WS8-10). Every figure is an estimate; WS4-
 | Vendor | Hard limit | Our planning target | Alert level | Per-run cap | Where it is enforced in code | Who can change it |
 |---|---|---|---|---|---|---|
 | LegiScan (all callers) | 10,000 queries/month (`LEGISCAN_PUBLIC_MONTHLY_LIMIT_DEFAULT`); about 2 requests/s sliding | 5,000/month; no run takes the month above 6,000 | Slack at 90/95/98/100% (`QUOTA_ALERT_BANDS`, `src/lib/slack-webhook.ts`); sync hold at 95% | see rows below | `src/lib/ky-legiscan-client.ts` `ensureQuotaAllows()` → `src/lib/legiscan-quota.ts` `checkLegiscanQuotaForSync()`; per-run caps: `src/lib/legiscan-run-budget.ts` (WS4-03a) | Owner (WS4-04) |
-| LegiScan `sync-bills` | as above | as above | as above | counted, no cap (`null`) until WS4-06 sets 250 | `legiscan-run-budget.ts` (WS4-03a); cap planned: WS4-06 | Owner |
+| LegiScan `sync-bills` | as above | as above | as above | 250 (WS4-06; the hash-gated path writes every 25 bills and stops early at the cap, and the next run continues) | `legiscan-run-budget.ts` (WS4-03a); resumable stop: `ky-bills-hash-sync-chunks.ts` (WS4-06) | Owner |
 | LegiScan `sync-legislators` | as above | as above | as above | 10 | `legiscan-run-budget.ts` (WS4-03a) | Owner |
 | LegiScan `sync-votes` | as above | as above | as above | 60 | `legiscan-run-budget.ts` (WS4-03a) | Owner |
 | LegiScan `dataset-sync` | as above | as above | as above | 40 | `legiscan-run-budget.ts` (WS4-03a) | Owner |
@@ -62,7 +62,7 @@ Since WS4-03a, every LegiScan HTTP attempt (retries included, cache hits not) is
 3. **Caller-tag default.** The tag (`withLegiscanCaller` or `LEGISCAN_CALLER`) gets `DATA_BUDGET.legiscan.perRunCap[tag]`, one counter per tag. `null` means counted with no cap.
 4. **Denied.** Any other tag, including `untagged` and every `wp-wsn-nn` tag, gets 0. The first call throws `No LegiScan budget for caller "<tag>": pass --budget=N (see docs/data-budget.md)` before any HTTP request. On Vercel (`VERCEL=1`) a call outside a pipeline scope is always denied.
 
-A run that reaches its budget stops with `LegiScan run budget reached (spent N of M)`. Sync sources record it as `skipped` with that note on `ky_sources`. The monthly 95% hold (`LegiscanQuotaHoldError`) is checked first and still applies to every run.
+A run that reaches its budget stops with `LegiScan run budget reached (spent N of M)`. Sync sources record it as `skipped` with that note on `ky_sources`. The hash-gated bills sync is the exception (WS4-06): it writes what it fetched and records `success` with the note `Hash-gated: stopped early (<deadline|run budget>) after N of M changed bills; the next run continues`, and `ky_sync_state.bills_hash_early_stop_streak` counts consecutive early stops. The monthly 95% hold (`LegiscanQuotaHoldError`) is checked first and still applies to every run.
 
 Example, a manual script with a budget of 50 queries:
 
