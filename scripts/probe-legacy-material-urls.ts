@@ -24,7 +24,7 @@
  *   npm run probe:legacy-material-urls -- --all
  */
 import './load-env';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { mapWithConcurrency, probeUrl } from '../src/lib/ky-committee-material-link-probe';
 
 const args = process.argv.slice(2);
@@ -43,7 +43,7 @@ interface MaterialRow {
   meeting_date: string | null;
 }
 
-async function fetchAll(db: ReturnType<typeof createClient>): Promise<MaterialRow[]> {
+async function fetchAll(db: SupabaseClient): Promise<MaterialRow[]> {
   const out: MaterialRow[] = [];
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {

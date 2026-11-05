@@ -52,6 +52,7 @@ import type { MemberRecentRollVote, MemberSponsoredBill, MemberVoteRecord } from
 import type { MemberCommitteeAssignment } from '@/lib/ky-member-committees';
 import type { VoteBucket } from '@/lib/legiscan-vote-tally';
 import { memberVoteLabel, voteBucketChipColor } from '@/lib/vote-display';
+import { UNMATCHED_ROLL_CALL_CAPTION } from '@/lib/roll-call-label';
 import {
   LRC_RECORD_VOTE_SEARCH_URL,
   legiscanHasNoRollCallsForKySession,
@@ -184,9 +185,16 @@ function VoteRollCallList({ rows }: { rows: MemberRecentRollVote[] }) {
               <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                 {r.date ? formatKyIsoDateShort(r.date) : ''}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {r.description || 'Roll call'}
-              </Typography>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {r.label}
+                </Typography>
+                {!r.labelMatched ? (
+                  <Typography variant="caption" color="text.secondary" component="p" sx={{ m: 0 }}>
+                    {UNMATCHED_ROLL_CALL_CAPTION}
+                  </Typography>
+                ) : null}
+              </Box>
               <Chip
                 size="small"
                 label={memberVoteLabel(r.myBucket, r.myVote)}
@@ -332,7 +340,7 @@ export function MemberProfileView({
     return voteRecord.votes.filter((v) => {
       if (!matchesVoteFilter(v.myBucket, voteFilter)) return false;
       if (!normalizedVoteSearch) return true;
-      const haystack = [v.bill?.bill_number, v.bill?.title, v.description]
+      const haystack = [v.bill?.bill_number, v.bill?.title, v.label]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
@@ -510,7 +518,7 @@ export function MemberProfileView({
                               size="small"
                               value={voteSearch}
                               onChange={(e) => setVoteSearch(e.target.value)}
-                              placeholder="Search votes by bill number, title, or roll-call description"
+                              placeholder="Search votes by bill number, title, or vote label"
                               aria-label="Search voting record"
                               sx={{ flex: '1 1 240px' }}
                               InputProps={{
