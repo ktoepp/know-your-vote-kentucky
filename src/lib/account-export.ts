@@ -6,13 +6,14 @@
  * so a column that no migration creates breaks the whole export.
  */
 
-/** Columns exported from `ky_notifications_log` (migrations 019, 041). */
+/** Columns exported from `ky_notifications_log` (migrations 019, 041, 057). */
 export const EXPORT_NOTIFICATION_LOG_COLUMNS = [
   'id',
   'sent_at',
   'digest_window_start',
   'digest_window_end',
   'delivery_status',
+  'kind',
 ] as const;
 
 /** Columns exported from `ky_committee_follows` (migration 026). */
