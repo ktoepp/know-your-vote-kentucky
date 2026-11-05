@@ -1,6 +1,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
+  ROLL_CALL_OUTCOME_POLICY,
+  ROLL_CALL_OUTCOME_TOOLTIP,
   UNMATCHED_ROLL_CALL_CAPTION,
   dedupeRollCallRows,
   deriveRollCallLabel,
@@ -9,6 +11,7 @@ import {
   matchVotesToHistory,
   rollCallChamberFromDesc,
   rollCallNumberFromDesc,
+  rollCallOutcomeLabel,
   type RollCallHistoryEntry,
 } from "./roll-call-label";
 
@@ -252,5 +255,67 @@ describe("dedupeRollCallRows", () => {
     const unkeyed = { ...keyed, roll_call_id: null, description: "House: Third Reading" };
     const distinct = { ...keyed, roll_call_id: 22, description: "House: Veto Override RCS# 156" };
     assert.deepEqual(dedupeRollCallRows([unkeyed, keyed, twin, distinct]), [twin, distinct]);
+  });
+});
+
+describe("rollCallOutcomeLabel (WS3-03a)", () => {
+  test("'none' never shows a chip", () => {
+    assert.equal(rollCallOutcomeLabel(true, "none"), null);
+    assert.equal(rollCallOutcomeLabel(false, "none"), null);
+    assert.equal(rollCallOutcomeLabel(null, "none"), null);
+  });
+
+  test("'all' labels every vote with a stored result", () => {
+    assert.equal(rollCallOutcomeLabel(true, "all"), "Vote result: passed");
+    assert.equal(rollCallOutcomeLabel(false, "all"), "Vote result: failed");
+    assert.equal(rollCallOutcomeLabel(null, "all"), null);
+  });
+
+  test("'failed_only' labels only failed votes", () => {
+    assert.equal(rollCallOutcomeLabel(true, "failed_only"), null);
+    assert.equal(rollCallOutcomeLabel(false, "failed_only"), "Vote result: failed");
+    assert.equal(rollCallOutcomeLabel(null, "failed_only"), null);
+  });
+
+  test("a missing result never shows a chip", () => {
+    for (const policy of ["none", "all", "failed_only"] as const) {
+      assert.equal(rollCallOutcomeLabel(undefined, policy), null);
+    }
+  });
+
+  test("the applied policy is the owner's option (c), failed only", () => {
+    assert.equal(ROLL_CALL_OUTCOME_POLICY, "failed_only");
+    assert.equal(rollCallOutcomeLabel(true, ROLL_CALL_OUTCOME_POLICY), null);
+    assert.equal(rollCallOutcomeLabel(false, ROLL_CALL_OUTCOME_POLICY), "Vote result: failed");
+  });
+});
+
+describe("WS3-03a copy rules", () => {
+  const strings = [
+    UNMATCHED_ROLL_CALL_CAPTION,
+    ROLL_CALL_OUTCOME_TOOLTIP,
+    rollCallOutcomeLabel(true, "all"),
+    rollCallOutcomeLabel(false, "all"),
+  ];
+
+  test("new strings have no em dash and no semicolon", () => {
+    for (const s of strings) {
+      assert.ok(s, "expected a string");
+      assert.doesNotMatch(s, /\u2014/, `em dash in: ${s}`);
+      assert.doesNotMatch(s, /;/, `semicolon in: ${s}`);
+    }
+  });
+
+  test("the tooltip is the exact WP copy", () => {
+    assert.equal(ROLL_CALL_OUTCOME_TOOLTIP, "This is the result of this one vote, not the status of the bill.");
+  });
+
+  test("unmatched row titles never say \"floor\"", () => {
+    const unmatched = deriveRollCallLabel(
+      { date: "2026-02-11", desc: "House: Veto Override RCS# 156", yea: 20, nay: 21 },
+      history,
+    );
+    assert.equal(unmatched.label, "House roll call no. 156");
+    assert.doesNotMatch(unmatched.label, /floor/i);
   });
 });
