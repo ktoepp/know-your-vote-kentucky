@@ -42,6 +42,7 @@ import {
   SYNC_SOURCES_PAUSED_FROM_CRON,
   type SyncResult,
 } from '../src/lib/ky-sync-pipeline';
+import { parseBudgetFlag } from '../src/lib/legiscan-run-budget';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -69,6 +70,8 @@ const useChangeHash =
   args.includes('--use-change-hash=true') ||
   args.includes('--useChangeHash') ||
   args.includes('--use-change-hash');
+// Per-run LegiScan budget (WS4-03a). Throws on a malformed value.
+const legiscanRunBudget = parseBudgetFlag(args);
 
 function printHeader() {
   console.log('');
@@ -77,6 +80,9 @@ function printHeader() {
   console.log('╚══════════════════════════════════════════════╝');
   console.log('');
   if (dryRun) console.log('🔍 DRY RUN MODE — No data will be written to the database\n');
+  console.log(
+    `LegiScan budget: ${legiscanRunBudget ?? 'per-source default from DATA_BUDGET'}\n`,
+  );
   if (sourceArg) console.log(`📌 Syncing source: ${sourceArg}\n`);
   else {
     console.log(`📌 Syncing GA default: ${SYNC_SOURCES_DEFAULT.join(', ')}\n`);
@@ -150,6 +156,7 @@ async function main() {
       sponsorDetailBudgetPerSession,
       quotaBackfillAdvanceCursor,
       useChangeHash: useChangeHash || undefined,
+      legiscanRunBudget,
     });
     printResults(results);
     await notifySyncSlack({

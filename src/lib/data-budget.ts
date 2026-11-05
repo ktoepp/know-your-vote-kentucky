@@ -4,9 +4,10 @@
  * `docs/data-budget.md`; keep the two in step.
  *
  * Status: PROPOSED 2026-10-06, pending WS4-04 (owner adopts or edits).
- * Nothing reads this constant yet. WS4-03a wires `legiscan.perRunCap` into
- * `KyLegiScanClient`, WS4-08 reads the pace targets and WS4-09a the LRC
- * spacing. Do not change runtime thresholds from here until those WPs land.
+ * `legiscan.perRunCap` is enforced by `src/lib/legiscan-run-budget.ts`
+ * (WS4-03a): every `KyLegiScanClient` attempt is charged to it. WS4-08 will
+ * read the pace targets and WS4-09a the LRC spacing; do not change those
+ * runtime thresholds from here until those WPs land.
  *
  * Only values that code will read belong here. Anthropic, Open States and
  * free-tier numbers stay in the doc because no code reads them.
@@ -24,7 +25,7 @@ export type DataBudget = {
     /**
      * `null` = counted, no cap. Keys are LegiScan caller tags
      * (`src/lib/legiscan-caller.ts`). Any caller not listed gets 0 and must
-     * pass `--budget=N` (enforced from WS4-03a).
+     * pass `--budget=N` (enforced since WS4-03a).
      */
     perRunCap: Record<string, number | null>;
     /** A single run budget above this needs owner approval. */

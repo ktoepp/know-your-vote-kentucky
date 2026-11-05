@@ -24,6 +24,10 @@ name: Backfill vote nv_count
 on:
   workflow_dispatch:
     inputs:
+      budget:
+        description: 'Required. Per-run LegiScan budget: the most LegiScan queries this run may make (passed as --budget=N; see docs/data-budget.md). Discovery also spends queries. Above 1,000 needs owner approval.'
+        type: string
+        required: true
       session:
         description: 'Session to scope to, e.g. "2026 Regular Session". Leave blank for all sessions (~23.1% of monthly quota).'
         type: string
@@ -80,6 +84,7 @@ jobs:
           INPUT_SESSION: ${{ inputs.session }}
           INPUT_LIMIT: ${{ inputs.limit }}
           INPUT_LIVE: ${{ inputs.live }}
+          INPUT_BUDGET: ${{ inputs.budget }}
         run: |
           set -euo pipefail
           args=()
@@ -92,4 +97,5 @@ jobs:
           if [ "$INPUT_LIVE" = "true" ]; then
             args+=("--live")
           fi
+          args+=("--budget=${INPUT_BUDGET}")
           npm run backfill:vote-nv-counts -- "${args[@]}"

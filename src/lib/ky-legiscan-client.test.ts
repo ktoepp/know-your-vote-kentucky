@@ -7,8 +7,19 @@ import {
   LegiscanRejectedError,
   type KyLegiScanClientDeps,
 } from './ky-legiscan-client';
+import { LegiscanQuotaHoldError } from './legiscan-quota';
+import { LegiscanRunBudgetError, withLegiscanRunBudget } from './legiscan-run-budget';
 
 // Every test stubs HTTP: no request ever reaches api.legiscan.com.
+
+/**
+ * Since WS4-03a every attempt is charged to a per-run budget, and a process
+ * with no budget is denied. These tests are about attempt counting, so each
+ * runs inside an uncapped (`null`) budget scope unless it says otherwise.
+ */
+function budgetedTest(name: string, fn: () => Promise<void>): void {
+  test(name, () => withLegiscanRunBudget(null, fn));
+}
 
 type Reply = { status: number; data: unknown } | Error;
 
@@ -69,7 +80,7 @@ async function withoutEnvKey<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-test('a 2xx OK reply records one attempt, no failure, and returns the data', async () => {
+budgetedTest('a 2xx OK reply records one attempt, no failure, and returns the data', async () => {
   const { client, calls } = harness([OK]);
   const bill = await client.fetchBillDetail(1);
   assert.deepEqual(bill, { bill_id: 1 });
@@ -78,7 +89,7 @@ test('a 2xx OK reply records one attempt, no failure, and returns the data', asy
   assert.equal(calls.get, 1);
 });
 
-test('a timeout then OK records two attempts and one failure', async () => {
+budgetedTest('a timeout then OK records two attempts and one failure', async () => {
   const { client, calls } = harness([timeoutError(), OK]);
   const bill = await client.fetchBillDetail(1);
   assert.deepEqual(bill, { bill_id: 1 });
@@ -87,7 +98,7 @@ test('a timeout then OK records two attempts and one failure', async () => {
   assert.equal(calls.get, 2);
 });
 
-test('an ERROR payload is a rejection: one attempt, no failure, no retry', async () => {
+budgetedTest('an ERROR payload is a rejection: one attempt, no failure, no retry', async () => {
   const { client, calls } = harness([
     { status: 200, data: { status: 'ERROR', alert: { message: 'Unknown bill id' } } },
     OK,
@@ -103,7 +114,7 @@ test('an ERROR payload is a rejection: one attempt, no failure, no retry', async
   assert.equal(calls.get, 1);
 });
 
-test('HTTP 400 records one attempt and one failure and is thrown at once', async () => {
+budgetedTest('HTTP 400 records one attempt and one failure and is thrown at once', async () => {
   const { client, calls } = harness([httpError(400), OK]);
   await assert.rejects(client.fetchBillDetail(1), /status code 400/);
   assert.equal(calls.recordAttempt.length, 1);
@@ -111,7 +122,7 @@ test('HTTP 400 records one attempt and one failure and is thrown at once', async
   assert.equal(calls.get, 1);
 });
 
-test('five timeouts record five attempts and five failures, then throw the last error', async () => {
+budgetedTest('five timeouts record five attempts and five failures, then throw the last error', async () => {
   const errors = [1, 2, 3, 4, 5].map((n) =>
     Object.assign(new Error(`timeout of 60000ms exceeded (#${n})`), { code: 'ECONNABORTED' }),
   );
@@ -122,7 +133,7 @@ test('five timeouts record five attempts and five failures, then throw the last 
   assert.equal(calls.get, 5);
 });
 
-test('a recordAttempt that throws does not stop the request being sent', async () => {
+budgetedTest('a recordAttempt that throws does not stop the request being sent', async () => {
   const { client, calls } = harness([OK], {
     deps: {
       recordAttempt: async () => {
@@ -135,7 +146,7 @@ test('a recordAttempt that throws does not stop the request being sent', async (
   assert.equal(calls.get, 1);
 });
 
-test('a cached second identical call records no new attempt', async () => {
+budgetedTest('a cached second identical call records no new attempt', async () => {
   const { client, calls } = harness([OK]);
   await client.fetchBillDetail(1);
   const again = await client.fetchBillDetail(1);
@@ -148,7 +159,7 @@ for (const [label, key] of [
   ['an empty key', ''],
   ['a whitespace-only key', '   '],
 ] as const) {
-  test(`${label} sends nothing, records nothing and skips the quota check`, async () => {
+  budgetedTest(`${label} sends nothing, records nothing and skips the quota check`, async () => {
     await withoutEnvKey(async () => {
       const { client, calls } = harness([OK], { apiKey: key });
       await assert.rejects(client.fetchBillDetail(1), (err: unknown) => {
@@ -168,10 +179,75 @@ for (const [label, key] of [
   });
 }
 
-test('constructing with an empty or blank key does not throw (eager construction keeps working)', async () => {
+budgetedTest('constructing with an empty or blank key does not throw (eager construction keeps working)', async () => {
   await withoutEnvKey(async () => {
     assert.doesNotThrow(() => new KyLegiScanClient(''));
     assert.doesNotThrow(() => new KyLegiScanClient('   '));
     assert.doesNotThrow(() => new KyLegiScanClient());
+  });
+});
+
+test('budget 2 and three timeouts in a row: the third attempt throws LegiscanRunBudgetError and get ran twice', async () => {
+  const { client, calls } = harness([timeoutError(), timeoutError(), timeoutError(), OK]);
+  await withLegiscanRunBudget(2, async () => {
+    await assert.rejects(client.fetchBillDetail(1), (err: unknown) => {
+      assert.ok(err instanceof LegiscanRunBudgetError);
+      assert.equal(err.reason, 'exhausted');
+      assert.equal(err.message, 'LegiScan run budget reached (spent 2 of 2)');
+      return true;
+    });
+  });
+  assert.equal(calls.get, 2);
+  // The denied third attempt is neither counted nor sent.
+  assert.equal(calls.recordAttempt.length, 2);
+  assert.equal(calls.recordFailure, 2);
+});
+
+test('no budget in scope or process: the first call is denied before any count or send', async () => {
+  const { client, calls } = harness([OK]);
+  const savedArgv = process.argv;
+  const savedCaller = process.env.LEGISCAN_CALLER;
+  process.argv = ['node', 'script.ts'];
+  delete process.env.LEGISCAN_CALLER;
+  try {
+    await assert.rejects(client.fetchBillDetail(1), (err: unknown) => {
+      assert.ok(err instanceof LegiscanRunBudgetError);
+      assert.equal(err.reason, 'no-budget');
+      return true;
+    });
+  } finally {
+    process.argv = savedArgv;
+    if (savedCaller === undefined) delete process.env.LEGISCAN_CALLER;
+    else process.env.LEGISCAN_CALLER = savedCaller;
+  }
+  assert.equal(calls.get, 0);
+  assert.equal(calls.recordAttempt.length, 0);
+});
+
+test('a blocked quota check (kill switch) throws LegiscanQuotaHoldError before any charge or get', async () => {
+  const { client, calls } = harness([OK], {
+    deps: {
+      checkQuota: async () => ({ blocked: true, reason: 'LegiScan quota hold (test)', summary: null }),
+    },
+  });
+  // A budget of 0 would throw on the first charge, so reaching the quota
+  // error proves the charge never ran.
+  await withLegiscanRunBudget(0, async () => {
+    await assert.rejects(client.fetchBillDetail(1), (err: unknown) => {
+      assert.ok(err instanceof LegiscanQuotaHoldError);
+      assert.match(err.message, /quota hold \(test\)/);
+      return true;
+    });
+  });
+  assert.equal(calls.get, 0);
+  assert.equal(calls.recordAttempt.length, 0);
+});
+
+budgetedTest('a cache hit is not charged', async () => {
+  const { client } = harness([OK]);
+  await withLegiscanRunBudget(1, async () => {
+    await client.fetchBillDetail(1);
+    // The budget is spent, but the cached reply needs no attempt.
+    assert.deepEqual(await client.fetchBillDetail(1), { bill_id: 1 });
   });
 });

@@ -72,6 +72,7 @@ jobs:
 
       - run: npm ci
 
+      # LegiScan per-run cap: DATA_BUDGET.legiscan.perRunCap['accuracy-audit'] (WS4-03a)
       - name: Run content accuracy audit
         run: npm run audit:accuracy
 
