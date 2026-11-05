@@ -14,6 +14,11 @@
  * target. Slack side just needs a plain Incoming Webhook (already stored in
  * SLACK_WEBHOOK_ERRORS for the sync/health pipelines).
  *
+ * Routing: every alert goes to #errors. A rule whose name starts with `[page]`
+ * also goes to SLACK_WEBHOOK_SUPPORT, the page channel (src/lib/alert-routing.ts,
+ * docs/ops/README.md). Only issue alerts are forwarded, so a paging rule must be
+ * an issue-alert rule, not a metric alert.
+ *
  * Signature check is HMAC-SHA256 over the raw request body using the shared
  * secret, header `sentry-hook-signature`. Timing-safe comparison; a missing or
  * bad signature returns 401.
@@ -22,6 +27,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import { postSlackIncomingWebhook } from '@/lib/slack-webhook';
+import { sentrySlackTargets } from '@/lib/alert-routing';
 
 export const runtime = 'nodejs';
 
@@ -59,16 +65,6 @@ function verifySentrySignature(rawBody: string, headers: Headers, secret: string
   } catch {
     return false;
   }
-}
-
-/** Slack channel target. Sentry alerts go to the #errors slot with a fallback. */
-function slackWebhookUrl(): string | null {
-  return (
-    process.env.SLACK_WEBHOOK_ERRORS?.trim() ||
-    process.env.SLACK_WEBHOOK_ALERTS?.trim() ||
-    process.env.SLACK_WEBHOOK_URL?.trim() ||
-    null
-  );
 }
 
 function levelEmoji(level: string | undefined): string {
@@ -145,8 +141,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'malformed json' }, { status: 400 });
   }
 
-  const slackUrl = slackWebhookUrl();
-  if (!slackUrl) {
+  const slackUrls = sentrySlackTargets(payload.data?.triggered_rule, process.env);
+  if (slackUrls.length === 0) {
     Sentry.captureMessage('sentry->slack webhook: no SLACK_WEBHOOK_ERRORS configured', 'warning');
     return NextResponse.json({ ok: true, skipped: 'no slack webhook configured' });
   }
@@ -154,10 +150,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const text = formatSlackMessage(payload);
   if (!text) return NextResponse.json({ ok: true, skipped: 'no event in payload' });
 
-  const { ok, status } = await postSlackIncomingWebhook(slackUrl, text);
-  if (!ok) {
-    Sentry.captureMessage(`sentry->slack post failed (HTTP ${status})`, 'error');
-    return NextResponse.json({ ok: false, slackStatus: status }, { status: 502 });
+  // Delivered if at least one channel accepted the post.
+  let delivered = false;
+  let failures = 0;
+  let lastFailedStatus = 0;
+  for (const url of slackUrls) {
+    const { ok, status } = await postSlackIncomingWebhook(url, text);
+    if (ok) {
+      delivered = true;
+    } else {
+      failures += 1;
+      lastFailedStatus = status;
+    }
+  }
+  if (!delivered) {
+    Sentry.captureMessage(`sentry->slack post failed (HTTP ${lastFailedStatus})`, 'error');
+    return NextResponse.json({ ok: false, slackStatus: lastFailedStatus }, { status: 502 });
+  }
+  if (failures > 0) {
+    Sentry.captureMessage(`sentry->slack post failed on one channel (HTTP ${lastFailedStatus})`, 'warning');
   }
   return NextResponse.json({ ok: true });
 }
