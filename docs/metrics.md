@@ -223,15 +223,15 @@ GROUP BY host ORDER BY clicks DESC
 
 ## Ledger
 
-Query date 2026-11-05 for every PostHog cell. KPI-3 and PostHog retention show percent (returned/new). KPI-6 and KPI-7 are Owner-run Supabase counts.
+Query date 2026-11-05 for every PostHog cell. KPI-3 and PostHog retention show percent (returned/new). KPI-6 and KPI-7 are Supabase counts, run read-only on 2026-11-05. KPI-7: every logged send in Jun–Oct has `delivery_status = sent`; no bounces or complaints are recorded.
 
 | Period | KPI-1 (month) | KPI-1 (weekly median) | KPI-3 | PostHog retention (no E-auth-bot) | KPI-5 | KPI-6 | KPI-7 | KPI-9 | Query date |
 |---|---|---|---|---|---|---|---|---|---|
-| Jun 2026 | 34 | 8 | 7.7% (3/39) | 2.2% (4/180) | n/a (`kpi-5`: no `matched` before 09-16) | Owner to run (`kpi-6`) | Owner to run (`kpi-7`) | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
-| Jul 2026 | 115 | 32.5 | 2.7% (3/112) | 0.3% (2/684) | n/a (`kpi-5`: no `matched` before 09-16) | Owner to run (`kpi-6`) | Owner to run (`kpi-7`) | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
-| Aug 2026 | 250 | 61 | 2.4% (7/292) | 2.0% (14/702) | n/a (`kpi-5`: no `matched` before 09-16) | Owner to run (`kpi-6`) | Owner to run (`kpi-7`) | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
-| Sep 2026 | 371 | 92.5 | 2.5% (9/353) | 1.5% (13/884) | 12.9% (25/194; Sep 16–30 only) | Owner to run (`kpi-6`) | Owner to run (`kpi-7`) | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
-| Oct 1–6 2026 | 76 | n/a (`kpi-1`: no complete ISO week inside Oct 1–6) | n/a (`kpi-3`: no complete cohort week inside Oct 1–6) | n/a (`kpi-3-posthog`, same reason) | 21.1% (16/76) | Owner to run (`kpi-6`) | Owner to run (`kpi-7`) | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
+| Jun 2026 | 34 | 8 | 7.7% (3/39) | 2.2% (4/180) | n/a (`kpi-5`: no `matched` before 09-16) | n/a (`kpi-6` is point-in-time; see Citable figures) | 11 sent, 3 recipients | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
+| Jul 2026 | 115 | 32.5 | 2.7% (3/112) | 0.3% (2/684) | n/a (`kpi-5`: no `matched` before 09-16) | n/a (`kpi-6` is point-in-time; see Citable figures) | 2 sent, 1 recipient | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
+| Aug 2026 | 250 | 61 | 2.4% (7/292) | 2.0% (14/702) | n/a (`kpi-5`: no `matched` before 09-16) | n/a (`kpi-6` is point-in-time; see Citable figures) | 3 sent, 1 recipient | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
+| Sep 2026 | 371 | 92.5 | 2.5% (9/353) | 1.5% (13/884) | 12.9% (25/194; Sep 16–30 only) | n/a (`kpi-6` is point-in-time; see Citable figures) | 1 sent, 1 recipient | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
+| Oct 1–6 2026 | 76 | n/a (`kpi-1`: no complete ISO week inside Oct 1–6) | n/a (`kpi-3`: no complete cohort week inside Oct 1–6) | n/a (`kpi-3-posthog`, same reason) | 21.1% (16/76) | n/a (`kpi-6` is point-in-time; see Citable figures) | n/a (`kpi-7` is monthly; Oct full month: 2 sent, 1 recipient) | n/a (pre-WS7-09d, `kpi-9`) | 2026-11-05 |
 | **Jun–Sep 2026 (baseline)** | 757 unique (KPI-2: 2,157) | — | 2.8% (22/796) | 1.3% (33/2,450) | — | — | — | — | 2026-11-05 |
 
 Each month's KPI-1 applies E-auth-bot within that month, so the monthly figures do not sum to the Jun–Sep unique count. Later rows (Oct 2026 → Mar 2027 and the 2026-10-20 → 11-04 election period) are added by WS7-14 and WS7-12.
@@ -244,7 +244,7 @@ Funder and partner copy uses only these rows, with the "as of" date (WS7-03). Ke
 |---|---|---|---|
 | 2026-11-05 | 757 | "About 760 people in Kentucky visited KYvKY from June to September 2026 (counted by browser, after removing bots and test accounts)." | KPI-1, `kpi-1` (Jun 1 → Oct 1) |
 | 2026-11-05 | 2,157 | "About 2,160 people in all visited KYvKY from June to September 2026 (counted by browser, after removing bots and test accounts)." | KPI-2, `kpi-2` (Jun 1 → Oct 1) |
-| Owner to fill | Owner to run | "N people have created a KYvKY account." (replace N) | KPI-6, `kpi-6` |
+| 2026-11-05 | 18 | "18 people have created a KYvKY account." (also on 2026-11-05: 3 verified, 6 follow at least one bill or committee, 4 have the email digest on) | KPI-6, `kpi-6` |
 | 2026-11-05 | 12.9% | "About 1 in 8 Kentucky visitors in late September 2026 looked up their own legislators." | KPI-5, `kpi-5` (Sep 16 → Oct 1) |
 | 2026-11-05 | 2.8% | "About 3 in 100 first-time Kentucky visitors came back the next week (June–September 2026)." | KPI-3, `kpi-3` |
 | 2026-11-05 | 86.5% (655/757) | "Most Kentucky visitors (about 87%) found KYvKY through a search engine (June–September 2026)." | KPI-8, `kpi-8` (Jun 1 → Oct 1) |
