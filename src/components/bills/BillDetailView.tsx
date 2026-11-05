@@ -78,9 +78,13 @@ import {
 } from '@/lib/map-legiscan-bill-status';
 import { getKyEnactedBillEffectiveDateNotice } from '@/lib/ky-bill-effective-date';
 import {
+  ROLL_CALL_OUTCOME_POLICY,
+  ROLL_CALL_OUTCOME_TOOLTIP,
+  UNMATCHED_ROLL_CALL_CAPTION,
   deriveRollCallLabel,
   matchVotesToHistory,
   rollCallChamberFromDesc,
+  rollCallOutcomeLabel,
 } from '@/lib/roll-call-label';
 import type { KYBill, KYLegislatorRoster } from '@/types/kentucky';
 import type { KyBillDetailEnrichment } from '@/lib/ky-bill-detail-server';
@@ -249,20 +253,50 @@ function VoteTallyBar({ yea, nay, nv, absent }: { yea: number; nay: number; nv: 
 }
 
 /**
+ * The result of one roll call, shown per `ROLL_CALL_OUTCOME_POLICY` (WS3-03a:
+ * "failed" only). It applies to matched and unmatched roll calls alike, is
+ * driven only by the stored `passed` value (never computed from a threshold),
+ * and its tooltip says it is not the status of the bill.
+ */
+function RollCallOutcomeChip({ passed }: { passed: boolean | null | undefined }) {
+  const label = rollCallOutcomeLabel(passed, ROLL_CALL_OUTCOME_POLICY);
+  if (!label) return null;
+  return (
+    <MuiTooltip
+      title={<Typography variant="body2">{ROLL_CALL_OUTCOME_TOOLTIP}</Typography>}
+      arrow
+      enterDelay={300}
+      componentsProps={{
+        tooltip: {
+          sx: {
+            maxWidth: 300,
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: 4,
+            '& .MuiTooltip-arrow': { color: 'background.paper' },
+          },
+        },
+      }}
+    >
+      <MuiChip size="small" label={label} color={passed ? 'success' : 'error'} variant="filled" />
+    </MuiTooltip>
+  );
+}
+
+/**
  * A roll call rendered inline in the legislative-history timeline: tally bar
- * with an icon-only LegiScan source link at its end, then the existing count
- * chips (keeping their civic tooltips). `showOutcome` adds a Passed/Failed chip for synthesized rows whose
- * action text doesn't already state the result; it renders only when `passed`
- * is present in the data — never computed from a threshold.
+ * with an icon-only LegiScan source link at its end, then the outcome chip
+ * (see RollCallOutcomeChip) and the existing count chips (keeping their civic
+ * tooltips).
  */
 function InlineRollCall({
   vote,
   billNumber,
-  showOutcome = false,
 }: {
   vote: BillVoteRow;
   billNumber: string;
-  showOutcome?: boolean;
 }) {
   const theme = useTheme();
   const rollId = vote.roll_call_id;
@@ -315,14 +349,7 @@ function InlineRollCall({
         )}
       </Box>
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-        {showOutcome && vote.passed != null && (
-          <MuiChip
-            size="small"
-            label={vote.passed ? 'Passed' : 'Failed'}
-            color={vote.passed ? 'success' : 'error'}
-            variant="filled"
-          />
-        )}
+        <RollCallOutcomeChip passed={vote.passed} />
         <VoteCountChip bucket="yea" count={vote.yea ?? 0} />
         <VoteCountChip bucket="nay" count={vote.nay ?? 0} />
         {(vote.nv ?? 0) > 0 && <VoteCountChip bucket="nv" count={vote.nv ?? 0} />}
@@ -695,12 +722,16 @@ function HistoryTimeline({
                   </Box>
                 )}
               </Typography>
+              {item.synthetic && (
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25, lineHeight: 1.35 }}>
+                  {UNMATCHED_ROLL_CALL_CAPTION}
+                </Typography>
+              )}
               {item.votes?.map((v, vi) => (
                 <InlineRollCall
                   key={v.roll_call_id ?? `vote-${vi}`}
                   vote={v}
                   billNumber={billNumber}
-                  showOutcome={item.synthetic}
                 />
               ))}
             </Box>
