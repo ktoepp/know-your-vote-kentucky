@@ -242,10 +242,15 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
 
     // Only delivered digests advance the window — a 'failed' send must not
     // swallow its window's events, or they are never delivered at all.
+    // 'bounced' and 'complained' rows do advance it: the email was accepted,
+    // and suppression stops further sends. Delivery delays no longer write
+    // (WS7-07b), so a delayed email's row stays 'sent'. Only bill digest rows
+    // count; other email kinds have their own windows.
     const { data: lastLog } = await supabaseAdmin
       .from('ky_notifications_log')
       .select('digest_window_end')
       .eq('user_id', uid)
+      .eq('kind', 'bill_digest')
       .neq('delivery_status', 'failed')
       .order('sent_at', { ascending: false })
       .limit(1)
@@ -623,6 +628,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
           event_ids: top.map((t) => t.id),
           committee_event_ids: committeeEventIds,
           delivery_status: 'failed',
+          kind: 'bill_digest',
         });
         continue;
       }
@@ -635,6 +641,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
         committee_event_ids: committeeEventIds,
         resend_message_id: sendData?.id ?? null,
         delivery_status: 'sent',
+        kind: 'bill_digest',
       });
     } catch (e) {
       errors.push(`${email}: ${e instanceof Error ? e.message : String(e)}`);
