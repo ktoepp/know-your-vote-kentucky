@@ -201,6 +201,96 @@ export function normalizeTopicFilters(input: string[]): string[] {
   return out;
 }
 
+/** Kentucky has 100 House districts and 38 Senate districts. */
+export const KY_HOUSE_DISTRICT_COUNT = 100;
+export const KY_SENATE_DISTRICT_COUNT = 38;
+
+/** Fields of the weekly My Legislators subscription accepted by `PATCH /api/me/preferences`. */
+export type MyLegislatorsPatch = {
+  my_legislators_weekly?: boolean;
+  house_district?: number | null;
+  senate_district?: number | null;
+};
+
+export type MyLegislatorsPatchResult =
+  | { ok: true; patch: MyLegislatorsPatch }
+  | { ok: false; error: string };
+
+export const MY_LEGISLATORS_DISTRICTS_REQUIRED_ERROR =
+  'Choose your House and Senate districts before turning on the weekly email.';
+
+function isDistrictValue(v: unknown, max: number): v is number | null {
+  return v === null || (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= max);
+}
+
+/**
+ * Validates the My Legislators fields of a preferences PATCH body. Keys that
+ * are absent stay absent; other body keys are ignored (the route validates them).
+ * A district is an integer in range, or null to clear it.
+ */
+export function normalizeMyLegislatorsPatch(body: Record<string, unknown>): MyLegislatorsPatchResult {
+  const patch: MyLegislatorsPatch = {};
+
+  if ('my_legislators_weekly' in body) {
+    const v = body.my_legislators_weekly;
+    if (typeof v !== 'boolean') {
+      return { ok: false, error: 'my_legislators_weekly must be true or false.' };
+    }
+    patch.my_legislators_weekly = v;
+  }
+
+  if ('house_district' in body) {
+    const v = body.house_district;
+    if (!isDistrictValue(v, KY_HOUSE_DISTRICT_COUNT)) {
+      return {
+        ok: false,
+        error: `house_district must be a whole number from 1 to ${KY_HOUSE_DISTRICT_COUNT}, or null.`,
+      };
+    }
+    patch.house_district = v;
+  }
+
+  if ('senate_district' in body) {
+    const v = body.senate_district;
+    if (!isDistrictValue(v, KY_SENATE_DISTRICT_COUNT)) {
+      return {
+        ok: false,
+        error: `senate_district must be a whole number from 1 to ${KY_SENATE_DISTRICT_COUNT}, or null.`,
+      };
+    }
+    patch.senate_district = v;
+  }
+
+  return { ok: true, patch };
+}
+
+export type StoredMyLegislators = {
+  my_legislators_weekly: boolean | null;
+  house_district: number | null;
+  senate_district: number | null;
+};
+
+/**
+ * The weekly email needs both districts. Returns the 400 message when the row
+ * would end up subscribed (turned on in this patch, or already on) without both
+ * districts, taking each district from the patch when present, else from the
+ * stored row. Returns null when the result is valid.
+ */
+export function myLegislatorsDistrictsError(
+  patch: MyLegislatorsPatch,
+  stored: StoredMyLegislators | null,
+): string | null {
+  const weekly =
+    'my_legislators_weekly' in patch
+      ? patch.my_legislators_weekly === true
+      : stored?.my_legislators_weekly === true;
+  if (!weekly) return null;
+  const house = 'house_district' in patch ? patch.house_district : stored?.house_district;
+  const senate = 'senate_district' in patch ? patch.senate_district : stored?.senate_district;
+  if (house == null || senate == null) return MY_LEGISLATORS_DISTRICTS_REQUIRED_ERROR;
+  return null;
+}
+
 /**
  * Ensure a preferences row exists (RLS INSERT policy on 020+). Idempotent.
  */

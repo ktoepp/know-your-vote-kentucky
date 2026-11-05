@@ -173,11 +173,15 @@ The postal address (`KYVKY_POSTAL_ADDRESS` in `src/lib/kyvky-contact.ts`) appear
 
 ### 3. Unsubscribe page
 
-One-click, no login. Rendered as a minimal HTML page.
+One-click, no login. Rendered as a minimal HTML page. The link may carry `?list=my_legislators` (the weekly legislator email only). A missing or unknown `list` stops all email updates.
 
-**Success (200):**
-- Title: `Digest emails stopped`
-- Body: `You will not receive further bill digest emails from Know Your Vote Kentucky. You can re-enable digests at any time from your profile.`
+**Success (200), all email updates (default):**
+- Title: `Email updates stopped`
+- Body: `You will not receive further digest or weekly legislator emails from Know Your Vote Kentucky. You can turn them back on at any time from your profile.`
+
+**Success (200), `list=my_legislators`:**
+- Title: `Weekly legislator email stopped`
+- Body: `You will not get the weekly email about your legislators. Bill digest emails are not affected. You can turn the weekly email back on from your profile.`
 
 **Not found (404):**
 - Title: `Link not found`
