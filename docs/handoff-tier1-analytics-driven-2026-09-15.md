@@ -1,5 +1,18 @@
 # Handoff — Tier 1, analytics-driven re-prioritization (2026-09-15)
 
+## Status (WS7-01, 2026-11-05)
+
+This handoff is closed. Each task's disposition is below; the rest of this file is kept as history.
+
+| Task | Disposition | Where it lives now |
+|---|---|---|
+| 1 | **Done** (PR #268). Validation is the `search_performed` split query. | `docs/metrics.md` (`handoff-search-source`) |
+| 2 | **Superseded:** answered from autocapture, no new event. | `docs/metrics.md` outbound-link query (`handoff-outbound-links`) |
+| 3 | **Implemented by WS6-18** (uses WS3-01's labels). | WS6 |
+| 4 | **Dropped** (see WS7 Deferred). | none |
+| 5 | **Superseded** by WS6-10 (calendar-aware home) and WS7-10 (saved legislators card). | WS6, WS7 |
+| PMF survey | **Stopped** (WS7-06). | WS7-06 |
+
 Five tasks re-ranked from the Wishlist & Roadmap after a PostHog review of the September
 organic surge. Ship order matters: 1 unblocks a real search read, 2 unblocks 4's link
 hierarchy, 3 supplies the vote-card shape 5 will reuse. Do not batch — one task per PR.
@@ -25,7 +38,7 @@ hierarchy, 3 supplies the vote-card shape 5 will reuse. Do not batch — one tas
 2. **Instrumentation before UI redesign.** Task 1 and Task 2 land events; they do not touch
    layout. `/search` overload redesign and legislator link hierarchy are explicitly out of
    scope here — see the Wishlist for why.
-3. **Filter test accounts.** PostHog insights created for these tasks should set
+3. **Filter test accounts.** _Superseded by the Exclusions section of [`docs/metrics.md`](./metrics.md) (WS7-01, 2026-11-05); the filter list below is kept as history._ PostHog insights created for these tasks should set
    `filterTestAccounts: true` and mirror the DAU/WAU tile's exclusions
    (`$current_url not_icontains vercel.app`, `email not_icontains minafter.com`,
    `$referrer not_icontains vercel`, `$referrer not_icontains minuteinbox.com`) unless a
