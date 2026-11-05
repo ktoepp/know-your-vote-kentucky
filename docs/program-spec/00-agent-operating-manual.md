@@ -49,7 +49,7 @@ Do not follow the repo-root `README.md`'s "For AI agents → Read first" list (E
 |---|---|---|
 | **W0 "Now"** | 2026-10-06 → 10-20 | Anything that passes §6. P0 first, in W0-queue order (below). |
 | **W1 "Election"** | 2026-10-21 → 11-03 | As W0. Code PRs merge by **10-30**. |
-| **Election freeze** | 2026-10-31 → 11-05 | **P0 fixes only.** Docs/test-only PRs (changing only `docs/**`, root `*.md` files and `src/**/*.test.ts`) may also merge. This is WS9-03's default option (a), applied from 2026-10-17 if unanswered, and it stays "pending owner confirmation" until WS9-03 merges. |
+| **Election freeze** | 2026-10-31 → 11-05 | **P0 fixes only.** Docs/test-only PRs (changing only `docs/**`, root `*.md` files and `src/**/*.test.ts`) may also merge. This is WS9-03's option (a), the default that applied on 2026-10-17. The owner-facing calendar and deploy checklist are in [`docs/ops/release.md`](../ops/release.md). |
 | **W2 "Build"** | 2026-11-04 (code from 11-06) → 12-14 | Migrations, refactors, dependency majors. See the W2 cut line below. |
 | **FZ "Freeze"** | 2026-12-15 → 2027-01-04 | Fixes, drills and readiness only. No refactors, no migrations, no dependency majors. |
 | **W3 "Session"** | 2027-01-05 → 03-30 | Small fixes only. |
