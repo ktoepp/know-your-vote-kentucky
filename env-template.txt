@@ -191,7 +191,9 @@ ADMIN_TOKEN=your_admin_token_here
 # Recommended mapping (matches typical #status-reports / #errors / #support webhooks):
 #   SLACK_WEBHOOK_STATUS_REPORTS — cron/manual sync digests (routine runs)
 #   SLACK_WEBHOOK_ERRORS — failed sync steps, health-check failures
-#   SLACK_WEBHOOK_SUPPORT — optional copy of *critical* only: sync crashes + health failures
+#   SLACK_WEBHOOK_SUPPORT — page channel: health failures, source breaches, sync crashes, LegiScan
+#                             quota bands, site check, Sentry rules named `[page]`. Point it at a
+#                             channel with phone notifications on (docs/ops/README.md).
 #                             (does not receive per-source row failures; those stay on ERRORS)
 #   SLACK_WEBHOOK_SIGNUPS — new verified-user announcements (#user-signups). NO fallback: kept out
 #                             of the status-reports firehose so signups are visible. If unset, the
