@@ -13,6 +13,9 @@
 #
 # Required secrets: NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL),
 #   SUPABASE_SERVICE_ROLE_KEY, SLACK_WEBHOOK_ERRORS, SLACK_SYNC_NOTIFY_CLI=true
+# Optional secret: SLACK_WEBHOOK_SUPPORT, the page channel (docs/ops/README.md).
+#   Breaches, this run's own failure and the site check post there as well as
+#   #errors. Unset, those posts go to #errors only.
 name: Sync source health
 
 on:
@@ -22,6 +25,10 @@ on:
         description: 'Exit non-zero when any source is unhealthy'
         type: boolean
         default: false
+      site_check_path:
+        description: 'Manual test only: path appended to the checked URL'
+        type: string
+        default: ''
   schedule:
     # 02:00 UTC — deliberately ~12h out of phase with the Vercel cron (14:00),
     # so a source that breaks just after one check is caught by the other within
@@ -55,12 +62,14 @@ jobs:
       - run: npm ci
 
       - name: Evaluate sync source health
+        id: evaluate
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_SUPPORT: ${{ secrets.SLACK_WEBHOOK_SUPPORT }}
           SLACK_SYNC_NOTIFY_CLI: 'true'
         run: |
           npm run health:sources ${{ inputs.strict && '-- --strict' || '' }}
@@ -98,6 +107,60 @@ jobs:
           SLACK_SYNC_NOTIFY_CLI: 'true'
         run: npm run triage:findings -- --source=health
 
+      # Off-Vercel check that the public site answers (WS9-01, decision (b)).
+      # Detection latency up to ~24 h plus GitHub delay (D5). Not an uptime monitor.
+      # Runs even when the evaluator crashed, and sits after triage so it never
+      # stops triage from running. Schedule runs have no inputs, so they always
+      # check the real URLs; site_check_path is for a manual test only and is
+      # read through env, never interpolated into the script.
+      - name: Check public site responds
+        if: always()
+        env:
+          SITE_CHECK_PATH: ${{ github.event_name == 'workflow_dispatch' && inputs.site_check_path || '' }}
+          EVALUATE_OUTCOME: ${{ steps.evaluate.outcome }}
+          SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+          SLACK_WEBHOOK_SUPPORT: ${{ secrets.SLACK_WEBHOOK_SUPPORT }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "$SITE_CHECK_PATH" ] && ! printf '%s' "$SITE_CHECK_PATH" | grep -Eq '^/[A-Za-z0-9._/-]*$'; then
+            echo "site_check_path must match ^/[A-Za-z0-9._/-]*\$"
+            exit 1
+          fi
+          check() {
+            local url="$1" code
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
+              -A "KnowYourVoteKentucky-sitecheck/1.0 (+https://kyvky.com)" "$url") || code=000
+            if [ "$code" != "200" ]; then
+              echo "$url returned $code; retrying in 30 s"
+              sleep 30
+              code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
+                -A "KnowYourVoteKentucky-sitecheck/1.0 (+https://kyvky.com)" "$url") || code=000
+            fi
+            echo "$url -> $code"
+            if [ "$code" != "200" ]; then
+              FAILURES="${FAILURES}*KYvKY site check failed* $url returned $code"$'\n'
+            fi
+          }
+          FAILURES=""
+          check "https://www.kyvky.com/${SITE_CHECK_PATH#/}"
+          check "https://www.kyvky.com/bills"
+          if [ -z "$FAILURES" ]; then
+            echo "Site check passed"
+            exit 0
+          fi
+          PAYLOAD=$(jq -n --arg text "${FAILURES}${RUN_URL}" '{text: $text}')
+          ok=0
+          for URL in "$SLACK_WEBHOOK_ERRORS" "$SLACK_WEBHOOK_SUPPORT"; do
+            [ -z "$URL" ] && continue
+            if curl -fsS -X POST -H 'Content-Type: application/json' --data "$PAYLOAD" "$URL"; then ok=1; fi
+          done
+          # Stand the generic notifier down only when this post was delivered and
+          # the evaluator itself succeeded; an evaluator failure must still report.
+          if [ "$ok" = "1" ] && [ "$EVALUATE_OUTCOME" = "success" ]; then
+            touch .slack-notified
+          fi
+          exit 1
+
       # Last-resort net: fires only when the step above could not report for
       # itself (setup failure, OOM, timeout kill). The script drops
       # .slack-notified after a *delivered* Slack post, so a successful alert
@@ -107,9 +170,10 @@ jobs:
         if: cancelled() || failure()
         env:
           SLACK_WEBHOOK_ERRORS: ${{ secrets.SLACK_WEBHOOK_ERRORS }}
+          SLACK_WEBHOOK_SUPPORT: ${{ secrets.SLACK_WEBHOOK_SUPPORT }}
         run: |
-          if [ -z "$SLACK_WEBHOOK_ERRORS" ]; then
-            echo "Skip Slack: SLACK_WEBHOOK_ERRORS not set"
+          if [ -z "$SLACK_WEBHOOK_ERRORS" ] && [ -z "$SLACK_WEBHOOK_SUPPORT" ]; then
+            echo "Skip Slack: neither SLACK_WEBHOOK_ERRORS nor SLACK_WEBHOOK_SUPPORT is set"
             exit 0
           fi
           if [ -f .slack-notified ]; then
@@ -122,6 +186,10 @@ jobs:
             HEADLINE="*Source health check failed*"
           fi
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -sS -X POST -H 'Content-Type: application/json' \
-            --data "{\"text\":\"$HEADLINE\nThe run could not report for itself.\n$RUN_URL\"}" \
-            "$SLACK_WEBHOOK_ERRORS" || true
+          # The source-health run is the backstop, so its own failure pages too.
+          for URL in "$SLACK_WEBHOOK_ERRORS" "$SLACK_WEBHOOK_SUPPORT"; do
+            [ -z "$URL" ] && continue
+            curl -sS -X POST -H 'Content-Type: application/json' \
+              --data "{\"text\":\"$HEADLINE\nThe run could not report for itself.\n$RUN_URL\"}" \
+              "$URL" || true
+          done
