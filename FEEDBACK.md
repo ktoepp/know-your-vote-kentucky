@@ -8,6 +8,8 @@
 
 ## How to use this file (for AI agents and humans)
 
+**No personal data.** No names, email addresses, phone numbers or other contact details of people who gave feedback. Store raw artifacts in `docs/feedback/` (gitignored) and refer to them by a neutral file name with no personal names. `src/lib/repo-hygiene.test.ts` enforces the email, phone and `From:` parts of this rule.
+
 **When new feedback arrives**, append it to `## Open` using the entry schema below. Assign the next `[#NN]` id (highest existing id + 1, across all sections).
 
 **When you action a piece of feedback**, *move* the entry to `## Actioned` (don't duplicate) and fill in the `Action:` line with a link to the PR, TASKS.md heading, or decisions.md section that resolved it. Update `Status:` to `actioned`.
@@ -18,17 +20,17 @@
 
 **PostHog surveys**: if a survey wave has more than ~5 responses, create *one* entry referencing a CSV export in `docs/feedback/<survey-slug>-YYYY-MM-DD.csv` rather than one entry per respondent. Surface only the standout quotes / themes inline.
 
-**Privacy**: Name and email may be captured when the user shared them directly (email reply, in-person intro, survey opt-in). For PostHog anonymous responses, leave both blank. Never paste raw PII from logs or analytics that wasn't volunteered as feedback.
+**Privacy**: This file is public. Never record who gave feedback beyond a neutral role descriptor ("a reader", "a county official", "a candidate"), with no location finer than "Kentucky". Names, email addresses and phone numbers stay in the gitignored raw artifact, if they are kept at all. For PostHog anonymous responses, omit the `From:` line. Never paste raw PII from logs or analytics.
 
 ### Entry schema
 
 ```
 ### YYYY-MM-DD — short title  [#NN]
 - Source: email | in-person | posthog:<survey-slug> | slack | other
-- From: Full Name <email@example.com>   ← omit line entirely if anonymous
+- From: <role descriptor, e.g. "a reader">   ← omit line entirely if anonymous
 - Verbatim: > quoted lines from the user (use ~ prefix for paraphrase)
 - Theme: nav, mobile, copy, perf, a11y, data-accuracy, onboarding, notifications, …
-- Artifact: docs/feedback/YYYY-MM-DD-<slug>.<ext>   ← omit if no raw artifact
+- Artifact: docs/feedback/YYYY-MM-DD-<neutral-slug>.<ext>   ← no personal or private-group names; omit if no raw artifact
 - Action: → TASKS.md "<heading>" | PR #NN | decisions.md §YYYY-MM-DD | none yet
 - Status: open | triaged | in-progress | actioned | wont-do (<reason if wont-do>)
 ```
@@ -40,24 +42,16 @@
 ## Open
 
 ### 2026-06-23 — Add "Women & Families" topic on /bills  [#3]
-- Source: in-person (iMessage group chat "KY Fried Women")
-- From: Katie Greene
+- Source: in-person (group chat)
+- From: a reader
 - Verbatim:
   > It would be awesome if they would build in a sub-heading here for leg related to Women & Families, so we could have a direct location to drive people
 - Theme: content, topic-taxonomy, navigation
-- Artifact: docs/feedback/2026-06-23-ky-fried-women-imessage.md
+- Artifact: docs/feedback/2026-06-23-reader-group-chat.md
 - Action: → [decisions.md §2026-06-26](./decisions.md#2026-06-26--ai-plain-language-bill-descriptions-with-embedded-impact-audiences) — partially served by the new per-bill AI summaries (each names likely impacted audiences in prose, [#1]). A cross-bill **"Women & Families" lens page** is still pending; revisit once summaries ship and we see whether per-bill audience prose is enough. The standalone audience-axis classifier was dropped as too hard.
 - Status: triaged (partially addressed by [#1])
 
-### 2026-06-23 — Outreach intros: Democracy Matters, KY Dem State House group, Dirtroad Organizing, KFTC, county Dem Party  [#2]
-- Source: email
-- From: Iva Markicevic <iva.b.markicevic@gmail.com>
-- Verbatim:
-  > I would recommend reaching out to your county's Democratic Party as well as the nearest chapter of Kentuckians for the Commonwealth (you could even reach out to KFTC). I'm happy to introduce you to Democracy Matters—a group working to flip red seats in KY—and can share your message & email (for feedback) in two group chats I'm in: one with current Dem candidates for State House in KY and one with my cohort of Dirtroad Organizing.
-- Theme: outreach, distribution
-- Artifact: docs/feedback/2026-06-23-iva-markicevic-email.md
-- Action: operator follow-up — reply to Iva accepting the intros; track resulting feedback as new entries here.
-- Status: open
+_Outreach notes are kept outside the public repo._
 
 ### 2026-08-16 — PMF survey wave 1: the instrument is the finding, not the result  [#5]
 - Source: posthog:product-market-fit-pmf
@@ -77,13 +71,13 @@
 
 ### 2026-06-23 — Plain-language bill summaries + candidate use case validation  [#1]
 - Source: email
-- From: Iva Markicevic <iva.b.markicevic@gmail.com> (KY State House candidate, recipient of 2026-06-19 outreach)
+- From: a reader (a candidate for the Kentucky House)
 - Verbatim:
   > One feature I'd love to see—and that I think users would find useful—is a brief summary in plain language of what the bill means for Kentuckians. The summaries provided on LRC can sometimes be vague and/or use confusing language, which can make it hard to understand exactly what the bill aims to do.
   > From a candidate perspective, I also think this would be helpful because 1) it would save us research time on bills we want to highlight that others aren't highlighting and 2) it would give us an easy tool to share with voters to highlight how [folks] are voting (whether it's an incumbent who wants to highlight a positive voting record or a challenger who wants to highlight an incumbent's problematic voting record).
   > [On LRC specifically:] resources you have to know about to find & don't offer the most user-friendly experience.
 - Theme: content, bill-summaries, candidate-persona, discovery
-- Artifact: docs/feedback/2026-06-23-iva-markicevic-email.md
+- Artifact: docs/feedback/2026-06-23-reader-email.md
 - Action: branch `feat/legiscan-quota-guard-and-slack-dedupe` — reviving the dormant per-bill AI summary (`ai_summary`), now incl. a grounded "Who it may affect:" clause + disclaimer + feedback CTA + accuracy check. See [decisions.md §2026-06-26](./decisions.md#2026-06-26--ai-plain-language-bill-descriptions-with-embedded-impact-audiences). Generation via `npm run backfill:bill-summaries`.
 - Status: in-progress
 
@@ -95,7 +89,7 @@ _Append-only. Move entries here once shipped; link to the PR / TASKS.md heading 
 
 ### 2026-07-06 — HB904 charitable-gaming device placement squeezes small veterans posts  [#4]
 - Source: email (via HB904 bill-page "See a problem? Tell us" mailto)
-- From: David (Amvets post trustee; full name/email in artifact)
+- From: a reader (a veterans post trustee; contact details in the artifact)
 - Verbatim:
   > These small Veterans posts typically dont have the room to locate all machines in one condoned area in clear view of the gaming officer. […] We rely on our gaming to keep our patrons coming in, and right now we dont have a clear way to comply with the new law.
   > ~ Asks KYvKY to support an amendment exempting private clubs — out of scope (non-partisan), but the impact gap on our page was real.
