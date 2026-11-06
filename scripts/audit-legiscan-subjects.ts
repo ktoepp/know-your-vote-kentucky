@@ -49,7 +49,6 @@ async function main() {
   let billsWithSubjects = 0;
 
   // Stream pages so we don't blow memory.
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { data, error } = await supabaseAdmin
       .from('ky_bills')

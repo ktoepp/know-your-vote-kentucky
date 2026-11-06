@@ -28,7 +28,7 @@ type DigestHistoryEntry = {
   sent_at: string;
   digest_window_start: string;
   digest_window_end: string;
-  delivery_status: 'sent' | 'failed' | 'bounced';
+  delivery_status: 'sent' | 'failed' | 'bounced' | 'complained';
   bills: DigestHistoryBill[];
   committees: DigestHistoryCommittee[];
 };
@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
   const logRes = await auth.supabase
     .from('ky_notifications_log')
     .select('id, sent_at, digest_window_start, digest_window_end, event_ids, committee_event_ids, delivery_status')
+    .eq('kind', 'bill_digest')
     .eq('delivery_status', 'sent')
     .order('sent_at', { ascending: false })
     .limit(limit);
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
     sent_at: string;
     digest_window_start: string;
     digest_window_end: string;
-    delivery_status: 'sent' | 'failed' | 'bounced';
+    delivery_status: 'sent' | 'failed' | 'bounced' | 'complained';
     event_ids: number[] | null;
     committee_event_ids: number[] | null;
   }>;

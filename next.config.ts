@@ -2,11 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 /**
- * Disables ESLint during Vercel builds to prevent non-critical lint errors from blocking deployment.
- *
- * Recommended for production deployment if you already run linting locally or in CI.
- *
- * To re-enable ESLint in production builds for stricter code quality, remove or set `ignoreDuringBuilds: false`.
+ * Lint runs in CI (`npm run lint`, ESLint CLI) and gates merges. The build does not repeat it. The Next 16 upgrade (S1) deletes this key.
  */
 const nextConfig: NextConfig = {
   /** Native WebSocket impl used by Supabase Realtime when Node is below 22 (see supabaseAdminCore.ts). */

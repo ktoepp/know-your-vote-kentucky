@@ -11,3 +11,7 @@ Runbooks and operating notes for KYvKY. WS9-01 completes the paging table below.
 ## Runbooks
 
 - [LegiScan: quota and ban risk](runbooks/legiscan.md)
+
+## Releases
+
+- [Release calendar, election freeze and deploy checklist](release.md)

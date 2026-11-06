@@ -11,7 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { rejectUnlessOperator } from '@/lib/auth/operator-guard';
-import { syncAll, SYNC_SOURCES } from '../../../../lib/ky-sync-pipeline';
+import { syncAll, SYNC_ROUTE_DEADLINE_MS, SYNC_SOURCES } from '../../../../lib/ky-sync-pipeline';
 import {
   isVercelCronRequest,
   notifySyncExceptionSlack,
@@ -24,6 +24,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ source: string }> },
 ) {
+  // WS4-06: the hash-gated bills sync stops starting new fetches after this.
+  const deadlineAt = Date.now() + SYNC_ROUTE_DEADLINE_MS;
   const denied = await rejectUnlessOperator(req);
   if (denied) return denied;
 
@@ -72,6 +74,7 @@ export async function POST(
       quotaBackfillAdvanceCursor,
       useChangeHash: useChangeHash || undefined,
       force: force || undefined,
+      deadlineAt,
     });
     const result = results[0];
     const cron = isVercelCronRequest(req);
