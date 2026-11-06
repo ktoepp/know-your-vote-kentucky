@@ -4,9 +4,10 @@
  * `docs/data-budget.md`; keep the two in step.
  *
  * Status: PROPOSED 2026-10-06, pending WS4-04 (owner adopts or edits).
- * Nothing reads this constant yet. WS4-03a wires `legiscan.perRunCap` into
- * `KyLegiScanClient`, WS4-08 reads the pace targets and WS4-09a the LRC
- * spacing. Do not change runtime thresholds from here until those WPs land.
+ * `legiscan.perRunCap` is enforced by `src/lib/legiscan-run-budget.ts`
+ * (WS4-03a): every `KyLegiScanClient` attempt is charged to it. WS4-08 will
+ * read the pace targets and WS4-09a the LRC spacing; do not change those
+ * runtime thresholds from here until those WPs land.
  *
  * Only values that code will read belong here. Anthropic, Open States and
  * free-tier numbers stay in the doc because no code reads them.
@@ -24,7 +25,7 @@ export type DataBudget = {
     /**
      * `null` = counted, no cap. Keys are LegiScan caller tags
      * (`src/lib/legiscan-caller.ts`). Any caller not listed gets 0 and must
-     * pass `--budget=N` (enforced from WS4-03a).
+     * pass `--budget=N` (enforced since WS4-03a).
      */
     perRunCap: Record<string, number | null>;
     /** A single run budget above this needs owner approval. */
@@ -49,8 +50,9 @@ export const DATA_BUDGET: DataBudget = {
     // decisions.md § 2026-09-29 (option d), "Revisit if" trigger. PROPOSED, WS4-04.
     paidTierTriggerByDay15: 5000,
     perRunCap: {
-      // PROPOSED, WS4-04: counted and uncapped until WS4-06 makes the sync resumable and sets 250.
-      'sync-bills': null,
+      // WS4-06 owner decision (default 250, due 2026-11-20): the hash-gated sync writes every
+      // 25 bills and stops early at the cap, so the next run continues instead of re-buying.
+      'sync-bills': 250,
       // PROPOSED, WS4-04: getSessionList + getSessionPeople per run (decisions.md § 2026-10-06).
       'sync-legislators': 10,
       // PROPOSED, WS4-04: ~5 getBill/day plus new roll calls in session (decisions.md § 2026-09-30).

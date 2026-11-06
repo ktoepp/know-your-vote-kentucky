@@ -10,6 +10,11 @@
  * error, timeout or non-2xx) are also counted on their own in
  * `legiscan_failed_attempt_counter`. A `status: "ERROR"` reply is a rejection
  * and is never retried, and a client with an empty key sends nothing.
+ *
+ * Per-run budget (WS4-03a): every attempt is also charged to the current run's
+ * LegiScan budget (`src/lib/legiscan-run-budget.ts`) just before it is counted.
+ * When the run has no budget left, or none at all, `LegiscanRunBudgetError` is
+ * thrown and nothing is counted or sent. Cache hits are not charged.
  */
 import axios, { AxiosInstance } from 'axios';
 import { supabaseAdmin } from '../app/lib/supabaseAdminCore';
@@ -20,6 +25,7 @@ import {
   normalizeLegiscanOp,
 } from './legiscan-quota';
 import { currentLegiscanCaller } from './legiscan-caller';
+import { chargeLegiscanRunBudget } from './legiscan-run-budget';
 
 export interface LegiScanSession { session_id: number; state_id: number; year_start: number; year_end: number; session_name: string; special: number; }
 export interface LegiScanBillSummary { bill_id: number; number: string; title: string; description: string; state: string; session_id: number; status: number; status_desc: string; last_action: string; last_action_date: string; url: string; }
@@ -261,6 +267,9 @@ export class KyLegiScanClient {
     for (let i = 1; i <= MAX_RETRIES; i++) {
       // Retries are requests too — every attempt waits its turn.
       await this.throttle();
+      // Charged to the run's budget before it is counted or sent; a throw here
+      // records nothing and sends nothing (WS4-03a).
+      chargeLegiscanRunBudget();
       // Counted before sending, so a timeout LegiScan may still bill is in the total.
       await this.safeRecord('attempt', this.recordAttempt, op);
       let data: any;

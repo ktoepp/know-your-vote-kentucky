@@ -52,6 +52,7 @@ jobs:
       - name: Sync legislators from Open States
         run: npm run sync:ky:legislators
 
+      # LegiScan per-run cap: DATA_BUDGET.legiscan.perRunCap['legislator-links'] (WS4-03a)
       - name: Verify outbound links
         id: verify
         run: |

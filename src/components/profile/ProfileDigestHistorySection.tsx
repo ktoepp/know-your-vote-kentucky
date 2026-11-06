@@ -39,7 +39,7 @@ export type DigestHistoryEntry = {
   sent_at: string;
   digest_window_start: string;
   digest_window_end: string;
-  delivery_status: 'sent' | 'failed' | 'bounced';
+  delivery_status: 'sent' | 'failed' | 'bounced' | 'complained';
   bills: DigestHistoryBill[];
   committees?: DigestHistoryCommittee[];
 };

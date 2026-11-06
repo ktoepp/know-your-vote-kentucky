@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
+import {
+  buildUnsubscribeUpdate,
+  parseUnsubscribeList,
+  unsubscribeSuccessCopy,
+  type UnsubscribeList,
+} from '@/lib/unsubscribe-update';
 
 function page(title: string, body: string, ok: boolean) {
   const color = ok ? '#166534' : '#991b1b';
@@ -8,7 +14,10 @@ function page(title: string, body: string, ok: boolean) {
 
 type Ctx = { params: Promise<{ token: string }> };
 
-async function unsubscribe(token: string): Promise<{ ok: boolean; status: number; body: string }> {
+async function unsubscribe(
+  token: string,
+  list: UnsubscribeList,
+): Promise<{ ok: boolean; status: number; body: string }> {
   if (!token || !supabaseAdmin) {
     return {
       ok: false,
@@ -41,11 +50,7 @@ async function unsubscribe(token: string): Promise<{ ok: boolean; status: number
 
   const { error: upErr } = await supabaseAdmin
     .from('ky_notification_preferences')
-    .update({
-      digest_frequency: 'off',
-      unsubscribed_all_at: new Date().toISOString(),
-      digest_user_disabled: true,
-    })
+    .update(buildUnsubscribeUpdate(list, new Date().toISOString()))
     .eq('unsubscribe_token', token);
 
   if (upErr) {
@@ -60,22 +65,20 @@ async function unsubscribe(token: string): Promise<{ ok: boolean; status: number
     };
   }
 
+  const copy = unsubscribeSuccessCopy(list);
   return {
     ok: true,
     status: 200,
-    body: page(
-      'Digest emails stopped',
-      'You will not receive further bill digest emails from Know Your Vote Kentucky. You can re-enable digests at any time from your profile.',
-      true,
-    ),
+    body: page(copy.title, copy.body, true),
   };
 }
 
 /** Browser click → friendly HTML page. */
-export async function GET(_req: NextRequest, { params }: Ctx) {
+export async function GET(req: NextRequest, { params }: Ctx) {
   const { token: raw } = await params;
   const token = decodeURIComponent(raw || '').trim();
-  const result = await unsubscribe(token);
+  const list = parseUnsubscribeList(new URL(req.url).searchParams.get('list'));
+  const result = await unsubscribe(token, list);
   return new NextResponse(result.body, {
     status: result.status,
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -83,9 +86,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 /** RFC 8058 one-click (List-Unsubscribe-Post). Mail clients POST here without user interaction. */
-export async function POST(_req: NextRequest, { params }: Ctx) {
+export async function POST(req: NextRequest, { params }: Ctx) {
   const { token: raw } = await params;
   const token = decodeURIComponent(raw || '').trim();
-  const result = await unsubscribe(token);
+  const list = parseUnsubscribeList(new URL(req.url).searchParams.get('list'));
+  const result = await unsubscribe(token, list);
   return NextResponse.json({ ok: result.ok }, { status: result.status });
 }

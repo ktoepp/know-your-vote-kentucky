@@ -27,6 +27,8 @@ Read in this order before changing anything:
 5. `CLAUDE.md` and, if your WP touches user-facing copy, `docs/voice-and-tone.md`.
 6. The files the WP lists under **Current state**. Open them yourself. Line numbers are approximate.
 
+April 2027 thresholds and verdict rules: docs/evaluation/README.md (WS8-08). How each number is measured: docs/metrics.md (WS7-08). Do not change either after 2027-01-05 without an ADR.
+
 **Do not read `TASKS.md` (about 203 KB) or `decisions.md` (about 432 KB) in full.** Grep them for your topic, the file names you will touch, and your finding IDs. For example, `grep -n -i "veto override\|RCS#" TASKS.md decisions.md`. For any overlapping open item, say in the PR whether your WP **keeps**, **supersedes** or **folds in** it.
 
 Do not follow the repo-root `README.md`'s "For AI agents → Read first" list (E12). It points you at the 160k-token docs and contains stale facts. For example, it says "3/5 veto override", which is wrong: Kentucky overrides with a majority of members elected (U18).
@@ -49,7 +51,7 @@ Do not follow the repo-root `README.md`'s "For AI agents → Read first" list (E
 |---|---|---|
 | **W0 "Now"** | 2026-10-06 → 10-20 | Anything that passes §6. P0 first, in W0-queue order (below). |
 | **W1 "Election"** | 2026-10-21 → 11-03 | As W0. Code PRs merge by **10-30**. |
-| **Election freeze** | 2026-10-31 → 11-05 | **P0 fixes only.** Docs/test-only PRs (changing only `docs/**`, root `*.md` files and `src/**/*.test.ts`) may also merge. This is WS9-03's default option (a), applied from 2026-10-17 if unanswered, and it stays "pending owner confirmation" until WS9-03 merges. |
+| **Election freeze** | 2026-10-31 → 11-05 | **P0 fixes only.** Docs/test-only PRs (changing only `docs/**`, root `*.md` files and `src/**/*.test.ts`) may also merge. This is WS9-03's option (a), the default that applied on 2026-10-17. The owner-facing calendar and deploy checklist are in [`docs/ops/release.md`](../ops/release.md). |
 | **W2 "Build"** | 2026-11-04 (code from 11-06) → 12-14 | Migrations, refactors, dependency majors. See the W2 cut line below. |
 | **FZ "Freeze"** | 2026-12-15 → 2027-01-04 | Fixes, drills and readiness only. No refactors, no migrations, no dependency majors. |
 | **W3 "Session"** | 2027-01-05 → 03-30 | Small fixes only. |

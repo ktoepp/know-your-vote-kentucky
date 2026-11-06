@@ -86,6 +86,7 @@ jobs:
 
       - run: npm ci
 
+      # LegiScan per-run cap: DATA_BUDGET.legiscan.perRunCap['dataset-sync'] (WS4-03a)
       - name: Reconcile LegiScan datasets
         id: dataset_sync
         run: |

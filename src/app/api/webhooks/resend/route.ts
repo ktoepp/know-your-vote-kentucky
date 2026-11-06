@@ -2,29 +2,21 @@
  * POST /api/webhooks/resend — Resend → Svix-signed delivery events.
  *
  * Verifies the signature using RESEND_WEBHOOK_SECRET (Resend dashboard →
- * Webhooks). Updates `ky_notifications_log.delivery_status` keyed by
- * `resend_message_id` and flips `ky_notification_preferences` into a
+ * Webhooks). Raises `ky_notifications_log.delivery_status` (never lowers it)
+ * keyed by `resend_message_id` and flips `ky_notification_preferences` into a
  * suppressed state for hard bounces and complaints.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
+import {
+  allowedPredecessors,
+  classifyEvent,
+  type ResendWebhookEvent,
+} from '@/lib/email/resend-delivery';
 
 export const runtime = 'nodejs';
-
-type ResendBounceType = 'hard' | 'soft' | string;
-
-type ResendWebhookEvent = {
-  type: string;
-  created_at?: string;
-  data?: {
-    email_id?: string;
-    to?: string | string[];
-    bounce?: { type?: ResendBounceType; message?: string };
-    [k: string]: unknown;
-  };
-};
 
 const TOLERANCE_SECONDS = 5 * 60;
 
@@ -59,39 +51,6 @@ function verifySignature(rawBody: string, headers: Headers, secret: string): boo
     }
   }
   return false;
-}
-
-function classifyEvent(event: ResendWebhookEvent): {
-  logStatus: 'sent' | 'failed' | 'bounced' | null;
-  bounceState: 'soft' | 'hard' | 'complained' | null;
-  suppress: boolean;
-  reason: string | null;
-} {
-  switch (event.type) {
-    case 'email.delivered':
-      return { logStatus: 'sent', bounceState: null, suppress: false, reason: null };
-    case 'email.bounced': {
-      const t = event.data?.bounce?.type;
-      const hard = t === 'hard' || t === 'Permanent' || t === 'permanent';
-      return {
-        logStatus: 'bounced',
-        bounceState: hard ? 'hard' : 'soft',
-        suppress: hard,
-        reason: hard ? 'hard_bounce' : null,
-      };
-    }
-    case 'email.complained':
-      return {
-        logStatus: 'bounced',
-        bounceState: 'complained',
-        suppress: true,
-        reason: 'spam_complaint',
-      };
-    case 'email.delivery_delayed':
-      return { logStatus: 'failed', bounceState: null, suppress: false, reason: null };
-    default:
-      return { logStatus: null, bounceState: null, suppress: false, reason: null };
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -140,10 +99,13 @@ export async function POST(req: NextRequest) {
     userId = (logRow?.user_id as string | undefined) ?? null;
 
     if (logRow && logStatus) {
+      // One conditional UPDATE: the precedence check runs in the database, so a
+      // late or concurrent event can never downgrade a row (e.g. complained -> bounced).
       await supabaseAdmin
         .from('ky_notifications_log')
         .update({ delivery_status: logStatus })
-        .eq('id', logRow.id);
+        .eq('id', logRow.id)
+        .in('delivery_status', allowedPredecessors(logStatus));
     }
   }
 
