@@ -4,13 +4,37 @@ import { getAuthedUser } from '@/lib/supabase/route-auth';
 import {
   ensureKyNotificationPreferencesRow,
   isDigestFrequency,
+  myLegislatorsDistrictsError,
   normalizeDigestEventTypes,
+  normalizeMyLegislatorsPatch,
   normalizeTopicFilters,
+  type StoredMyLegislators,
 } from '@/lib/ky-notification-preferences';
 import { rateLimit } from '@/lib/rate-limit';
 
+// One string literal so supabase-js can infer the selected row type.
 const SELECT_FIELDS =
-  'digest_frequency, event_types, topic_filters, unsubscribed_all_at, updated_at';
+  'digest_frequency, event_types, topic_filters, unsubscribed_all_at, updated_at, my_legislators_weekly, house_district, senate_district, districts_set_at';
+
+const VERIFY_EMAIL_ERROR = 'Verify your email before turning on email notifications.';
+
+/**
+ * Shared gate for every email opt-in (bill digest and the weekly My Legislators
+ * email): both return the same 403 and message when the account's email is not
+ * verified.
+ */
+async function requireVerifiedEmail(userId: string): Promise<NextResponse | null> {
+  if (!supabaseAdmin) return null;
+  const { data: profile } = await supabaseAdmin
+    .from('ky_user_profiles')
+    .select('email_verified_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!profile?.email_verified_at) {
+    return NextResponse.json({ error: VERIFY_EMAIL_ERROR }, { status: 403 });
+  }
+  return null;
+}
 
 export async function GET(request: NextRequest) {
   const auth = await getAuthedUser(request);
@@ -111,24 +135,22 @@ export async function PATCH(request: NextRequest) {
     patch.topic_filters = normalized;
   }
 
-  if (Object.keys(patch).length === 0) {
+  const myLegislators = normalizeMyLegislatorsPatch(b);
+  if (!myLegislators.ok) {
+    return NextResponse.json({ error: myLegislators.error }, { status: 400 });
+  }
+  const mlPatch = myLegislators.patch;
+
+  if (Object.keys(patch).length === 0 && Object.keys(mlPatch).length === 0) {
     return NextResponse.json({ error: 'No updatable fields provided.' }, { status: 400 });
   }
 
   const enablingDigest =
     patch.digest_frequency === 'daily' || patch.digest_frequency === 'weekly';
-  if (enablingDigest && supabaseAdmin) {
-    const { data: profile } = await supabaseAdmin
-      .from('ky_user_profiles')
-      .select('email_verified_at')
-      .eq('user_id', auth.userId)
-      .maybeSingle();
-    if (!profile?.email_verified_at) {
-      return NextResponse.json(
-        { error: 'Verify your email before turning on email notifications.' },
-        { status: 403 },
-      );
-    }
+  const enablingMyLegislators = mlPatch.my_legislators_weekly === true;
+  if (enablingDigest || enablingMyLegislators) {
+    const denied = await requireVerifiedEmail(auth.userId);
+    if (denied) return denied;
   }
 
   const ensured = await ensureKyNotificationPreferencesRow(auth.supabase, auth.userId);
@@ -137,18 +159,53 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: ensured.error.message }, { status: 500 });
   }
 
+  if (Object.keys(mlPatch).length > 0) {
+    // The weekly email needs both districts, from this patch or the stored row.
+    const { data: stored, error: storedErr } = await auth.supabase
+      .from('ky_notification_preferences')
+      .select('my_legislators_weekly, house_district, senate_district')
+      .eq('user_id', auth.userId)
+      .maybeSingle();
+    if (storedErr) {
+      console.error('ky_notification_preferences select:', storedErr);
+      return NextResponse.json({ error: storedErr.message }, { status: 500 });
+    }
+    const districtsError = myLegislatorsDistrictsError(
+      mlPatch,
+      (stored as StoredMyLegislators | null) ?? null,
+    );
+    if (districtsError) {
+      return NextResponse.json({ error: districtsError }, { status: 400 });
+    }
+  }
+
   const rowPatch: {
     digest_frequency?: string;
     event_types?: string[];
     topic_filters?: string[];
     unsubscribed_all_at?: null;
     digest_user_disabled?: boolean;
-  } = { ...patch };
+    my_legislators_weekly?: boolean;
+    house_district?: number | null;
+    senate_district?: number | null;
+    districts_set_at?: string;
+  } = { ...patch, ...mlPatch };
+  // Turning the digest on does not change my_legislators_weekly: the two email
+  // kinds are separate opt-ins, so only mlPatch (never this branch) sets it.
   if (rowPatch.digest_frequency === 'daily' || rowPatch.digest_frequency === 'weekly') {
     rowPatch.unsubscribed_all_at = null;
     rowPatch.digest_user_disabled = false;
   } else if (rowPatch.digest_frequency === 'off') {
     rowPatch.digest_user_disabled = true;
+  }
+  if (enablingMyLegislators) {
+    // Turning the weekly email on is an explicit re-subscription, so it clears a
+    // past all-mail unsubscribe. It leaves digest_frequency and
+    // digest_user_disabled alone: the digest stays off until the user turns it on.
+    rowPatch.unsubscribed_all_at = null;
+  }
+  if ('house_district' in mlPatch || 'senate_district' in mlPatch) {
+    rowPatch.districts_set_at = new Date().toISOString();
   }
 
   const { data, error } = await auth.supabase

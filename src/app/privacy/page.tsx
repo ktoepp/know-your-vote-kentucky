@@ -35,6 +35,10 @@ export default function PrivacyPage() {
             <li>Display name, if you set one.</li>
             <li>The bills and topics you follow, and your notification preferences.</li>
             <li>
+              Your Kentucky House and Senate district numbers, if you save them for the weekly
+              legislator email. We store the two numbers, not your address.
+            </li>
+            <li>
               Email delivery events from our mail provider (Resend). For each digest we receive
               callbacks like &ldquo;delivered,&rdquo; &ldquo;bounced,&rdquo; and &ldquo;complained.&rdquo;
               We use these to suppress mail to addresses that hard-bounce or mark us as spam, which

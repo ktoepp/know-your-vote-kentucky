@@ -25,6 +25,9 @@
  *   npm run sync:ky -- bills --quota-backfill --quota-backfill-sessions-per-run=1 --sponsor-budget=20
  *   npm run sync:ky -- bills --quota-backfill --dry-run
  *
+ * Deadline (hash-gated bills sync; WS4-06): stop starting getBill calls after N seconds.
+ *   npm run sync:ky:bills:status -- --deadline-seconds=1080
+ *
  * Slack (optional): set SLACK_WEBHOOK_STATUS_REPORTS (+ SLACK_WEBHOOK_ERRORS) and SLACK_SYNC_NOTIFY_CLI=true
  * for CLI/GitHub Actions digests (includes LegiScan quota + ky_sources snapshot).
  */
@@ -42,6 +45,7 @@ import {
   SYNC_SOURCES_PAUSED_FROM_CRON,
   type SyncResult,
 } from '../src/lib/ky-sync-pipeline';
+import { parseBudgetFlag } from '../src/lib/legiscan-run-budget';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -69,6 +73,14 @@ const useChangeHash =
   args.includes('--use-change-hash=true') ||
   args.includes('--useChangeHash') ||
   args.includes('--use-change-hash');
+// Per-run LegiScan budget (WS4-03a). Throws on a malformed value.
+const legiscanRunBudget = parseBudgetFlag(args);
+// WS4-06: stop the hash-gated bills sync from starting new getBill calls after
+// N seconds. Rows fetched so far are written and the next run continues. Unset
+// without the flag (no deadline).
+const deadlineSeconds = intFlag('--deadline-seconds');
+const deadlineAt =
+  deadlineSeconds !== undefined && deadlineSeconds > 0 ? Date.now() + deadlineSeconds * 1000 : undefined;
 
 function printHeader() {
   console.log('');
@@ -77,6 +89,10 @@ function printHeader() {
   console.log('╚══════════════════════════════════════════════╝');
   console.log('');
   if (dryRun) console.log('🔍 DRY RUN MODE — No data will be written to the database\n');
+  console.log(
+    `LegiScan budget: ${legiscanRunBudget ?? 'per-source default from DATA_BUDGET'}\n`,
+  );
+  if (deadlineAt !== undefined) console.log(`Deadline: ${deadlineSeconds}s (hash-gated bills sync)\n`);
   if (sourceArg) console.log(`📌 Syncing source: ${sourceArg}\n`);
   else {
     console.log(`📌 Syncing GA default: ${SYNC_SOURCES_DEFAULT.join(', ')}\n`);
@@ -150,6 +166,8 @@ async function main() {
       sponsorDetailBudgetPerSession,
       quotaBackfillAdvanceCursor,
       useChangeHash: useChangeHash || undefined,
+      legiscanRunBudget,
+      deadlineAt,
     });
     printResults(results);
     await notifySyncSlack({

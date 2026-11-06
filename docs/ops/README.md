@@ -23,3 +23,7 @@ Test the page channel with `npm run slack:smoke-test` (posts one message per con
 ## Runbooks
 
 - [LegiScan: quota and ban risk](runbooks/legiscan.md)
+
+## Releases
+
+- [Release calendar, election freeze and deploy checklist](release.md)
