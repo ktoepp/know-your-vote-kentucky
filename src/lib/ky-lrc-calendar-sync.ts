@@ -538,6 +538,39 @@ export async function upsertLrcCalendarMeetings(
   return { meetingsSynced, agendaSynced, hearingEventsRecorded, meetingsCancelled, errors };
 }
 
+export type CalendarParseOutcome =
+  | { kind: 'days' }
+  | { kind: 'empty_page' }
+  | { kind: 'unreadable'; error: string };
+
+/**
+ * Decide whether a parsed calendar page is healthy. Three outcomes, which the
+ * sync once collapsed into an identical `success` with itemsSynced=0:
+ *
+ *   - `days`: LRC published day headings. Some may say "No meetings
+ *     scheduled", a real, healthy empty week that is routine during interim.
+ *   - `empty_page`: no day headings, but the page carries LRC's page-wide
+ *     "There are no meetings scheduled." notice. Also healthy, and seen during
+ *     long lulls such as the weeks after an election.
+ *   - `unreadable`: no day headings and no notice. We can no longer read the
+ *     page. The fetch still returned HTTP 200, so nothing else notices.
+ *
+ * Only `unreadable` is a failure.
+ */
+export function classifyCalendarParse(
+  parsed: LrcLegislativeCalendarParseResult,
+  htmlBytes: number,
+): CalendarParseOutcome {
+  if (parsed.stats.dayCount > 0) return { kind: 'days' };
+  if (parsed.stats.pageNoMeetingsNotice) return { kind: 'empty_page' };
+  return {
+    kind: 'unreadable',
+    error:
+      `calendar HTML parsed to 0 day headings (${htmlBytes} bytes) — ` +
+      'the page structure likely changed; the parser needs updating',
+  };
+}
+
 export async function syncKyLrcCalendar(
   db: SupabaseClient,
   options: SyncOptions = {},
@@ -568,25 +601,27 @@ export async function syncKyLrcCalendar(
 
     log(`Parsed ${parsed.stats.dayCount} days, ${scheduled.length} scheduled meetings`);
 
-    // Distinguish the two very different zero-meeting outcomes, which the sync
-    // previously collapsed into an identical `success` with itemsSynced=0:
-    //
-    //   - LRC published day headings that say "No meetings scheduled" — a real,
-    //     healthy empty week, routine during interim.
-    //   - We parsed no day headings at all — we can no longer read the page.
-    //     The fetch still returned HTTP 200, so nothing else notices.
-    //
-    // Only the second is a failure, and the parser already knows the difference.
-    if (parsed.stats.dayCount === 0) {
-      const message =
-        `calendar HTML parsed to 0 day headings (${html.length} bytes) — ` +
-        'the page structure likely changed; the parser needs updating';
-      logError(message);
+    const outcome = classifyCalendarParse(parsed, html.length);
+    if (outcome.kind === 'unreadable') {
+      logError(outcome.error);
       return {
         source: SOURCE,
         status: 'error',
         itemsSynced: 0,
-        error: message,
+        error: outcome.error,
+        duration: Date.now() - start,
+      };
+    }
+    if (outcome.kind === 'empty_page') {
+      // Return before the upsert: there is nothing to write, and the
+      // cancellation diff must never run against an empty parse. (It is also
+      // guarded inside upsertLrcCalendarMeetings by `seenMeetingDates.length`,
+      // but an empty calendar should not reach the DB at all.)
+      log('LRC calendar says "There are no meetings scheduled." — nothing to sync');
+      return {
+        source: SOURCE,
+        status: 'success',
+        itemsSynced: 0,
         duration: Date.now() - start,
       };
     }
