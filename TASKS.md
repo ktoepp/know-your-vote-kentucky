@@ -548,7 +548,7 @@ This is **not** a DNS relabel — `kyvky.com` is the load-bearing identity threa
 
 **Full rebrand (large, not scoped):** needs an audit pass across every item above before touching anything — in particular the LRC-facing User-Agent strings and the Resend/Supabase auth domain config, both of which can fail scraping/mail/login silently rather than loudly. Flagging as investigate-first, build-later; not started.
 
-**Update 2026-11-08: plan written, scope decided.** Owner chose the full canonical flip to `www.kyvky.org` with email moving to `@kyvky.org`; owner supplies new `.org` logo/OG artwork (`.com` is baked into `Logo-03.png` and `opengraph-image.jpg`). Phased plan, audit, cutover order, risks and rollback: [`docs/specs/org-domain-migration.md`](docs/specs/org-domain-migration.md). Cutover must land by 2026-12-14 (no DNS changes in FZ/W3) or slips to April 2027. Nothing changed yet.
+**Update 2026-11-08: plan written, scope decided.** Owner chose the full canonical flip to `www.kyvky.org` with email moving to `@kyvky.org`; owner supplies new `.org` logo/OG artwork (`.com` is baked into `Logo-03.png` and `opengraph-image.jpg`). Phased plan, audit, cutover order, risks and rollback: [`docs/specs/org-domain-migration.md`](docs/specs/org-domain-migration.md). Target cutover 2026-11-30; hard deadline 2026-12-14 (no DNS changes in FZ/W3). Nothing changed yet.
 
 ### `/members` page redesign — replace governor's-office photos with search/filter tiles
 

@@ -11,10 +11,14 @@ Origin: TASKS.md › "Owner wishlist, filed 2026-08-31" (SFG feedback: present a
 | Email | **Move to `.org`.** Sender `alerts@kyvky.org`, reply-to and contact `katie@kyvky.org`, Supabase auth sender `auth@kyvky.org`. |
 | Logo and share image | **Owner supplies new artwork.** `.com` is drawn into the artwork itself (see below). |
 | Canonical host shape | `www.kyvky.org` with apex → www. This keeps the current www pattern, so the reasoning in `src/lib/site-canonical.ts` (auth fragments, webhook POSTs) still applies. |
+| Cutover date | **By 2026-11-30** (owner, 2026-11-08). This leaves two weeks before the 12-14 DNS deadline for fixes or rollback. Avoid Thanksgiving (11-26/27). |
+| Registrar and DNS for `kyvky.org` | Hostinger, owned (owner, 2026-11-08). It is the same account as `kyvky.com`. |
+| Mailboxes | `alerts@` is send-only and gets no mailbox, as today. `katie@kyvky.org` is a Hostinger **forwarder** to the existing `katie@kyvky.com` inbox, so there is one inbox and nothing to migrate. |
+| Resend | Add `kyvky.org` as a second domain, then remove `kyvky.com` after the transition. Resend cannot rename a domain, so a "transfer" means add, then remove. The free plan allows 3 verified domains (Resend changelog, 2026-08-25), so this works on any plan. |
 
 ## Timing constraint
 
-`docs/ops/release.md` allows no DNS changes during FZ (2026-12-15 → 2027-01-04) or W3 (2027-01-05 → 03-30, the legislative session). `docs/program-spec/09-…` WS9-05 sets the same limit. **Cutover must finish by 2026-12-14, or it waits until April 2027 (W4).** Phases 0–1 can start now.
+`docs/ops/release.md` allows no DNS changes during FZ (2026-12-15 → 2027-01-04) or W3 (2027-01-05 → 03-30, the legislative session). `docs/program-spec/09-…` WS9-05 sets the same limit. **Cutover must finish by 2026-12-14, or it waits until April 2027 (W4).** The owner target is 2026-11-30, which leaves two weeks of slack. Phases 0–1 can start now.
 
 ## What the audit found
 
@@ -50,14 +54,13 @@ Each step can be done on its own, and none of them changes what users see.
 
 1. **Record current state for rollback.** Screenshot or export the DNS records for `kyvky.com`, `kyvky.org` and `knowyourvotekentucky.org`, the Vercel domain list, the Supabase URL configuration and the Resend domain list.
 2. **Serve `.org` alongside `.com`.** Add `www.kyvky.org` and `kyvky.org` to the Vercel project as normal (non-redirect) domains, with apex → `www.kyvky.org`. Point DNS as Vercel instructs. Canonical tags still say `.com`, so search engines treat `.org` as a duplicate host, not a competitor.
-3. **Email on `.org`:**
-   - Create the `katie@kyvky.org` mailbox in Hostinger, or a forward to an inbox a human reads. Set MX on `kyvky.org`.
-   - Add `kyvky.org` in Resend → Domains. Add SPF, DKIM (`resend._domainkey.kyvky.org`) and DMARC. Confirm DKIM resolves at `8.8.8.8` before trusting Resend's "verified" badge (the 2026-06-04 stale-verification incident, `docs/launch-checklist.md`).
-   - [verify] that the current Resend plan allows a second sending domain.
+3. **Email on `.org`** (finish by about 2026-11-20 so the new domain has a week of test sends before cutover):
+   - Hostinger → Emails → `kyvky.org`: turn on email for the domain (which sets MX) and add a forwarder from `katie@kyvky.org` to `katie@kyvky.com`. Send a test to `katie@kyvky.org` and confirm it arrives. No mailbox is needed for `alerts@`.
+   - Resend → Domains → Add `kyvky.org`. Add the SPF, DKIM (`resend._domainkey.kyvky.org`) and DMARC records it lists in Hostinger DNS for `kyvky.org`. Confirm DKIM resolves at `8.8.8.8` before trusting Resend's "verified" badge (the 2026-06-04 stale-verification incident, `docs/launch-checklist.md`). Keep `kyvky.com` in Resend until Phase 3.
    - Send test mail from `alerts@kyvky.org` to Gmail, Outlook and Yahoo using `docs/email-client-qa.md`. A new domain has no sending reputation, so check the spam folder.
 4. **Artwork:** deliver `.org` versions of `Logo-03.png` (same dimensions, 2488×603) and `opengraph-image.jpg` (1200×630). Check the icons as well.
 5. **Search Console:** add `kyvky.org` as a Domain property (DNS TXT, no code change). Do the same in Bing.
-6. **Mapbox:** if the token is URL-restricted, add `www.kyvky.org` and `kyvky.org` now.
+6. **Mapbox** (owner unsure whether a restriction is set): go to account.mapbox.com → Tokens → open the public token the site uses (`NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` in Vercel) → **URL restrictions**. If the list is empty, there is nothing to do. If it has entries, add `https://www.kyvky.org` and `https://kyvky.org` and keep the `.com` entries.
 
 ## Phase 1: Code PR (agent, prepared ahead, merged at cutover)
 
@@ -77,7 +80,7 @@ One PR, held as a draft until cutover day.
 - Update `CLAUDE.md`, `README.md`, `env-template.txt`, `docs/launch-checklist.md`, `docs/voice-and-tone.md` and `docs/email-client-qa.md` to the new identity. Add a `decisions.md` entry. Leave historical docs alone.
 - Verify: `npm test`, `npx tsc --noEmit`, `npm run lint`, `npm run build`. Then use a host header against `next start` to confirm the redirect and its exclusions.
 
-## Phase 2: Cutover (owner and agent, one sitting, low-traffic hour, by 2026-12-14)
+## Phase 2: Cutover (owner and agent, one sitting, low-traffic hour, by 2026-11-30)
 
 Order matters. Env vars come before the deploy because `NEXT_PUBLIC_*` is baked in at build time.
 
@@ -105,8 +108,8 @@ Order matters. Env vars come before the deploy because `NEXT_PUBLIC_*` is baked 
 ## Phase 3: Transition and cleanup
 
 - **Never let `kyvky.com` lapse.** It carries backlinks, links in old emails and printed material. Keep it renewed and redirecting for good.
-- Keep the `katie@kyvky.com` mailbox receiving, forwarded to `.org`, for good.
-- After about 90 days: remove the `.com` Supabase redirect URLs. Drop `kyvky.com` from the hygiene allowlist. Optionally replace the `next.config.ts` host rule with Vercel-level domain redirects (unsubscribe links in digests sent before cutover will have aged out by then).
+- Keep the `katie@kyvky.com` mailbox for good. It is the real inbox behind the `katie@kyvky.org` forwarder.
+- After about 90 days: remove `kyvky.com` from Resend → Domains (this completes the "transfer"; leave its DKIM record in DNS, where it does no harm). Remove the `.com` Supabase redirect URLs. Drop `kyvky.com` from the hygiene allowlist. Optionally replace the `next.config.ts` host rule with Vercel-level domain redirects (unsubscribe links in digests sent before cutover will have aged out by then).
 - Off-site updates: social bios, GitHub repo homepage, partner links, email signatures, print.
 
 ## Risks and visible effects
@@ -129,8 +132,8 @@ The Resend `.com` domain stays verified throughout, so `RESEND_FROM_EMAIL=alerts
 
 ## Open questions for the owner
 
-1. Which registrar holds `kyvky.org`, and is its DNS on Hostinger? Is the `www.kyvky.org` host available?
-2. `katie@kyvky.org`: a new mailbox or a forward? Is `alerts@` meant to receive anything (today it is a send-only From)?
-3. Is the Mapbox token URL-restricted yet (WS2-04)?
-4. Resend plan: does it allow a second domain?
-5. Which cutover date, within 2026-11-09 → 12-14?
+Answered 2026-11-08 (see "Decisions taken"). Still open:
+
+1. Mapbox URL restriction: check it with Phase 0 step 6.
+2. The exact cutover day and hour within 2026-11-09 → 11-30.
+3. Delivery date for the `.org` logo and share-image artwork.
