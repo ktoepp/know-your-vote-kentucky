@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import NextLink from 'next/link';
 import { Box, Container, Link as MuiLink, Typography } from '@mui/material';
 import { JsonLd } from '@/components/seo/JsonLd';
@@ -6,7 +7,7 @@ import { ChartTooltipLayer } from '@/components/elections/ChartTooltipLayer';
 import { DistrictChangeMap } from '@/components/elections/DistrictChangeMap';
 import { SeatChangeRows } from '@/components/elections/SeatChangeRows';
 import { SeatHemicycle } from '@/components/elections/SeatHemicycle';
-import { PARTY_FILL } from '@/components/elections/election-chart-colors';
+import { PARTY_COLOR, hatchBackground } from '@/components/elections/election-chart-colors';
 import { buildBreadcrumbJsonLd, buildGuideArticleJsonLd } from '@/lib/structured-data';
 import { buildPageMetadata } from '@/lib/seo';
 import { formatCivicDate } from '@/lib/civic-date';
@@ -77,12 +78,20 @@ const CHAMBERS = {
   senate: { name: 'Senate', seats: 38, rows: 3, innerRatio: 0.45 },
 } as const;
 
-function Swatch({ color }: { color: string }) {
+/** A legend/stat swatch: solid party color, or that color's 45° hatch. */
+function Swatch({ party, hatched = false }: { party: KyElectionParty; hatched?: boolean }) {
   return (
     <Box
       component="span"
       aria-hidden="true"
-      sx={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', bgcolor: color, flexShrink: 0 }}
+      sx={{
+        display: 'inline-block',
+        width: 12,
+        height: 12,
+        borderRadius: '50%',
+        flexShrink: 0,
+        background: hatched ? hatchBackground(party) : PARTY_COLOR[party],
+      }}
     />
   );
 }
@@ -97,7 +106,7 @@ function PartyStat({ chamber, party, align }: { chamber: 'house' | 'senate'; par
         {after}
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, justifyContent: align === 'left' ? 'flex-start' : 'flex-end' }}>
-        <Swatch color={PARTY_FILL[party].changed} />
+        <Swatch party={party} />
         <Typography component="span" variant="body2" fontWeight={600}>
           {party}
         </Typography>
@@ -125,6 +134,7 @@ function ChamberPanel({ chamber, outcomes }: { chamber: 'house' | 'senate'; outc
         outcomes={outcomes}
         rows={cfg.rows}
         innerRatio={cfg.innerRatio}
+        hatchId={`${chamber}-seats-hatch`}
         label={`Kentucky ${cfg.name} after the 2026 election: ${after.Democratic} Democratic and ${after.Republican} Republican seats; ${changed} seats changed party.`}
       />
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
@@ -136,12 +146,11 @@ function ChamberPanel({ chamber, outcomes }: { chamber: 'house' | 'senate'; outc
 }
 
 function Legend() {
-  const item = (fills: string[], text: string) => (
+  const item = (hatched: boolean, text: string) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
       <Box sx={{ display: 'flex', gap: 0.5 }}>
-        {fills.map((f) => (
-          <Swatch key={f} color={f} />
-        ))}
+        <Swatch party="Democratic" hatched={hatched} />
+        <Swatch party="Republican" hatched={hatched} />
       </Box>
       <Typography component="span" variant="body2" color="text.secondary">
         {text}
@@ -150,9 +159,17 @@ function Legend() {
   );
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 3, rowGap: 1 }}>
-      {item([PARTY_FILL.Democratic.changed, PARTY_FILL.Republican.changed], 'Changed party in 2026')}
-      {item([PARTY_FILL.Democratic.unchanged, PARTY_FILL.Republican.unchanged], 'No change')}
+      {item(false, 'Changed party in 2026')}
+      {item(true, 'No change')}
     </Box>
+  );
+}
+
+function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <MuiLink href={href} target="_blank" rel="noopener noreferrer" underline="hover">
+      {children}
+    </MuiLink>
   );
 }
 
@@ -251,7 +268,7 @@ export default function SeatsChangedParty2026Page() {
       </Box>
 
       <Box component="section" sx={{ mb: 5 }}>
-        <Typography {...sectionHeading}>The {CHANGED} seats, closest first</Typography>
+        <Typography {...sectionHeading}>The {CHANGED} seats</Typography>
         <SeatChangeRows changes={KY_2026_SEAT_CHANGES} />
       </Box>
 
@@ -262,26 +279,29 @@ export default function SeatsChangedParty2026Page() {
           sx={{ m: 0, pl: 2.5, display: 'grid', rowGap: 0.75, color: 'text.secondary', typography: 'body2' }}
         >
           <li>
-            Results are from the{' '}
-            <MuiLink href={KY_2026_ELECTION.sourceUrl} target="_blank" rel="noopener noreferrer" underline="hover">
-              {KY_2026_ELECTION.sourceName}
-            </MuiLink>{' '}
-            as of {AS_OF}, with all counties reporting.
-            {UNOFFICIAL &&
-              ' They become official when the State Board certifies them; a recanvass or recount can change them. This page will be updated after certification.'}
+            Results are from{' '}
+            <ExternalLink href={KY_2026_ELECTION.sourceUrl}>election-night reporting</ExternalLink> by the{' '}
+            {KY_2026_ELECTION.sourceName} as of {AS_OF}, with all counties reporting.
+            {UNOFFICIAL && (
+              <>
+                {' '}
+                They become official when the State Board certifies them, and a recanvass or recount can change them.
+                The State Board posts certified results on its{' '}
+                <ExternalLink href={KY_2026_ELECTION.certifiedResultsUrl}>2026 election results page</ExternalLink> and
+                deadlines on its <ExternalLink href={KY_2026_ELECTION.electionCalendarUrl}>election calendar</ExternalLink>
+                . This page will be updated after certification.
+              </>
+            )}
           </li>
           <li>
-            The closest race statewide did not change party:{' '}
+            The closest race statewide,{' '}
             <MuiLink component={NextLink} href={kyDistrictPath(closestRef)} underline="hover">
               {kyDistrictShortName(closestRef)}
             </MuiLink>
-            , where {closest.results[0].name} ({abbr(closest.results[0].party)}) led {closest.results[1].name} (
-            {abbr(closest.results[1].party)}) by {closestMargin.toLocaleString('en-US')} votes.
+            , did not change party: {closest.results[0].name} ({abbr(closest.results[0].party)}) led by{' '}
+            {closestMargin.toLocaleString('en-US')} votes.
           </li>
-          <li>
-            Margin is the winner&apos;s lead as a share of votes for named candidates. Pre-election seats are from the
-            Know Your Vote Kentucky member roster on {AS_OF}.
-          </li>
+          <li>Each seat&apos;s party before the election is from the Know Your Vote Kentucky member roster on {AS_OF}.</li>
           <li>
             Members elected in 2026 take office in January 2027
             {NEXT_SESSION ? `; the ${NEXT_SESSION.name} convenes on ${formatCivicDate(NEXT_SESSION.start)}` : ''}.

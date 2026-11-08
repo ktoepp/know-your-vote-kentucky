@@ -2,7 +2,7 @@ import { Box, Typography } from '@mui/material';
 import { KY_DISTRICT_MAP_SVG, type KyDistrictShape } from '@/lib/generated/ky-district-map-svg';
 import { kyDistrictPath, kyDistrictShortName } from '@/lib/ky-district-pages';
 import type { KySeatOutcome } from '@/lib/ky-2026-election-seat-changes';
-import { seatFill } from './election-chart-colors';
+import { HatchPatterns, seatFill } from './election-chart-colors';
 import { seatTip } from './seat-tip';
 
 const MAP = KY_DISTRICT_MAP_SVG;
@@ -22,12 +22,22 @@ const SMALL = 30;
  * `linked`: the one copy of a changed district (state map or inset, whichever labels it)
  * that is a link, so each changed district is a single keyboard stop.
  */
-function DistrictShape({ o, shape, linked }: { o: KySeatOutcome; shape: KyDistrictShape; linked: boolean }) {
+function DistrictShape({
+  o,
+  shape,
+  linked,
+  hatchId,
+}: {
+  o: KySeatOutcome;
+  shape: KyDistrictShape;
+  linked: boolean;
+  hatchId: string;
+}) {
   const tip = seatTip(o);
   const path = (
     <path
       d={shape.d}
-      fill={seatFill(o.after, Boolean(o.change))}
+      fill={seatFill(o.after, Boolean(o.change), hatchId)}
       stroke="#FFFFFF"
       strokeWidth={1}
       strokeLinejoin="round"
@@ -105,6 +115,8 @@ export function DistrictChangeMap({
   // Draw unchanged districts first so changed districts' focus/hover strokes sit on top.
   const ordered = [...outcomes].sort((a, b) => Number(Boolean(a.change)) - Number(Boolean(b.change)));
   const changed = outcomes.filter((o) => o.change);
+  const stateHatch = `${chamber}-map-hatch`;
+  const insetHatch = `${chamber}-inset-hatch`;
 
   return (
     <Box
@@ -119,10 +131,11 @@ export function DistrictChangeMap({
       }}
     >
       <svg viewBox={`0 0 ${MAP.width} ${MAP.height}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+        <HatchPatterns id={stateHatch} spacing={7} line={2.6} />
         {ordered.map((o) => {
           const shape = shapes.districts[o.district];
           return shape ? (
-            <DistrictShape key={o.district} o={o} shape={shape} linked={!insideFrame(shape.label)} />
+            <DistrictShape key={o.district} o={o} shape={shape} linked={!insideFrame(shape.label)} hatchId={stateHatch} />
           ) : null;
         })}
         {changed
@@ -154,13 +167,20 @@ export function DistrictChangeMap({
         }}
       >
         <svg viewBox={`0 0 ${inset.width} ${inset.height}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+          <HatchPatterns id={insetHatch} spacing={5} line={1.9} />
           <rect width={inset.width} height={inset.height} fill="#F8FAFC" />
           {Object.entries(shapes.inset)
             .map(([n, shape]) => ({ o: byDistrict.get(Number(n)), shape }))
             .sort((a, b) => Number(Boolean(a.o?.change)) - Number(Boolean(b.o?.change)))
             .map(({ o, shape }) =>
               o ? (
-                <DistrictShape key={o.district} o={o} shape={shape} linked={insideFrame(shapes.districts[o.district].label)} />
+                <DistrictShape
+                  key={o.district}
+                  o={o}
+                  shape={shape}
+                  linked={insideFrame(shapes.districts[o.district].label)}
+                  hatchId={insetHatch}
+                />
               ) : null,
             )}
           {changed

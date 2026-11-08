@@ -8,7 +8,6 @@ import {
   compositionAfter,
   seatChangesBetween,
   seatOutcomes,
-  winningMargin,
 } from './ky-2026-election-seat-changes';
 
 const margin = (r: { votes: number }[]) => r[0].votes - r[1].votes;
@@ -97,17 +96,6 @@ describe('KY_PRE_ELECTION_SEAT_PARTIES / seatOutcomes', () => {
       );
       for (const o of outcomes) assert.equal(o.before !== o.after, Boolean(o.change));
     }
-  });
-});
-
-describe('winningMargin', () => {
-  test('votes and points of named-candidate votes', () => {
-    const m = winningMargin([
-      { name: 'A', party: 'Democratic', votes: 7846 },
-      { name: 'B', party: 'Republican', votes: 7630 },
-    ]);
-    assert.equal(m.votes, 216);
-    assert.equal(m.points.toFixed(1), '1.4');
   });
 });
 

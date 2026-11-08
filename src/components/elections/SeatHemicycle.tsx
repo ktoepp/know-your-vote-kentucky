@@ -1,5 +1,5 @@
 import type { KyElectionParty, KySeatOutcome } from '@/lib/ky-2026-election-seat-changes';
-import { seatFill } from './election-chart-colors';
+import { HatchPatterns, seatFill } from './election-chart-colors';
 import { seatTip } from './seat-tip';
 
 const R = 100;
@@ -54,10 +54,13 @@ export function SeatHemicycle({
   rows,
   innerRatio,
   label,
+  hatchId,
 }: {
   outcomes: KySeatOutcome[];
   rows: number;
   innerRatio: number;
+  /** Unique per chart on the page: pattern ids are document-global. */
+  hatchId: string;
   /** Accessible summary of the whole chart. */
   label: string;
 }) {
@@ -71,6 +74,7 @@ export function SeatHemicycle({
       aria-label={label}
       style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
     >
+      <HatchPatterns id={hatchId} spacing={2.2} line={0.9} />
       {seats.map((o, i) => {
         const p = points[i];
         const tip = seatTip(o);
@@ -81,7 +85,7 @@ export function SeatHemicycle({
             cx={p.x.toFixed(2)}
             cy={p.y.toFixed(2)}
             r={dotR.toFixed(2)}
-            fill={seatFill(party, Boolean(o.change))}
+            fill={seatFill(party, Boolean(o.change), hatchId)}
             data-tip-title={tip.title}
             data-tip-detail={tip.detail}
           />

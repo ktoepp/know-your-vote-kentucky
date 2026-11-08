@@ -47,6 +47,10 @@ export const KY_2026_ELECTION = {
   resultsAsOf: '2026-11-08',
   sourceName: 'Kentucky State Board of Elections',
   sourceUrl: 'https://vrsws.sos.ky.gov/liveresults?id=2',
+  /** Where the State Board posts each election's official certification (the 2026 primary's is there). */
+  certifiedResultsUrl: 'https://elect.ky.gov/results/2020-2029/Pages/2026.aspx',
+  /** The State Board's election-year deadline calendars. */
+  electionCalendarUrl: 'https://elect.ky.gov/Resources/Pages/Election-Calendar.aspx',
   /** Seats on the 2026 ballot: all 100 House seats, the 19 even-numbered Senate districts. */
   seatsOnBallot: { house: 100, senate: 19 },
   /** Chamber seats held by each party going into the election (`ky_legislators`, 2026-11-08). */
@@ -202,16 +206,6 @@ export function seatOutcomes(
     const change = changes.find((c) => c.chamber === chamber && c.district === district) ?? null;
     return { chamber, district, before, after: change ? change.results[0].party : before, change };
   });
-}
-
-/** Winner's lead over the runner-up, in votes and in points of all named-candidate votes. */
-export function winningMargin(results: readonly KyElectionCandidateResult[]): {
-  votes: number;
-  points: number;
-} {
-  const total = results.reduce((sum, r) => sum + r.votes, 0);
-  const votes = results[0].votes - (results[1]?.votes ?? 0);
-  return { votes, points: total > 0 ? (votes / total) * 100 : 0 };
 }
 
 /** Seats per party after the election: the pre-election count adjusted by each change. */
