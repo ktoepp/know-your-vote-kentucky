@@ -55,10 +55,19 @@ export interface LrcLegislativeCalendarParseResult {
     meetingCount: number;
     agendaItemCount: number;
     billReferenceCount: number;
+    /**
+     * The page carries LRC's page-wide "There are no meetings scheduled."
+     * notice. During a lull LRC renders that sentence *instead of* any
+     * `.DateHeading` blocks, so `dayCount === 0` alone cannot tell a quiet
+     * calendar from a page we can no longer read; this flag can.
+     */
+    pageNoMeetingsNotice: boolean;
   };
 }
 
 const NO_MEETINGS = /no\s+meetings\s+scheduled/i;
+/** Page-wide empty-calendar notice (distinct from a day heading's "No meetings scheduled"). */
+const PAGE_NO_MEETINGS_NOTICE = /\bthere\s+are\s+no\s+meetings\s+scheduled\b/i;
 
 function parseCommitteeDetailsUrl(href: string | undefined): Pick<LrcCalendarCommitteeRef, 'lrcRsn' | 'committeeType' | 'profileUrl'> {
   if (!href) return { lrcRsn: null, committeeType: null, profileUrl: null };
@@ -284,6 +293,7 @@ export function parseLegislativeCalendarHtml(html: string): LrcLegislativeCalend
       meetingCount,
       agendaItemCount,
       billReferenceCount,
+      pageNoMeetingsNotice: PAGE_NO_MEETINGS_NOTICE.test(root.text().replace(/\s+/g, ' ')),
     },
   };
 }
