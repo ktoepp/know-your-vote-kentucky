@@ -52,7 +52,7 @@ export function SeatListDisclosure() {
           </caption>
           <thead>
             <tr>
-              {['District', 'Change', 'Won by', 'Previously held by'].map((h) => (
+              {['District', 'Won by', 'Previously held by'].map((h) => (
                 <Box component="th" scope="col" key={h} sx={{ ...cell, fontWeight: 600, color: 'text.secondary' }}>
                   {h}
                 </Box>
@@ -69,9 +69,6 @@ export function SeatListDisclosure() {
                     <MuiLink component={NextLink} href={kyDistrictPath(ref)} underline="hover">
                       {kyDistrictShortName(ref)}
                     </MuiLink>
-                  </Box>
-                  <Box component="td" sx={{ ...cell, whiteSpace: 'nowrap' }}>
-                    {abbr(c.incumbent.party)} to {abbr(winner.party)}
                   </Box>
                   <Box component="td" sx={cell}>
                     {winner.name} ({abbr(winner.party)})
