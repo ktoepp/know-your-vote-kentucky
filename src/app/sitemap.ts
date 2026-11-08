@@ -18,7 +18,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = publicSiteOrigin();
   const origin = base.startsWith('http') ? base : `https://${base}`;
 
-  const staticPaths: { path: string; changeFrequency: ChangeFreq; priority: number }[] = [
+  const staticPaths: { path: string; changeFrequency: ChangeFreq; priority: number; lastModified?: string }[] = [
     { path: '', changeFrequency: 'daily', priority: 1 },
     { path: '/bills', changeFrequency: 'daily', priority: 0.9 },
     { path: '/bills/house', changeFrequency: 'daily', priority: 0.85 },
@@ -38,6 +38,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/guides/track-a-kentucky-bill', changeFrequency: 'monthly', priority: 0.6 },
     { path: '/guides/how-a-kentucky-bill-becomes-a-law', changeFrequency: 'monthly', priority: 0.6 },
     { path: '/guides/kentucky-general-assembly-sessions', changeFrequency: 'monthly', priority: 0.6 },
+    {
+      path: '/guides/kentucky-legislative-seats-changed-party-2026',
+      changeFrequency: 'weekly',
+      priority: 0.6,
+      lastModified: '2026-11-08',
+    },
     { path: '/legislature/resources', changeFrequency: 'monthly', priority: 0.5 },
     { path: '/privacy', changeFrequency: 'yearly', priority: 0.3 },
     { path: '/terms', changeFrequency: 'yearly', priority: 0.3 },
@@ -72,8 +78,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  const staticEntries: MetadataRoute.Sitemap = staticPaths.map(({ path, changeFrequency, priority }) => ({
+  const staticEntries: MetadataRoute.Sitemap = staticPaths.map(({ path, changeFrequency, priority, lastModified }) => ({
     url: `${origin}${path}`,
+    ...(lastModified ? { lastModified } : {}),
     changeFrequency,
     priority,
   }));

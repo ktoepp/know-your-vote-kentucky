@@ -12,7 +12,7 @@ export interface BreadcrumbCrumb {
   path: string;
 }
 
-function absoluteUrl(path: string): string {
+export function absoluteUrl(path: string): string {
   const base = publicSiteOrigin();
   const origin = base.startsWith('http') ? base : `https://${base}`;
   return `${origin}${path.startsWith('/') ? path : `/${path}`}`;

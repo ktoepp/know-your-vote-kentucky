@@ -4,6 +4,7 @@ import { Box, Container, Link as MuiLink, Typography } from '@mui/material';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { buildBreadcrumbJsonLd, buildCollectionPageJsonLd } from '@/lib/structured-data';
 import { buildPageMetadata } from '@/lib/seo';
+import { KY_2026_ELECTION, KY_2026_SEAT_CHANGES } from '@/lib/ky-2026-election-seat-changes';
 
 const DESCRIPTION =
   'Short factual guides to the Kentucky General Assembly: finding your state legislators, tracking a bill, how a bill becomes a law, and when the legislature meets.';
@@ -44,6 +45,11 @@ const GUIDES = [
     title: 'Kentucky General Assembly session dates and schedule',
     blurb:
       '60-day even-year sessions, 30-day odd-year sessions, the veto recess, and the interim.',
+  },
+  {
+    href: '/guides/kentucky-legislative-seats-changed-party-2026',
+    title: 'Kentucky legislative seats that changed party in 2026',
+    blurb: `The ${KY_2026_SEAT_CHANGES.length} House and Senate seats that changed party in the November 2026 general election, with ${KY_2026_ELECTION.resultsStatus} vote totals.`,
   },
 ] as const;
 
