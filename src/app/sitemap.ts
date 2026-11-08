@@ -38,6 +38,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/guides/track-a-kentucky-bill', changeFrequency: 'monthly', priority: 0.6 },
     { path: '/guides/how-a-kentucky-bill-becomes-a-law', changeFrequency: 'monthly', priority: 0.6 },
     { path: '/guides/kentucky-general-assembly-sessions', changeFrequency: 'monthly', priority: 0.6 },
+    { path: '/guides/kentucky-legislative-seats-changed-party-2026', changeFrequency: 'weekly', priority: 0.6 },
     { path: '/legislature/resources', changeFrequency: 'monthly', priority: 0.5 },
     { path: '/privacy', changeFrequency: 'yearly', priority: 0.3 },
     { path: '/terms', changeFrequency: 'yearly', priority: 0.3 },
