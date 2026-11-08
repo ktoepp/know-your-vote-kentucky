@@ -1,9 +1,9 @@
 import { Box, Typography } from '@mui/material';
 import { KY_DISTRICT_MAP_SVG, type KyDistrictShape } from '@/lib/generated/ky-district-map-svg';
-import { kyDistrictPath, kyDistrictShortName } from '@/lib/ky-district-pages';
+import { kyDistrictPath } from '@/lib/ky-district-pages';
 import type { KySeatOutcome } from '@/lib/ky-2026-election-seat-changes';
-import { HatchPatterns, seatFill } from './election-chart-colors';
-import { seatTip } from './seat-tip';
+import { HatchPatterns, districtFill } from './election-chart-colors';
+import { seatTipAttrs } from './seat-tip';
 
 const MAP = KY_DISTRICT_MAP_SVG;
 const INSET_X = 8;
@@ -33,23 +33,22 @@ function DistrictShape({
   linked: boolean;
   hatchId: string;
 }) {
-  const tip = seatTip(o);
+  const tip = seatTipAttrs(o);
   const path = (
     <path
       d={shape.d}
-      fill={seatFill(o.after, Boolean(o.change), hatchId)}
+      fill={districtFill(o.after, Boolean(o.change), hatchId)}
       stroke="#FFFFFF"
       strokeWidth={1}
       strokeLinejoin="round"
       vectorEffect="non-scaling-stroke"
-      data-tip-title={tip.title}
-      data-tip-detail={tip.detail}
+      {...tip}
     />
   );
   if (!o.change || !linked) return path;
   const ref = { chamber: o.chamber, districtNumber: o.district };
   return (
-    <a href={kyDistrictPath(ref)} aria-label={`${kyDistrictShortName(ref)}: ${tip.title}, ${o.change.incumbent.party} to ${o.after}`}>
+    <a href={kyDistrictPath(ref)} aria-label={`${tip['data-tip-district']}: ${tip['data-tip-title']}. ${tip['data-tip-detail']}`}>
       {path}
     </a>
   );

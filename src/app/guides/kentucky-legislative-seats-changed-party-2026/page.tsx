@@ -5,9 +5,8 @@ import { Box, Container, Link as MuiLink, Typography } from '@mui/material';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { ChartTooltipLayer } from '@/components/elections/ChartTooltipLayer';
 import { DistrictChangeMap } from '@/components/elections/DistrictChangeMap';
-import { SeatChangeRows } from '@/components/elections/SeatChangeRows';
 import { SeatHemicycle } from '@/components/elections/SeatHemicycle';
-import { PARTY_COLOR, hatchBackground } from '@/components/elections/election-chart-colors';
+import { PARTY_COLOR, PARTY_WASH, hatchBackground } from '@/components/elections/election-chart-colors';
 import { buildBreadcrumbJsonLd, buildGuideArticleJsonLd } from '@/lib/structured-data';
 import { buildPageMetadata } from '@/lib/seo';
 import { formatCivicDate } from '@/lib/civic-date';
@@ -78,8 +77,10 @@ const CHAMBERS = {
   senate: { name: 'Senate', seats: 38, rows: 3, innerRatio: 0.45 },
 } as const;
 
-/** A legend/stat swatch: solid party color, or that color's 45° hatch. */
-function Swatch({ party, hatched = false }: { party: KyElectionParty; hatched?: boolean }) {
+type SwatchStyle = 'solid' | 'ring' | 'hatch';
+
+/** Legend/stat swatch matching a chart mark: solid (changed), ring (seat chart), hatch (map). */
+function Swatch({ party, style = 'solid' }: { party: KyElectionParty; style?: SwatchStyle }) {
   return (
     <Box
       component="span"
@@ -90,7 +91,9 @@ function Swatch({ party, hatched = false }: { party: KyElectionParty; hatched?: 
         height: 12,
         borderRadius: '50%',
         flexShrink: 0,
-        background: hatched ? hatchBackground(party) : PARTY_COLOR[party],
+        boxSizing: 'border-box',
+        background: style === 'solid' ? PARTY_COLOR[party] : style === 'ring' ? PARTY_WASH[party] : hatchBackground(party),
+        border: style === 'ring' ? `2px solid ${PARTY_COLOR[party]}` : 'none',
       }}
     />
   );
@@ -134,7 +137,6 @@ function ChamberPanel({ chamber, outcomes }: { chamber: 'house' | 'senate'; outc
         outcomes={outcomes}
         rows={cfg.rows}
         innerRatio={cfg.innerRatio}
-        hatchId={`${chamber}-seats-hatch`}
         label={`Kentucky ${cfg.name} after the 2026 election: ${after.Democratic} Democratic and ${after.Republican} Republican seats; ${changed} seats changed party.`}
       />
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
@@ -145,12 +147,13 @@ function ChamberPanel({ chamber, outcomes }: { chamber: 'house' | 'senate'; outc
   );
 }
 
-function Legend() {
-  const item = (hatched: boolean, text: string) => (
+/** `unchanged`: how the chart above draws seats that did not change party. */
+function Legend({ unchanged }: { unchanged: 'ring' | 'hatch' }) {
+  const item = (style: SwatchStyle, text: string) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
       <Box sx={{ display: 'flex', gap: 0.5 }}>
-        <Swatch party="Democratic" hatched={hatched} />
-        <Swatch party="Republican" hatched={hatched} />
+        <Swatch party="Democratic" style={style} />
+        <Swatch party="Republican" style={style} />
       </Box>
       <Typography component="span" variant="body2" color="text.secondary">
         {text}
@@ -159,8 +162,8 @@ function Legend() {
   );
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 3, rowGap: 1 }}>
-      {item(false, 'Changed party in 2026')}
-      {item(true, 'No change')}
+      {item('solid', 'Changed party in 2026')}
+      {item(unchanged, 'No change')}
     </Box>
   );
 }
@@ -180,6 +183,8 @@ const chartInteractionSx = {
   '& [data-tip-title]:hover': { stroke: '#0F172A', strokeWidth: 2, vectorEffect: 'non-scaling-stroke' },
   '& a': { outline: 'none' },
   '& a:focus-visible path': { stroke: '#0F172A', strokeWidth: 3, vectorEffect: 'non-scaling-stroke' },
+  '& [data-selected="true"]': { stroke: '#0F172A', strokeWidth: 3, vectorEffect: 'non-scaling-stroke' },
+  '& [data-tip-title]': { cursor: 'pointer' },
 } as const;
 
 export default function SeatsChangedParty2026Page() {
@@ -234,7 +239,7 @@ export default function SeatsChangedParty2026Page() {
               <ChamberPanel chamber="house" outcomes={house} />
               <ChamberPanel chamber="senate" outcomes={senate} />
             </Box>
-            <Legend />
+            <Legend unchanged="ring" />
           </Box>
 
           <Box component="section" sx={{ mb: 5 }}>
@@ -262,14 +267,9 @@ export default function SeatsChangedParty2026Page() {
                 label="Map of Kentucky Senate districts shaded by party after the 2026 election. Districts that changed party are labeled and link to their district pages."
               />
             </Box>
-            <Legend />
+            <Legend unchanged="hatch" />
           </Box>
         </ChartTooltipLayer>
-      </Box>
-
-      <Box component="section" sx={{ mb: 5 }}>
-        <Typography {...sectionHeading}>The {CHANGED} seats</Typography>
-        <SeatChangeRows changes={KY_2026_SEAT_CHANGES} />
       </Box>
 
       <Box component="section" sx={{ mb: 4 }}>

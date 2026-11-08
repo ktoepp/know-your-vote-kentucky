@@ -1,9 +1,11 @@
 import type { KyElectionParty, KySeatOutcome } from '@/lib/ky-2026-election-seat-changes';
-import { HatchPatterns, seatFill } from './election-chart-colors';
-import { seatTip } from './seat-tip';
+import { PARTY_COLOR, PARTY_WASH } from './election-chart-colors';
+import { seatTipAttrs } from './seat-tip';
 
 const R = 100;
 const PAD = 2;
+/** Ring stroke for unchanged seats, in chart units (~1.7px at typical sizes). */
+const RING = 0.95;
 
 interface SeatPoint {
   x: number;
@@ -54,13 +56,10 @@ export function SeatHemicycle({
   rows,
   innerRatio,
   label,
-  hatchId,
 }: {
   outcomes: KySeatOutcome[];
   rows: number;
   innerRatio: number;
-  /** Unique per chart on the page: pattern ids are document-global. */
-  hatchId: string;
   /** Accessible summary of the whole chart. */
   label: string;
 }) {
@@ -74,20 +73,22 @@ export function SeatHemicycle({
       aria-label={label}
       style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
     >
-      <HatchPatterns id={hatchId} spacing={2.2} line={0.9} />
       {seats.map((o, i) => {
         const p = points[i];
-        const tip = seatTip(o);
         const party: KyElectionParty = o.after;
+        const changed = Boolean(o.change);
+        // Changed: solid. No change: an outlined ring on the party wash (the stroke sits
+        // inside the dot's footprint so rings and solid dots are the same size).
         return (
           <circle
             key={`${o.chamber}-${o.district}`}
             cx={p.x.toFixed(2)}
             cy={p.y.toFixed(2)}
-            r={dotR.toFixed(2)}
-            fill={seatFill(party, Boolean(o.change), hatchId)}
-            data-tip-title={tip.title}
-            data-tip-detail={tip.detail}
+            r={(changed ? dotR : dotR - RING / 2).toFixed(2)}
+            fill={changed ? PARTY_COLOR[party] : PARTY_WASH[party]}
+            stroke={changed ? undefined : PARTY_COLOR[party]}
+            strokeWidth={changed ? undefined : RING}
+            {...seatTipAttrs(o)}
           />
         );
       })}

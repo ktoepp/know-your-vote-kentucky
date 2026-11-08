@@ -4,6 +4,7 @@ import {
   KY_2026_CLOSEST_RACE,
   KY_2026_ELECTION,
   KY_2026_SEAT_CHANGES,
+  KY_POST_ELECTION_SEAT_HOLDERS,
   KY_PRE_ELECTION_SEAT_PARTIES,
   compositionAfter,
   seatChangesBetween,
@@ -95,6 +96,20 @@ describe('KY_PRE_ELECTION_SEAT_PARTIES / seatOutcomes', () => {
         KY_2026_SEAT_CHANGES.filter((c) => c.chamber === chamber).map((c) => c.district).sort((a, b) => a - b),
       );
       for (const o of outcomes) assert.equal(o.before !== o.after, Boolean(o.change));
+    }
+  });
+});
+
+describe('KY_POST_ELECTION_SEAT_HOLDERS', () => {
+  test('one name per seat, and changed seats name the winner', () => {
+    assert.equal(KY_POST_ELECTION_SEAT_HOLDERS.house.length, 100);
+    assert.equal(KY_POST_ELECTION_SEAT_HOLDERS.senate.length, 38);
+    for (const name of [...KY_POST_ELECTION_SEAT_HOLDERS.house, ...KY_POST_ELECTION_SEAT_HOLDERS.senate]) {
+      assert.ok(name.trim().length > 3);
+      assert.doesNotMatch(name, /\b[A-Z]{3,}\b/, `${name} still has an all-caps surname`);
+    }
+    for (const c of KY_2026_SEAT_CHANGES) {
+      assert.equal(KY_POST_ELECTION_SEAT_HOLDERS[c.chamber][c.district - 1], c.results[0].name);
     }
   });
 });

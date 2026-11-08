@@ -2,20 +2,35 @@ import type { KyElectionParty } from '@/lib/ky-2026-election-seat-changes';
 
 /**
  * Party colors for election charts: the site's `--party-d` / `--party-r` tokens. Seats
- * that changed party are solid; seats that did not are 45° hatching in the same color
- * over a pale wash of it, so "changed" vs "no change" reads by texture as well as tone
- * (also in grayscale and for color-blind readers). The solid pair passes the dataviz
- * palette validator (CVD ΔE 23.6, normal-vision ΔE 32.1).
+ * that changed party are solid. Seats that did not are drawn lighter, in a style that
+ * also differs by texture so it reads in grayscale and for color-blind readers:
+ * - seat charts: an outlined ring (hatching on small dots causes moiré);
+ * - maps: low-contrast 45° hatching over a pale wash of the party color.
+ * The solid pair passes the dataviz palette validator (CVD ΔE 23.6, normal-vision ΔE 32.1).
  */
 export const PARTY_COLOR: Record<KyElectionParty, string> = {
   Democratic: '#4338CA',
   Republican: '#BE123C',
 };
 
-/** Pale ground under the hatching, so district edges (white strokes) still show. */
-const HATCH_GROUND: Record<KyElectionParty, string> = {
-  Democratic: '#ECEDFB',
-  Republican: '#FBECEF',
+/**
+ * Ground for unchanged seats: ring interiors and the base under map hatching. Neutral
+ * gray for both parties, so only the thin ring or stripe carries party color and the
+ * unchanged seats stay muted next to the solid changed ones.
+ */
+const NEUTRAL_GROUND = '#E8EBF0';
+export const PARTY_WASH: Record<KyElectionParty, string> = {
+  Democratic: NEUTRAL_GROUND,
+  Republican: NEUTRAL_GROUND,
+};
+
+/**
+ * Hatch stripes: ~40% of the way from the wash to the party color. Kept low-contrast
+ * against the wash so the stripes read as texture, not as a moiré-prone line field.
+ */
+const HATCH_LINE: Record<KyElectionParty, string> = {
+  Democratic: '#B6B4EC',
+  Republican: '#ECAAB8',
 };
 
 const CODE: Record<KyElectionParty, string> = { Democratic: 'd', Republican: 'r' };
@@ -33,22 +48,20 @@ export function HatchPatterns({ id, spacing, line }: { id: string; spacing: numb
           height={spacing}
           patternTransform="rotate(45)"
         >
-          <rect width={spacing} height={spacing} fill={HATCH_GROUND[party]} />
-          <rect width={line} height={spacing} fill={PARTY_COLOR[party]} />
+          <rect width={spacing} height={spacing} fill={PARTY_WASH[party]} />
+          <rect width={line} height={spacing} fill={HATCH_LINE[party]} />
         </pattern>
       ))}
     </defs>
   );
 }
 
-/** Solid party color for a changed seat; the SVG's hatch pattern for an unchanged one. */
-export function seatFill(party: KyElectionParty, changed: boolean, hatchId: string): string {
+/** Map fill: solid party color for a changed district; the SVG's hatch pattern otherwise. */
+export function districtFill(party: KyElectionParty, changed: boolean, hatchId: string): string {
   return changed ? PARTY_COLOR[party] : `url(#${hatchId}-${CODE[party]})`;
 }
 
-/** The same hatch for HTML legend swatches. 135deg in CSS draws the same "/" as rotate(45) in SVG. */
+/** Map legend swatch. 135deg in CSS draws the same "/" as rotate(45) in SVG. */
 export function hatchBackground(party: KyElectionParty): string {
-  const c = PARTY_COLOR[party];
-  const g = HATCH_GROUND[party];
-  return `repeating-linear-gradient(135deg, ${c} 0 1.5px, ${g} 1.5px 4px)`;
+  return `repeating-linear-gradient(135deg, ${HATCH_LINE[party]} 0 1.5px, ${PARTY_WASH[party]} 1.5px 4px)`;
 }

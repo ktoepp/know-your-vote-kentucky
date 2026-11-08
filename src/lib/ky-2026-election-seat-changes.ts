@@ -182,6 +182,157 @@ export const KY_PRE_ELECTION_SEAT_PARTIES = {
   senate: 'RRRRRRRRRRRRDRRRRRDRRRRRRDRRRRRRDRDRDR',
 } as const;
 
+/**
+ * Who holds each seat after the election, district 1 first. House and even-numbered
+ * Senate seats: the 2026 winner as listed on the State Board's results (surnames
+ * converted from capitals). Odd-numbered Senate seats were not on the ballot: the sitting
+ * senator from the roster snapshot, who serves through 2028.
+ */
+export const KY_POST_ELECTION_SEAT_HOLDERS: { house: readonly string[]; senate: readonly string[] } = {
+  house: [
+    "Steven Jack Rudy",
+    "Kim Holloway",
+    "Randy Bridges",
+    "D. Wade Williams",
+    "Mary Beth Imes",
+    "Chris Freeland",
+    "Suzanne Miles",
+    "Walker Wood Thomas",
+    "Myron B. Dossett",
+    "Josh Calloway",
+    "J. T. Payne",
+    "Jim Gooch Jr.",
+    "D. J. Johnson",
+    "Wes Pate",
+    "Rebecca Raymer",
+    "Jason Petrie",
+    "Robert B. Duvall",
+    "Samara Heavrin",
+    "Michael Lee Meredith",
+    "Kevin Jackson",
+    "Amy Neighbors",
+    "Shawn McPherson",
+    "Steve Riley",
+    "Ryan Dale Bivens",
+    "Steve Bratcher",
+    "Peyton Griffee",
+    "Joseph Redmon",
+    "Almaria Baker",
+    "Cassie Blausey",
+    "Mitra Subedi",
+    "Tim Hall",
+    "Tina Bojanowski",
+    "Jennifer Hardin",
+    "Sarah Stalker",
+    "Lisa Willner",
+    "John F. Hodgson",
+    "Emily Myers Callaway",
+    "Rachel Roarx",
+    "Ryan Stanford",
+    "Nima Kulkarni",
+    "Mary Lou Marzian",
+    "Joshua Watkins",
+    "Robert LeVertis Bell",
+    "Kenya Wade",
+    "Adam Moore",
+    "Al Gentry",
+    "Felicia Rabourn",
+    "Suhas Kulkarni",
+    "Thomas Huff",
+    "Candy Massaroni",
+    "Michael \"Sarge\" Pollock",
+    "Kevin G. Jones",
+    "James Allen Tipton",
+    "Daniel B. Elliott",
+    "Kim King",
+    "Daniel A. Fister",
+    "Erika Hancock",
+    "Jennifer Henson Decker",
+    "David W. Osborne",
+    "Marianne Proctor",
+    "Savannah Maddox",
+    "Tony Hampton",
+    "Cole Cuzick",
+    "Kimberly Poore Moser",
+    "Aaron John Currin",
+    "T. J. Roberts",
+    "Matthew Lehman",
+    "Mike Clines",
+    "Steven Doan",
+    "Mike Fisher",
+    "Josh Bray",
+    "Matthew R. Koch",
+    "Daniel Konstantopoulos",
+    "David F. Charles",
+    "Lindsey Burke",
+    "Anne Gay Donworth",
+    "George A. Brown Jr.",
+    "Mark Hart",
+    "Chad R. Aull",
+    "David Meade",
+    "Deanna Frazier Gordon",
+    "Nick Wilson",
+    "Joshua Branscum",
+    "Chris Fugate",
+    "R. Shane Baker",
+    "Tom O'Dell Smith",
+    "Adam Bowling",
+    "Vanessa Grossl",
+    "Timmy Truett",
+    "Derek Lewis",
+    "Darrell Billings",
+    "John Blanton",
+    "Adrielle Camuel",
+    "Mitchum Addison Whitaker",
+    "Tanner Hesterberg",
+    "Patrick Flannery",
+    "Bobby W. McCool",
+    "Aaron Thompson",
+    "Richard Lee White",
+    "Scott Sharp",
+  ],
+  senate: [
+    "Jason Howell",
+    "Danny Carroll",
+    "Craig Richardson",
+    "Robert M. \"Robby\" Mills",
+    "Steve Meredith",
+    "Christian Furman",
+    "Aaron Reed",
+    "Gary M. Boswell",
+    "David Givens",
+    "Matt Deneen",
+    "Steve Rawlings",
+    "Amanda Mays Bledsoe",
+    "Reggie Thomas",
+    "Ben Mudd",
+    "Rick Girdler",
+    "George Maxwell \"Max\" Wise",
+    "Matt Nunn",
+    "Robin L. Webb",
+    "Cassie Armstrong",
+    "Gex \"Jay\" Williams",
+    "Brandon Storm",
+    "Donald R. Douglas",
+    "Chris McDaniel",
+    "Shelley \"Funke\" Frommeyer",
+    "Robert Stivers",
+    "Karen A. Berg",
+    "Steve West",
+    "Greg Elkins",
+    "Scott Madon",
+    "Brandon D. Smith",
+    "Phillip Wheeler",
+    "Mike Wilson",
+    "Gerald Neal",
+    "Jared K. Carpenter",
+    "Keturah Herron",
+    "Sarah Cole McIntosh",
+    "Gary Clemons",
+    "Mike Nemes",
+  ],
+};
+
 export type KyChamberComposition = Record<KyElectionParty, number>;
 
 export interface KySeatOutcome {
@@ -191,6 +342,10 @@ export interface KySeatOutcome {
   after: KyElectionParty;
   /** The matching row of `KY_2026_SEAT_CHANGES` when the seat changed party. */
   change: KySeatChange | null;
+  /** Who holds the seat after the election. */
+  holder: string;
+  /** False for odd-numbered Senate seats, which were not up in 2026. */
+  onBallot: boolean;
 }
 
 const PARTY_CODE: Record<string, KyElectionParty> = { R: 'Republican', D: 'Democratic' };
@@ -204,7 +359,15 @@ export function seatOutcomes(
     const district = i + 1;
     const before = PARTY_CODE[code];
     const change = changes.find((c) => c.chamber === chamber && c.district === district) ?? null;
-    return { chamber, district, before, after: change ? change.results[0].party : before, change };
+    return {
+      chamber,
+      district,
+      before,
+      after: change ? change.results[0].party : before,
+      change,
+      holder: KY_POST_ELECTION_SEAT_HOLDERS[chamber][i],
+      onBallot: chamber === 'house' || district % 2 === 0,
+    };
   });
 }
 
