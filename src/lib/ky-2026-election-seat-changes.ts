@@ -166,7 +166,53 @@ export const KY_2026_CLOSEST_RACE: {
   ],
 };
 
+/**
+ * Party of every seat going into the election, one character per district starting at
+ * district 1 (`R` / `D`). Snapshot of the active `ky_legislators` roster on 2026-11-08,
+ * frozen here because the roster turns over in January and would then describe the
+ * winners instead. Senate odd-numbered seats were not on the 2026 ballot.
+ */
+export const KY_PRE_ELECTION_SEAT_PARTIES = {
+  house:
+    'RRRRRRRRRRRRRRRRRRRRRRRRRRRRRDRDRDDRRDRDDDDDDDRRRRRRRRRRDRRRRRRRRRDRRRRRRRDDDRDRRRRRRRRRRRRRDRDRRRRR',
+  senate: 'RRRRRRRRRRRRDRRRRRDRRRRRRDRRRRRRDRDRDR',
+} as const;
+
 export type KyChamberComposition = Record<KyElectionParty, number>;
+
+export interface KySeatOutcome {
+  chamber: 'house' | 'senate';
+  district: number;
+  before: KyElectionParty;
+  after: KyElectionParty;
+  /** The matching row of `KY_2026_SEAT_CHANGES` when the seat changed party. */
+  change: KySeatChange | null;
+}
+
+const PARTY_CODE: Record<string, KyElectionParty> = { R: 'Republican', D: 'Democratic' };
+
+/** Every seat in a chamber with its party before and after the election, district 1 first. */
+export function seatOutcomes(
+  chamber: 'house' | 'senate',
+  changes: readonly KySeatChange[] = KY_2026_SEAT_CHANGES,
+): KySeatOutcome[] {
+  return [...KY_PRE_ELECTION_SEAT_PARTIES[chamber]].map((code, i) => {
+    const district = i + 1;
+    const before = PARTY_CODE[code];
+    const change = changes.find((c) => c.chamber === chamber && c.district === district) ?? null;
+    return { chamber, district, before, after: change ? change.results[0].party : before, change };
+  });
+}
+
+/** Winner's lead over the runner-up, in votes and in points of all named-candidate votes. */
+export function winningMargin(results: readonly KyElectionCandidateResult[]): {
+  votes: number;
+  points: number;
+} {
+  const total = results.reduce((sum, r) => sum + r.votes, 0);
+  const votes = results[0].votes - (results[1]?.votes ?? 0);
+  return { votes, points: total > 0 ? (votes / total) * 100 : 0 };
+}
 
 /** Seats per party after the election: the pre-election count adjusted by each change. */
 export function compositionAfter(

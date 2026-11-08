@@ -4,8 +4,11 @@ import {
   KY_2026_CLOSEST_RACE,
   KY_2026_ELECTION,
   KY_2026_SEAT_CHANGES,
+  KY_PRE_ELECTION_SEAT_PARTIES,
   compositionAfter,
   seatChangesBetween,
+  seatOutcomes,
+  winningMargin,
 } from './ky-2026-election-seat-changes';
 
 const margin = (r: { votes: number }[]) => r[0].votes - r[1].votes;
@@ -61,6 +64,50 @@ describe('composition', () => {
   test('direction counts', () => {
     assert.equal(seatChangesBetween('Republican', 'Democratic').length, 9);
     assert.equal(seatChangesBetween('Democratic', 'Republican').length, 1);
+  });
+});
+
+describe('KY_PRE_ELECTION_SEAT_PARTIES / seatOutcomes', () => {
+  test('snapshot covers every seat and matches the pre-election counts', () => {
+    for (const chamber of ['house', 'senate'] as const) {
+      const s = KY_PRE_ELECTION_SEAT_PARTIES[chamber];
+      const { Republican, Democratic } = KY_2026_ELECTION.compositionBefore[chamber];
+      assert.equal(s.length, Republican + Democratic);
+      assert.match(s, /^[RD]+$/);
+      assert.equal([...s].filter((c) => c === 'D').length, Democratic);
+    }
+  });
+
+  test("each change's incumbent party matches the snapshot", () => {
+    for (const c of KY_2026_SEAT_CHANGES) {
+      const code = KY_PRE_ELECTION_SEAT_PARTIES[c.chamber][c.district - 1];
+      assert.equal(code, c.incumbent.party[0], `${c.chamber} ${c.district}`);
+    }
+  });
+
+  test('outcomes agree with compositionAfter and flag exactly the changed seats', () => {
+    for (const chamber of ['house', 'senate'] as const) {
+      const outcomes = seatOutcomes(chamber);
+      const after = compositionAfter(chamber);
+      assert.equal(outcomes.filter((o) => o.after === 'Democratic').length, after.Democratic);
+      assert.equal(outcomes.filter((o) => o.after === 'Republican').length, after.Republican);
+      assert.deepEqual(
+        outcomes.filter((o) => o.change).map((o) => o.district),
+        KY_2026_SEAT_CHANGES.filter((c) => c.chamber === chamber).map((c) => c.district).sort((a, b) => a - b),
+      );
+      for (const o of outcomes) assert.equal(o.before !== o.after, Boolean(o.change));
+    }
+  });
+});
+
+describe('winningMargin', () => {
+  test('votes and points of named-candidate votes', () => {
+    const m = winningMargin([
+      { name: 'A', party: 'Democratic', votes: 7846 },
+      { name: 'B', party: 'Republican', votes: 7630 },
+    ]);
+    assert.equal(m.votes, 216);
+    assert.equal(m.points.toFixed(1), '1.4');
   });
 });
 

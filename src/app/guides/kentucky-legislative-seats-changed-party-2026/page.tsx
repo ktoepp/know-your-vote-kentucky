@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
 import NextLink from 'next/link';
 import { Box, Container, Link as MuiLink, Typography } from '@mui/material';
 import { JsonLd } from '@/components/seo/JsonLd';
+import { ChartTooltipLayer } from '@/components/elections/ChartTooltipLayer';
+import { DistrictChangeMap } from '@/components/elections/DistrictChangeMap';
+import { SeatChangeRows } from '@/components/elections/SeatChangeRows';
+import { SeatHemicycle } from '@/components/elections/SeatHemicycle';
+import { PARTY_FILL } from '@/components/elections/election-chart-colors';
 import { buildBreadcrumbJsonLd, buildGuideArticleJsonLd } from '@/lib/structured-data';
 import { buildPageMetadata } from '@/lib/seo';
 import { formatCivicDate } from '@/lib/civic-date';
@@ -15,10 +19,10 @@ import {
   KY_2026_SEAT_CHANGES,
   compositionAfter,
   seatChangesBetween,
-  type KyChamberComposition,
-  type KyElectionCandidateResult,
+  seatOutcomes,
   type KyElectionParty,
   type KySeatChange,
+  type KySeatOutcome,
 } from '@/lib/ky-2026-election-seat-changes';
 
 const PATH = '/guides/kentucky-legislative-seats-changed-party-2026';
@@ -30,54 +34,36 @@ const ELECTION_DATE = formatCivicDate(KY_2026_ELECTION.electionDate) ?? '';
 const AS_OF = formatCivicDate(KY_2026_ELECTION.resultsAsOf) ?? '';
 const SEATS_ON_BALLOT = KY_2026_ELECTION.seatsOnBallot.house + KY_2026_ELECTION.seatsOnBallot.senate;
 const NEXT_SESSION = KY_SESSIONS.find((s) => s.name === '2027 Regular Session');
-
-const R_TO_D = seatChangesBetween('Republican', 'Democratic');
-const D_TO_R = seatChangesBetween('Democratic', 'Republican');
+const CHANGED = KY_2026_SEAT_CHANGES.length;
 
 const PARTY_MEMBER_NOUN: Record<KyElectionParty, string> = {
   Republican: 'Republican',
   Democratic: 'Democrat',
 };
 
-/**
- * "Democratic candidates won 9 seats (7 House, 2 Senate) held by Republicans" /
- * "a Republican candidate won 1 House seat held by a Democrat". Null when there are none.
- */
-function directionClause(
-  from: KyElectionParty,
-  to: KyElectionParty,
-  changes: KySeatChange[],
-): string | null {
+/** "Democratic candidates won 9 seats held by Republicans" / "a Republican candidate won 1 held by a Democrat". */
+function directionClause(from: KyElectionParty, to: KyElectionParty, changes: KySeatChange[]): string | null {
   const n = changes.length;
   if (n === 0) return null;
-  const house = changes.filter((c) => c.chamber === 'house').length;
-  const senate = n - house;
-  const seats = n === 1 ? 'seat' : 'seats';
-  const where =
-    house && senate
-      ? `${n} ${seats} (${house} House, ${senate} Senate)`
-      : `${n} ${house ? 'House' : 'Senate'} ${seats}`;
   return n === 1
-    ? `a ${to} candidate won ${where} held by a ${PARTY_MEMBER_NOUN[from]}`
-    : `${to} candidates won ${where} held by ${PARTY_MEMBER_NOUN[from]}s`;
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+    ? `a ${to} candidate won 1 held by a ${PARTY_MEMBER_NOUN[from]}`
+    : `${to} candidates won ${n} seats held by ${PARTY_MEMBER_NOUN[from]}s`;
 }
 
 const DIRECTION_SENTENCE = (() => {
   const clauses = [
-    directionClause('Republican', 'Democratic', R_TO_D),
-    directionClause('Democratic', 'Republican', D_TO_R),
+    directionClause('Republican', 'Democratic', seatChangesBetween('Republican', 'Democratic')),
+    directionClause('Democratic', 'Republican', seatChangesBetween('Democratic', 'Republican')),
   ].filter((c): c is string => Boolean(c));
-  return clauses.length ? `${capitalize(clauses.join(', and '))}.` : '';
+  if (!clauses.length) return '';
+  const s = clauses.join('; ');
+  return `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
 })();
 
 const DESCRIPTION =
-  `${KY_2026_SEAT_CHANGES.length} Kentucky House and Senate seats changed party in the ` +
-  `${ELECTION_DATE} general election${UNOFFICIAL ? ', based on unofficial results' : ''}: ` +
-  'each district, its incumbent, and the vote totals.';
+  `${CHANGED} of ${SEATS_ON_BALLOT} Kentucky House and Senate seats on the ballot changed party in the ` +
+  `${ELECTION_DATE} general election${UNOFFICIAL ? ' (unofficial results)' : ''}: seat charts, district maps, ` +
+  'and each race with its margin.';
 
 export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
@@ -86,121 +72,112 @@ export const metadata: Metadata = buildPageMetadata({
   ogType: 'article',
 });
 
-function formatVotes(n: number): string {
-  return n.toLocaleString('en-US');
-}
+const CHAMBERS = {
+  house: { name: 'House', seats: 100, rows: 5, innerRatio: 0.4 },
+  senate: { name: 'Senate', seats: 38, rows: 3, innerRatio: 0.45 },
+} as const;
 
-function compositionText(c: KyChamberComposition): string {
-  return `${c.Republican} Republican, ${c.Democratic} Democratic`;
-}
-
-function candidateText(r: KyElectionCandidateResult): string {
-  return `${r.name} (${formatPartyLetterAbbrev(r.party)}), ${formatVotes(r.votes)} votes`;
-}
-
-/** Label/value rows — same compact grid the sessions guide uses for milestones. */
-function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+function Swatch({ color }: { color: string }) {
   return (
-    <>
-      <Typography variant="body2" color="text.secondary" component="dt" sx={{ m: 0 }}>
-        {label}
-      </Typography>
-      <Typography variant="body2" color="text.primary" component="dd" sx={{ m: 0 }}>
-        {children}
-      </Typography>
-    </>
+    <Box
+      component="span"
+      aria-hidden="true"
+      sx={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', bgcolor: color, flexShrink: 0 }}
+    />
   );
 }
 
-function SeatChangeItem({ change }: { change: KySeatChange }) {
-  const ref = { chamber: change.chamber, districtNumber: change.district };
-  const [winner, ...others] = change.results;
-  const { incumbent } = change;
+function PartyStat({ chamber, party, align }: { chamber: 'house' | 'senate'; party: KyElectionParty; align: 'left' | 'right' }) {
+  const after = compositionAfter(chamber)[party];
+  const before = KY_2026_ELECTION.compositionBefore[chamber][party];
+  const change = after === before ? 'no change' : `${after > before ? 'up' : 'down'} from ${before}`;
   return (
-    <Box component="li">
-      <Typography variant="body1" component="h3" fontWeight={600}>
-        <MuiLink component={NextLink} href={kyDistrictPath(ref)} underline="hover">
-          {kyDistrictShortName(ref)}
-        </MuiLink>
+    <Box sx={{ textAlign: align }}>
+      <Typography component="p" sx={{ fontSize: { xs: 28, sm: 32 }, fontWeight: 600, lineHeight: 1.1 }}>
+        {after}
       </Typography>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        {incumbent.party} to {winner.party}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, justifyContent: align === 'left' ? 'flex-start' : 'flex-end' }}>
+        <Swatch color={PARTY_FILL[party].changed} />
+        <Typography component="span" variant="body2" fontWeight={600}>
+          {party}
+        </Typography>
+      </Box>
+      <Typography component="p" variant="caption" color="text.secondary">
+        {change}
       </Typography>
-      <Box
-        component="dl"
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'minmax(140px, max-content) 1fr' },
-          columnGap: 2,
-          rowGap: 0.5,
-          m: 0,
-        }}
-      >
-        <DetailRow label="Incumbent">
-          <MuiLink component={NextLink} href={`/members/${incumbent.profileSlug}`} underline="hover">
-            {incumbent.name}
-          </MuiLink>{' '}
-          ({formatPartyLetterAbbrev(incumbent.party)})
-          {incumbent.onBallot ? '' : ', not on the 2026 ballot'}
-        </DetailRow>
-        <DetailRow label="Winner">{candidateText(winner)}</DetailRow>
-        {others.length > 0 && (
-          <DetailRow label="Also on the ballot">
-            {others.map((r) => (
-              <Box component="span" key={r.name} sx={{ display: 'block' }}>
-                {candidateText(r)}
-              </Box>
-            ))}
-          </DetailRow>
-        )}
+    </Box>
+  );
+}
+
+function ChamberPanel({ chamber, outcomes }: { chamber: 'house' | 'senate'; outcomes: KySeatOutcome[] }) {
+  const cfg = CHAMBERS[chamber];
+  const after = compositionAfter(chamber);
+  const changed = outcomes.filter((o) => o.change).length;
+  return (
+    <Box component="figure" sx={{ m: 0 }}>
+      <Typography component="figcaption" variant="body1" fontWeight={700} sx={{ mb: 1 }}>
+        {cfg.name}{' '}
+        <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary' }}>
+          · {cfg.seats} seats · {changed} changed party
+        </Box>
+      </Typography>
+      <SeatHemicycle
+        outcomes={outcomes}
+        rows={cfg.rows}
+        innerRatio={cfg.innerRatio}
+        label={`Kentucky ${cfg.name} after the 2026 election: ${after.Democratic} Democratic and ${after.Republican} Republican seats; ${changed} seats changed party.`}
+      />
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+        <PartyStat chamber={chamber} party="Democratic" align="left" />
+        <PartyStat chamber={chamber} party="Republican" align="right" />
       </Box>
     </Box>
   );
 }
 
-function ChamberSection({ chamber }: { chamber: 'house' | 'senate' }) {
-  const changes = KY_2026_SEAT_CHANGES.filter((c) => c.chamber === chamber).sort(
-    (a, b) => a.district - b.district,
-  );
-  if (changes.length === 0) return null;
-  return (
-    <Box component="section" sx={{ mb: 4 }}>
-      <Typography variant="h6" component="h2" fontWeight={700} gutterBottom>
-        {chamber === 'house' ? 'House' : 'Senate'}
-      </Typography>
-      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', rowGap: 3 }}>
-        {changes.map((c) => (
-          <SeatChangeItem key={`${c.chamber}-${c.district}`} change={c} />
+function Legend() {
+  const item = (fills: string[], text: string) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+      <Box sx={{ display: 'flex', gap: 0.5 }}>
+        {fills.map((f) => (
+          <Swatch key={f} color={f} />
         ))}
       </Box>
+      <Typography component="span" variant="body2" color="text.secondary">
+        {text}
+      </Typography>
+    </Box>
+  );
+  return (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 3, rowGap: 1 }}>
+      {item([PARTY_FILL.Democratic.changed, PARTY_FILL.Republican.changed], 'Changed party in 2026')}
+      {item([PARTY_FILL.Democratic.unchanged, PARTY_FILL.Republican.unchanged], 'No change')}
     </Box>
   );
 }
 
-const cellSx = {
-  py: 1,
-  pr: 2,
-  textAlign: 'left' as const,
-  verticalAlign: 'top' as const,
-  borderBottom: 1,
-  borderColor: 'divider',
-};
+const sectionHeading = { variant: 'h6', component: 'h2', fontWeight: 700, gutterBottom: true } as const;
+
+/** Hover lift + focus ring for chart marks (tooltips come from ChartTooltipLayer). */
+const chartInteractionSx = {
+  '& [data-tip-title]:hover': { stroke: '#0F172A', strokeWidth: 2, vectorEffect: 'non-scaling-stroke' },
+  '& a': { outline: 'none' },
+  '& a:focus-visible path': { stroke: '#0F172A', strokeWidth: 3, vectorEffect: 'non-scaling-stroke' },
+} as const;
 
 export default function SeatsChangedParty2026Page() {
+  const house = seatOutcomes('house');
+  const senate = seatOutcomes('senate');
   const closest = KY_2026_CLOSEST_RACE;
   const closestRef = { chamber: closest.chamber, districtNumber: closest.district };
   const closestMargin = closest.results[0].votes - closest.results[1].votes;
+  const abbr = formatPartyLetterAbbrev;
 
   return (
     <Container maxWidth="md" sx={{ py: { xs: 4, sm: 6 } }}>
       <JsonLd
         data={[
-          buildGuideArticleJsonLd({
-            headline: TITLE,
-            description: DESCRIPTION,
-            path: PATH,
-            dateModified: DATE_MODIFIED,
-          }),
+          buildGuideArticleJsonLd({ headline: TITLE, description: DESCRIPTION, path: PATH, dateModified: DATE_MODIFIED }),
           buildBreadcrumbJsonLd([
             { name: 'Home', path: '/' },
             { name: 'Guides', path: '/guides' },
@@ -211,135 +188,115 @@ export default function SeatsChangedParty2026Page() {
       <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
         {TITLE}
       </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        In the {ELECTION_DATE} general election, {KY_2026_SEAT_CHANGES.length} of the{' '}
-        {SEATS_ON_BALLOT} Kentucky General Assembly seats on the ballot changed party
-        {UNOFFICIAL ? ', based on unofficial results' : ''}. {DIRECTION_SENTENCE}
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+        {CHANGED} of the {SEATS_ON_BALLOT} seats on the ballot changed party in the {ELECTION_DATE} general election.{' '}
+        {DIRECTION_SENTENCE}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+        <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+          {UNOFFICIAL ? 'Unofficial results' : 'Certified results'}
+        </Box>{' '}
+        as of {AS_OF}
+        {UNOFFICIAL ? ', subject to certification' : ''}.
       </Typography>
 
-      <Box
-        role="note"
-        sx={{ border: 1, borderColor: 'divider', borderRadius: 1, px: 2, py: 1.5, mb: 4 }}
-      >
-        <Typography variant="body2" color="text.primary">
-          <Box component="span" sx={{ fontWeight: 600 }}>
-            {UNOFFICIAL ? 'Unofficial results.' : 'Certified results.'}
-          </Box>{' '}
-          Vote totals are from the {KY_2026_ELECTION.sourceName} as of {AS_OF}.
-          {UNOFFICIAL &&
-            ' Results become official when the State Board certifies them, and a recanvass or recount can change them. This page will be updated after certification.'}
-        </Typography>
-      </Box>
-
-      <Box component="section" sx={{ mb: 4 }}>
-        <Typography variant="h6" component="h2" fontWeight={700} gutterBottom>
-          Seats held by each party
-        </Typography>
-        <Box sx={{ overflowX: 'auto', mb: 2 }}>
-          <Box component="table" sx={{ borderCollapse: 'collapse', width: '100%' }}>
-            {UNOFFICIAL && (
-              <Typography
-                component="caption"
-                variant="body2"
-                color="text.secondary"
-                sx={{ textAlign: 'left', captionSide: 'bottom', pt: 1 }}
-              >
-                After-election counts are based on unofficial results.
-              </Typography>
-            )}
-            <thead>
-              <tr>
-                <Typography component="th" scope="col" variant="body2" fontWeight={600} sx={cellSx}>
-                  Chamber
-                </Typography>
-                <Typography component="th" scope="col" variant="body2" fontWeight={600} sx={cellSx}>
-                  Before the election
-                </Typography>
-                <Typography component="th" scope="col" variant="body2" fontWeight={600} sx={cellSx}>
-                  After the election
-                </Typography>
-              </tr>
-            </thead>
-            <tbody>
-              {(['house', 'senate'] as const).map((chamber) => (
-                <tr key={chamber}>
-                  <Typography component="th" scope="row" variant="body2" fontWeight={600} sx={cellSx}>
-                    {chamber === 'house' ? 'House (100 seats)' : 'Senate (38 seats)'}
-                  </Typography>
-                  <Typography component="td" variant="body2" sx={cellSx}>
-                    {compositionText(KY_2026_ELECTION.compositionBefore[chamber])}
-                  </Typography>
-                  <Typography component="td" variant="body2" sx={cellSx}>
-                    {compositionText(compositionAfter(chamber))}
-                  </Typography>
-                </tr>
-              ))}
-            </tbody>
+      <Box sx={chartInteractionSx}>
+        <ChartTooltipLayer>
+          <Box component="section" sx={{ mb: 5 }}>
+            <Typography {...sectionHeading}>Seats in each chamber</Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                columnGap: 5,
+                rowGap: 4,
+                mt: 2,
+                mb: 2,
+              }}
+            >
+              <ChamberPanel chamber="house" outcomes={house} />
+              <ChamberPanel chamber="senate" outcomes={senate} />
+            </Box>
+            <Legend />
           </Box>
+
+          <Box component="section" sx={{ mb: 5 }}>
+            <Typography {...sectionHeading}>Where seats changed</Typography>
+            <Box component="figure" sx={{ m: 0, mb: 3 }}>
+              <Typography component="figcaption" variant="body1" fontWeight={700} sx={{ mb: 1 }}>
+                House
+              </Typography>
+              <DistrictChangeMap
+                chamber="house"
+                outcomes={house}
+                label="Map of Kentucky House districts shaded by party after the 2026 election. Districts that changed party are labeled and link to their district pages."
+              />
+            </Box>
+            <Box component="figure" sx={{ m: 0, mb: 2 }}>
+              <Typography component="figcaption" variant="body1" fontWeight={700} sx={{ mb: 1 }}>
+                Senate{' '}
+                <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary' }}>
+                  · odd-numbered seats were not on the 2026 ballot
+                </Box>
+              </Typography>
+              <DistrictChangeMap
+                chamber="senate"
+                outcomes={senate}
+                label="Map of Kentucky Senate districts shaded by party after the 2026 election. Districts that changed party are labeled and link to their district pages."
+              />
+            </Box>
+            <Legend />
+          </Box>
+        </ChartTooltipLayer>
+      </Box>
+
+      <Box component="section" sx={{ mb: 5 }}>
+        <Typography {...sectionHeading}>The {CHANGED} seats, closest first</Typography>
+        <SeatChangeRows changes={KY_2026_SEAT_CHANGES} />
+      </Box>
+
+      <Box component="section" sx={{ mb: 4 }}>
+        <Typography {...sectionHeading}>Notes</Typography>
+        <Box
+          component="ul"
+          sx={{ m: 0, pl: 2.5, display: 'grid', rowGap: 0.75, color: 'text.secondary', typography: 'body2' }}
+        >
+          <li>
+            Results are from the{' '}
+            <MuiLink href={KY_2026_ELECTION.sourceUrl} target="_blank" rel="noopener noreferrer" underline="hover">
+              {KY_2026_ELECTION.sourceName}
+            </MuiLink>{' '}
+            as of {AS_OF}, with all counties reporting.
+            {UNOFFICIAL &&
+              ' They become official when the State Board certifies them; a recanvass or recount can change them. This page will be updated after certification.'}
+          </li>
+          <li>
+            The closest race statewide did not change party:{' '}
+            <MuiLink component={NextLink} href={kyDistrictPath(closestRef)} underline="hover">
+              {kyDistrictShortName(closestRef)}
+            </MuiLink>
+            , where {closest.results[0].name} ({abbr(closest.results[0].party)}) led {closest.results[1].name} (
+            {abbr(closest.results[1].party)}) by {closestMargin.toLocaleString('en-US')} votes.
+          </li>
+          <li>
+            Margin is the winner&apos;s lead as a share of votes for named candidates. Pre-election seats are from the
+            Know Your Vote Kentucky member roster on {AS_OF}.
+          </li>
+          <li>
+            Members elected in 2026 take office in January 2027
+            {NEXT_SESSION ? `; the ${NEXT_SESSION.name} convenes on ${formatCivicDate(NEXT_SESSION.start)}` : ''}.
+          </li>
         </Box>
-        <Typography variant="body1" color="text.secondary">
-          All {KY_2026_ELECTION.seatsOnBallot.house} House seats and the{' '}
-          {KY_2026_ELECTION.seatsOnBallot.senate} even-numbered Senate districts were on the 2026
-          ballot. Senators serve four-year terms, so the odd-numbered Senate districts are next on
-          the ballot in 2028. Members elected in 2026 take office in January 2027
-          {NEXT_SESSION
-            ? `, and the ${NEXT_SESSION.name} convenes on ${formatCivicDate(NEXT_SESSION.start)}`
-            : ''}
-          .
-        </Typography>
       </Box>
 
-      <ChamberSection chamber="house" />
-      <ChamberSection chamber="senate" />
-
-      <Box component="section" sx={{ mb: 4 }}>
-        <Typography variant="h6" component="h2" fontWeight={700} gutterBottom>
-          Closest race
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          The narrowest legislative race statewide was in{' '}
-          <MuiLink component={NextLink} href={kyDistrictPath(closestRef)} underline="hover">
-            {kyDistrictShortName(closestRef)}
-          </MuiLink>
-          , where {closest.results[0].name} ({formatPartyLetterAbbrev(closest.results[0].party)})
-          received {formatVotes(closest.results[0].votes)} votes and {closest.results[1].name} (
-          {formatPartyLetterAbbrev(closest.results[1].party)}) received{' '}
-          {formatVotes(closest.results[1].votes)}, a margin of {formatVotes(closestMargin)} votes.
-          The seat did not change party in the {UNOFFICIAL ? 'unofficial' : 'certified'} count.
-        </Typography>
-      </Box>
-
-      <Box component="section" sx={{ mb: 4 }}>
-        <Typography variant="h6" component="h2" fontWeight={700} gutterBottom>
-          Sources
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Candidates, parties and vote totals:{' '}
-          <MuiLink href={KY_2026_ELECTION.sourceUrl} target="_blank" rel="noopener noreferrer" underline="hover">
-            {KY_2026_ELECTION.sourceName}, 2026 General Election results
-          </MuiLink>
-          . Incumbents and pre-election seat counts: the Know Your Vote Kentucky member roster as of{' '}
-          {AS_OF}.
-        </Typography>
-      </Box>
-
-      <Box
-        component="nav"
-        aria-label="Related pages"
-        sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2.5, rowGap: 1 }}
-      >
+      <Box component="nav" aria-label="Related pages" sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2.5, rowGap: 1 }}>
         <MuiLink component={NextLink} href="/members/map" underline="hover" variant="body2">
           Find my legislators →
         </MuiLink>
         <MuiLink component={NextLink} href="/members" underline="hover" variant="body2">
           Members →
         </MuiLink>
-        <MuiLink
-          component={NextLink}
-          href="/guides/kentucky-general-assembly-sessions"
-          underline="hover"
-          variant="body2"
-        >
+        <MuiLink component={NextLink} href="/guides/kentucky-general-assembly-sessions" underline="hover" variant="body2">
           Session dates →
         </MuiLink>
         <MuiLink component={NextLink} href="/guides" underline="hover" variant="body2">

@@ -73,6 +73,7 @@
     "refresh:bill-status": "tsx scripts/refresh-bill-status-from-legiscan.ts",
     "refresh:bill-status:dry": "tsx scripts/refresh-bill-status-from-legiscan.ts --dry-run",
     "generate:district-thumbnails": "tsx scripts/generate-district-thumbnails.ts",
+    "build:district-map-svg": "tsx scripts/build-district-map-svg.ts",
     "debug:openstates-roster": "tsx scripts/debug-openstates-roster.ts",
     "spike:lrc:calendar": "tsx scripts/lrc-calendar-spike.ts",
     "spike:lrc:committee-materials": "tsx scripts/spike-lrc-committee-materials.ts",
