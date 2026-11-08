@@ -3,7 +3,11 @@ import { PARTY_COLOR, PARTY_WASH } from './election-chart-colors';
 import { seatTipAttrs } from './seat-tip';
 
 const R = 100;
-const PAD = 2;
+/**
+ * Fixed outer margin (chart units), larger than any chamber's dot radius, so every seat
+ * chart shares one aspect ratio and side-by-side charts line up.
+ */
+const MARGIN = 10;
 /** Ring stroke for unchanged seats, in chart units (~1.7px at typical sizes). */
 const RING = 0.95;
 
@@ -33,7 +37,7 @@ export function hemicycleLayout(seats: number, rows: number, innerRatio: number)
     const n = perRow[i];
     for (let j = 0; j < n; j++) {
       const angle = n === 1 ? Math.PI / 2 : Math.PI * (1 - j / (n - 1));
-      points.push({ x: R + PAD + dotR + r * R * Math.cos(angle), y: R + PAD + dotR - r * R * Math.sin(angle), angle, r });
+      points.push({ x: R + MARGIN + r * R * Math.cos(angle), y: R + MARGIN - r * R * Math.sin(angle), angle, r });
     }
   });
   // Left to right; within the same angle, inner row first.
@@ -65,10 +69,10 @@ export function SeatHemicycle({
 }) {
   const { points, dotR } = hemicycleLayout(outcomes.length, rows, innerRatio);
   const seats = orderSeats(outcomes);
-  const size = 2 * (R + PAD + dotR);
+  const width = 2 * (R + MARGIN);
   return (
     <svg
-      viewBox={`0 0 ${size.toFixed(1)} ${(R + 2 * PAD + 2 * dotR).toFixed(1)}`}
+      viewBox={`0 0 ${width} ${R + 2 * MARGIN}`}
       role="img"
       aria-label={label}
       style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}

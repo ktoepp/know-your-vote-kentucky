@@ -6,13 +6,14 @@ import { JsonLd } from '@/components/seo/JsonLd';
 import { ChartTooltipLayer } from '@/components/elections/ChartTooltipLayer';
 import { DistrictChangeMap } from '@/components/elections/DistrictChangeMap';
 import { SeatHemicycle } from '@/components/elections/SeatHemicycle';
+import { SeatListDisclosure } from '@/components/elections/SeatListDisclosure';
 import { PARTY_COLOR, PARTY_WASH, hatchBackground } from '@/components/elections/election-chart-colors';
-import { buildBreadcrumbJsonLd, buildGuideArticleJsonLd } from '@/lib/structured-data';
+import { absoluteUrl, buildBreadcrumbJsonLd, buildGuideArticleJsonLd } from '@/lib/structured-data';
 import { buildPageMetadata } from '@/lib/seo';
 import { formatCivicDate } from '@/lib/civic-date';
 import { formatPartyLetterAbbrev } from '@/lib/bill-display';
 import { KY_SESSIONS } from '@/lib/ky-sessions';
-import { kyDistrictPath, kyDistrictShortName } from '@/lib/ky-district-pages';
+import { kyDistrictDisplayName, kyDistrictPath, kyDistrictShortName } from '@/lib/ky-district-pages';
 import {
   KY_2026_CLOSEST_RACE,
   KY_2026_ELECTION,
@@ -28,6 +29,7 @@ import {
 const PATH = '/guides/kentucky-legislative-seats-changed-party-2026';
 const TITLE = 'Kentucky legislative seats that changed party in 2026';
 const DATE_MODIFIED = '2026-11-08';
+const DATE_PUBLISHED = '2026-11-08';
 
 const UNOFFICIAL = KY_2026_ELECTION.resultsStatus === 'unofficial';
 const ELECTION_DATE = formatCivicDate(KY_2026_ELECTION.electionDate) ?? '';
@@ -61,9 +63,9 @@ const DIRECTION_SENTENCE = (() => {
 })();
 
 const DESCRIPTION =
-  `${CHANGED} of ${SEATS_ON_BALLOT} Kentucky House and Senate seats on the ballot changed party in the ` +
-  `${ELECTION_DATE} general election${UNOFFICIAL ? ' (unofficial results)' : ''}: seat charts, district maps, ` +
-  'and each race with its margin.';
+  `${CHANGED} Kentucky House and Senate seats changed party in the ${ELECTION_DATE} general election` +
+  `${UNOFFICIAL ? ' (unofficial results)' : ''}. See which districts, who won, and each chamber's party balance ` +
+  'before and after, on interactive seat charts and district maps.';
 
 export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
@@ -73,8 +75,8 @@ export const metadata: Metadata = buildPageMetadata({
 });
 
 const CHAMBERS = {
-  house: { name: 'House', seats: 100, rows: 5, innerRatio: 0.4 },
-  senate: { name: 'Senate', seats: 38, rows: 3, innerRatio: 0.45 },
+  house: { name: 'House', seats: 100, rows: 5, innerRatio: 0.4, subtitle: '100 seats, all on the 2026 ballot' },
+  senate: { name: 'Senate', seats: 38, rows: 3, innerRatio: 0.45, subtitle: '38 seats, 19 on the 2026 ballot' },
 } as const;
 
 type SwatchStyle = 'solid' | 'ring' | 'hatch';
@@ -127,12 +129,7 @@ function ChamberPanel({ chamber, outcomes }: { chamber: 'house' | 'senate'; outc
   const changed = outcomes.filter((o) => o.change).length;
   return (
     <Box component="figure" sx={{ m: 0 }}>
-      <Typography component="figcaption" variant="body1" fontWeight={700} sx={{ mb: 1 }}>
-        {cfg.name}{' '}
-        <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary' }}>
-          · {cfg.seats} seats · {changed} changed party
-        </Box>
-      </Typography>
+      <ChartTitle title={cfg.name} subtitle={cfg.subtitle} />
       <SeatHemicycle
         outcomes={outcomes}
         rows={cfg.rows}
@@ -143,29 +140,89 @@ function ChamberPanel({ chamber, outcomes }: { chamber: 'house' | 'senate'; outc
         <PartyStat chamber={chamber} party="Democratic" align="left" />
         <PartyStat chamber={chamber} party="Republican" align="right" />
       </Box>
+      <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
+        <Legend unchanged="ring" changedCount={changed} unchangedCount={cfg.seats - changed} />
+      </Box>
     </Box>
   );
 }
 
-/** `unchanged`: how the chart above draws seats that did not change party. */
-function Legend({ unchanged }: { unchanged: 'ring' | 'hatch' }) {
-  const item = (style: SwatchStyle, text: string) => (
+/** Chart heading: the name carries the weight, the context sits quietly beneath it. */
+function ChartTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <Box component="figcaption" sx={{ mb: 1.5 }}>
+      <Typography component="h3" sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1.3 }}>
+        {title}
+      </Typography>
+      {subtitle && (
+        <Typography variant="body2" color="text.secondary">
+          {subtitle}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+/**
+ * `unchanged`: how the chart above draws seats that did not change party. With counts,
+ * the legend doubles as the chart's summary: the number leads, the label follows.
+ */
+function Legend({
+  unchanged,
+  changedCount,
+  unchangedCount,
+}: {
+  unchanged: 'ring' | 'hatch';
+  changedCount?: number;
+  unchangedCount?: number;
+}) {
+  const item = (style: SwatchStyle, count: number | undefined, text: string) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
       <Box sx={{ display: 'flex', gap: 0.5 }}>
         <Swatch party="Democratic" style={style} />
         <Swatch party="Republican" style={style} />
       </Box>
       <Typography component="span" variant="body2" color="text.secondary">
+        {count != null && (
+          <Box component="span" sx={{ fontWeight: 700, color: 'text.primary', mr: 0.5 }}>
+            {count}
+          </Box>
+        )}
         {text}
       </Typography>
     </Box>
   );
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 3, rowGap: 1 }}>
-      {item('solid', 'Changed party in 2026')}
-      {item(unchanged, 'No change')}
+      {item('solid', changedCount, changedCount != null ? 'changed party' : 'Changed party in 2026')}
+      {item(unchanged, unchangedCount, unchangedCount != null ? 'no change' : 'No change')}
     </Box>
   );
+}
+
+/** The changed seats as a schema.org ItemList, each linking to its district page. */
+function buildSeatChangesItemList() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `Kentucky legislative seats that changed party in 2026${UNOFFICIAL ? ' (unofficial)' : ''}`,
+    numberOfItems: KY_2026_SEAT_CHANGES.length,
+    itemListElement: KY_2026_SEAT_CHANGES.map((c, i) => {
+      const ref = { chamber: c.chamber, districtNumber: c.district };
+      const [winner] = c.results;
+      const abbr = formatPartyLetterAbbrev;
+      return {
+        '@type': 'ListItem',
+        position: i + 1,
+        url: absoluteUrl(kyDistrictPath(ref)),
+        name:
+          `${kyDistrictDisplayName(ref)}: ${winner.name} (${abbr(winner.party)}) ` +
+          (c.incumbent.onBallot
+            ? `defeated ${c.incumbent.name} (${abbr(c.incumbent.party)})`
+            : `won the seat held by ${c.incumbent.name} (${abbr(c.incumbent.party)})`),
+      };
+    }),
+  };
 }
 
 function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
@@ -176,7 +233,11 @@ function ExternalLink({ href, children }: { href: string; children: ReactNode })
   );
 }
 
-const sectionHeading = { variant: 'h6', component: 'h2', fontWeight: 700, gutterBottom: true } as const;
+/** Section headings sit above the 18px chart titles (h3) in size and weight. */
+const sectionHeading = {
+  component: 'h2',
+  sx: { fontSize: { xs: 21, sm: 23 }, fontWeight: 700, lineHeight: 1.3, mb: 0.5 },
+} as const;
 
 /** Hover lift + focus ring for chart marks (tooltips come from ChartTooltipLayer). */
 const chartInteractionSx = {
@@ -199,7 +260,18 @@ export default function SeatsChangedParty2026Page() {
     <Container maxWidth="md" sx={{ py: { xs: 4, sm: 6 } }}>
       <JsonLd
         data={[
-          buildGuideArticleJsonLd({ headline: TITLE, description: DESCRIPTION, path: PATH, dateModified: DATE_MODIFIED }),
+          {
+            ...buildGuideArticleJsonLd({ headline: TITLE, description: DESCRIPTION, path: PATH, dateModified: DATE_MODIFIED }),
+            datePublished: DATE_PUBLISHED,
+            about: {
+              '@type': 'Event',
+              name: '2026 Kentucky general election',
+              startDate: KY_2026_ELECTION.electionDate,
+              location: { '@type': 'State', name: 'Kentucky' },
+            },
+            isBasedOn: KY_2026_ELECTION.sourceUrl,
+          },
+          buildSeatChangesItemList(),
           buildBreadcrumbJsonLd([
             { name: 'Home', path: '/' },
             { name: 'Guides', path: '/guides' },
@@ -226,6 +298,9 @@ export default function SeatsChangedParty2026Page() {
         <ChartTooltipLayer>
           <Box component="section" sx={{ mb: 5 }}>
             <Typography {...sectionHeading}>Seats in each chamber</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Select any seat or district to see who holds it.
+            </Typography>
             <Box
               sx={{
                 display: 'grid',
@@ -239,15 +314,15 @@ export default function SeatsChangedParty2026Page() {
               <ChamberPanel chamber="house" outcomes={house} />
               <ChamberPanel chamber="senate" outcomes={senate} />
             </Box>
-            <Legend unchanged="ring" />
           </Box>
 
           <Box component="section" sx={{ mb: 5 }}>
             <Typography {...sectionHeading}>Where seats changed</Typography>
+            <Box sx={{ mt: 1, mb: 2.5 }}>
+              <Legend unchanged="hatch" />
+            </Box>
             <Box component="figure" sx={{ m: 0, mb: 3 }}>
-              <Typography component="figcaption" variant="body1" fontWeight={700} sx={{ mb: 1 }}>
-                House
-              </Typography>
+              <ChartTitle title="House" />
               <DistrictChangeMap
                 chamber="house"
                 outcomes={house}
@@ -255,19 +330,14 @@ export default function SeatsChangedParty2026Page() {
               />
             </Box>
             <Box component="figure" sx={{ m: 0, mb: 2 }}>
-              <Typography component="figcaption" variant="body1" fontWeight={700} sx={{ mb: 1 }}>
-                Senate{' '}
-                <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary' }}>
-                  · odd-numbered seats were not on the 2026 ballot
-                </Box>
-              </Typography>
+              <ChartTitle title="Senate" subtitle="Odd-numbered seats were not on the 2026 ballot." />
               <DistrictChangeMap
                 chamber="senate"
                 outcomes={senate}
                 label="Map of Kentucky Senate districts shaded by party after the 2026 election. Districts that changed party are labeled and link to their district pages."
               />
             </Box>
-            <Legend unchanged="hatch" />
+            <SeatListDisclosure />
           </Box>
         </ChartTooltipLayer>
       </Box>
