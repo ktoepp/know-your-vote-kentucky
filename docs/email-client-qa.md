@@ -14,7 +14,7 @@ Manual pass after template copy changes (especially Bill Watch alignment). Send 
 - [ ] Subject line readable; preview text not truncated awkwardly
 - [ ] Plain-text part present (`render(..., { plainText: true })`)
 - [ ] Unsubscribe link works (GET page + one-click POST)
-- [ ] Bill links use `https://kyvky.com`
+- [ ] Bill links use `https://www.kyvky.org`
 - [ ] Logo loads (`/branding/Logo-03.png`) and links to the site home; alt text shows when images are blocked
 - [ ] Footer: privacy, terms, preference link, postal address
 - [ ] Dark mode: heading/links/borders legible (prefers-color-scheme clients)
@@ -22,7 +22,7 @@ Manual pass after template copy changes (especially Bill Watch alignment). Send 
 ## Welcome email
 
 - [ ] Single-column layout; links to browse, profile, map
-- [ ] Resend from `alerts@kyvky.com`, reply-to `katie@kyvky.com`
+- [ ] Resend from `alerts@kyvky.org`, reply-to `katie@kyvky.org`
 
 ## Ops
 

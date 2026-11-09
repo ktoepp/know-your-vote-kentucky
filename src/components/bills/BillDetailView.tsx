@@ -51,6 +51,7 @@ import {
 } from '@/lib/bill-display';
 import { governmentTooltips, voteCountTooltips } from '@/lib/tooltipContent';
 import { voteBucketChipColor, voteBucketLabel } from '@/lib/vote-display';
+import { KYVKY_CONTACT_EMAIL } from '@/lib/kyvky-contact';
 import { getSessionTooltip } from '@/lib/ky-sessions';
 import { formatCivicDate } from '@/lib/civic-date';
 import { supabase } from '@/app/lib/supabaseClient';
@@ -1214,7 +1215,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
         <Typography variant="body2" color="text.secondary" sx={{ mt: 4, textAlign: 'center' }}>
           Something wrong on this page?{' '}
           <MuiLink
-            href={`mailto:katie@kyvky.com?subject=${encodeURIComponent(`Problem on ${bill.bill_number} page`)}`}
+            href={`mailto:${KYVKY_CONTACT_EMAIL}?subject=${encodeURIComponent(`Problem on ${bill.bill_number} page`)}`}
             underline="hover"
           >
             Tell us

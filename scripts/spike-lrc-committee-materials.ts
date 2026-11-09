@@ -47,7 +47,7 @@ async function runSpike() {
       timeout: 30_000,
       responseType: 'text',
       headers: {
-        'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; committee-materials spike)',
+        'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; committee-materials spike)',
       },
     });
     writeFileSync(DEFAULT_FIXTURE, r.data, 'utf8');

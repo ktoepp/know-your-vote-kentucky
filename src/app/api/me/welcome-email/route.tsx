@@ -12,6 +12,7 @@ import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { WelcomeEmail } from '@/lib/email/welcome-email';
 import { emailLogoSrc } from '@/lib/email/brand';
 import { publicSiteOrigin } from '@/lib/site-canonical';
+import { KYVKY_ALERTS_EMAIL, KYVKY_CONTACT_EMAIL } from '@/lib/kyvky-contact';
 
 export const runtime = 'nodejs';
 
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
   }
 
   const resendKey = process.env.RESEND_API_KEY?.trim();
-  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || 'alerts@kyvky.com';
+  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || KYVKY_ALERTS_EMAIL;
   if (!resendKey) {
     // Stamp persists; without an API key we can't send. Surface for ops.
     return NextResponse.json(
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: profile.email as string,
-      replyTo: 'katie@kyvky.com',
+      replyTo: KYVKY_CONTACT_EMAIL,
       subject: 'Your Know Your Vote Kentucky account is set up',
       html,
       text,
