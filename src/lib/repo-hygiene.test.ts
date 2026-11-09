@@ -12,7 +12,8 @@ import { join } from "node:path";
 const FEEDBACK_PATH = join(process.cwd(), "FEEDBACK.md");
 
 /** Domains that may appear in FEEDBACK.md: our own, and the RFC 2606 placeholder. */
-const ALLOWED_EMAIL_DOMAINS = new Set(["kyvky.com", "example.com"]);
+/** kyvky.com stays allowed through the .org transition (docs/specs/org-domain-migration.md, Phase 3). */
+const ALLOWED_EMAIL_DOMAINS = new Set(["kyvky.org", "kyvky.com", "example.com"]);
 
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/g;
 
@@ -73,9 +74,10 @@ describe("repo hygiene: FEEDBACK.md", () => {
 });
 
 describe("repo hygiene detectors", () => {
-  test("flag a non-allowlisted email and allow kyvky.com / example.com", () => {
+  test("flag a non-allowlisted email and allow kyvky.org / kyvky.com / example.com", () => {
     assert.equal(findDisallowedEmails("write to person@example.org").length, 1);
     assert.equal(findDisallowedEmails("katie@kyvky.com and email@example.com").length, 0);
+    assert.equal(findDisallowedEmails("katie@kyvky.org").length, 0);
   });
 
   test("flag common US phone formats but not dates or bill numbers", () => {

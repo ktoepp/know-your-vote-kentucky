@@ -1,6 +1,6 @@
 # `.com` → `.org` domain migration plan
 
-Status: **plan, not started.** No code or infrastructure has changed. Written 2026-11-08.
+Status: **in progress.** Plan written 2026-11-08. On 2026-11-09 the code changes were written (held until cutover) and the `.org` domains were added to the Vercel project. Nothing user-visible has changed yet.
 Origin: TASKS.md › "Owner wishlist, filed 2026-08-31" (SFG feedback: present as a nonpartisan `.org`).
 
 ## Decisions taken (owner, 2026-11-08)
@@ -48,62 +48,107 @@ There are 218 `kyvky.com` references. Most are in historical docs (`decisions.md
 - Google Search Console and Bing Webmaster Tools.
 - Off-site: social profiles, GitHub repo homepage, partner links (SFG), email signatures, print collateral.
 
+## Reference values
+
+| Thing | Value |
+|---|---|
+| Vercel project domains | https://vercel.com/the-eighth-dimension/know-your-vote-kentucky/settings/domains |
+| Vercel env vars | https://vercel.com/the-eighth-dimension/know-your-vote-kentucky/settings/environment-variables |
+| Supabase project | `pmpadtydauuqysnxekno` ("know-your-vote-kentucky") |
+| Supabase URL configuration | https://supabase.com/dashboard/project/pmpadtydauuqysnxekno/auth/url-configuration |
+| Hostinger panel | https://hpanel.hostinger.com. Both zones are on Hostinger nameservers (`kyvky.org`: `lunar`/`solar.dns-parking.com`; `kyvky.com`: `athena`/`apollo.dns-parking.com`). |
+| Resend | https://resend.com/domains and https://resend.com/webhooks |
+| Mapbox tokens | https://account.mapbox.com/access-tokens/ |
+| Search Console / Bing | https://search.google.com/search-console and https://www.bing.com/webmasters |
+| Check DNS from a browser | `https://dns.google/query?name=<host>&type=<A|CNAME|TXT|MX>` |
+
 ## Phase 0: Prerequisites (owner, no visible change, start now)
 
 Each step can be done on its own, and none of them changes what users see.
 
-1. **Record current state for rollback.** Screenshot or export the DNS records for `kyvky.com`, `kyvky.org` and `knowyourvotekentucky.org`, the Vercel domain list, the Supabase URL configuration and the Resend domain list.
-2. **Serve `.org` alongside `.com`.** Add `www.kyvky.org` and `kyvky.org` to the Vercel project as normal (non-redirect) domains, with apex → `www.kyvky.org`. Point DNS as Vercel instructs. Canonical tags still say `.com`, so search engines treat `.org` as a duplicate host, not a competitor.
+1. **Record current state for rollback.** Take screenshots of the Hostinger DNS records for `kyvky.com`, `kyvky.org` and `knowyourvotekentucky.org`, and of the Supabase URL configuration. Vercel domains as of 2026-11-09, read through the API:
+   - `www.kyvky.com` serves the site.
+   - `kyvky.com` → redirect to `www.kyvky.com` (default status).
+   - `knowyourvotekentucky.com`, `www.knowyourvotekentucky.com`, `knowyourvoteky.com`, `www.knowyourvoteky.com` and `know-your-vote-kentucky.vercel.app` → 308 to `www.kyvky.com`.
+   - `kyvky.org` on 2026-11-09: `A @ 2.57.91.91` (Hostinger parking) and `CNAME www → kyvky.org`.
+2. **Serve `.org` alongside `.com`.**
+   - Vercel side: **done 2026-11-09 by the agent.** `www.kyvky.org` was added as a serving domain, and `kyvky.org` as a 308 redirect to `www.kyvky.org`. Both show "misconfigured" until DNS points at Vercel.
+   - **Owner, in Hostinger → Domains → `kyvky.org` → DNS / Nameservers:**
+     - **Delete** `A @ 2.57.91.91`, and any `AAAA @` record if one exists. If hPanel has a domain *redirect/forward* or *parking page* set for `kyvky.org`, remove that too.
+     - **Add** `A @ 216.150.1.1` and `A @ 216.150.16.1`. (If Hostinger allows only one A record: `A @ 76.76.21.21`.)
+     - **Edit** `CNAME www`: change the target from `kyvky.org` to `2fa4423ab3821f7e.vercel-dns-017.com`. These are the same values `www.kyvky.com` uses.
+     - Leave MX and TXT records alone.
+   - Check: after 5–60 minutes the Vercel domains page shows both `.org` hosts as "Valid Configuration", and https://www.kyvky.org loads the site. The page's canonical tag still says `.com` until cutover. That is expected.
 3. **Email on `.org`** (finish by about 2026-11-20 so the new domain has a week of test sends before cutover):
-   - Hostinger → Emails → `kyvky.org`: turn on email for the domain (which sets MX) and add a forwarder from `katie@kyvky.org` to `katie@kyvky.com`. Send a test to `katie@kyvky.org` and confirm it arrives. No mailbox is needed for `alerts@`.
-   - Resend → Domains → Add `kyvky.org`. Add the SPF, DKIM (`resend._domainkey.kyvky.org`) and DMARC records it lists in Hostinger DNS for `kyvky.org`. Confirm DKIM resolves at `8.8.8.8` before trusting Resend's "verified" badge (the 2026-06-04 stale-verification incident, `docs/launch-checklist.md`). Keep `kyvky.com` in Resend until Phase 3.
-   - Send test mail from `alerts@kyvky.org` to Gmail, Outlook and Yahoo using `docs/email-client-qa.md`. A new domain has no sending reputation, so check the spam folder.
-4. **Artwork:** deliver `.org` versions of `Logo-03.png` (same dimensions, 2488×603) and `opengraph-image.jpg` (1200×630). Check the icons as well.
-5. **Search Console:** add `kyvky.org` as a Domain property (DNS TXT, no code change). Do the same in Bing.
-6. **Mapbox** (owner unsure whether a restriction is set): go to account.mapbox.com → Tokens → open the public token the site uses (`NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` in Vercel) → **URL restrictions**. If the list is empty, there is nothing to do. If it has entries, add `https://www.kyvky.org` and `https://kyvky.org` and keep the `.com` entries.
+   - **Forwarder:** hPanel → Emails → pick `kyvky.org` → Forwarders → create one from `katie@kyvky.org` to `katie@kyvky.com`. Hostinger sets MX (`mx1.hostinger.com` / `mx2.hostinger.com`) when email is turned on for the domain. Send a test from Gmail to `katie@kyvky.org` and confirm it arrives. No mailbox is needed for `alerts@`. If hPanel wants a paid email plan just to forward, stop and tell the agent; there are free alternatives.
+   - **Resend:** https://resend.com/domains → **Add Domain** → `kyvky.org`, same region as `kyvky.com`. Resend then lists 3–4 records. Add each one in Hostinger DNS for `kyvky.org`, **copying the exact values from Resend**. They look like this:
+     - `MX send` → `feedback-smtp.<region>.amazonses.com`, priority 10
+     - `TXT send` → `v=spf1 include:amazonses.com ~all`
+     - `TXT resend._domainkey` → a long `p=…` key
+     - If Resend suggests DMARC, `TXT _dmarc` → `v=DMARC1; p=none;`
+   - Click **Verify** in Resend. Before trusting the green badge, open https://dns.google/query?name=resend._domainkey.kyvky.org&type=TXT and confirm the `p=…` key shows up. This guards against a repeat of the 2026-06-04 stale-verification incident in `docs/launch-checklist.md`. Keep `kyvky.com` in Resend until Phase 3.
+   - **Test sends:** from https://resend.com/emails (or the API), send from `alerts@kyvky.org` with reply-to `katie@kyvky.org` to a Gmail, an Outlook and a Yahoo address. Use `docs/email-client-qa.md`, and check spam folders: a new domain has no sending reputation.
+4. **Artwork:** deliver `.org` versions of `public/branding/Logo-03.png` (2488×603 PNG, transparent background) and `src/app/opengraph-image.jpg` (1200×630 JPG). Check the icons (`public/branding/icon-*`, `apple-touch-icon.png`, `favicon*`) for a TLD as well.
+5. **Search Console:** https://search.google.com/search-console → Add property → **Domain** → `kyvky.org`. Google gives a `TXT @` value (`google-site-verification=…`); add it in Hostinger DNS for `kyvky.org`. In Bing Webmaster Tools, import the property from Search Console.
+6. **Mapbox:** https://account.mapbox.com/access-tokens/ → open the token whose value matches `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` in Vercel → **URL restrictions**. If it is empty, there is nothing to do. If it has entries, add `https://www.kyvky.org` and `https://kyvky.org`, and keep the `.com` entries.
 
-## Phase 1: Code PR (agent, prepared ahead, merged at cutover)
+## Phase 1: Code changes (agent, on the plan PR, merged at cutover)
 
-One PR, held as a draft until cutover day.
+**Status: written 2026-11-09 on the plan PR's branch. Held as a draft. Do not merge before cutover.** Merging turns on the `.com` → `.org` redirect and the `.org` addresses.
 
-- `DEFAULT_SITE_ORIGIN` → `https://www.kyvky.org`, and update the comments in `site-canonical.ts`.
-- Move the email addresses into `src/lib/kyvky-contact.ts` (`KYVKY_ALERTS_EMAIL`, `KYVKY_CONTACT_EMAIL`, next to `KYVKY_POSTAL_ADDRESS`) and point every hardcoded use above at those constants. This makes any future change one edit.
-- Move the bot contact URL into one constant in the same file and use it for all 21 User-Agent strings. The workflow file can't import it, so edit it directly.
-- **`.com` → `.org` redirect, host-matched in `next.config.ts` `redirects()`,** permanent (308), path and query kept. **Exclude `/api/unsubscribe/:token` and `/api/webhooks/:path*`** so that:
-  - one-click unsubscribe POSTs from digests already in inboxes (`List-Unsubscribe` points at `.com`) still land. Whether mail providers follow redirects on that POST is unknown [verify], so don't depend on it.
-  - Resend and Sentry webhook calls keep working until their dashboards are updated.
-
-  This only works if `kyvky.com` and `www.kyvky.com` stay attached to Vercel as **normal** domains, not Vercel-level redirects (see the existing `next.config.ts` comment on why host rules otherwise never fire).
-- Swap in the new artwork and update `opengraph-image.alt.txt`.
-- `source-health.yml` site check → `www.kyvky.org`.
-- `repo-hygiene.test.ts`: allow `kyvky.org`. Keep `kyvky.com` allowed until the transition ends.
-- Update `CLAUDE.md`, `README.md`, `env-template.txt`, `docs/launch-checklist.md`, `docs/voice-and-tone.md` and `docs/email-client-qa.md` to the new identity. Add a `decisions.md` entry. Leave historical docs alone.
-- Verify: `npm test`, `npx tsc --noEmit`, `npm run lint`, `npm run build`. Then use a host header against `next start` to confirm the redirect and its exclusions.
+- `DEFAULT_SITE_ORIGIN` → `https://www.kyvky.org` (`src/lib/site-canonical.ts`).
+- `KYVKY_ALERTS_EMAIL` (`alerts@kyvky.org`) and `KYVKY_CONTACT_EMAIL` (`katie@kyvky.org`) were added to `src/lib/kyvky-contact.ts`. Every hardcoded use now points at them: the welcome and digest sends, the preview script, the about/terms/privacy pages, the bill-page and AI-summary feedback links, and the unsubscribe error page. `RESEND_FROM_EMAIL` still overrides the From address at runtime.
+- All 21 scraper User-Agent strings: `+https://kyvky.com` → `+https://www.kyvky.org`, edited in place. The bot names are unchanged, and a shared constant wasn't worth 18 new imports.
+- `next.config.ts`: a host rule 308s every `www.kyvky.com` path to the same path and query on `www.kyvky.org`. **It leaves `/api/unsubscribe/*` and `/api/webhooks/*` alone**, so one-click unsubscribe POSTs from digests already sent and any webhook not yet repointed still land. This needs `www.kyvky.com` to stay a **serving** domain in Vercel, as it is today.
+- `source-health.yml` site check → `www.kyvky.org`. `repo-hygiene.test.ts` allows `kyvky.org` (and keeps `kyvky.com` for the transition).
+- Updated `CLAUDE.md`, `README.md`, `env-template.txt`, `docs/voice-and-tone.md`, `docs/email-client-qa.md`, and added a `decisions.md` entry. Historical docs are unchanged.
+- **Still to do when the artwork arrives:** swap `Logo-03.png` and `opengraph-image.jpg`, and update `src/app/opengraph-image.alt.txt`.
+- Verified locally:
+  - `npx tsc --noEmit`, `npm test` (302/302), `npm run lint` (0 errors).
+  - `next dev` with Host headers: `www.kyvky.com/bills/HB1?session=2026RS&x=1` → `308 https://www.kyvky.org/bills/HB1?session=2026RS&x=1`. `/api/unsubscribe/<token>` (GET and POST) and `/api/webhooks/resend` reach their routes on `.com`. `/api/unsubscribe-other` is redirected. Other hosts are unaffected.
+  - `next build` can't run in the agent sandbox, which blocks Google Fonts; CI runs it.
 
 ## Phase 2: Cutover (owner and agent, one sitting, low-traffic hour, by 2026-11-30)
 
 Order matters. Env vars come before the deploy because `NEXT_PUBLIC_*` is baked in at build time.
 
-1. Vercel → Production env:
-   - `NEXT_PUBLIC_APP_URL` and `APP_PUBLIC_URL` = `https://www.kyvky.org`
+1. **Vercel env vars** (https://vercel.com/the-eighth-dimension/know-your-vote-kentucky/settings/environment-variables). Edit each one; they currently target Production + Preview:
+   - `NEXT_PUBLIC_APP_URL` = `https://www.kyvky.org`
+   - `APP_PUBLIC_URL` = `https://www.kyvky.org`
    - `RESEND_FROM_EMAIL` = `alerts@kyvky.org`
-2. Supabase → Auth → URL Configuration:
-   - Site URL = `https://www.kyvky.org`.
-   - Add the `.org` `/auth/verify` and `/auth/reset` redirect URLs. **Keep the `.com` entries** until the transition ends.
-   - Then Auth → SMTP: sender `auth@kyvky.org`.
-3. Merge the Phase 1 PR, which deploys.
-4. Vercel domain settings: repoint the four `.com` alternates (`knowyourvotekentucky.com`, `knowyourvoteky.com` and their `www` hosts) to `https://www.kyvky.org`, so there is no chain through `.com`. Repoint the `knowyourvotekentucky.org` forward too. Moving it into Vercel (WS9-05 option a) also fixes the path-stripping bug.
-5. Resend → Webhooks: add `https://www.kyvky.org/api/webhooks/resend`. If it issues a new signing secret, update `RESEND_WEBHOOK_SECRET` and redeploy before deleting the old endpoint. Sentry integration webhook → `.org`. Check whether `SENTRY_WEBHOOK_SECRET` changes [verify].
-6. Search Console: run **Change of Address** from the `kyvky.com` property to `kyvky.org` and submit `https://www.kyvky.org/sitemap.xml`. Use Bing's Site Move tool.
-7. Smoke test, and record the results in `docs/ops/log.md`:
-   - `curl -sI https://www.kyvky.com/bills/…` gives one redirect to the same path on `.org`. The same holds for the apex and every alternate.
-   - On `.org`: the page's canonical tag, `sitemap.xml`, `robots.txt` and `llms.txt` all show `.org`.
-   - Sign up, confirm, log in, reset a password. Receive the welcome email: From `alerts@kyvky.org`, reply goes to `katie@kyvky.org`.
-   - Send a digest to yourself. Check that its unsubscribe link works by GET and by one-click POST.
-   - Unsubscribe link in an **old** `.com` digest still works.
-   - A Resend webhook event arrives (Sentry `route:webhooks/resend` tag, no signature errors).
+2. **Supabase** (https://supabase.com/dashboard/project/pmpadtydauuqysnxekno/auth/url-configuration):
+   - Site URL = `https://www.kyvky.org`
+   - Redirect URLs: **add** `https://www.kyvky.org/auth/verify` and `https://www.kyvky.org/auth/reset` (and `https://www.kyvky.org/**` if the `.com` list uses a wildcard). **Keep** the `.com` entries.
+   - Then Authentication → Emails → SMTP Settings: Sender email = `auth@kyvky.org`. The sender name stays the same.
+3. **Merge the PR** (agent, on the owner's go). Vercel deploys with the new env.
+4. **Vercel domains** (https://vercel.com/the-eighth-dimension/know-your-vote-kentucky/settings/domains): edit each of these to **Redirect to `www.kyvky.org`, 308**:
+   - `kyvky.com`
+   - `knowyourvotekentucky.com` and `www.knowyourvotekentucky.com`
+   - `knowyourvoteky.com` and `www.knowyourvoteky.com`
+   - `know-your-vote-kentucky.vercel.app`
+
+   **Do not touch `www.kyvky.com`.** It must stay a serving domain so the `next.config.ts` rule can handle it.
+   - Optional, same sitting: fix the `knowyourvotekentucky.org` Hostinger forward (WS9-05). Either add it and its `www` host here as redirects to `www.kyvky.org` and point their DNS at Vercel (A `216.150.1.1` / `216.150.16.1`, `www` CNAME `2fa4423ab3821f7e.vercel-dns-017.com`), or change the Hostinger forward's target to `https://www.kyvky.org` with the path kept.
+5. **Webhooks:**
+   - https://resend.com/webhooks → add an endpoint `https://www.kyvky.org/api/webhooks/resend` with the same events as the `.com` one. Copy its signing secret into `RESEND_WEBHOOK_SECRET` in Vercel, redeploy, then delete the `.com` endpoint. The `.com` endpoint keeps working in the meantime because the redirect leaves it alone.
+   - Sentry → Settings → Developer Settings → the internal integration → Webhook URL → `https://www.kyvky.org/api/webhooks/sentry`. The client secret normally stays the same; if Sentry rotates it, update `SENTRY_WEBHOOK_SECRET`.
+6. **Search:** in Search Console, open the old `kyvky.com` property → Settings → **Change of address** → choose `kyvky.org`. Then in the `kyvky.org` property → Sitemaps → submit `https://www.kyvky.org/sitemap.xml`. In Bing, use the **Site Move** tool.
+7. **Smoke test** (owner runs these and pastes the output to the agent; record the result in `docs/ops/log.md`):
+   ```bash
+   for u in https://www.kyvky.com/bills https://kyvky.com/bills https://knowyourvotekentucky.com/bills https://knowyourvoteky.com/bills https://kyvky.org/bills; do echo "$u"; curl -sI "$u" | grep -iE '^(HTTP|location)'; done
+   ```
+   ```bash
+   curl -s https://www.kyvky.org/ | grep -o '<link rel="canonical"[^>]*>'
+   ```
+   ```bash
+   curl -s https://www.kyvky.org/robots.txt | grep -i sitemap
+   ```
+   Expect each legacy URL to answer with one 308 whose `location` is `https://www.kyvky.org/bills`, the canonical tag to show `https://www.kyvky.org/`, and robots.txt to list the `.org` sitemap. Then by hand:
+   - Sign up with a test address, confirm, log in, reset the password.
+   - Turn on a daily digest for one bill, and when it arrives check From `alerts@kyvky.org`, that a reply goes to `katie@kyvky.org`, and that its unsubscribe link works.
+   - Click the unsubscribe link in an **old** `.com` digest. It should still work.
    - Check `/members/map` and one district thumbnail.
-   - Run `source-health` manually.
+   - Run the `source-health` workflow manually: https://github.com/ktoepp/know-your-vote-kentucky/actions/workflows/source-health.yml → Run workflow.
 
 ## Phase 3: Transition and cleanup
 
@@ -124,9 +169,9 @@ Order matters. Env vars come before the deploy because `NEXT_PUBLIC_*` is baked 
 ## Rollback
 
 `.com` is never removed, so rollback is quick:
-1. Set the Vercel env vars back to `.com`, revert the Phase 1 PR and redeploy.
+1. Set the Vercel env vars back to `.com`, revert the Phase 1 merge and redeploy.
 2. Set the Supabase Site URL and SMTP sender back.
-3. Set the alternates' redirect targets back.
+3. Set the alternates' redirect targets in Vercel back to `www.kyvky.com` (the `kyvky.com` apex used the default status; the others used 308).
 
 The Resend `.com` domain stays verified throughout, so `RESEND_FROM_EMAIL=alerts@kyvky.com` works immediately. Leave the `.org` DNS in place (it does no harm).
 

@@ -43,7 +43,7 @@ import {
 
 const CDX_URL = 'https://web.archive.org/cdx/search/cdx';
 const WAYBACK_HTTP_HEADERS = {
-  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; agenda-items-repair)',
+  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; agenda-items-repair)',
 };
 
 function argFlag(name: string): boolean {

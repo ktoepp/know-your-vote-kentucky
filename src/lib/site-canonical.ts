@@ -1,5 +1,6 @@
 /**
- * Canonical public site origin. Production default: https://www.kyvky.com
+ * Canonical public site origin. Production default: https://www.kyvky.org
+ * (moved from www.kyvky.com; see docs/specs/org-domain-migration.md).
  *
  * `www` is canonical, not the apex: the apex 301s to www, and the page canonical
  * link tag plus og:url both emit the www origin (confirmed live, see PR #247 and
@@ -11,7 +12,7 @@
  * Set `NEXT_PUBLIC_APP_URL` (and optional `APP_PUBLIC_URL` for server-only overrides)
  * in each environment so metadata, sitemap, and email links match the live host.
  */
-export const DEFAULT_SITE_ORIGIN = 'https://www.kyvky.com';
+export const DEFAULT_SITE_ORIGIN = 'https://www.kyvky.org';
 
 export function publicSiteOrigin(): string {
   const fromEnv =
@@ -26,7 +27,7 @@ export function publicSiteOrigin(): string {
 
 /**
  * Origin embedded in Supabase email links (`emailRedirectTo` / `redirectTo`).
- * Prefer `NEXT_PUBLIC_APP_URL` (e.g. https://www.kyvky.com) so links match a host that is
+ * Prefer `NEXT_PUBLIC_APP_URL` (e.g. https://www.kyvky.org) so links match a host that is
  * always on Vercel and avoid www vs apex + hash loss on redirects. Falls back to `window` on the client.
  *
  * The fallback must be the canonical www host for the same reason: an apex link would

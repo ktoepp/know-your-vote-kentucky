@@ -2668,3 +2668,15 @@ Both jobs: `conclusion: cancelled`, `runner_id: 0`, empty runner name, 0 billabl
 - **Contingency rule.** After 2026-10-21, new advisories are detected by Dependabot alerts (turned on by WS1-07). The owner triages any critical Next.js alert within 72 hours. If it has no 15.x patch, WS2-11c becomes P0 and is pulled forward. In W1 this needs an Owner go-ahead.
 
 **Revisit if:** a critical Next.js advisory lands with no 15.x patch (rule above), or WS2-11c moves production to Next 16.
+
+---
+
+## 2026-11-09 — Canonical domain moves to kyvky.org
+
+Plan, cutover order and rollback: [docs/specs/org-domain-migration.md](./docs/specs/org-domain-migration.md).
+
+- **Full canonical flip, not just .org redirects.** Owner decision after SFG feedback that a `.com` reads as commercial for a nonpartisan civic resource. Canonical origin becomes `https://www.kyvky.org`; `www` stays canonical for the same reasons recorded in `src/lib/site-canonical.ts` (auth fragments, webhook POSTs).
+- **Email moves with the domain.** `alerts@kyvky.org` (send-only) and `katie@kyvky.org` (a Hostinger forwarder to the existing `katie@kyvky.com` inbox, so there is one inbox). Both addresses are now constants in `src/lib/kyvky-contact.ts`, so they change in one place. **Trade-off:** a new sending domain starts with no reputation. It gets a week of test sends before cutover, and `kyvky.com` stays verified in Resend for ~90 days as the rollback path.
+- **`www.kyvky.com` redirects with a host rule in `next.config.ts`, not a Vercel domain redirect.** The rule leaves `/api/unsubscribe/*` and `/api/webhooks/*` alone, so one-click unsubscribe POSTs from digests already in inboxes and any webhook not yet repointed still land. Whether mail providers follow a redirect on a one-click POST is unverified, and CAN-SPAM requires those links to keep working. The other legacy hosts still redirect at the Vercel edge.
+- **Scraper User-Agents change only their contact URL** (`+https://www.kyvky.org`). The bot names are unchanged, so LRC sees the same client.
+- **Not a find-and-replace of history.** Earlier entries here, TASKS.md history and `docs/program-spec/**` keep `kyvky.com` as written.

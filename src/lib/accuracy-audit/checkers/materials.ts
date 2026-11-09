@@ -35,7 +35,7 @@ import {
 } from '../../ky-committee-material-link-probe';
 
 const FETCH_HEADERS = {
-  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; accuracy-audit)',
+  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; accuracy-audit)',
   Accept: 'text/html',
 };
 

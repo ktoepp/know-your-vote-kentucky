@@ -24,7 +24,7 @@ import { normalizeBillNumberForLookup, normalizeKySessionLabel } from './lrc-ses
 const SOURCE = 'lrc-popular-names';
 
 const FETCH_HEADERS = {
-  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; lrc-popular-names-sync)',
+  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; lrc-popular-names-sync)',
   Accept: 'text/html',
 };
 

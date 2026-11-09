@@ -275,7 +275,7 @@ function fetchOpts(method: 'HEAD' | 'GET', extraHeaders?: Record<string, string>
     redirect: 'follow',
     signal: AbortSignal.timeout(TIMEOUT_MS),
     headers: {
-      'User-Agent': 'KnowYourVoteKentucky-LinkVerifier/1.0 (integrity check; +https://kyvky.com)',
+      'User-Agent': 'KnowYourVoteKentucky-LinkVerifier/1.0 (integrity check; +https://www.kyvky.org)',
       Accept: '*/*',
       ...extraHeaders,
     },

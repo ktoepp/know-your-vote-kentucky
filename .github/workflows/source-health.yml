@@ -129,12 +129,12 @@ jobs:
           check() {
             local url="$1" code
             code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
-              -A "KnowYourVoteKentucky-sitecheck/1.0 (+https://kyvky.com)" "$url") || code=000
+              -A "KnowYourVoteKentucky-sitecheck/1.0 (+https://www.kyvky.org)" "$url") || code=000
             if [ "$code" != "200" ]; then
               echo "$url returned $code; retrying in 30 s"
               sleep 30
               code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
-                -A "KnowYourVoteKentucky-sitecheck/1.0 (+https://kyvky.com)" "$url") || code=000
+                -A "KnowYourVoteKentucky-sitecheck/1.0 (+https://www.kyvky.org)" "$url") || code=000
             fi
             echo "$url -> $code"
             if [ "$code" != "200" ]; then
@@ -142,8 +142,8 @@ jobs:
             fi
           }
           FAILURES=""
-          check "https://www.kyvky.com/${SITE_CHECK_PATH#/}"
-          check "https://www.kyvky.com/bills"
+          check "https://www.kyvky.org/${SITE_CHECK_PATH#/}"
+          check "https://www.kyvky.org/bills"
           if [ -z "$FAILURES" ]; then
             echo "Site check passed"
             exit 0

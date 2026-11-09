@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
+import { KYVKY_CONTACT_EMAIL } from '@/lib/kyvky-contact';
 import {
   buildUnsubscribeUpdate,
   parseUnsubscribeList,
@@ -24,7 +25,7 @@ async function unsubscribe(
       status: 400,
       body: page(
         'Invalid link',
-        'This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at katie@kyvky.com.',
+        `This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at ${KYVKY_CONTACT_EMAIL}.`,
         false,
       ),
     };

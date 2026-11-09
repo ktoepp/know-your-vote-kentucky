@@ -19,6 +19,7 @@ import { supabaseAdmin } from '../src/app/lib/supabaseAdminCore';
 import { WelcomeEmail } from '../src/lib/email/welcome-email';
 import { emailLogoSrc } from '../src/lib/email/brand';
 import { publicSiteOrigin } from '../src/lib/site-canonical';
+import { KYVKY_ALERTS_EMAIL, KYVKY_CONTACT_EMAIL } from '../src/lib/kyvky-contact';
 
 type Args = {
   email?: string;
@@ -105,12 +106,12 @@ async function main() {
     console.error('RESEND_API_KEY not set');
     process.exit(4);
   }
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || 'alerts@kyvky.com';
+  const from = process.env.RESEND_FROM_EMAIL?.trim() || KYVKY_ALERTS_EMAIL;
   const resend = new Resend(key);
   const { data, error: sendErr } = await resend.emails.send({
     from,
     to: profile.email as string,
-    replyTo: 'katie@kyvky.com',
+    replyTo: KYVKY_CONTACT_EMAIL,
     subject: 'Your Know Your Vote Kentucky account is set up',
     html,
     text,

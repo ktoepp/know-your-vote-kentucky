@@ -47,18 +47,29 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     /**
-     * Canonical host is https://www.kyvky.com (apex 307s to it at the Vercel edge).
+     * Canonical host is https://www.kyvky.org (moved from www.kyvky.com; see
+     * docs/specs/org-domain-migration.md). The kyvky.org apex 308s to it at the Vercel edge.
      *
-     * The alternate domains — knowyourvotekentucky.com/.org, knowyourvoteky.com and
-     * their www hosts — are deliberately NOT host-matched here: requests for them
-     * never reach this table. The .com pairs are redirected to www.kyvky.com by the
-     * Vercel project's domain settings, and the .org pair is forwarded by Hostinger
-     * before it ever touches Vercel. A `has: [{ type: 'host' }]` rule for any of them
-     * is dead code, so changing a destination here would silently fix nothing.
-     * (The .org forwarding currently drops the path — that is a Hostinger-side fix;
-     * see TASKS.md.)
+     * www.kyvky.com stays attached to the Vercel project as a normal serving domain so the
+     * host rule below can see it. Every path 308s to the same path on www.kyvky.org, with
+     * the query string carried over, EXCEPT /api/unsubscribe/* and /api/webhooks/*. Those
+     * keep answering on .com so that one-click unsubscribe POSTs from digests sent before
+     * the move (List-Unsubscribe points at .com) and any webhook not yet repointed still
+     * land. Drop the exclusion once those have aged out (plan: Phase 3).
+     *
+     * Every other alternate host (kyvky.com apex, knowyourvotekentucky.com,
+     * knowyourvoteky.com and their www hosts) is redirected by the Vercel project's domain
+     * settings and never reaches this table, and the knowyourvotekentucky.org pair is
+     * forwarded by Hostinger. A `has: [{ type: 'host' }]` rule for any of those is dead
+     * code, so changing a destination here would silently fix nothing.
      */
     return [
+      {
+        source: '/:path((?!api/unsubscribe/|api/webhooks/).*)',
+        has: [{ type: 'host', value: 'www.kyvky.com' }],
+        destination: 'https://www.kyvky.org/:path',
+        permanent: true,
+      },
       {
         source: '/ordinances',
         destination: '/',

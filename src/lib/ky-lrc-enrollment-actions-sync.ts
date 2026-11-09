@@ -23,7 +23,7 @@ import { billSessionLookupKey, normalizeKySessionLabel } from './lrc-session-lab
 const SOURCE = 'lrc-enrollment-actions';
 
 const FETCH_HEADERS = {
-  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; lrc-enrollment-actions-sync)',
+  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; lrc-enrollment-actions-sync)',
   Accept: 'text/html',
 };
 

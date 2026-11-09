@@ -31,7 +31,7 @@ async function loadHtml(): Promise<string> {
       timeout: 30_000,
       responseType: 'text',
       headers: {
-        'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; committee-calendar phase0)',
+        'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; committee-calendar phase0)',
       },
     });
     writeFileSync(DEFAULT_FIXTURE, r.data, 'utf8');

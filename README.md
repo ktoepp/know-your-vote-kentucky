@@ -167,13 +167,13 @@ These feed `/admin/sync-status` (send `ADMIN_TOKEN` in the `x-admin-token` heade
 
 ### Outbound mail
 
-`From: alerts@kyvky.com` (transactional only — do not reply). `Reply-To: katie@kyvky.com` (real inbox). All inbound contact and vulnerability reports go to `katie@kyvky.com`. Resend webhook posts to `https://www.kyvky.com/api/webhooks/resend` (apex 307s break POST). Every transactional send includes a plain-text fallback.
+`From: alerts@kyvky.org` (transactional only — do not reply). `Reply-To: katie@kyvky.org` (real inbox; forwards to the original `katie@kyvky.com` mailbox). All inbound contact and vulnerability reports go to `katie@kyvky.org`. Both addresses live in `src/lib/kyvky-contact.ts`. Resend webhook posts to `https://www.kyvky.org/api/webhooks/resend` (apex redirects break POST). Every transactional send includes a plain-text fallback.
 
 ## Deployment
 
 Vercel project. Set `CRON_SECRET` (16+ random chars) — Vercel Cron invokes `/api/sync?source=…` with `Authorization: Bearer <CRON_SECRET>`. Manual operator runs can use `SYNC_API_KEY` instead. At least one of the two must be configured.
 
-Canonical origin is `https://www.kyvky.com` (`NEXT_PUBLIC_APP_URL` / `APP_PUBLIC_URL`, and the `DEFAULT_SITE_ORIGIN` fallback in `src/lib/site-canonical.ts`). The apex 301s to `www`, and `next.config.ts` redirects the legacy hosts (`knowyourvotekentucky.com/.org`, `knowyourvoteky.com`) straight to `www` so nothing chains through the apex. Do not set either env var to the apex — it costs a redirect hop, drops auth-token URL fragments, and breaks webhook POSTs.
+Canonical origin is `https://www.kyvky.org` (`NEXT_PUBLIC_APP_URL` / `APP_PUBLIC_URL`, and the `DEFAULT_SITE_ORIGIN` fallback in `src/lib/site-canonical.ts`); it moved from `www.kyvky.com` (see `docs/specs/org-domain-migration.md`). The `kyvky.org` apex 308s to `www` in the Vercel project's domain settings. `www.kyvky.com` path-preserving 308s to `www.kyvky.org` via a host rule in `next.config.ts` (unsubscribe and webhook routes excepted). The other legacy hosts (`kyvky.com`, `knowyourvotekentucky.com`, `knowyourvoteky.com` and their `www` hosts) redirect in Vercel's domain settings, and `knowyourvotekentucky.org` is forwarded by Hostinger. Do not set either env var to the apex — it costs a redirect hop, drops auth-token URL fragments, and breaks webhook POSTs.
 
 Before merging a code change, follow **[docs/ops/release.md](./docs/ops/release.md)** (release calendar, freezes and the deploy checklist).
 

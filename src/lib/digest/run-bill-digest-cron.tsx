@@ -25,7 +25,7 @@ import {
 } from '@/lib/digest/format-digest-event-detail';
 import { publicSiteOrigin } from '@/lib/site-canonical';
 import { kyBillSlug } from '@/lib/ky-bill-slug';
-import { KYVKY_POSTAL_ADDRESS } from '@/lib/kyvky-contact';
+import { KYVKY_ALERTS_EMAIL, KYVKY_CONTACT_EMAIL, KYVKY_POSTAL_ADDRESS } from '@/lib/kyvky-contact';
 
 const DIGEST_CAP = 10;
 /** Committee updates get their own cap; the remainder counts toward the overflow line. */
@@ -139,7 +139,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
   }
 
   const resendKey = process.env.RESEND_API_KEY?.trim();
-  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || 'alerts@kyvky.com';
+  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || KYVKY_ALERTS_EMAIL;
   const resend = resendKey && !dryRun ? new Resend(resendKey) : null;
 
   const now = new Date();
@@ -610,7 +610,7 @@ export async function runBillDigestCron(opts: RunBillDigestCronOptions = {}): Pr
       const { data: sendData, error: sendErr } = await resend.emails.send({
         from: fromEmail,
         to: email,
-        replyTo: 'katie@kyvky.com',
+        replyTo: KYVKY_CONTACT_EMAIL,
         subject,
         html,
         text,

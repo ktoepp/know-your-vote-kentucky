@@ -19,7 +19,7 @@ import {
 const SOURCE = 'lrc-committee-materials';
 
 const FETCH_HEADERS = {
-  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; lrc-committee-materials-sync)',
+  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; lrc-committee-materials-sync)',
   Accept: 'text/html',
 };
 
