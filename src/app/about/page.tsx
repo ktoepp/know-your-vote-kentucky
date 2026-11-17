@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Box, Container, Paper, Typography, List, ListItem, ListItemText } from '@mui/material';
 import { buildPageMetadata } from '@/lib/seo';
+import { KYVKY_CONTACT_EMAIL } from '@/lib/kyvky-contact';
 
 export const metadata: Metadata = buildPageMetadata({
   title: 'About',
@@ -66,7 +67,7 @@ export default function AboutPage() {
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
           If something here looks wrong, write to{' '}
-          <Link href="mailto:katie@kyvky.com">katie@kyvky.com</Link>. It comes straight to me, and
+          <Link href={`mailto:${KYVKY_CONTACT_EMAIL}`}>{KYVKY_CONTACT_EMAIL}</Link>. It comes straight to me, and
           I&apos;d like to know. Thanks for being here.
         </Typography>
       </Paper>

@@ -121,7 +121,7 @@ Triggered once, after first email verification.
 
 "Signing up" and not "using KYvKY" in the greeting, because the email fires at verification, before the reader has used anything. The sign-off still says "using KYvKY," which is correct there: by then it is a send-off, not a claim about what they have already done.
 
-The reply claim is literally true: every transactional send sets `Reply-To: katie@kyvky.com`. Do not add it to any surface where that stops being the case.
+The reply claim is literally true: every transactional send sets `Reply-To: katie@kyvky.org` (`KYVKY_CONTACT_EMAIL`). Do not add it to any surface where that stops being the case.
 
 The funding sentence must stay in the **seeking** tense. Per the Notion wording rules, never name a sponsor or write "our fiscal sponsor" until an agreement is signed. When one is, this line changes here, on `/about`, and in the design-system specimen together.
 
@@ -189,7 +189,7 @@ One-click, no login. Rendered as a minimal HTML page. The link may carry `?list=
 
 **Invalid/missing token (400):**
 - Title: `Invalid link`
-- Body: `This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at katie@kyvky.com.`
+- Body: `This unsubscribe link is not valid. If you received it in an email, try selecting the link again or contact us at katie@kyvky.org.`
 
 **Server error (500):**
 - Title: `Something went wrong`

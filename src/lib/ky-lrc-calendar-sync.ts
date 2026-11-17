@@ -29,7 +29,7 @@ export const LRC_LEGISLATIVE_CALENDAR_URL = 'https://apps.legislature.ky.gov/leg
 const SOURCE = 'lrc-calendar';
 
 const FETCH_HEADERS = {
-  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; lrc-calendar-sync)',
+  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; lrc-calendar-sync)',
   Accept: 'text/html',
 };
 

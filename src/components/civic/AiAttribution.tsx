@@ -3,6 +3,7 @@
 import React from 'react';
 import { Box, Chip, Link, Typography } from '@mui/material';
 import { ExpandableText } from '@/components/ui/ExpandableText';
+import { KYVKY_CONTACT_EMAIL } from '@/lib/kyvky-contact';
 import {
   AUDIENCE_CLAUSE_LABEL,
   SHOW_AUDIENCE_CLAUSE,
@@ -47,7 +48,7 @@ export function AiSummaryInline({ children }: { children: React.ReactNode }) {
 }
 
 /** Inbox that fields summary-feedback reports (see FEEDBACK.md workflow). */
-const FEEDBACK_EMAIL = 'katie@kyvky.com';
+const FEEDBACK_EMAIL = KYVKY_CONTACT_EMAIL;
 
 /** Shown above a description-based summary when the bill changed after introduction (WS3-04). */
 const CHANGED_AFTER_INTRODUCTION_CAVEAT =

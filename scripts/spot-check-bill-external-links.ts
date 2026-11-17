@@ -36,7 +36,7 @@ function parseArgs(): { votesLimit: number; billsScan: number } {
 }
 
 async function probeUrl(url: string): Promise<{ ok: boolean; status: number }> {
-  const ua = 'KnowYourVoteKentucky-SpotCheck/1.0 (+https://kyvky.com)';
+  const ua = 'KnowYourVoteKentucky-SpotCheck/1.0 (+https://www.kyvky.org)';
   try {
     let res = await fetch(url, {
       method: 'HEAD',
