@@ -79,6 +79,7 @@ Each step can be done on its own, and none of them changes what users see.
      - **Edit** `CNAME www`: change the target from `kyvky.org` to `2fa4423ab3821f7e.vercel-dns-017.com`. These are the same values `www.kyvky.com` uses.
      - Leave MX and TXT records alone.
    - Check: after 5–60 minutes the Vercel domains page shows both `.org` hosts as "Valid Configuration", and https://www.kyvky.org loads the site. The page's canonical tag still says `.com` until cutover. That is expected.
+   - **Done 2026-11-17.** The owner updated Hostinger DNS. Vercel reports `kyvky.org` configured by `A 216.150.1.1` and `www.kyvky.org` by `CNAME 2fa4423ab3821f7e.vercel-dns-017.com`, both `misconfigured: false`.
 3. **Email on `.org`** (finish by about 2026-11-20 so the new domain has a week of test sends before cutover):
    - **Forwarder:** hPanel → Emails → pick `kyvky.org` → Forwarders → create one from `katie@kyvky.org` to `katie@kyvky.com`. Hostinger sets MX (`mx1.hostinger.com` / `mx2.hostinger.com`) when email is turned on for the domain. Send a test from Gmail to `katie@kyvky.org` and confirm it arrives. No mailbox is needed for `alerts@`. If hPanel wants a paid email plan just to forward, stop and tell the agent; there are free alternatives.
    - **Resend:** https://resend.com/domains → **Add Domain** → `kyvky.org`, same region as `kyvky.com`. Resend then lists 3–4 records. Add each one in Hostinger DNS for `kyvky.org`, **copying the exact values from Resend**. They look like this:
