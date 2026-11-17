@@ -13,7 +13,7 @@ Origin: TASKS.md › "Owner wishlist, filed 2026-08-31" (SFG feedback: present a
 | Canonical host shape | `www.kyvky.org` with apex → www. This keeps the current www pattern, so the reasoning in `src/lib/site-canonical.ts` (auth fragments, webhook POSTs) still applies. |
 | Cutover date | **By 2026-11-30** (owner, 2026-11-08). This leaves two weeks before the 12-14 DNS deadline for fixes or rollback. Avoid Thanksgiving (11-26/27). |
 | Registrar and DNS for `kyvky.org` | Hostinger, owned (owner, 2026-11-08). It is the same account as `kyvky.com`. |
-| Mailboxes | `alerts@` is send-only and gets no mailbox, as today. `katie@kyvky.org` is a Hostinger **forwarder** to the existing `katie@kyvky.com` inbox, so there is one inbox and nothing to migrate. |
+| Mailboxes | `alerts@` is send-only and gets no mailbox, as today. **The existing Hostinger mailbox moves from `katie@kyvky.com` to `katie@kyvky.org` on switch day** (owner, 2026-11-17). A forwarder was ruled out: Hostinger's `.org` email turns into a paid plan, and the owner declined ImprovMX. After the move `katie@kyvky.com` **stops receiving**, which the owner accepted given the small user base. |
 | Resend | Add `kyvky.org` as a second domain, then remove `kyvky.com` after the transition. Resend cannot rename a domain, so a "transfer" means add, then remove. The free plan allows 3 verified domains (Resend changelog, 2026-08-25), so this works on any plan. |
 
 ## Timing constraint
@@ -81,7 +81,11 @@ Each step can be done on its own, and none of them changes what users see.
    - Check: after 5–60 minutes the Vercel domains page shows both `.org` hosts as "Valid Configuration", and https://www.kyvky.org loads the site. The page's canonical tag still says `.com` until cutover. That is expected.
    - **Done 2026-11-17.** The owner updated Hostinger DNS. Vercel reports `kyvky.org` configured by `A 216.150.1.1` and `www.kyvky.org` by `CNAME 2fa4423ab3821f7e.vercel-dns-017.com`, both `misconfigured: false`.
 3. **Email on `.org`** (finish by about 2026-11-20 so the new domain has a week of test sends before cutover):
-   - **Forwarder:** hPanel → Emails → pick `kyvky.org` → Forwarders → create one from `katie@kyvky.org` to `katie@kyvky.com`. Hostinger sets MX (`mx1.hostinger.com` / `mx2.hostinger.com`) when email is turned on for the domain. Send a test from Gmail to `katie@kyvky.org` and confirm it arrives. No mailbox is needed for `alerts@`. If hPanel wants a paid email plan just to forward, stop and tell the agent; there are free alternatives.
+   - **Mailbox prep (don't move it yet; that happens on switch day, Phase 2 step 0):**
+     - Do **not** claim Hostinger's free `.org` email offer (it turns paid).
+     - List every account that uses `katie@kyvky.com` as its login or recovery email, because those resets stop arriving after the move. Check Hostinger, Resend, Supabase, GitHub, Google (Search Console), Mapbox, Sentry, PostHog, Slack, LegiScan, Open States, and anything a partner such as SFG has on file. Change each one to `katietoepp@gmail.com` now, or to `katie@kyvky.org` after the move.
+     - Ask Hostinger support (the hPanel chat) whether they can move the existing email plan from `kyvky.com` to `kyvky.org` in place. If not, the documented route is: export the mail in Webmail (or use the IMAP Sync tool, which handles up to 3 GB) → release `kyvky.com` from the plan → attach `kyvky.org` → recreate `katie@` → import.
+   - No mailbox is needed for `alerts@`.
    - **Resend:** https://resend.com/domains → **Add Domain** → `kyvky.org`, same region as `kyvky.com`. Resend then lists 3–4 records. Add each one in Hostinger DNS for `kyvky.org`, **copying the exact values from Resend**. They look like this:
      - `MX send` → `feedback-smtp.<region>.amazonses.com`, priority 10
      - `TXT send` → `v=spf1 include:amazonses.com ~all`
@@ -117,6 +121,7 @@ Order matters. Env vars come before the deploy because `NEXT_PUBLIC_*` is baked 
    - `NEXT_PUBLIC_APP_URL` = `https://www.kyvky.org`
    - `APP_PUBLIC_URL` = `https://www.kyvky.org`
    - `RESEND_FROM_EMAIL` = `alerts@kyvky.org`
+   - **Step 0, just before this:** move the Hostinger mailbox from `katie@kyvky.com` to `katie@kyvky.org` (see Phase 0 step 3). Hostinger then adds its own MX, SPF and DKIM records to `kyvky.org`; keep exactly one `v=spf1` TXT on `@`. Send a test from Gmail to `katie@kyvky.org` and confirm it arrives before going on. The move happens on switch day so that `katie@kyvky.com` keeps receiving for as long as the live site still lists it.
 2. **Supabase** (https://supabase.com/dashboard/project/pmpadtydauuqysnxekno/auth/url-configuration):
    - Site URL = `https://www.kyvky.org`
    - Redirect URLs: **add** `https://www.kyvky.org/auth/verify` and `https://www.kyvky.org/auth/reset` (and `https://www.kyvky.org/**` if the `.com` list uses a wildcard). **Keep** the `.com` entries.
@@ -154,7 +159,7 @@ Order matters. Env vars come before the deploy because `NEXT_PUBLIC_*` is baked 
 ## Phase 3: Transition and cleanup
 
 - **Never let `kyvky.com` lapse.** It carries backlinks, links in old emails and printed material. Keep it renewed and redirecting for good.
-- Keep the `katie@kyvky.com` mailbox for good. It is the real inbox behind the `katie@kyvky.org` forwarder.
+- `katie@kyvky.com` no longer receives after the mailbox move. Keep the `kyvky.com` domain itself for good regardless.
 - After about 90 days: remove `kyvky.com` from Resend → Domains (this completes the "transfer"; leave its DKIM record in DNS, where it does no harm). Remove the `.com` Supabase redirect URLs. Drop `kyvky.com` from the hygiene allowlist. Optionally replace the `next.config.ts` host rule with Vercel-level domain redirects (unsubscribe links in digests sent before cutover will have aged out by then).
 - Off-site updates: social bios, GitHub repo homepage, partner links, email signatures, print.
 
@@ -165,6 +170,7 @@ Order matters. Env vars come before the deploy because `NEXT_PUBLIC_*` is baked 
 - **Deliverability dip.** `kyvky.org` starts with no sending reputation. Mitigate with DKIM and DMARC in place before cutover and the inbox tests in Phase 0, and watch bounces and complaints in Resend for two weeks.
 - **Short-term search ranking wobble.** This is normal for a domain move. Path-preserving 308s, Change of Address and the `.org` sitemap all limit it.
 - **LRC scraping.** Only the contact URL inside the User-Agent changes. Watch `source-health` and the sync logs for 403s for a week.
+- **`katie@kyvky.com` stops receiving.** Replies to digests sent before the switch (their Reply-To is `.com`), old links to that address, and password resets for any account still registered to it will bounce or go missing. Mitigation: the account audit in Phase 0 step 3, and a small user base.
 - **Unsubscribe compliance (CAN-SPAM).** Unsubscribe links in emails already sent must keep working. The redirect exclusion and keeping `.com` covered by the Supabase allowlist handle this. The postal address does not change.
 
 ## Rollback
@@ -174,7 +180,7 @@ Order matters. Env vars come before the deploy because `NEXT_PUBLIC_*` is baked 
 2. Set the Supabase Site URL and SMTP sender back.
 3. Set the alternates' redirect targets in Vercel back to `www.kyvky.com` (the `kyvky.com` apex used the default status; the others used 308).
 
-The Resend `.com` domain stays verified throughout, so `RESEND_FROM_EMAIL=alerts@kyvky.com` works immediately. Leave the `.org` DNS in place (it does no harm).
+The Resend `.com` domain stays verified throughout, so `RESEND_FROM_EMAIL=alerts@kyvky.com` works immediately. Leave the `.org` DNS in place (it does no harm). The mailbox move is **not** quick to undo: if the code is rolled back, its Reply-To goes back to `katie@kyvky.com`, which no longer receives. Either move the mailbox back the same way, or keep the rollback to the env and domain settings and leave the merged code in place.
 
 ## Open questions for the owner
 

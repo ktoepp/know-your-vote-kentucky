@@ -167,7 +167,7 @@ These feed `/admin/sync-status` (send `ADMIN_TOKEN` in the `x-admin-token` heade
 
 ### Outbound mail
 
-`From: alerts@kyvky.org` (transactional only — do not reply). `Reply-To: katie@kyvky.org` (real inbox; forwards to the original `katie@kyvky.com` mailbox). All inbound contact and vulnerability reports go to `katie@kyvky.org`. Both addresses live in `src/lib/kyvky-contact.ts`. Resend webhook posts to `https://www.kyvky.org/api/webhooks/resend` (apex redirects break POST). Every transactional send includes a plain-text fallback.
+`From: alerts@kyvky.org` (transactional only — do not reply). `Reply-To: katie@kyvky.org` (real inbox; the Hostinger mailbox moved here from `katie@kyvky.com`, which no longer receives). All inbound contact and vulnerability reports go to `katie@kyvky.org`. Both addresses live in `src/lib/kyvky-contact.ts`. Resend webhook posts to `https://www.kyvky.org/api/webhooks/resend` (apex redirects break POST). Every transactional send includes a plain-text fallback.
 
 ## Deployment
 
