@@ -94,6 +94,7 @@ Each step can be done on its own, and none of them changes what users see.
      - Recommended: `TXT _dmarc` → `v=DMARC1; p=none` (same as `.com`)
      - Leave Resend's **Enable receiving** off. It would want MX records on `kyvky.org`, which belong to the Hostinger mailbox.
      - **Done 2026-11-17 13:28 ET:** Resend shows `kyvky.org` Verified (DKIM, `rsend` and `send` all verified; Forge Ready).
+     - **Test send 2026-11-17 13:39 ET:** from `alerts@kyvky.org` to Gmail, which shows SPF PASS (return path `rsend.kyvky.org`), DKIM PASS (`d=kyvky.org`), DMARC PASS. Delivered in 0 seconds.
    - Click **Verify** in Resend. Before trusting the green badge, open https://dns.google/query?name=resend._domainkey.kyvky.org&type=TXT and confirm the `p=…` key shows up. This guards against a repeat of the 2026-06-04 stale-verification incident in `docs/launch-checklist.md`. Keep `kyvky.com` in Resend until Phase 3.
    - **Test sends:** from https://resend.com/emails (or the API), send from `alerts@kyvky.org` with reply-to `katie@kyvky.org` to a Gmail, an Outlook and a Yahoo address. Use `docs/email-client-qa.md`, and check spam folders: a new domain has no sending reputation.
 4. **Artwork:** deliver `.org` versions of `public/branding/Logo-03.png` (2488×603 PNG, transparent background) and `src/app/opengraph-image.jpg` (1200×630 JPG). Check the icons (`public/branding/icon-*`, `apple-touch-icon.png`, `favicon*`) for a TLD as well.
