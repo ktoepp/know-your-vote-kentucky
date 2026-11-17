@@ -11,7 +11,7 @@ Origin: TASKS.md › "Owner wishlist, filed 2026-08-31" (SFG feedback: present a
 | Email | **Move to `.org`.** Sender `alerts@kyvky.org`, reply-to and contact `katie@kyvky.org`, Supabase auth sender `auth@kyvky.org`. |
 | Logo and share image | **Owner supplies new artwork.** `.com` is drawn into the artwork itself (see below). |
 | Canonical host shape | `www.kyvky.org` with apex → www. This keeps the current www pattern, so the reasoning in `src/lib/site-canonical.ts` (auth fragments, webhook POSTs) still applies. |
-| Cutover date | **By 2026-11-30** (owner, 2026-11-08). This leaves two weeks before the 12-14 DNS deadline for fixes or rollback. Avoid Thanksgiving (11-26/27). |
+| Cutover date | **Saturday 2026-11-21** (owner, 2026-11-17; originally "by 11-30"). Start late morning ET or later, after the daily 07:00 ET digest send (`0 11 * * *` UTC), so the Sunday digest becomes the first real send from `alerts@kyvky.org`. This leaves more than three weeks before the 12-14 DNS deadline for fixes or rollback. |
 | Registrar and DNS for `kyvky.org` | Hostinger, owned (owner, 2026-11-08). It is the same account as `kyvky.com`. |
 | Mailboxes | `alerts@` is send-only and gets no mailbox, as today. **The existing Hostinger mailbox moves from `katie@kyvky.com` to `katie@kyvky.org` on switch day** (owner, 2026-11-17). A forwarder was ruled out: Hostinger's `.org` email turns into a paid plan, and the owner declined ImprovMX. After the move `katie@kyvky.com` **stops receiving**, which the owner accepted given the small user base. |
 | Resend | Add `kyvky.org` as a second domain, then remove `kyvky.com` after the transition. Resend cannot rename a domain, so a "transfer" means add, then remove. The free plan allows 3 verified domains (Resend changelog, 2026-08-25), so this works on any plan. |
@@ -95,6 +95,7 @@ Each step can be done on its own, and none of them changes what users see.
    - **Test sends:** from https://resend.com/emails (or the API), send from `alerts@kyvky.org` with reply-to `katie@kyvky.org` to a Gmail, an Outlook and a Yahoo address. Use `docs/email-client-qa.md`, and check spam folders: a new domain has no sending reputation.
 4. **Artwork:** deliver `.org` versions of `public/branding/Logo-03.png` (2488×603 PNG, transparent background) and `src/app/opengraph-image.jpg` (1200×630 JPG). Check the icons (`public/branding/icon-*`, `apple-touch-icon.png`, `favicon*`) for a TLD as well.
 5. **Search Console:** https://search.google.com/search-console → Add property → **Domain** → `kyvky.org`. Google gives a `TXT @` value (`google-site-verification=…`); add it in Hostinger DNS for `kyvky.org`. In Bing Webmaster Tools, import the property from Search Console.
+   - **Done 2026-11-17:** owner verified the `kyvky.org` Domain property.
 6. **Mapbox:** https://account.mapbox.com/access-tokens/ → open the token whose value matches `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` in Vercel → **URL restrictions**. If it is empty, there is nothing to do. If it has entries, add `https://www.kyvky.org` and `https://kyvky.org`, and keep the `.com` entries.
 
 ## Phase 1: Code changes (agent, on the plan PR, merged at cutover)
@@ -113,7 +114,7 @@ Each step can be done on its own, and none of them changes what users see.
   - `next dev` with Host headers: `www.kyvky.com/bills/HB1?session=2026RS&x=1` → `308 https://www.kyvky.org/bills/HB1?session=2026RS&x=1`. `/api/unsubscribe/<token>` (GET and POST) and `/api/webhooks/resend` reach their routes on `.com`. `/api/unsubscribe-other` is redirected. Other hosts are unaffected.
   - `next build` can't run in the agent sandbox, which blocks Google Fonts; CI runs it.
 
-## Phase 2: Cutover (owner and agent, one sitting, low-traffic hour, by 2026-11-30)
+## Phase 2: Cutover (owner and agent, one sitting, Saturday 2026-11-21 after 11:00 ET)
 
 Order matters. Env vars come before the deploy because `NEXT_PUBLIC_*` is baked in at build time.
 
