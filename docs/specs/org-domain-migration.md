@@ -99,6 +99,7 @@ Each step can be done on its own, and none of them changes what users see.
 5. **Search Console:** https://search.google.com/search-console → Add property → **Domain** → `kyvky.org`. Google gives a `TXT @` value (`google-site-verification=…`); add it in Hostinger DNS for `kyvky.org`. In Bing Webmaster Tools, import the property from Search Console.
    - **Done 2026-11-17:** owner verified the `kyvky.org` Domain property.
 6. **Mapbox:** https://account.mapbox.com/access-tokens/ → open the token whose value matches `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` in Vercel → **URL restrictions**. If it is empty, there is nothing to do. If it has entries, add `https://www.kyvky.org` and `https://kyvky.org`, and keep the `.com` entries.
+   - **Done 2026-11-17:** owner confirmed the token has 0 URL restrictions, so nothing to change. If WS2-04 adds restrictions later, list the `.org` hosts (and `.com` for the transition).
 
 ## Phase 1: Code changes (agent, on the plan PR, merged at cutover)
 
