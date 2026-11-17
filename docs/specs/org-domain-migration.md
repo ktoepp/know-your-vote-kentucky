@@ -84,6 +84,7 @@ Each step can be done on its own, and none of them changes what users see.
    - **Mailbox prep (don't move it yet; that happens on switch day, Phase 2 step 0):**
      - Do **not** claim Hostinger's free `.org` email offer (it turns paid).
      - List every account that uses `katie@kyvky.com` as its login or recovery email, because those resets stop arriving after the move. Check Hostinger, Resend, Supabase, GitHub, Google (Search Console), Mapbox, Sentry, PostHog, Slack, LegiScan, Open States, and anything a partner such as SFG has on file. Change each one to `katietoepp@gmail.com` now, or to `katie@kyvky.org` after the move.
+       - **Done 2026-11-17:** owner moved those logins off `katie@kyvky.com`.
      - Ask Hostinger support (the hPanel chat) whether they can move the existing email plan from `kyvky.com` to `kyvky.org` in place. If not, the documented route is: export the mail in Webmail (or use the IMAP Sync tool, which handles up to 3 GB) → release `kyvky.com` from the plan → attach `kyvky.org` → recreate `katie@` → import.
    - No mailbox is needed for `alerts@`.
    - **Resend:** https://resend.com/domains → **Add Domain** → `kyvky.org`, region North Virginia (us-east-1). **Added 2026-11-17.** Resend now uses its "Forge" setup for new domains, which differs from `kyvky.com`'s older MX/TXT-on-`send` records. Add these in Hostinger DNS for `kyvky.org`, copying values from Resend:
