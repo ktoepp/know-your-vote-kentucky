@@ -86,11 +86,12 @@ Each step can be done on its own, and none of them changes what users see.
      - List every account that uses `katie@kyvky.com` as its login or recovery email, because those resets stop arriving after the move. Check Hostinger, Resend, Supabase, GitHub, Google (Search Console), Mapbox, Sentry, PostHog, Slack, LegiScan, Open States, and anything a partner such as SFG has on file. Change each one to `katietoepp@gmail.com` now, or to `katie@kyvky.org` after the move.
      - Ask Hostinger support (the hPanel chat) whether they can move the existing email plan from `kyvky.com` to `kyvky.org` in place. If not, the documented route is: export the mail in Webmail (or use the IMAP Sync tool, which handles up to 3 GB) → release `kyvky.com` from the plan → attach `kyvky.org` → recreate `katie@` → import.
    - No mailbox is needed for `alerts@`.
-   - **Resend:** https://resend.com/domains → **Add Domain** → `kyvky.org`, same region as `kyvky.com`. Resend then lists 3–4 records. Add each one in Hostinger DNS for `kyvky.org`, **copying the exact values from Resend**. They look like this:
-     - `MX send` → `feedback-smtp.<region>.amazonses.com`, priority 10
-     - `TXT send` → `v=spf1 include:amazonses.com ~all`
-     - `TXT resend._domainkey` → a long `p=…` key
-     - If Resend suggests DMARC, `TXT _dmarc` → `v=DMARC1; p=none;`
+   - **Resend:** https://resend.com/domains → **Add Domain** → `kyvky.org`, region North Virginia (us-east-1). **Added 2026-11-17.** Resend now uses its "Forge" setup for new domains, which differs from `kyvky.com`'s older MX/TXT-on-`send` records. Add these in Hostinger DNS for `kyvky.org`, copying values from Resend:
+     - `TXT resend._domainkey` → the full `p=MIGf…` key (use Resend's copy button; the screen truncates it)
+     - `CNAME rsend` → `rsend.forge.rmta.net`
+     - `CNAME send` → `send.forge.rmta.net`
+     - Recommended: `TXT _dmarc` → `v=DMARC1; p=none` (same as `.com`)
+     - Leave Resend's **Enable receiving** off. It would want MX records on `kyvky.org`, which belong to the Hostinger mailbox.
    - Click **Verify** in Resend. Before trusting the green badge, open https://dns.google/query?name=resend._domainkey.kyvky.org&type=TXT and confirm the `p=…` key shows up. This guards against a repeat of the 2026-06-04 stale-verification incident in `docs/launch-checklist.md`. Keep `kyvky.com` in Resend until Phase 3.
    - **Test sends:** from https://resend.com/emails (or the API), send from `alerts@kyvky.org` with reply-to `katie@kyvky.org` to a Gmail, an Outlook and a Yahoo address. Use `docs/email-client-qa.md`, and check spam folders: a new domain has no sending reputation.
 4. **Artwork:** deliver `.org` versions of `public/branding/Logo-03.png` (2488×603 PNG, transparent background) and `src/app/opengraph-image.jpg` (1200×630 JPG). Check the icons (`public/branding/icon-*`, `apple-touch-icon.png`, `favicon*`) for a TLD as well.
