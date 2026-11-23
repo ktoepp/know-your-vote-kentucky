@@ -9,6 +9,7 @@
  * The production trigger lives in /auth/verify which fire-and-forgets to
  * /api/me/welcome-email after a successful session exchange.
  */
+import { KYVKY_ALERTS_EMAIL, KYVKY_CONTACT_EMAIL } from '@/lib/kyvky-contact';
 import './load-env';
 import * as React from 'react';
 import fs from 'node:fs/promises';
@@ -105,12 +106,12 @@ async function main() {
     console.error('RESEND_API_KEY not set');
     process.exit(4);
   }
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || 'alerts@kyvky.com';
+  const from = process.env.RESEND_FROM_EMAIL?.trim() || KYVKY_ALERTS_EMAIL;
   const resend = new Resend(key);
   const { data, error: sendErr } = await resend.emails.send({
     from,
     to: profile.email as string,
-    replyTo: 'katie@kyvky.com',
+    replyTo: KYVKY_CONTACT_EMAIL,
     subject: 'Your Know Your Vote Kentucky account is set up',
     html,
     text,

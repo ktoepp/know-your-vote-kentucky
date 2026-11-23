@@ -1,5 +1,6 @@
 'use client';
 
+import { KYVKY_CONTACT_EMAIL } from '@/lib/kyvky-contact';
 import { LegiScanCredit } from '@/components/civic/LegiScanCredit';
 import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -1214,7 +1215,7 @@ export function BillDetailView({ bill, detail, routeId, legislatorRoster }: Bill
         <Typography variant="body2" color="text.secondary" sx={{ mt: 4, textAlign: 'center' }}>
           Something wrong on this page?{' '}
           <MuiLink
-            href={`mailto:katie@kyvky.com?subject=${encodeURIComponent(`Problem on ${bill.bill_number} page`)}`}
+            href={`mailto:${KYVKY_CONTACT_EMAIL}?subject=${encodeURIComponent(`Problem on ${bill.bill_number} page`)}`}
             underline="hover"
           >
             Tell us

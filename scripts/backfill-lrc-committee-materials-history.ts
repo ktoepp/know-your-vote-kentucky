@@ -38,7 +38,7 @@ import {
 
 const FETCH_HEADERS = {
   'User-Agent':
-    'KnowYourVoteKentucky/1.0 (+https://kyvky.com; committee-materials-historical-backfill)',
+    'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; committee-materials-historical-backfill)',
   Accept: 'text/html',
 };
 

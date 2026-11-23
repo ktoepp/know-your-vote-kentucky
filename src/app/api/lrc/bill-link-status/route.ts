@@ -4,7 +4,7 @@ import { kyLrcBillDetailsUrl } from '@/lib/external-legislative-links';
 export const dynamic = 'force-dynamic';
 
 const TIMEOUT_MS = 12_000;
-const UA = 'KnowYourVoteKentucky/1.0 (+https://kyvky.com)';
+const UA = 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org)';
 
 function sanitizeLegislation(raw: string | null): string | null {
   const t = (raw ?? '').trim();
