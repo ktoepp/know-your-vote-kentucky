@@ -49,15 +49,33 @@ const nextConfig: NextConfig = {
     /**
      * Canonical host is https://www.kyvky.org (apex redirects to it at the Vercel edge).
      *
-     * The alternate domains — kyvky.com, knowyourvotekentucky.com/.org, knowyourvoteky.com
-     * and their www hosts — are deliberately NOT host-matched here: requests for them
-     * should be redirected to www.kyvky.org (path intact) by the Vercel project's domain
-     * settings, or by the registrar forward for any domain not attached to Vercel. A
-     * `has: [{ type: 'host' }]` rule for any of them is dead code, so changing a
-     * destination here would silently fix nothing. See TASKS.md "Canonical host moves
-     * to www.kyvky.org" for the cutover steps.
+     * The other alternate domains (kyvky.com, knowyourvoteky.com, knowyourvotekentucky.com/.org
+     * and their www hosts) are redirected to www.kyvky.org by the Vercel project's domain
+     * settings, or by the registrar forward for a domain not attached to Vercel. A host rule
+     * here only fires for a host that Vercel serves from this project, so changing a
+     * destination for any other host would silently fix nothing.
+     *
+     * The one exception is www.kyvky.com. Emails sent before the 2026-11-23 move carry
+     * `https://www.kyvky.com/api/unsubscribe/<token>` in List-Unsubscribe, and mail clients POST
+     * to it (RFC 8058 one-click) without following redirects. So www.kyvky.com is served by this
+     * project (no Vercel domain-level redirect), and the rules below send every path except
+     * /api/unsubscribe/ to www.kyvky.org. Drop these rules, and set the Vercel domain to redirect
+     * again, once those emails are old enough to ignore (the log keeps one year).
      */
+    const LEGACY_EMAIL_HOST = 'www.kyvky.com';
     return [
+      {
+        source: '/',
+        has: [{ type: 'host', value: LEGACY_EMAIL_HOST }],
+        destination: 'https://www.kyvky.org/',
+        permanent: true,
+      },
+      {
+        source: '/:path((?!api/unsubscribe/).+)',
+        has: [{ type: 'host', value: LEGACY_EMAIL_HOST }],
+        destination: 'https://www.kyvky.org/:path',
+        permanent: true,
+      },
       {
         source: '/ordinances',
         destination: '/',
