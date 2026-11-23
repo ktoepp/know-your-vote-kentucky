@@ -115,10 +115,10 @@ export const implementationPatterns = {
   complex: `
     <ComplexTooltip
       title="Veto Override"
-      summary="The General Assembly can override a Governor veto with 3/5 of elected members."
+      summary="The General Assembly can override a Governor veto with a majority of the members elected to each chamber."
       details={[
-        "Requires 61 of 100 House members (elected, not just present)",
-        "Requires 23 of 38 Senate members",
+        "Requires 51 of 100 House members (elected, not just present)",
+        "Requires 20 of 38 Senate members",
         "Both chambers must vote to override"
       ]}
     >
