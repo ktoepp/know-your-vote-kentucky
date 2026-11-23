@@ -4,6 +4,7 @@
  * Idempotent: checks ky_user_profiles.welcome_email_sent_at and returns 200 with
  * { sent: false } if already sent. Not called from /auth/verify while welcome is paused.
  */
+import { KYVKY_ALERTS_EMAIL, KYVKY_CONTACT_EMAIL } from '@/lib/kyvky-contact';
 import { NextResponse, type NextRequest } from 'next/server';
 import { render } from 'react-email';
 import { Resend } from 'resend';
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
   }
 
   const resendKey = process.env.RESEND_API_KEY?.trim();
-  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || 'alerts@kyvky.com';
+  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || KYVKY_ALERTS_EMAIL;
   if (!resendKey) {
     // Stamp persists; without an API key we can't send. Surface for ops.
     return NextResponse.json(
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: profile.email as string,
-      replyTo: 'katie@kyvky.com',
+      replyTo: KYVKY_CONTACT_EMAIL,
       subject: 'Your Know Your Vote Kentucky account is set up',
       html,
       text,

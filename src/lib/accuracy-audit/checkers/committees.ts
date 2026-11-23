@@ -47,7 +47,7 @@ import { normalizeCommitteeNameForDupes } from '../../ky-committee-utils';
 import { normalizeBillNumberForLookup } from '../../lrc-session-label';
 
 const FETCH_HEADERS = {
-  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; accuracy-audit)',
+  'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; accuracy-audit)',
   Accept: 'text/html',
 };
 

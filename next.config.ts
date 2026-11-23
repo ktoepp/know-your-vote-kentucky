@@ -47,16 +47,15 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     /**
-     * Canonical host is https://www.kyvky.com (apex 307s to it at the Vercel edge).
+     * Canonical host is https://www.kyvky.org (apex redirects to it at the Vercel edge).
      *
-     * The alternate domains — knowyourvotekentucky.com/.org, knowyourvoteky.com and
-     * their www hosts — are deliberately NOT host-matched here: requests for them
-     * never reach this table. The .com pairs are redirected to www.kyvky.com by the
-     * Vercel project's domain settings, and the .org pair is forwarded by Hostinger
-     * before it ever touches Vercel. A `has: [{ type: 'host' }]` rule for any of them
-     * is dead code, so changing a destination here would silently fix nothing.
-     * (The .org forwarding currently drops the path — that is a Hostinger-side fix;
-     * see TASKS.md.)
+     * The alternate domains — kyvky.com, knowyourvotekentucky.com/.org, knowyourvoteky.com
+     * and their www hosts — are deliberately NOT host-matched here: requests for them
+     * should be redirected to www.kyvky.org (path intact) by the Vercel project's domain
+     * settings, or by the registrar forward for any domain not attached to Vercel. A
+     * `has: [{ type: 'host' }]` rule for any of them is dead code, so changing a
+     * destination here would silently fix nothing. See TASKS.md "Canonical host moves
+     * to www.kyvky.org" for the cutover steps.
      */
     return [
       {

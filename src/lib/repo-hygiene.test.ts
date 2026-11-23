@@ -12,7 +12,7 @@ import { join } from "node:path";
 const FEEDBACK_PATH = join(process.cwd(), "FEEDBACK.md");
 
 /** Domains that may appear in FEEDBACK.md: our own, and the RFC 2606 placeholder. */
-const ALLOWED_EMAIL_DOMAINS = new Set(["kyvky.com", "example.com"]);
+const ALLOWED_EMAIL_DOMAINS = new Set(["kyvky.org", "kyvky.com", "example.com"]);
 
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/g;
 

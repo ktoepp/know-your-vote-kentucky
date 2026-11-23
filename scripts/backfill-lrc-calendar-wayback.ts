@@ -85,7 +85,7 @@ async function listWaybackSnapshots(fromIso: string, toIso: string): Promise<str
   const requestUrl = `${CDX_URL}?${params}`;
   const requestOpts = {
     timeout: 120_000,
-    headers: { 'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; lrc-calendar-backfill)' },
+    headers: { 'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; lrc-calendar-backfill)' },
   };
 
   // Exponential backoff over ~5 minutes: 10s, 30s, 90s. Wayback's typical blips
@@ -127,7 +127,7 @@ async function fetchWaybackHtml(timestamp: string): Promise<string> {
   const res = await axios.get<string>(waybackRawUrl(timestamp), {
     timeout: 90_000,
     responseType: 'text',
-    headers: { 'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://kyvky.com; lrc-calendar-backfill)' },
+    headers: { 'User-Agent': 'KnowYourVoteKentucky/1.0 (+https://www.kyvky.org; lrc-calendar-backfill)' },
   });
   return res.data;
 }

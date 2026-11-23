@@ -166,7 +166,7 @@ Six of the seven W4 owners are Backlog. If one is not picked up in W4, its rows 
 | 9.4 | WS9 | The full account-transfer order (retired WS9-09) | WS8-16 picks a mode that moves accounts | WS9-14 | |
 | 9.5 | WS9 | Moving the repo to a GitHub organization | A partner agreement or LOI | WS9-14 | |
 | 9.6 | WS9 | A separate Supabase org | WS8-16 picks a mode that moves accounts | WS9-14 | |
-| 9.7 | WS9 | A `.org` rebrand of the canonical host | A partner or funder requires `.org` as the primary host | WS9-14 | |
+| 9.7 | WS9 | A `.org` rebrand of the canonical host | A partner or funder requires `.org` as the primary host | WS9-14 | **Triggered 2026-11-23:** owner chose `https://www.kyvky.org` as canonical, mail included. Tracked in TASKS.md "Canonical host moves to www.kyvky.org". |
 | 9.8 | WS9 | A transfer rehearsal with a second admin | A partner LOI (W5) | WS9-14 | |
 | 9.9 | WS9 | A font-fallback guard test | WS6-17b keeps Adobe Fonts and a later CSS change removes the fallback | WS9-14 | |
 | 9.10 | WS9 | A monthly cash ledger or cron reminder | A partner requires monthly cost reporting | WS9-14 | |
