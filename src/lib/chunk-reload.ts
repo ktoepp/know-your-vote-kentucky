@@ -12,6 +12,10 @@
  *   "pending"  → the reloaded page landed: `recordChunkReloadOutcome` captures
  *                `chunk_reload_recovered`, sets "done".
  *   "done"     → a later chunk failure in this tab is not retried (real failure).
+ *
+ * Telemetry reads the flag with `hasFinishedChunkReload`, not `hasSpentChunkReload`: the
+ * `unhandledrejection` listener sets "pending" before PostHog/Sentry see the same error,
+ * so the error that triggers the reload must still count as recoverable.
  */
 import { isChunkLoadError } from "@/lib/telemetry-filters";
 
@@ -44,6 +48,13 @@ const defaultStorage = (): StorageLike | undefined =>
 /** True once this tab has already used (or is in the middle of) its one reload. */
 export const hasSpentChunkReload = (storage: StorageLike | undefined = defaultStorage()): boolean =>
   readFlag(storage) !== null;
+
+/**
+ * True once a reload in this tab has landed ("done"), so a chunk failure now is real.
+ * "pending" means the failing page is about to unload, so its errors are not crashes.
+ */
+export const hasFinishedChunkReload = (storage: StorageLike | undefined = defaultStorage()): boolean =>
+  readFlag(storage) === "done";
 
 /**
  * If `error` is a chunk-load failure and this tab has not reloaded for one yet, mark the

@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import {
   CHUNK_RELOAD_KEY,
   CHUNK_RELOAD_RECOVERED_EVENT,
+  hasFinishedChunkReload,
   hasSpentChunkReload,
   recordChunkReloadOutcome,
   reloadOnChunkLoadError,
   type StorageLike,
 } from "./chunk-reload";
+import { shouldDropException, type ExceptionLike } from "./telemetry-filters";
 
 const memoryStorage = (initial: Record<string, string> = {}): StorageLike & { data: Record<string, string> } => {
   const data = { ...initial };
@@ -85,5 +87,42 @@ describe("recordChunkReloadOutcome", () => {
     const captured: string[] = [];
     assert.equal(recordChunkReloadOutcome((e) => captured.push(e), memoryStorage()), false);
     assert.equal(captured.length, 0);
+  });
+});
+
+describe("hasFinishedChunkReload", () => {
+  test("is true only once the reload has landed", () => {
+    assert.equal(hasFinishedChunkReload(memoryStorage()), false);
+    assert.equal(hasFinishedChunkReload(memoryStorage({ [CHUNK_RELOAD_KEY]: "pending" })), false);
+    assert.equal(hasFinishedChunkReload(memoryStorage({ [CHUNK_RELOAD_KEY]: "done" })), true);
+    assert.equal(hasFinishedChunkReload(undefined), false);
+  });
+});
+
+describe("telemetry drop decision across the reload lifecycle", () => {
+  // V8 shape of a stale webpack runtime loading a chunk from a newer build.
+  const staleModule: ExceptionLike[] = [
+    {
+      type: "TypeError",
+      value: "Cannot read properties of undefined (reading 'call')",
+      stacktrace: { frames: [{ filename: "https://www.kyvky.com/_next/static/chunks/webpack-40527c2c9ab3273c.js" }] },
+    },
+  ];
+  const drops = (storage: StorageLike) =>
+    shouldDropException(staleModule, { chunkReloadSpent: hasFinishedChunkReload(storage) });
+
+  test("drops the error that triggers the reload, even after the listener set the flag", () => {
+    const storage = memoryStorage();
+    const err = new Error("Cannot read properties of undefined (reading 'call')");
+    err.stack = "TypeError: x\n at https://www.kyvky.com/_next/static/chunks/webpack-40527c2c9ab3273c.js:1:100";
+    assert.equal(reloadOnChunkLoadError(err, { storage, reload: () => {} }), true);
+    assert.equal(storage.data[CHUNK_RELOAD_KEY], "pending");
+    assert.equal(drops(storage), true);
+  });
+
+  test("keeps the same error once the reloaded page landed (the reload did not help)", () => {
+    const storage = memoryStorage({ [CHUNK_RELOAD_KEY]: "pending" });
+    recordChunkReloadOutcome(() => {}, storage);
+    assert.equal(drops(storage), false);
   });
 });
