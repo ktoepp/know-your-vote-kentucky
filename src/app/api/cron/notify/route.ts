@@ -10,6 +10,7 @@ import * as Sentry from '@sentry/nextjs';
 import { runBillDigestCron } from '@/lib/digest/run-bill-digest-cron';
 import { supabaseAdmin } from '@/app/lib/supabaseAdminCore';
 import { shouldTrimLog, trimNotificationLog } from '@/lib/email/notification-log-retention';
+import { formatDigestRunSummary } from '@/lib/digest/digest-run-summary';
 
 export const maxDuration = 120;
 
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest) {
 
   const dryRun =
     process.env.DIGEST_DRY_RUN === 'true' || new URL(req.url).searchParams.get('dryRun') === 'true';
+  const startedAt = Date.now();
   try {
     const result = await runBillDigestCron({ dryRun });
     // Per-user send errors don't throw — they accumulate in result.errors.
@@ -59,6 +61,10 @@ export async function GET(req: NextRequest) {
         });
       }
     }
+    // A run with nothing to send writes no other log, so say that it ran.
+    console.info(
+      formatDigestRunSummary({ ...result, logRowsTrimmed }, Date.now() - startedAt),
+    );
     return NextResponse.json(
       logRowsTrimmed === undefined ? result : { ...result, logRowsTrimmed },
       { status: 200 },
