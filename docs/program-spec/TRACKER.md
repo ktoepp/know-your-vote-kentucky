@@ -98,7 +98,7 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS5-02 | Delete never-imported source files, drop `openai`, add an orphan guard | WS5 | P1 | W1 (merge by 10-30) | Sonnet | M | none (soft: WS2-07, WS1-05a) | Backlog | todo |
 | WS5-03a | Freeze `TASKS.md` and `decisions.md` and start ADRs | WS5 | P1 | W0 (merge by 10-20) | Sonnet | S | none | Backlog | todo |
 | WS5-03b | Write `CURRENT.md` and map every open `TASKS.md` item | WS5 | P1 | W1 (merge by 10-30) | Sonnet | S | WS5-03a | Backlog | todo |
-| WS5-04a | Correct two wrong Kentucky-law statements (README veto rule, special-session copy) | WS5 | P1 | W0 (merge by 10-20) | Sonnet | S | none | Backlog | todo |
+| WS5-04a | Correct two wrong Kentucky-law statements (README veto rule, special-session copy) | WS5 | P1 | W0 (merge by 10-20) | Sonnet | S | none | Backlog | done (#332) |
 | WS5-04b | Rewrite the README to be short and accurate | WS5 | P2 | W2 | Sonnet | S | WS5-01b, WS5-03b | Backlog | todo |
 | WS5-05 | Record the maintenance baseline and label PRs by type | WS5 | P2 | W1 (merge by 10-30) | Sonnet | S | WS5-03b, WS1-04 | Backlog | todo |
 | WS5-06a | Remove parked local-government and executive-order code | WS5 | P2 | W2 (merge by 11-14) | Opus | M | WS5-02 (soft: WS2-07) | Backlog | todo |
@@ -178,7 +178,7 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS9-03 | Publish the release calendar, the election freeze and the deploy checklist | WS9 | P1 | W0 | Sonnet | S | none | Core | done (#314) |
 | WS9-06a | Write the LegiScan quota and ban-risk runbook before enforcement | WS9 | P0 | W0 | Opus | S | none | Core | done (#307) |
 | WS9-04 | Start `docs/ops/log.md` and cap the ops docs with a test | WS9 | P1 | W1 | Sonnet | S | WS9-01, WS9-03 | Core | todo |
-| WS9-05 | Make the `.org` domains redirect with the path intact | WS9 | P2 | W2 | Owner | S | none | Backlog | todo |
+| WS9-05 | Make the `.org` domains redirect with the path intact | WS9 | P2 | W2 | Owner | S | none | Backlog | done (owner 2026-11-23; #327, #330) |
 | WS9-06b | Write one runbook file for LRC, Open States, Supabase and email | WS9 | P1 | W2 | Opus | M | WS9-04 | Core | todo |
 | WS9-08 | Inventory vendors, list what does not transfer, and define the one monthly check | WS9 | P2 | W2 | Sonnet | S | WS9-04 | Core | todo |
 | WS9-11b | Check that the migrations rebuild the production schema | WS9 | P2 | W2 | Opus | S | none | Backlog | todo |

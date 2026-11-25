@@ -14,7 +14,7 @@ Read first if you're picking up this project:
 - **[decisions.md](./decisions.md)** — append-only rationale log; check before changing established patterns.
 - **[FEEDBACK.md](./FEEDBACK.md)** — incoming user feedback (email / in-person / PostHog) and how it's triaged into work. Raw artifacts live in gitignored `docs/feedback/`.
 - **[docs/specs/](./docs/specs/)** — feature specs (follow-bills, committee-calendar).
-- **This is the Kentucky General Assembly**, not the US Congress. Use KY terminology: 100 House / 38 Senate, Governor (not President), 3/5 veto override.
+- **This is the Kentucky General Assembly**, not the US Congress. Use KY terminology: 100 House / 38 Senate, Governor (not President), a veto is overridden by a majority of the members elected to each chamber (51 House, 20 Senate).
 - **Stack:** TypeScript, Next.js 15 (App Router only), React 18, MUI (primary), Tailwind (minimal — tooltip layer), Supabase / Postgres.
 - **Data sources:** LegiScan (bills, votes), Open States (legislators), LRC HTML calendar (committee meetings + agendas + materials). Orchestrated by `src/lib/ky-sync-pipeline.ts`.
 
