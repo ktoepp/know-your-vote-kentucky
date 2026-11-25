@@ -1,4 +1,4 @@
-import NextLink from 'next/link';
+import NextLink from '@/components/ClientNextLink';
 import { preload } from 'react-dom';
 import { Box, Container, Link as MuiLink, Typography } from '@mui/material';
 import { DistrictMapExplorerIsland } from '@/components/members/DistrictMapExplorerIsland';

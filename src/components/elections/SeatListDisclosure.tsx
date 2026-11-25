@@ -1,4 +1,4 @@
-import NextLink from 'next/link';
+import NextLink from '@/components/ClientNextLink';
 import { Box, Link as MuiLink } from '@mui/material';
 import { formatPartyLetterAbbrev } from '@/lib/bill-display';
 import { kyDistrictPath, kyDistrictShortName } from '@/lib/ky-district-pages';

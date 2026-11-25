@@ -2,7 +2,11 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 /**
- * Lint runs in CI (`npm run lint`, ESLint CLI) and gates merges. The build does not repeat it. The Next 16 upgrade (S1) deletes this key.
+ * Lint runs in CI (`npm run lint`, ESLint CLI) and gates merges. Next 16's `next build` no longer lints,
+ * so there is no `eslint` key here.
+ *
+ * `npm run build`, `dev` and `dev:clean` pass `--webpack`: Next 16 builds with Turbopack by default and
+ * fails on a custom `webpack()` hook (the `@mui/material/esm` alias below). Moving to Turbopack is deferred.
  */
 const nextConfig: NextConfig = {
   /** Native WebSocket impl used by Supabase Realtime when Node is below 22 (see supabaseAdminCore.ts). */
@@ -87,9 +91,6 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
     ];
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   },
   /** Map libs ship modern ESM; transpiling avoids occasional webpack chunk/module id mismatches in the App Router. */
   transpilePackages: ['mapbox-gl', 'react-map-gl'],

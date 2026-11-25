@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Container, Typography, Link as MuiLink, Stack, Divider } from '@mui/material';
-import Link from 'next/link';
+import Link from '@/components/ClientNextLink';
 import { APP_VERSION } from '@/lib/app-version';
 import { buildPageMetadata } from '@/lib/seo';
 import { CC_BY_4_NAME, CC_BY_4_URL, LEGISCAN_CHANGES_NOTE, LEGISCAN_URL } from '@/lib/legiscan-attribution';

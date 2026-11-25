@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server';
 import { GET, POST } from '../../app/api/cron/slack-test/route';
-import { middleware } from '../../middleware';
+import { proxy } from '../../proxy';
 
 // Dummy values only. Never put a real secret in a test.
 const SYNC = 'dummy-sync-key-0123456789abcdef';
@@ -57,7 +57,7 @@ describe('/api/cron/slack-test', () => {
   }
 });
 
-describe('middleware /admin access', () => {
+describe('proxy /admin access', () => {
   const adminRequest = (headers?: Record<string, string>) =>
     new NextRequest('http://localhost/admin/sync-status', { headers });
 
@@ -65,35 +65,35 @@ describe('middleware /admin access', () => {
 
   test('responds 404 when ADMIN_TOKEN is not configured', async () => {
     delete process.env.ADMIN_TOKEN;
-    const res = await middleware(adminRequest({ 'x-admin-token': ADMIN }));
+    const res = await proxy(adminRequest({ 'x-admin-token': ADMIN }));
     assert.equal(res.status, 404);
     assert.equal(continues(res), false);
   });
 
   test('responds 401 when ADMIN_TOKEN is set and no header is sent', async () => {
     process.env.ADMIN_TOKEN = ADMIN;
-    const res = await middleware(adminRequest());
+    const res = await proxy(adminRequest());
     assert.equal(res.status, 401);
     assert.equal(continues(res), false);
   });
 
   test('responds 401 for a wrong x-admin-token header', async () => {
     process.env.ADMIN_TOKEN = ADMIN;
-    const res = await middleware(adminRequest({ 'x-admin-token': 'wrong-token' }));
+    const res = await proxy(adminRequest({ 'x-admin-token': 'wrong-token' }));
     assert.equal(res.status, 401);
     assert.equal(continues(res), false);
   });
 
   test('continues to the page for the correct x-admin-token header', async () => {
     process.env.ADMIN_TOKEN = ADMIN;
-    const res = await middleware(adminRequest({ 'x-admin-token': ADMIN }));
+    const res = await proxy(adminRequest({ 'x-admin-token': ADMIN }));
     assert.equal(res.status, 200);
     assert.equal(continues(res), true);
   });
 
   test('leaves non-admin paths alone', async () => {
     delete process.env.ADMIN_TOKEN;
-    const res = await middleware(new NextRequest('http://localhost/bills'));
+    const res = await proxy(new NextRequest('http://localhost/bills'));
     assert.equal(continues(res), true);
   });
 });
