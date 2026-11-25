@@ -150,6 +150,18 @@ describe("shouldDropException (shared PostHog before_send / Sentry beforeSend de
     );
   });
 
+  test("drops the stale webpack runtime 'reading call' error until the reload has landed", () => {
+    const exceptions: ExceptionLike[] = [
+      {
+        type: "TypeError",
+        value: "Cannot read properties of undefined (reading 'call')",
+        stacktrace: { frames: [{ filename: "https://www.kyvky.com/_next/static/chunks/webpack-40527c2c9ab3273c.js" }] },
+      },
+    ];
+    assert.equal(shouldDropException(exceptions, { chunkReloadSpent: false }), true);
+    assert.equal(shouldDropException(exceptions, { chunkReloadSpent: true }), false);
+  });
+
   test("keeps an unrecovered chunk failure so a missing chunk stays reportable", () => {
     assert.equal(
       shouldDropException([{ type: "ChunkLoadError", value: "Loading chunk 7122 failed." }], { chunkReloadSpent: true }),
