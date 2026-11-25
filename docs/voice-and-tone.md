@@ -208,7 +208,7 @@ In those two blocks the voice is Katie's, first person singular. They exist beca
 
 Rules for the personal register:
 
-**Claims stay checkable.** Every sentence is something a skeptical reader could verify: solo build, running since February 2026, free, no advertising, no data sold, open source, roughly $1,000 a year in infrastructure. Nothing about impact, importance, or how anyone should feel.
+**Claims stay checkable.** Every sentence is something a skeptical reader could verify: solo build, running since March 2026, free, no advertising, no data sold, open source, roughly $1,000 a year in infrastructure. Nothing about impact, importance, or how anyone should feel.
 
 **Never claim effect.** No causal claims about turnout, participation, or legislative outcomes — that is a non-partisanship risk before it is an accuracy one.
 
