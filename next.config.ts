@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 /**
  * Lint runs in CI (`npm run lint`, ESLint CLI) and gates merges. The build does not repeat it. The Next 16 upgrade (S1) deletes this key.

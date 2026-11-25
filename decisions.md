@@ -2692,3 +2692,15 @@ Plan, cutover order and rollback: [docs/specs/org-domain-migration.md](./docs/sp
 - **Guard:** `repo-invariants.test.ts` fails if any file under `src/` or `scripts/` imports a `react-email/...` subpath.
 - **Registry (2026-11-25):** `@react-email/components` is still deprecated ("Package no longer supported"), so the swap is not available; `@react-email/render` 2.3.1 is current.
 - **Revisit if:** an advisory lands in `react-email`'s runtime entry; `react-email` drops its component exports; or a server trace ever includes socket.io.
+
+---
+
+## 2026-11-25 — Sentry patch: `@sentry/nextjs` 10.63.0 → 10.78.0
+
+**Status: in review.** `@sentry/nextjs` < 10.75.2 has a critical tunnel-route middleware bypass (GHSA-mchm-gjx6-7h55). The app uses a tunnel route (`monitoring`, excluded from the `middleware` matcher), so this was a live exposure.
+
+- **Same major.** `^10.51.0` → `^10.78.0`; 11.x is a major and stays out. The critical clears; `@sentry/nextjs` still shows as moderate through a `glob` advisory in its bundler plugin, which only 11.x fixes.
+- **`withSentryConfig` import** moves to `@sentry/nextjs/config`, as the 10.78 build warns it must before v11.
+- **Rejected:** bundling `undici`, `follow-redirects` or `openai` advisories here; they are separate.
+
+**Revisit if:** Sentry 11 is worth taking (it clears the remaining moderate); the `glob` advisory is backported to 10.x.
