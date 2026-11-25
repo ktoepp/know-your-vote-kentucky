@@ -23,6 +23,7 @@ Every WP decision that has options is listed here, sorted by the date its defaul
 | 2026-10-06 | WS1-04, WS2-02 | CI Node version and build job; admin access method | Defaults: `'24'` with a separate `build` job; header only |
 | 2026-10-08 | WS4-04 | LegiScan key ownership; data budget; backfill workflows | Owner confirmed one Public API key (created 2026-03-09, 10k/month) and that it matches Vercel and GitHub. Budget accepted (#298). `backfill-vote-nv-counts` and `backfill-session-votes` disabled until WS4-03a merges. Internal counter matched LegiScan exactly on 2026-10-08 (57 October queries). |
 
+| 2026-11-23 | WS9-05 | `.org` redirect mechanism; canonical host | (a) Vercel redirect domains, and the canonical host moved to `https://www.kyvky.org` (mail included); done and verified the same day (#327, #330) |
 Rows below that are listed in this table are settled; agents do not wait on their dates.
 
 ## 1. Decision calendar
