@@ -24,6 +24,7 @@ Every WP decision that has options is listed here, sorted by the date its defaul
 | 2026-10-08 | WS4-04 | LegiScan key ownership; data budget; backfill workflows | Owner confirmed one Public API key (created 2026-03-09, 10k/month) and that it matches Vercel and GitHub. Budget accepted (#298). `backfill-vote-nv-counts` and `backfill-session-votes` disabled until WS4-03a merges. Internal counter matched LegiScan exactly on 2026-10-08 (57 October queries). |
 
 | 2026-11-23 | WS9-05 | `.org` redirect mechanism; canonical host | (a) Vercel redirect domains, and the canonical host moved to `https://www.kyvky.org` (mail included); done and verified the same day (#327, #330) |
+| 2026-11-25 | WS7-06 | PMF survey; intent survey | (c) stop, executed: both PostHog surveys stopped 2026-11-25 16:52 UTC (the intent survey's planned 2026-11-04 stop was missed; its 200-response cap was never reached). Final counts: PMF shown 480, dismissed 135, answered 20, no score reported. Intent survey shown 238, dismissed 85, answered 19: "Who my representatives are" 13, "What my representatives have been doing" 3, "How to contact my representatives" 3. WS7-14 adds these to `docs/metrics.md` |
 Rows below that are listed in this table are settled; agents do not wait on their dates.
 
 ## 1. Decision calendar
