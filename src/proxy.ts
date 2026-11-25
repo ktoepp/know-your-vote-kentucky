@@ -3,7 +3,7 @@ import { updateSession } from '@/lib/supabase/middleware';
 import { shouldRefreshSupabaseSession } from '@/lib/supabase/session-middleware';
 import { checkAdminAccess } from '@/lib/auth/shared-secret';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const sessionResponse = shouldRefreshSupabaseSession(request)
     ? await updateSession(request)
     : NextResponse.next({ request });

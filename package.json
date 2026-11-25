@@ -4,9 +4,9 @@
   "description": "Kentucky General Assembly transparency app — bills, members, district map — Next.js 15, Supabase, LegiScan & Open States.",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:clean": "rm -rf .next && next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "dev:clean": "rm -rf .next && next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint . --max-warnings=2",
     "typecheck": "tsc --noEmit",
@@ -101,7 +101,7 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^5.15.15",
     "@mui/material": "^5.15.15",
-    "@mui/material-nextjs": "^5.18.0",
+    "@mui/material-nextjs": "^7.3.9",
     "@mui/system": "^5.15.15",
     "@sentry/nextjs": "^10.78.0",
     "@supabase/ssr": "^0.8.0",
@@ -115,7 +115,7 @@
     "lottie-react": "^2.4.1",
     "lucide-react": "^1.8.0",
     "mapbox-gl": "^3.22.0",
-    "next": "15.5.27",
+    "next": "16.4.6",
     "openai": "^5.6.0",
     "posthog-js": "^1.378.1",
     "react": "~19.2.0",
@@ -141,7 +141,7 @@
     "autoprefixer": "^10.4.21",
     "dotenv": "^16.5.0",
     "eslint": "^9",
-    "eslint-config-next": "15.5.27",
+    "eslint-config-next": "16.4.6",
     "pg": "^8.20.0",
     "postcss": "8.5.23",
     "shpjs": "^6.2.0",
@@ -151,7 +151,10 @@
   },
   "overrides": {
     "postcss": "8.5.23",
-    "brace-expansion": "5.0.12"
+    "brace-expansion": "5.0.12",
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.22"
+    }
   },
   "keywords": [],
   "author": "",

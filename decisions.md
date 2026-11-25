@@ -2695,6 +2695,23 @@ Plan, cutover order and rollback: [docs/specs/org-domain-migration.md](./docs/sp
 
 ---
 
+## 2026-11-25 — WS2-11c: Next 15.5.27 → 16.4.6
+
+**Status: in review.** Spec: `docs/program-spec/02-security-and-platform.md` § WS2-11c. Guide read from the package itself (`node_modules/next/dist/docs/.../version-16.md`), because nextjs.org is not reachable from the build container.
+
+- **Why now.** `npm audit --omit=dev` on `main` flagged `next` as critical (5 advisories, including an unauthenticated image-optimization RCE; 15.5.29 patches them within 15.x). 16.4.6 clears all five. `main` showed 13 production advisories; this branch shows 12, none in `next`.
+- **Pinned:** `next` and `eslint-config-next` 16.4.6 (exact); `@mui/material-nextjs` ^7.3.9 (7.3.10 installed, `v16-appRouter`).
+- **Webpack stays.** Next 16 builds with Turbopack and fails on a custom `webpack()` hook (the `@mui/material/esm` alias), so `build`, `dev` and `dev:clean` pass `--webpack`. Moving to Turbopack is deferred.
+- **`middleware` → `proxy`.** `src/proxy.ts`, function `proxy`, matcher unchanged, Node runtime (the admin check uses Web Crypto). The admin gate test imports it.
+- **Server Components can no longer pass `next/link` as a prop.** In Next 16 the server layer resolves it to the plain `LinkComponent` function, which breaks MUI's `component={NextLink}`. Not in the guide; the build found it (17 files, 67 uses). Fix: `src/components/ClientNextLink.tsx`, a `'use client'` re-export, imported by those server files. Client Components keep `next/link`.
+- **Lint rule set unchanged.** `eslint-config-next` 16 bundles `eslint-plugin-react-hooks` 7, whose React Compiler rules did not exist before; five are off in `eslint.config.mjs` (53 findings on 2026-11-25). One new Next rule is suppressed inline at the deliberate hard navigation in `src/app/error.tsx`.
+- **`brace-expansion` override scoped.** The blanket 5.0.12 pin (2026-07-27, 2026-10-06) assumed a stable single-function API. In 5.x the CommonJS export is an object, so `minimatch@3` threw `expand is not a function` as soon as ESLint met a brace glob (Next 16's config has them). `minimatch@3.1.5` now gets `brace-expansion` 1.1.22; everything else stays on 5.0.12. Full `npm audit` total unchanged by this.
+- **Not adopted:** Cache Components, `"use cache"`, the React Compiler, Turbopack, PPR.
+
+**Revisit if:** Turbopack should replace the webpack hook; the five react-hooks rules are worth adopting; or `@sentry/nextjs` 10.x is patched (its tunnel-route advisory is separate, see the PR).
+
+---
+
 ## 2026-11-25 — Sentry patch: `@sentry/nextjs` 10.63.0 → 10.78.0
 
 **Status: in review.** `@sentry/nextjs` < 10.75.2 has a critical tunnel-route middleware bypass (GHSA-mchm-gjx6-7h55). The app uses a tunnel route (`monitoring`, excluded from the `middleware` matcher), so this was a live exposure.

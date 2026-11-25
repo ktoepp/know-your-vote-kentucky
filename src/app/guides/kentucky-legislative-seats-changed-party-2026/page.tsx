@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import NextLink from 'next/link';
+import NextLink from '@/components/ClientNextLink';
 import { Box, Container, Link as MuiLink, Typography } from '@mui/material';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { ChartTooltipLayer } from '@/components/elections/ChartTooltipLayer';

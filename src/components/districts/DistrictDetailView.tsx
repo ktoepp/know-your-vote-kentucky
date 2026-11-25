@@ -1,4 +1,4 @@
-import NextLink from 'next/link';
+import NextLink from '@/components/ClientNextLink';
 import { Box, Container, Divider, Link as MuiLink, Stack, Typography } from '@mui/material';
 import type { KYLegislator } from '@/types/kentucky';
 import type { MemberSponsoredBill } from '@/lib/member-profile-data';

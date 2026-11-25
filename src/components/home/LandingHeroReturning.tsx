@@ -1,6 +1,6 @@
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import { DynamicFeed, ListAlt, Place } from '@mui/icons-material';
-import Link from 'next/link';
+import Link from '@/components/ClientNextLink';
 import {
   HERO_CTA_PRIMARY_SX,
   HERO_CTA_SECONDARY_SX,

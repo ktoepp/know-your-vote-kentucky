@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import NextLink from 'next/link';
+import NextLink from '@/components/ClientNextLink';
 import { Box, Container, Link as MuiLink, Paper, Typography } from '@mui/material';
 import { KYBillCard } from '@/components/bills/KYBillCard';
 import { JsonLd } from '@/components/seo/JsonLd';
