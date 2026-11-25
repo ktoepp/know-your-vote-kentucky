@@ -136,3 +136,20 @@ describe("LegiScan per-run caps match the scheduled caller tags (WS4-03a)", () =
     assert.deepEqual(dead, [], "Remove the unused perRunCap key, or tag the job that uses it.");
   });
 });
+
+// WS5-08: `react-email` ships a preview CLI whose dependencies include socket.io. That
+// stack is "installed, not reachable" only while app code imports the package root
+// (`react-email`), whose runtime entry does not load it. A subpath import could change
+// that, so this guard fails on any `react-email/...` specifier. See the 2026-11-25
+// WS5-08 note in decisions.md.
+describe("react-email entry (WS5-08)", () => {
+  test("no file under src/ or scripts/ imports a react-email subpath", () => {
+    const subpath = /(?:from|import|require)\s*\(?\s*['"]react-email\//;
+    const offenders = filesMatching(sourceFiles(), (text) => subpath.test(text));
+    assert.deepEqual(
+      offenders,
+      [],
+      "Import from the package root ('react-email'). If a subpath is needed, re-check that no server trace pulls in socket.io and update the WS5-08 note.",
+    );
+  });
+});

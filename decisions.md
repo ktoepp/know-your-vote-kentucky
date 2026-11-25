@@ -2680,3 +2680,15 @@ Plan, cutover order and rollback: [docs/specs/org-domain-migration.md](./docs/sp
 - **`www.kyvky.com` redirects with a host rule in `next.config.ts`, not a Vercel domain redirect.** The rule leaves `/api/unsubscribe/*` and `/api/webhooks/*` alone, so one-click unsubscribe POSTs from digests already in inboxes and any webhook not yet repointed still land. Whether mail providers follow a redirect on a one-click POST is unverified, and CAN-SPAM requires those links to keep working. The other legacy hosts still redirect at the Vercel edge.
 - **Scraper User-Agents change only their contact URL** (`+https://www.kyvky.org`). The bot names are unchanged, so LRC sees the same client.
 - **Not a find-and-replace of history.** Earlier entries here, TASKS.md history and `docs/program-spec/**` keep `kyvky.com` as written.
+
+---
+
+## 2026-11-25 — WS5-08: build-only dependencies moved to dev; react-email CLI not shipped
+
+**Status: in review.** Spec: `docs/program-spec/05-simplification.md` § WS5-08. No docs/adr/ folder exists yet (WS5-03a has not run), so this note lives here, as WS2-01 did.
+
+- **Moved to `devDependencies`:** `dotenv`, `autoprefixer`, `postcss` (the `overrides.postcss` pin stays). Only scripts or the PostCSS build use them. Two never-imported files still import `dotenv` (`src/lib/transcribe.ts`, `src/app/lib/transcribe.ts`); nothing references them and WS5-02 deletes them. Production dependency tree: 499 → 495 packages.
+- **S2, socket.io advisory: accepted as "installed, not reachable".** `npm ls socket.io --omit=dev` shows it only under `react-email@6.6.6`, which pulls it in for its preview CLI. Our code imports the package root only, and the root runtime entry does not load socket.io. After `npm run build` (Next 15.5.27): 0 of 84 `.nft.json` server traces mention socket.io, and no compiled server file does either.
+- **Guard:** `repo-invariants.test.ts` fails if any file under `src/` or `scripts/` imports a `react-email/...` subpath.
+- **Registry (2026-11-25):** `@react-email/components` is still deprecated ("Package no longer supported"), so the swap is not available; `@react-email/render` 2.3.1 is current.
+- **Revisit if:** an advisory lands in `react-email`'s runtime entry; `react-email` drops its component exports; or a server trace ever includes socket.io.
