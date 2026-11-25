@@ -1,7 +1,7 @@
 import { KYVKY_CONTACT_EMAIL } from '@/lib/kyvky-contact';
 import type { Metadata } from 'next';
 import { Container, Typography, Link as MuiLink, Stack } from '@mui/material';
-import Link from 'next/link';
+import Link from '@/components/ClientNextLink';
 import { buildPageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = buildPageMetadata({

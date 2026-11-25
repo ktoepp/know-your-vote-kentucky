@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import NextLink from 'next/link';
+import NextLink from '@/components/ClientNextLink';
 import { Box, Container, Link as MuiLink, Typography } from '@mui/material';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { buildBreadcrumbJsonLd, buildCollectionPageJsonLd } from '@/lib/structured-data';

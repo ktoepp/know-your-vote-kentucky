@@ -70,6 +70,8 @@ export default function Error({
                 {chunkError ? 'Reload page' : 'Try again'}
               </button>
               <button
+                // Hard navigation on purpose: a full load resets the crashed app state, which router.push would not.
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                 onClick={() => window.location.href = '/'}
                 className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
               >
