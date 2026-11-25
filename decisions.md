@@ -2709,3 +2709,15 @@ Plan, cutover order and rollback: [docs/specs/org-domain-migration.md](./docs/sp
 - **Not adopted:** Cache Components, `"use cache"`, the React Compiler, Turbopack, PPR.
 
 **Revisit if:** Turbopack should replace the webpack hook; the five react-hooks rules are worth adopting; or `@sentry/nextjs` 10.x is patched (its tunnel-route advisory is separate, see the PR).
+
+---
+
+## 2026-11-25 — Sentry patch: `@sentry/nextjs` 10.63.0 → 10.78.0
+
+**Status: in review.** `@sentry/nextjs` < 10.75.2 has a critical tunnel-route middleware bypass (GHSA-mchm-gjx6-7h55). The app uses a tunnel route (`monitoring`, excluded from the `middleware` matcher), so this was a live exposure.
+
+- **Same major.** `^10.51.0` → `^10.78.0`; 11.x is a major and stays out. The critical clears; `@sentry/nextjs` still shows as moderate through a `glob` advisory in its bundler plugin, which only 11.x fixes.
+- **`withSentryConfig` import** moves to `@sentry/nextjs/config`, as the 10.78 build warns it must before v11.
+- **Rejected:** bundling `undici`, `follow-redirects` or `openai` advisories here; they are separate.
+
+**Revisit if:** Sentry 11 is worth taking (it clears the remaining moderate); the `glob` advisory is backported to 10.x.
