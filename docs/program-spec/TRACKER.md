@@ -47,7 +47,7 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS2-09b | Make /privacy match the real data flows | WS2 | P1 | W1 | Opus | S | WS2-09a | Backlog | todo |
 | WS2-10 | Close the unused service-role wrapper gap | WS2 | P3 | W2 | Sonnet | S | none | Backlog | todo |
 | WS2-11a | Declare React 19 in package.json and fix type fallout | WS2 | P0 | W2 | Opus | M | WS2-01 | Core | done (#316) |
-| WS2-11c | Upgrade to Next 16, bump @mui/material-nextjs, rename middleware to proxy | WS2 | P0 | W2 | Opus | M | WS2-02, WS2-11a, WS1-03 | Core | todo |
+| WS2-11c | Upgrade to Next 16, bump @mui/material-nextjs, rename middleware to proxy | WS2 | P0 | W2 | Opus | M | WS2-02, WS2-11a, WS1-03 | Core | done (#336) |
 | WS2-12a | Extract and correct the CSP in a tested function | WS2 | P3 | W4 | Sonnet | S | WS2-11c | Backlog | todo |
 | WS2-12b | Enforce the CSP after a production Report-Only check | WS2 | P2 | W4 | Opus | S | WS2-12a | Backlog | todo |
 | WS2-13 | Get a legal review of /privacy and /terms when a trigger fires | WS2 | P3 | W4 | Owner | S | WS2-09b | Backlog | todo |
@@ -103,7 +103,7 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS5-05 | Record the maintenance baseline and label PRs by type | WS5 | P2 | W1 (merge by 10-30) | Sonnet | S | WS5-03b, WS1-04 | Backlog | todo |
 | WS5-06a | Remove parked local-government and executive-order code | WS5 | P2 | W2 (merge by 11-14) | Opus | M | WS5-02 (soft: WS2-07) | Backlog | todo |
 | WS5-07 | Retire the LLM triage step and the two daily Claude Code Routines | WS5 | P1 | W1 (merge by 10-30) | Sonnet | S | none (Routine action after WS9-02) | Backlog | todo |
-| WS5-08 | Move build- and script-only dependencies to dev and record `react-email` reachability | WS5 | P2 | W2 (before WS2-11c opens, about 11-21) | Sonnet | S | WS2-01, WS5-02 | Backlog | todo |
+| WS5-08 | Move build- and script-only dependencies to dev and record `react-email` reachability | WS5 | P2 | W2 (before WS2-11c opens, about 11-21) | Sonnet | S | WS2-01, WS5-02 | Backlog | done (#335) |
 | WS5-09 | Remove the public `/design-system` page and the 712 KB design export | WS5 | P2 | W2 | Sonnet | S | none | Backlog | todo |
 | WS5-10 | Remove the Tailwind and PostCSS toolchain | WS5 | P2 | W2 (merge by 11-14, else Deferred) | Sonnet | M | WS5-02, WS5-09 | Backlog | todo |
 | WS5-12a | Check for surname collisions and, if any, require a first-initial match on profile sponsor matching | WS5 | P0 if triggered | W0 owner check (by 10-13); W1 fix (by 10-30) | Opus | S | none | Backlog | todo |
@@ -138,10 +138,10 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS7-01 | Define the KPIs once, record a filtered baseline, and close the Tier-1 handoff | WS7 | P0 | W0 | Sonnet | M | none | Core | done (#313) |
 | WS7-02a | Correct the internal-traffic doc | WS7 | P1 | W0 | Sonnet | S | none | Backlog | todo |
 | WS7-02b | Add a URL flag that turns analytics off in the owner's browsers | WS7 | P2 | W2 | Sonnet | S | WS7-02a | Backlog | todo |
-| WS7-03 | Correct funder-facing figures before the NLnet deadline | WS7 | P0 | W0 | Owner | S | WS7-01 | Core | todo |
+| WS7-03 | Correct funder-facing figures before the NLnet deadline | WS7 | P0 | W0 | Owner | S | WS7-01 | Core | awaiting-owner (agent pass done 2026-11-25; ask figure, launch month, retention wording, NLnet open) |
 | WS7-03b | Correct the launch month on /about | WS7 | P1 | W1 | Sonnet | S | WS7-03 | Backlog | todo |
 | WS7-05 | Label email links by campaign instead of tracking opens | WS7 | P2 | W2 | Sonnet | S | none | Backlog | todo |
-| WS7-06 | Stop the underpowered PMF survey and close the intent survey | WS7 | P2 | W0 | Owner | S | none | Core | todo |
+| WS7-06 | Stop the underpowered PMF survey and close the intent survey | WS7 | P2 | W0 | Owner | S | none | Core | done (owner 2026-11-25; both surveys stopped, counts in OWNER-DECISIONS) |
 | WS7-07a | Fix the account data export | WS7 | P0 | W0 | Sonnet | S | none | Core | done (#308) |
 | WS7-07b | Separate email kinds, record complaints, and trim the mail log | WS7 | P1 | W2 | Opus | M | WS7-07a | Core | done (#318) |
 | WS7-08 | Map every April decision metric to one KPI and write the measurement protocol | WS7 | P1 | W2 | Sonnet | S | WS7-01 | Core | done (#319) |
