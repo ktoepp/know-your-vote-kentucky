@@ -33,8 +33,8 @@ export interface KYSessionRecord {
   end: string;
   type: KYSessionType;
   /**
-   * Why a special (extraordinary) session was called — the Governor's or
-   * petition's stated subject. Regular sessions leave this undefined.
+   * Why a special (extraordinary) session was called — the Governor's
+   * stated subject. Regular sessions leave this undefined.
    */
   subject?: string;
   milestones?: KYSessionMilestones;
@@ -360,8 +360,8 @@ export const SESSION_TYPE_DESCRIPTIONS: Record<KYSessionType, string> = {
     'These are the budget sessions. In odd-numbered years it meets for up to 30 legislative days, adjourning by March 30. ' +
     'Most bills can only be introduced and passed during this window.',
   special:
-    'A special session is called by the Governor, or by petition of 3/5 of the members of each chamber, ' +
-    'outside the regular annual schedule. Business is limited to topics specified in the call. ' +
+    'A special session is called by the Governor, outside the regular annual schedule. ' +
+    'Business is limited to topics specified in the call. ' +
     'Special sessions are typically brief and focused on urgent or time-sensitive matters.',
 };
 
