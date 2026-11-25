@@ -50,7 +50,7 @@ export default function AboutPage() {
           Hi. KYvKY is a one-person project, and I&apos;m the person. I&apos;m Katie Toepp, a designer
           and self-taught developer in Kentucky. I designed and built this myself, from the database
           and the sync jobs to the interface, directing AI tools along the way. It&apos;s been running
-          since February 2026, and I keep it running.
+          since March 2026, and I keep it running.
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, mb: 2 }}>
           I believe more than anything that knowledge is power. I wanted to better understand the
