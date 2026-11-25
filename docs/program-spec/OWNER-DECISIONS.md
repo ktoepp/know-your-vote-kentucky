@@ -25,6 +25,9 @@ Every WP decision that has options is listed here, sorted by the date its defaul
 
 | 2026-11-23 | WS9-05 | `.org` redirect mechanism; canonical host | (a) Vercel redirect domains, and the canonical host moved to `https://www.kyvky.org` (mail included); done and verified the same day (#327, #330) |
 | 2026-11-25 | WS7-06 | PMF survey; intent survey | (c) stop, executed: both PostHog surveys stopped 2026-11-25 16:52 UTC (the intent survey's planned 2026-11-04 stop was missed; its 200-response cap was never reached). Final counts: PMF shown 480, dismissed 135, answered 20, no score reported. Intent survey shown 238, dismissed 85, answered 19: "Who my representatives are" 13, "What my representatives have been doing" 3, "How to contact my representatives" 3. WS7-14 adds these to `docs/metrics.md` |
+| 2026-11-25 | WS7-03 (1) | The funding ask | Replace the ask with `[ASK TBD]` on every current Notion page, because the funding strategy is being re-evaluated before any funding is sought. Dated history, sent drafts and the budget cells that feed the three-year sums were left as written |
+| 2026-11-25 | WS7-03 (launch month) | Launch month on `/about` and the Notion pages | **March 2026** (first commit 2026-02-27; Supabase and GitHub created 2026-03-09, Vercel 2026-03-10; no platform record shows a public February launch). `/about` changes in #340 (WS7-03b) |
+| 2026-11-25 | WS7-03 | NLnet application | Not submitted; the 2026-11-03 deadline passed. The Notion lines that listed it as outstanding now say so |
 Rows below that are listed in this table are settled; agents do not wait on their dates.
 
 ## 1. Decision calendar
