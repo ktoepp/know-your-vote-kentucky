@@ -138,8 +138,8 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS7-01 | Define the KPIs once, record a filtered baseline, and close the Tier-1 handoff | WS7 | P0 | W0 | Sonnet | M | none | Core | done (#313) |
 | WS7-02a | Correct the internal-traffic doc | WS7 | P1 | W0 | Sonnet | S | none | Backlog | todo |
 | WS7-02b | Add a URL flag that turns analytics off in the owner's browsers | WS7 | P2 | W2 | Sonnet | S | WS7-02a | Backlog | todo |
-| WS7-03 | Correct funder-facing figures before the NLnet deadline | WS7 | P0 | W0 | Owner | S | WS7-01 | Core | awaiting-owner (agent pass done 2026-11-25; ask figure, launch month, retention wording, NLnet open) |
-| WS7-03b | Correct the launch month on /about | WS7 | P1 | W1 | Sonnet | S | WS7-03 | Backlog | todo |
+| WS7-03 | Correct funder-facing figures before the NLnet deadline | WS7 | P0 | W0 | Owner | S | WS7-01 | Core | done (owner 2026-11-25: ask replaced by [ASK TBD] pending a strategy review, launch month March 2026, NLnet not submitted; agent pass on the Notion pages done the same day) |
+| WS7-03b | Correct the launch month on /about | WS7 | P1 | W1 | Sonnet | S | WS7-03 | Backlog | review (#340) |
 | WS7-05 | Label email links by campaign instead of tracking opens | WS7 | P2 | W2 | Sonnet | S | none | Backlog | todo |
 | WS7-06 | Stop the underpowered PMF survey and close the intent survey | WS7 | P2 | W0 | Owner | S | none | Core | done (owner 2026-11-25; both surveys stopped, counts in OWNER-DECISIONS) |
 | WS7-07a | Fix the account data export | WS7 | P0 | W0 | Sonnet | S | none | Core | done (#308) |
