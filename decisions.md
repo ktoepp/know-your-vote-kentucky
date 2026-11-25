@@ -2721,3 +2721,14 @@ Plan, cutover order and rollback: [docs/specs/org-domain-migration.md](./docs/sp
 - **Rejected:** bundling `undici`, `follow-redirects` or `openai` advisories here; they are separate.
 
 **Revisit if:** Sentry 11 is worth taking (it clears the remaining moderate); the `glob` advisory is backported to 10.x.
+
+---
+
+## 2026-11-25 — Advisory patch round (in-range only)
+
+**Status: in review.** After the Next 16 (#336) and Sentry (#337) merges, `npm audit` (production and full) had no criticals. This round moves seven packages within their existing semver ranges; `package.json` is unchanged and only the lockfile moves.
+
+- **Updated:** `undici` 7.30.0 → 7.30.2, `follow-redirects` 1.16.0 → 1.16.3, `fast-uri` 3.1.8 → 3.1.9, `dompurify` 3.4.16 → 3.5.0 (via `posthog-js`), and dev-only `adm-zip` 0.6.0 → 0.6.1, `js-yaml` 4.3.0 → 4.3.2, `@humanfs/node` 0.16.6 → 0.16.8. Full audit: 15 → 8 advisories, highs 6 → 2.
+- **Left, with reasons.** `openai` and `zod` (high): only the two never-imported `transcribe.ts` files use `openai`; WS5-02 removes both, and it is Backlog. `@sentry/*`, `glob`, `minimatch` (moderate): the fix is Sentry 11, a major. `react-email` (moderate): the flag is its CLI's own `glob`, in the same "installed, not reachable" class as the WS5-08 socket.io finding; bumping it five minors could change email markup, so it needs a render comparison first.
+
+**Revisit if:** WS5-02 is approved (clears `openai` and `zod`); Sentry 11 is taken; or a `react-email` bump is verified to render identically.
