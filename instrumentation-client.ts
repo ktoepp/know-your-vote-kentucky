@@ -1,5 +1,5 @@
 import posthog from "posthog-js";
-import { hasSpentChunkReload, recordChunkReloadOutcome, reloadOnChunkLoadError } from "@/lib/chunk-reload";
+import { hasFinishedChunkReload, recordChunkReloadOutcome, reloadOnChunkLoadError } from "@/lib/chunk-reload";
 import { shouldDropException, type ExceptionLike } from "@/lib/telemetry-filters";
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
@@ -19,7 +19,10 @@ const posthogInDev =
 // project. NEXT_PUBLIC_VERCEL_ENV is baked in via next.config.ts.
 const isPreviewDeploy = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview";
 
-if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || posthogInDev)) {
+const posthogEnabled =
+  !!posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || posthogInDev);
+
+if (posthogEnabled) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
     // App Router pageviews are tracked manually via PostHogPageviewTracker;
@@ -44,7 +47,7 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
         if (
           shouldDropException(exceptions, {
             topLevelMessage,
-            chunkReloadSpent: hasSpentChunkReload(),
+            chunkReloadSpent: hasFinishedChunkReload(),
           })
         ) {
           return null;
@@ -53,10 +56,15 @@ if (posthogKey && !isPreviewDeploy && (process.env.NODE_ENV === "production" || 
       return event;
     },
   });
-  // If the previous page in this tab reloaded to recover from a missing chunk, record
-  // that the recovery landed (see src/lib/chunk-reload.ts).
-  recordChunkReloadOutcome((name) => posthog.capture(name));
 }
+
+// If the previous page in this tab reloaded to recover from a missing chunk, record
+// that the recovery landed (see src/lib/chunk-reload.ts). Runs even without PostHog so
+// the flag still moves from "pending" to "done" and Sentry keeps reporting a real
+// second failure.
+recordChunkReloadOutcome((name) => {
+  if (posthogEnabled) posthog.capture(name);
+});
 
 // Chunk/module failures from dynamic imports surface as unhandled rejections, which no
 // React error boundary sees (so error.tsx / global-error.tsx never reload). Recover the
@@ -94,7 +102,7 @@ async function loadAndInitSentry() {
       // what counts as a real crash.
       beforeSend: (event) => {
         const exceptions = (event.exception?.values ?? []) as ExceptionLike[];
-        if (shouldDropException(exceptions, { chunkReloadSpent: hasSpentChunkReload() })) {
+        if (shouldDropException(exceptions, { chunkReloadSpent: hasFinishedChunkReload() })) {
           return null;
         }
         return event;

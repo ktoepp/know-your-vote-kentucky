@@ -158,7 +158,11 @@ export const isRecoverableChunkLoadError = (
 export type DropExceptionContext = {
   /** Top-level message PostHog puts on `$exception_message` (absent in Sentry). */
   topLevelMessage?: string;
-  /** Whether this session has already performed its one-shot chunk-error reload. */
+  /**
+   * Whether this tab's one-shot chunk-error reload has already landed (flag "done").
+   * Use `hasFinishedChunkReload`: the flag is already "pending" when the triggering
+   * error reaches telemetry, and that error must still be dropped.
+   */
   chunkReloadSpent: boolean;
 };
 
