@@ -95,7 +95,7 @@ The amendments from the 2026-10-06 consistency pass are applied in place; no sep
 | WS4-16 | Review real session usage and publish the per-state data-cost sheet | WS4 | P2 | W4 | Sonnet | S | WS4-15 | Backlog | todo |
 | WS5-01a | Archive one-off scripts and the aliases that point at them | WS5 | P1 | W0 (merge by 10-16) | Sonnet | S | none | Backlog | todo |
 | WS5-01b | Cut npm aliases to an explicit keep-set and index `scripts/` | WS5 | P2 | W2 | Sonnet | S | WS5-01a (soft: WS5-07) | Backlog | todo |
-| WS5-02 | Delete never-imported source files, drop `openai`, add an orphan guard | WS5 | P1 | W1 (merge by 10-30) | Sonnet | M | none (soft: WS2-07, WS1-05a) | Backlog | todo |
+| WS5-02 | Delete never-imported source files, drop `openai`, add an orphan guard | WS5 | P1 | W1 (merge by 10-30) | Sonnet | M | none (soft: WS2-07, WS1-05a) | Backlog | review (#344) |
 | WS5-03a | Freeze `TASKS.md` and `decisions.md` and start ADRs | WS5 | P1 | W0 (merge by 10-20) | Sonnet | S | none | Backlog | todo |
 | WS5-03b | Write `CURRENT.md` and map every open `TASKS.md` item | WS5 | P1 | W1 (merge by 10-30) | Sonnet | S | WS5-03a | Backlog | todo |
 | WS5-04a | Correct two wrong Kentucky-law statements (README veto rule, special-session copy) | WS5 | P1 | W0 (merge by 10-20) | Sonnet | S | none | Backlog | done (#332) |

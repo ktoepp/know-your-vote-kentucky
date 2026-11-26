@@ -153,3 +153,109 @@ describe("react-email entry (WS5-08)", () => {
     );
   });
 });
+
+// WS5-02: dead files keep wrong facts alive (the veto rule lived in an unused file until #332)
+// and keep dependencies installed (`openai` was used only by two). This guard fails when a
+// source file under src/ cannot be reached from any entry point. It follows the import graph
+// (static, `export … from`, side-effect, dynamic `import('…')` and `require('…')`), so a cluster
+// of dead files that import each other is caught too.
+describe("orphan files (WS5-02)", () => {
+  // Files kept on purpose although nothing imports them. Add a reason and an owner, or delete the file.
+  const ALLOWLIST = new Map<string, string>([
+    ["src/app/lib/supabaseAdmin.ts", "S7: WS2-10 decides whether to delete it"],
+    ["src/components/bills/StatsGrid.tsx", "documented as the metric-tile component in design-system/guidelines.md; owner kept it (WS5-02)"],
+  ]);
+  const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".mjs", ".js", ".cjs"]);
+  const RESOLVE_SUFFIXES = ["", ".ts", ".tsx", ".js", ".mjs", ".cjs", "/index.ts", "/index.tsx", "/index.js"];
+  const APP_ENTRY_NAMES = new Set([
+    "page", "layout", "route", "loading", "error", "not-found", "global-error", "template",
+    "default", "sitemap", "robots", "manifest", "opengraph-image", "twitter-image", "icon", "apple-icon",
+  ]);
+  const IMPORT_PATTERNS = [
+    /\bfrom\s*['"]([^'"]+)['"]/g,
+    /\bimport\s*['"]([^'"]+)['"]/g,
+    /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /\brequire\(\s*['"]([^'"]+)['"]\s*\)/g,
+  ];
+
+  /** Repo-relative POSIX paths of every code file under `dir`. */
+  function listCode(dir: string, out: string[] = []): string[] {
+    const abs = path.join(ROOT, dir);
+    if (!existsSync(abs)) return out;
+    for (const entry of readdirSync(abs, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name === ".next") continue;
+      const rel = path.posix.join(dir, entry.name);
+      if (entry.isDirectory()) listCode(rel, out);
+      else if (entry.isFile() && CODE_EXTENSIONS.has(path.extname(entry.name))) out.push(rel);
+    }
+    return out;
+  }
+
+  function allCodeFiles(): Set<string> {
+    const rootFiles = readdirSync(ROOT, { withFileTypes: true })
+      .filter((e) => e.isFile() && CODE_EXTENSIONS.has(path.extname(e.name)))
+      .map((e) => e.name);
+    return new Set([...listCode("src"), ...listCode("scripts"), ...rootFiles]);
+  }
+
+  /** Entry points: Next special files, the proxy, tests, scripts, and root config (including instrumentation and Sentry files). */
+  function isEntry(file: string): boolean {
+    const base = path.posix.basename(file);
+    const stem = base.slice(0, base.lastIndexOf("."));
+    if (file.startsWith("src/app/") && APP_ENTRY_NAMES.has(stem)) return true;
+    if (file === "src/proxy.ts" || file === "src/middleware.ts") return true;
+    if (/\.test\.tsx?$/.test(file)) return true;
+    if (file.startsWith("scripts/")) return true;
+    return !file.includes("/");
+  }
+
+  function resolveSpecifier(from: string, spec: string, files: Set<string>): string | null {
+    let base: string;
+    if (spec.startsWith("@/")) base = path.posix.join("src", spec.slice(2));
+    else if (spec.startsWith(".")) base = path.posix.join(path.posix.dirname(from), spec);
+    else return null;
+    for (const suffix of RESOLVE_SUFFIXES) {
+      const candidate = path.posix.normalize(base + suffix);
+      if (files.has(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  function importsOf(file: string, files: Set<string>): string[] {
+    const text = readFileSync(path.join(ROOT, file), "utf8");
+    const found = new Set<string>();
+    for (const pattern of IMPORT_PATTERNS) {
+      for (const match of text.matchAll(pattern)) {
+        const target = resolveSpecifier(file, match[1], files);
+        if (target) found.add(target);
+      }
+    }
+    return [...found];
+  }
+
+  test("every file under src/ is reachable from an entry point or is on the allowlist", () => {
+    const files = allCodeFiles();
+    const reachable = new Set<string>([...files].filter((f) => isEntry(f) || ALLOWLIST.has(f)));
+    const stack = [...reachable];
+    while (stack.length > 0) {
+      const file = stack.pop() as string;
+      for (const target of importsOf(file, files)) {
+        if (!reachable.has(target)) {
+          reachable.add(target);
+          stack.push(target);
+        }
+      }
+    }
+    const orphans = [...files].filter((f) => f.startsWith("src/") && !reachable.has(f)).sort();
+    assert.deepEqual(
+      orphans,
+      [],
+      "Nothing imports these files. Delete them, or add each to ALLOWLIST in this block with a reason (WS5-02).",
+    );
+  });
+
+  test("allowlist entries still exist", () => {
+    const stale = [...ALLOWLIST.keys()].filter((f) => !existsSync(path.join(ROOT, f)));
+    assert.deepEqual(stale, [], "Remove these from ALLOWLIST: the files are gone.");
+  });
+});
