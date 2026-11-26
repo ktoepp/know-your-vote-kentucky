@@ -2760,3 +2760,17 @@ Plan, cutover order and rollback: [docs/specs/org-domain-migration.md](./docs/sp
 - **Not done here:** the `DEBUG_MODE` and `LOG_LEVEL` lines in `env-template.txt` (read nowhere) were outside the approved list.
 
 **Revisit if:** the interactive minimap or the legacy graph feature is wanted again (restore from git history, and put the file on the allowlist with a reason).
+
+---
+
+## 2026-11-26 — WS5-02 merged; router-state errors after the Next 16 upgrade
+
+**Status: done (WS5-02, #344, squash `6455ad8`); router-state errors watched, not fixed.**
+
+- **WS5-02 shipped.** The owner approved the merge on 2026-11-26 after the checks passed. The production deploy (`dpl_7eyU649JXmij1gHPmYxVGDzfrRMN`) went READY and the key pages, the sitemap and the roster API returned 200; a browser run of 151 prefetch and navigation requests on `/bills` and `/members` returned only 200s. The entry above this one holds the design; its "in review" status is now "done".
+- **`The router state header was sent but could not be parsed.`** First logged 2026-11-25 19:16 UTC, about an hour after the Next 16 merge; 104 hits across 43 users by 2026-11-26 16:27 UTC, on `/bills` and `/members/[slug]` RSC requests. `parseAndValidateFlightRouterState` in Next 16.4.6 throws for any header that fails its schema. Production returns 200 for a Next 16-shaped `Next-Router-State-Tree` and 500 for the Next 15 shapes (a `true` in slot 5, or a 3-part dynamic segment). So the senders are browsers still running pre-upgrade JavaScript, such as tabs left open across the deploy.
+- **Visitors are not shown a failed page.** With non-prefetch RSC requests forced to 500, a client-side link click fell back to one full document load and ended on the right page. Fresh browsers send no state tree on prefetch and had no failures.
+- **Decision: leave it and watch.** Next 16 is meant to reject the old format, and the fallback heals each browser. Recheck 2026-11-27 18:00 UTC. Skew Protection is the lever if the rate stays flat; the project setting could not be read from the tools available.
+- **Not part of the 104:** six hits after 2026-11-26 16:38 UTC are the agent's own test requests (`_rsc=probe*`).
+
+**Revisit if:** the hits do not fall within about two days (look for a bot or a client that is not a stale tab), or a visitor reports a full-page reload or a blank page after clicking a link.
