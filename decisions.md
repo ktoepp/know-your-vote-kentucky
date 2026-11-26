@@ -2745,3 +2745,18 @@ Plan, cutover order and rollback: [docs/specs/org-domain-migration.md](./docs/sp
 - **Left:** the six moderates (the Sentry 11 family and the `react-email` CLI `glob`), as recorded in the advisory-round note above.
 
 **Revisit if:** the rest of WS5-02 is approved; or code starts using an OpenAI model (it would then re-add the SDK deliberately).
+
+---
+
+## 2026-11-26 — WS5-02: delete the 37 never-imported files; add the orphan guard
+
+**Status: in review.** Spec: `docs/program-spec/05-simplification.md` § WS5-02. The owner approved the list on 2026-11-26 after a per-file review (each file has a recommendation and reason in the PR).
+
+- **Deleted 37 files, 8,293 lines** (`src/app/components`, `src/components`, `src/lib`, `src/utils`), found by following the import graph from the real entry points. The scan on `main` found 39 unreachable files: 37 imported by nothing, plus `graph-database.ts` and the district minimap, which only dead files imported. This corrects the spec's October snapshot (38 plus 2).
+- **Kept on an allowlist, with reasons:** `src/components/bills/StatsGrid.tsx` (documented as the metric-tile component in `design-system/guidelines.md`; remove the entry when that doc row goes) and `src/app/lib/supabaseAdmin.ts` (S7, WS2-10 decides).
+- **Orphan guard.** `src/lib/repo-invariants.test.ts` fails when a file under `src/` is unreachable from an entry point (Next special files, proxy, tests, scripts, root config). It follows the graph, so a cluster of dead files that import each other is caught. Before the deletion it reported exactly these 37 files and not the two allowlisted ones.
+- **Minimap (option a).** `LegislatorDistrictMinimap` and its lazy wrapper are gone; `LegislatorDistrictThumbnail` (static Mapbox thumbnails) is the live replacement, and WS2-04's attribution guard no longer has an interactive map surface there to cover. Restore from git history if it ever comes back.
+- **For WS5-06a:** `content-generation.ts` was the only caller of `generateOrdinanceSummary`, `generateEOSummary` and `generateSchoolBoardSummary` in `ky-content-generation.ts`; they now have no caller.
+- **Not done here:** the `DEBUG_MODE` and `LOG_LEVEL` lines in `env-template.txt` (read nowhere) were outside the approved list.
+
+**Revisit if:** the interactive minimap or the legacy graph feature is wanted again (restore from git history, and put the file on the allowlist with a reason).
