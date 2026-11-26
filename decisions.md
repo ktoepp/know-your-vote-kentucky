@@ -2732,3 +2732,16 @@ Plan, cutover order and rollback: [docs/specs/org-domain-migration.md](./docs/sp
 - **Left, with reasons.** `openai` and `zod` (high): only the two never-imported `transcribe.ts` files use `openai`; WS5-02 removes both, and it is Backlog. `@sentry/*`, `glob`, `minimatch` (moderate): the fix is Sentry 11, a major. `react-email` (moderate): the flag is its CLI's own `glob`, in the same "installed, not reachable" class as the WS5-08 socket.io finding; bumping it five minors could change email markup, so it needs a render comparison first.
 
 **Revisit if:** WS5-02 is approved (clears `openai` and `zod`); Sentry 11 is taken; or a `react-email` bump is verified to render identically.
+
+---
+
+## 2026-11-25 — Drop `openai` and the two dead `transcribe.ts` files
+
+**Status: in review.** A narrow slice of WS5-02 (`docs/program-spec/05-simplification.md`), approved by the owner on 2026-11-25. The rest of WS5-02 (39 never-imported files, about 8,800 lines, an orphan-guard test) is Backlog and still waiting for a go-ahead.
+
+- **Deleted:** `src/lib/transcribe.ts` and `src/app/lib/transcribe.ts`. Nothing imported either, and no script, workflow or `package.json` entry referenced them.
+- **Dropped:** the `openai` dependency, and its two lines in `env-template.txt`. `src/lib/env-validation.ts` still names `OPENAI_API_KEY`; it is itself never imported, so the full WS5-02 deletes it.
+- **Audit:** full `npm audit` 8 → 6, highs 2 → 0. `zod` stayed in the tree through a dev-only ESLint plugin; `npm update zod` moved it 3.25.67 → 4.6.7 inside that plugin's declared range, and lint still passes.
+- **Left:** the six moderates (the Sentry 11 family and the `react-email` CLI `glob`), as recorded in the advisory-round note above.
+
+**Revisit if:** the rest of WS5-02 is approved; or code starts using an OpenAI model (it would then re-add the SDK deliberately).
